@@ -160,7 +160,7 @@ in sequence.
 |--------|--------|
 | Success path | Valid YAML spec → schemas parsed → JSLT expression compiled → immutable `Expression` object cached |
 | Validation path | Invalid YAML → fail fast with descriptive parse error including line/column |
-| Failure path | JSLT syntax error → reject at load time, not at runtime |
+| Failure path | JSLT syntax error → reject at load time, not at evaluation time |
 | Source | JSLT (Schibsted), JourneyForge transform state pattern, ADR-0008 |
 
 ### FR-001-02: Expression Engine SPI (Pluggable Engines)
@@ -206,12 +206,16 @@ public interface CompiledExpression {
  public interface TransformContext {
     /** HTTP headers as a JsonNode object (keys = header names, values = first value). */
     JsonNode getHeaders();
-    /** HTTP status code. Returns -1 for request transforms (no status yet). */
-    int getStatusCode();
+    /** HTTP status code, or null for request transforms (ADR-0017, ADR-0020). */
+    Integer getStatusCode();
     /** Request path (e.g., "/json/alpha/authenticate"). */
     String getRequestPath();
     /** HTTP method (e.g., "POST"). */
     String getRequestMethod();
+    /** Query params as JsonNode object (keys = param names, values = first value). ADR-0021. */
+    JsonNode getQueryParams();
+    /** Request cookies as JsonNode object (keys = cookie names, values = cookie values). ADR-0021. */
+    JsonNode getCookies();
 }
 ```
 
@@ -234,13 +238,13 @@ engines:
 Engine support matrix — the engine MUST validate at load time that a spec does not
 use capabilities the declared engine does not support:
 
-| Engine    | Body Transform | Predicates (`when`) | `$headers` / `$status` | Bidirectional | Status |
-|-----------|:-:|:-:|:-:|:-:|-----------|
-| `jslt`    | ✅ | ✅ | ✅ | ✅ | Baseline — always available |
-| `jolt`    | ✅ | ❌ | ❌ | ❌ | Structural shift/default/remove only |
-| `jq`      | ✅ | ✅ | ✅ | ✅ | Future — via adapter |
-| `jsonata` | ✅ | ✅ | ✅ | ✅ | Future — via adapter |
-| `dataweave` | ✅ | ✅ | ✅ | ✅ | Future — being open-sourced by MuleSoft (BSD-3), via adapter |
+| Engine    | Body Transform | Predicates (`when`) | `$headers` / `$status` | `$queryParams` / `$cookies` | Bidirectional | Status |
+|-----------|:-:|:-:|:-:|:-:|:-:|-----------|
+| `jslt`    | ✅ | ✅ | ✅ | ✅ | ✅ | Baseline — always available |
+| `jolt`    | ✅ | ❌ | ❌ | ❌ | ❌ | Structural shift/default/remove only |
+| `jq`      | ✅ | ✅ | ✅ | ✅ | ✅ | Future — via adapter |
+| `jsonata` | ✅ | ✅ | ✅ | ✅ | ✅ | Future — via adapter |
+| `dataweave` | ✅ | ✅ | ✅ | ✅ | ✅ | Future — being open-sourced by MuleSoft (BSD-3), via adapter |
 
 If a spec declares `lang: jolt` with a `when` predicate or `$headers` reference,
 the engine MUST reject the spec at load time with a diagnostic message (e.g.,
@@ -303,7 +307,7 @@ entries.
 | Success path | Forward transform applied to response, reverse transform applied to request |
 | Validation path | Both forward and reverse compile successfully at load time |
 | Validation path | Profile entry without `direction` → reject at load time |
-| Failure path | Reverse expression errors at runtime → abort, pass original through |
+| Failure path | Reverse expression errors at evaluation time → abort, pass original through |
 | Source | Novel — no existing gateway transformer supports bidirectional, ADR-0016 |
 
 ### FR-001-04: Message Envelope
@@ -432,7 +436,7 @@ they form an **ordered pipeline** executed in declaration order:
 3. `TransformContext` (headers, status) is **re-read** from the `Message` envelope
    before each step — so header changes applied by spec N's `headers` block are
    visible to spec N+1's `$headers` variable.
-4. **Abort-on-failure**: if any spec in the chain fails at runtime (evaluation error,
+4. **Abort-on-failure**: if any spec in the chain fails at evaluation time (evaluation error,
    budget exceeded), the **entire chain aborts**. The original, unmodified message
    passes through. No partial pipeline results reach the client.
 5. Structured logging MUST include the chain step index (e.g., `chain_step: 2/3`)
@@ -466,7 +470,7 @@ unmodified**. No headers, body, or status code changes. This is the default beha
 
 ### FR-001-07: Error Handling
 
-**Requirement:** When a transformation fails at runtime (e.g., JSLT evaluation error,
+**Requirement:** When a transformation fails at evaluation time (e.g., JSLT evaluation error,
 missing field, output size exceeded), the engine MUST:
 1. Log a structured warning with the spec ID, engine id, and error detail.
 2. Depending on configuration: either **abort the transformation** and pass the
@@ -558,7 +562,7 @@ transform:
 
 **Requirement:** Every transform spec MUST declare `input.schema` and `output.schema`
 using JSON Schema 2020-12. The engine MUST validate these schemas at **load time**
-(spec compilation), not at runtime.
+(spec compilation), not at evaluation time.
 
 ```yaml
 id: callback-prettify
@@ -584,20 +588,20 @@ output:
 At load time, the engine:
 1. Parses the JSON Schema blocks from the spec YAML.
 2. Validates that the schemas themselves are valid JSON Schema 2020-12.
-3. Stores them alongside the compiled expression for optional runtime validation
+3. Stores them alongside the compiled expression for optional evaluation-time validation
    (e.g., in development/debug mode).
 
 At evaluation time (optional, configurable):
 - In `strict` mode: validate input against `input.schema` before evaluation and
   output against `output.schema` after evaluation.
-- In `lenient` mode: skip runtime schema validation (production default for
+- In `lenient` mode: skip evaluation-time schema validation (production default for
   performance).
 
 | Aspect | Detail |
 |--------|--------|
 | Success path | Schemas parse as valid JSON Schema 2020-12 → stored with spec |
 | Validation path | Invalid JSON Schema syntax → reject spec at load time |
-| Failure path | Runtime validation failure (strict mode) → abort, pass original through |
+| Failure path | Evaluation-time validation failure (strict mode) → abort, pass original through |
 | Source | JourneyForge schema validation pattern, ADR-0001 |
 
 ### FR-001-10: Header Transformations
@@ -747,7 +751,7 @@ Processing order:
 | S-001-49 | Profile-level chaining: JOLT → JSLT mixed-engine pipeline |
 | S-001-50 | Reusable mapper: `mapperRef` resolves to named expression |
 | S-001-53 | JSON Schema validated and stored at spec load time |
-| S-001-55 | Strict-mode runtime schema validation rejects non-conforming input |
+| S-001-55 | Strict-mode evaluation-time schema validation rejects non-conforming input |
 
 ## Test Strategy
 
@@ -816,7 +820,7 @@ Processing order:
 | CFG-001-05 | `engines.defaults.max-eval-ms` | int | Per-expression evaluation time budget (default: 50ms) |
 | CFG-001-06 | `engines.defaults.max-output-bytes` | int | Max output size per evaluation (default: 1MB) |
 | CFG-001-07 | `engines.<id>.enabled` | boolean | Enable/disable a specific expression engine |
-| CFG-001-08 | `schema-validation-mode` | enum | `strict` (validate input/output schemas at runtime) or `lenient` (skip, default). Separate from `error-mode` (CFG-001-03) which governs transform failure handling. |
+| CFG-001-08 | `schema-validation-mode` | enum | `strict` (validate input/output schemas at evaluation time) or `lenient` (skip, default). Separate from `error-mode` (CFG-001-03) which governs transform failure handling. |
 
 ### Fixtures & Sample Data
 
@@ -863,11 +867,11 @@ domain_objects:
       - name: inputSchema
         type: JsonSchema
         constraints: "required — JSON Schema 2020-12"
-        note: "Validated at load time; optional runtime validation in strict mode"
+        note: "Validated at load time; optional evaluation-time validation in strict mode"
       - name: outputSchema
         type: JsonSchema
         constraints: "required — JSON Schema 2020-12"
-        note: "Validated at load time; optional runtime validation in strict mode"
+        note: "Validated at load time; optional evaluation-time validation in strict mode"
       - name: compiledExpr
         type: CompiledExpression
         note: "Immutable, thread-safe — compiled at load time"
@@ -898,14 +902,20 @@ domain_objects:
         type: JsonNode
         note: "Read-only $headers — keys are header names, values are first value"
       - name: statusCode
-        type: int
-        note: "$status — null for request transforms (ADR-0017)"
+        type: Integer
+        note: "$status — null for request transforms (ADR-0017, ADR-0020)"
       - name: requestPath
         type: string
         note: "e.g. /json/alpha/authenticate"
       - name: requestMethod
         type: string
         note: "e.g. POST"
+      - name: queryParams
+        type: JsonNode
+        note: "$queryParams — keys are param names, values are first value (ADR-0021)"
+      - name: cookies
+        type: JsonNode
+        note: "$cookies — request-side only, keys are cookie names (ADR-0021)"
 
 engine_api:
   - id: API-001-01

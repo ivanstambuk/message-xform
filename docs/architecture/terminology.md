@@ -196,7 +196,11 @@ terminology agreements must be captured here immediately.
 - Use **"the engine"** for the core execution component.
 - Use **"expression engine"** for the pluggable evaluation component (JSLT, JOLT, etc.).
 - Use **"load time"** for spec/profile loading and validation.
-- Use **"evaluation time"** for runtime transform execution.
+- Use **"evaluation time"** for per-request transform execution (when the engine
+  evaluates a compiled expression against a message).
+- Do **not** introduce "runtime" as a generic noun in new prose. This aligns with
+  JourneyForge's identical convention (their `terminology.md`, line 29). Legacy
+  identifiers or external system names containing "runtime" may remain unchanged.
 
 ### Canonical term map (use vs avoid)
 
