@@ -1,19 +1,23 @@
 # Pending Task
 
-**Focus**: Feature 001 — Message Transformation Engine (core specification)
-**Status**: Spec draft ~85% complete. 7/9 open questions resolved. Governance infrastructure built.
-**Next Step**: Resolve Q-008 (chained/pipeline transforms) — Decision Card already prepared.
+**Focus**: Feature 001 spec refinement — resolving medium-severity open questions
+**Status**: All 4 high-severity questions resolved (Q-010–Q-013). Working through 6 medium-severity questions (Q-014–Q-019). Q-014 Decision Card was presented but not yet answered.
+**Next Step**: Get user's answer on Q-014 (mapperRef invocation model), then continue through Q-015–Q-019.
 
 ## Context Notes
-- Decision Card for Q-008 was presented but user chose to do retro before answering.
-  Resume by re-presenting Q-008.
-- After Q-008, resolve Q-009 (retroactive ADRs for JSLT/SPI/JsonNode choices).
-- After both Q's: spec is ready for plan.md and tasks.md authoring.
-- All governance infrastructure is in place (constitution, terminology, knowledge map,
-  docs style guide, analysis gate, templates, workflows).
+- Q-014 Decision Card was already shown to user — Option A (transform-level sequential directive only) recommended. Await answer.
+- Resolution Checklist (AGENTS.md Rule 8) is now mandatory: spec → ADR → knowledge-map → llms.txt → scenarios → open-questions → commit.
+- CFG-001-04 (reload-interval) was intentionally removed from core config — it's an adapter concern. ID gap is intentional and stable.
+- NFR-001-05 was narrowed to core-only (atomic registry swap). Reload triggers are adapter concerns.
 
 ## SDD Gaps (if any)
-- FR-001-08 (Reusable Mappers): scenarios pending — need mapperRef spec detail first.
-- FR-001-09 (Schema Validation): scenarios pending — need test vector design.
-- ADR-0001: validating scenarios marked as pending (blocked on FR-001-09 scenarios).
-- NFR-001-02, 05, 06: verified by static analysis / integration test, not scenario-testable.
+- None identified — retro audit was clean after fixes applied.
+- Note: medium-severity questions (Q-014–Q-019) may or may not need ADRs — use judgement per Resolution Checklist.
+
+## Questions Ready to Present
+- Q-014: mapperRef invocation model (Decision Card already shown)
+- Q-015: match block spec-vs-profile overlap
+- Q-016: Unidirectional direction semantics
+- Q-017: $status availability for requests
+- Q-018: Large/streaming body handling
+- Q-019: sensitive field YAML syntax
