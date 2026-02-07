@@ -2,12 +2,12 @@
 
 | # | Feature | Status | Spec | Dependencies |
 |---|---------|--------|------|--------------|
-| 1 | PingAM Callback Response Prettification | 🔲 Spec Draft | `docs/architecture/features/001/spec.md` | Research complete |
-| 2 | PingAM Callback Request Transformation | 🔲 Not Started | — | Feature 001 |
-| 3 | PingAccess Adapter | 🔲 Not Started | — | Features 001, 002 |
+| 1 | Message Transformation Engine (core) | 📝 Spec Draft | `docs/architecture/features/001/spec.md` | Research complete |
+| 2 | PingAM Callback Transform Profile | 🔲 Not Started | — | Feature 001 |
+| 3 | PingAccess Adapter | 🔲 Not Started | — | Feature 001 |
 | 4 | Standalone HTTP Proxy Mode | 🔲 Not Started | — | Feature 001 |
 | 5 | PingGateway Adapter | 🔲 Not Started | — | Feature 001 |
-| 6 | Transformation Configuration Model (YAML) | 🔲 Not Started | — | Feature 001 |
+| 6 | Transform Profile Configuration & Loading | 🔲 Not Started | — | Feature 001 |
 
 ## Status Key
 
