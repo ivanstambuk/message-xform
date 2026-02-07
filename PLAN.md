@@ -288,6 +288,33 @@ Assess which API gateways are realistic targets for message-xform adapters, beyo
 
 **Decision needed:** Which Tier 1/2 candidates to prioritize for adapter development after PingAccess?
 
+### E2E Gateway Integration Testing
+
+Build and validate message-xform adapters against real gateway instances, end-to-end. For each gateway, the workflow is:
+
+1. **Dockerize the gateway** — Docker Compose stack with the gateway, a mock upstream API (e.g., WireMock or a simple stub), and a test client.
+2. **Build the adapter locally** — Compile the `message-xform-<gateway>` adapter module and deploy the plugin/filter into the running gateway container.
+3. **Deploy transform specs** — Load YAML transform specs and profiles that exercise the core features (field mapping, header promotion, status code transforms, bidirectional specs).
+4. **Run E2E validation** — Automated test suite (JUnit or shell-based) that sends requests through the gateway, asserts on transformed payloads reaching the mock, and validates responses back to the client.
+
+**Gateway testing order** (follows the roadmap tiers):
+
+| Priority | Gateway | Notes |
+|----------|---------|-------|
+| 1st | **PingAccess** | Primary target — Java plugin API. Docker image available via Ping Identity. |
+| 2nd | **PingGateway** | Same Ping ecosystem — Groovy filters, shared Java core. |
+| 3rd | **Standalone proxy** | `message-xform-standalone` as an embedded HTTP proxy — no gateway dependency. |
+| 4th | **WSO2 API Manager** | Java-native, OSS — Docker images on Docker Hub. |
+| 5th | **Apache APISIX** | Java Plugin Runner, hot-reload — Docker Compose ready. |
+| 6th | **Kong** | Lua/Go plugin — requires bridging strategy. |
+| 7th | **NGINX** | njs or sidecar proxy — requires bridging strategy. |
+
+**Key deliverables per gateway:**
+- [ ] `docker-compose.<gateway>.yml` — Gateway + mock API + test client stack
+- [ ] Adapter module built and deployable as a plugin/filter
+- [ ] Scenario-driven test suite covering core transform features
+- [ ] CI-ready: tests runnable via a single `make test-e2e-<gateway>` command
+
 ---
 
 *Created: 2026-02-07*  
