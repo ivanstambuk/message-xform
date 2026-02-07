@@ -31,8 +31,15 @@ Report to the user:
 - **Pending work**: Any carry-over from a previous session.
 - **Recent changes**: What happened in the last few commits.
 
-### 5. Propose Next Steps
+### 5. Check Open Questions
+// turbo
+Read `docs/architecture/open-questions.md`. If any rows with status `Open` exist:
+- Count them and note which features they belong to.
+- These take priority in the next step.
+
+### 6. Propose Next Steps
 Offer 2–4 concrete options for the session based on:
+- **Open questions first**: If open questions exist, the default first option MUST be to resolve them (one by one, per Rule 8). Open questions block spec finalization.
 - Pending tasks from the previous session.
 - Open items in `PLAN.md` (research, features, decisions).
 - Any issues discovered during state assessment.
