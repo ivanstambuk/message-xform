@@ -101,7 +101,7 @@ terminology agreements must be captured here immediately.
 - **Evaluation time**
   - When a request arrives and the engine evaluates the matched transform spec
     against the message body.
-  - Runtime schema validation (strict/lenient mode) occurs here.
+  - Evaluation-time schema validation (strict/lenient mode) occurs here.
 
 - **Passthrough**
   - When a message does not match any transform profile, or the body is not valid
@@ -112,8 +112,10 @@ terminology agreements must be captured here immediately.
 
 - **TransformContext** (`TransformContext`, DO-001-07)
   - A read-only context object passed to expression engines during evaluation.
-    Contains: `$headers` (JsonNode), `$status` (int, -1 for requests), request path,
-    request method. Engines consume whichever context they support.
+    Contains: `$headers` (JsonNode), `$status` (Integer, null for requests per
+    ADR-0020), `$queryParams` (JsonNode, ADR-0021), `$cookies` (JsonNode,
+    request-side only, ADR-0021), request path, request method. Engines consume
+    whichever context they support.
 
 - **Pipeline chaining** (profile-level chaining)
   - When multiple transform entries in a single profile match the same request,

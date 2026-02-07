@@ -2697,6 +2697,147 @@ expected_error:
 
 ---
 
+### S-001-63: Nullable Status Code — Integer Contract
+
+Validates that `$status` is properly null (not -1 or any sentinel) for request
+transforms, using the nullable `Integer` contract (ADR-0020).
+
+```yaml
+scenario: S-001-63
+name: nullable-status-integer-contract
+description: >
+  A spec uses $status in a body expression. When bound to direction: request,
+  $status is null (not -1). The expression tests strict null equality.
+  Validates ADR-0020 superseding int/-1 sentinel.
+tags: [status, null, nullable, integer, adr-0020]
+requires: [FR-001-11, FR-001-02]
+
+spec:
+  id: status-type-check
+  version: "1.0.0"
+  transform:
+    lang: jslt
+    expr: |
+      {
+        "statusIsNull": $status == null,
+        "statusType": if ($status == null) "absent" else "present",
+        "data": .data
+      }
+
+# Bound to request direction → $status must be null, not -1
+profile_direction: request
+
+input:
+  data: "test"
+
+expected_output:
+  statusIsNull: true
+  statusType: "absent"
+  data: "test"
+
+# CRITICAL: $status must NOT be -1. Testing that null != -1:
+negative_assertion:
+  statusType_must_not_be: "present"
+  # If engine incorrectly maps -1 as non-null, statusType would be "present"
+```
+
+---
+
+### S-001-64: Query Params in Body Expression
+
+Validates that `$queryParams` is accessible in JSLT body expressions, allowing
+specs to branch on URL query parameters (ADR-0021).
+
+```yaml
+scenario: S-001-64
+name: query-params-in-body-expression
+description: >
+  A spec references $queryParams to branch transformation logic based on the
+  authIndexType query parameter. Validates ADR-0021.
+tags: [query-params, context, branching, adr-0021]
+requires: [FR-001-02]
+
+spec:
+  id: auth-type-aware
+  version: "1.0.0"
+  transform:
+    lang: jslt
+    expr: |
+      {
+        "authType": $queryParams."authIndexType",
+        "authValue": $queryParams."authIndexValue",
+        "isServiceAuth": $queryParams."authIndexType" == "service",
+        "data": .data
+      }
+
+profile_direction: request
+request_path: "/json/alpha/authenticate"
+request_query: "authIndexType=service&authIndexValue=Login"
+
+input:
+  data: "hello"
+
+expected_output:
+  authType: "service"
+  authValue: "Login"
+  isServiceAuth: true
+  data: "hello"
+
+expected_context:
+  queryParams:
+    authIndexType: "service"
+    authIndexValue: "Login"
+```
+
+---
+
+### S-001-65: Request Cookies in Body Expression
+
+Validates that `$cookies` is accessible in JSLT body expressions, exposing
+request-side cookies as key-value pairs (ADR-0021).
+
+```yaml
+scenario: S-001-65
+name: cookies-in-body-expression
+description: >
+  A spec references $cookies to read the user's language preference from a
+  request cookie and include it in the transformed output. Validates ADR-0021.
+tags: [cookies, context, adr-0021]
+requires: [FR-001-02]
+
+spec:
+  id: locale-aware-transform
+  version: "1.0.0"
+  transform:
+    lang: jslt
+    expr: |
+      {
+        "locale": if ($cookies."lang") $cookies."lang" else "en-US",
+        "theme": if ($cookies."theme") $cookies."theme" else "light",
+        "data": .data
+      }
+
+profile_direction: request
+request_headers:
+  Cookie: "lang=nl-NL; theme=dark; session=eyJhbGciOi..."
+
+input:
+  data: "hello"
+
+expected_output:
+  locale: "nl-NL"
+  theme: "dark"
+  data: "hello"
+
+expected_context:
+  cookies:
+    lang: "nl-NL"
+    theme: "dark"
+    session: "eyJhbGciOi..."
+```
+
+---
+
 ## Scenario Index
 
 | ID | Name | Category | Tags |
@@ -2763,13 +2904,16 @@ expected_error:
 | S-001-60 | direction-agnostic-both-bindings | Direction Semantics | direction, agnostic, profile, adr-0016 |
 | S-001-61 | status-null-in-request-transform | Status Code | status, null, request, direction, adr-0017 |
 | S-001-62 | sensitive-path-invalid-syntax-rejected | Sensitive Fields | sensitive, validation, error, adr-0019, nfr-001-06 |
+| S-001-63 | nullable-status-integer-contract | Status Code | status, null, nullable, integer, adr-0020 |
+| S-001-64 | query-params-in-body-expression | TransformContext | query-params, context, branching, adr-0021 |
+| S-001-65 | cookies-in-body-expression | TransformContext | cookies, context, adr-0021 |
 
 ## Coverage Matrix
 
 | Spec Requirement | Scenarios |
 |------------------|-----------|
 | FR-001-01 (Spec Format) | S-001-01 through S-001-17, S-001-49 |
-| FR-001-02 (Expression Engine SPI) | S-001-25, S-001-26, S-001-27, S-001-28, S-001-39, S-001-40, S-001-57 |
+| FR-001-02 (Expression Engine SPI) | S-001-25, S-001-26, S-001-27, S-001-28, S-001-39, S-001-40, S-001-57, S-001-63, S-001-64, S-001-65 |
 | FR-001-03 (Bidirectional) | S-001-02, S-001-29, S-001-30, S-001-60 |
 | FR-001-04 (Message Envelope) | S-001-19, S-001-58 |
 | FR-001-05 (Transform Profiles) | S-001-41, S-001-42, S-001-43, S-001-44, S-001-45, S-001-46, S-001-49, S-001-56 |
@@ -2778,7 +2922,7 @@ expected_error:
 | FR-001-08 (Reusable Mappers) | S-001-50, S-001-51, S-001-52, S-001-59 |
 | FR-001-09 (Schema Validation) | S-001-53, S-001-54, S-001-55 |
 | FR-001-10 (Header Transforms) | S-001-33, S-001-34, S-001-35, S-001-57 |
-| FR-001-11 (Status Code Transforms) | S-001-36, S-001-37, S-001-38, S-001-61 |
+| FR-001-11 (Status Code Transforms) | S-001-36, S-001-37, S-001-38, S-001-61, S-001-63 |
 | NFR-001-01 (Stateless) | All — implicit in test harness design |
 | NFR-001-03 (Latency <5ms) | S-001-23 |
 | NFR-001-04 (Open-world) | S-001-07, S-001-20 |
@@ -2789,3 +2933,4 @@ expected_error:
 | NFR-001-08 (Match logging) | S-001-44, S-001-46 (matched profile logged) |
 | NFR-001-09 (Telemetry SPI) | S-001-47 |
 | NFR-001-10 (Trace correlation) | S-001-48 |
+
