@@ -2136,6 +2136,257 @@ expected_output:
 
 ---
 
+## Category 11: Reusable Mappers (FR-001-08)
+
+Mapper definitions and `mapperRef` resolution within transform specs.
+
+### S-001-50: mapperRef Resolves to Named Expression
+
+```yaml
+scenario: S-001-50
+name: mapper-ref-resolves
+description: >
+  A transform spec defines named mappers under the `mappers` block. The main
+  expression references a mapper via mapperRef, and the engine resolves it to
+  the corresponding compiled expression. Validates FR-001-08 happy path.
+tags: [mappers, mapperRef, resolution, fr-001-08]
+requires: [FR-001-08]
+
+spec:
+  id: order-transform
+  version: "1.0.0"
+  mappers:
+    strip-internal:
+      lang: jslt
+      expr: |
+        { * : . }
+        - "_internal_id"
+        - "_debug_trace"
+    add-metadata:
+      lang: jslt
+      expr: |
+        . + {
+          "_meta": {
+            "transformedBy": "message-xform",
+            "specVersion": "1.0.0"
+          }
+        }
+  transform:
+    lang: jslt
+    # Conceptual: mapperRef invocations are applied in sequence
+    mapperRef: [strip-internal, add-metadata]
+
+input:
+  orderId: "ord-123"
+  amount: 99.50
+  currency: "EUR"
+  _internal_id: 88412
+  _debug_trace: "svc=orders,dur=8ms"
+
+expected_output:
+  orderId: "ord-123"
+  amount: 99.50
+  currency: "EUR"
+  _meta:
+    transformedBy: "message-xform"
+    specVersion: "1.0.0"
+```
+
+### S-001-51: Missing mapperRef Rejected at Load Time
+
+```yaml
+scenario: S-001-51
+name: mapper-ref-missing-rejected
+description: >
+  A transform spec references a mapper id that does not exist in the `mappers`
+  block. The engine MUST reject the spec at load time with a descriptive error.
+  Validates FR-001-08 validation path.
+tags: [mappers, mapperRef, validation, error, fr-001-08]
+requires: [FR-001-08]
+
+spec:
+  id: broken-spec
+  version: "1.0.0"
+  mappers:
+    strip-internal:
+      lang: jslt
+      expr: '{ * : . } - "_debug"'
+  transform:
+    lang: jslt
+    mapperRef: [strip-internal, does-not-exist]  # <- unknown mapper id
+
+expected_error:
+  phase: load
+  type: MapperResolutionError
+  message_contains: "does-not-exist"
+```
+
+### S-001-52: Circular mapperRef Rejected at Load Time
+
+```yaml
+scenario: S-001-52
+name: mapper-ref-circular-rejected
+description: >
+  Mapper A references mapper B, and mapper B references mapper A, creating a
+  circular dependency. The engine MUST detect the cycle at load time and reject
+  the spec with a descriptive error.
+  Validates FR-001-08 failure path.
+tags: [mappers, mapperRef, circular, validation, error, fr-001-08]
+requires: [FR-001-08]
+
+spec:
+  id: circular-spec
+  version: "1.0.0"
+  mappers:
+    mapper-a:
+      lang: jslt
+      mapperRef: [mapper-b]  # references mapper-b
+      expr: '{ * : . }'
+    mapper-b:
+      lang: jslt
+      mapperRef: [mapper-a]  # references mapper-a -> cycle
+      expr: '. + {"x": 1}'
+  transform:
+    lang: jslt
+    mapperRef: [mapper-a]
+
+expected_error:
+  phase: load
+  type: CircularMapperReferenceError
+  message_contains: "circular"
+```
+
+---
+
+## Category 12: Schema Validation (FR-001-09 / ADR-0001)
+
+Input/output JSON Schema validation at load time and runtime.
+
+### S-001-53: Valid Schemas Accepted at Load Time
+
+```yaml
+scenario: S-001-53
+name: schema-valid-load-time
+description: >
+  A transform spec declares valid JSON Schema 2020-12 for both input and output.
+  The engine parses and stores the schemas at load time without error.
+  Validates FR-001-09 and ADR-0001 happy path.
+tags: [schema, validation, load-time, fr-001-09, adr-0001]
+requires: [FR-001-09]
+
+spec:
+  id: validated-transform
+  version: "1.0.0"
+  input:
+    schema:
+      type: object
+      required: [userId, email]
+      properties:
+        userId: { type: string, pattern: "^usr-" }
+        email: { type: string, format: email }
+        role: { type: string, enum: [admin, user, guest] }
+  output:
+    schema:
+      type: object
+      required: [id, emailAddress]
+      properties:
+        id: { type: string }
+        emailAddress: { type: string }
+  transform:
+    lang: jslt
+    expr: |
+      {
+        "id": .userId,
+        "emailAddress": .email
+      }
+
+expected_load_result: success
+```
+
+### S-001-54: Invalid Schema Rejected at Load Time
+
+```yaml
+scenario: S-001-54
+name: schema-invalid-rejected
+description: >
+  A transform spec declares a syntactically invalid JSON Schema (unknown type
+  keyword, malformed structure). The engine MUST reject the spec at load time
+  with a descriptive error.
+  Validates FR-001-09 and ADR-0001 validation path.
+tags: [schema, validation, error, load-time, fr-001-09, adr-0001]
+requires: [FR-001-09]
+
+spec:
+  id: bad-schema-spec
+  version: "1.0.0"
+  input:
+    schema:
+      type: not-a-valid-type  # invalid JSON Schema type
+      required: 42             # must be an array, not integer
+  output:
+    schema:
+      type: object
+  transform:
+    lang: jslt
+    expr: '.'
+
+expected_error:
+  phase: load
+  type: SchemaValidationError
+  message_contains: "input.schema"
+```
+
+### S-001-55: Strict-Mode Runtime Schema Validation Failure
+
+```yaml
+scenario: S-001-55
+name: schema-strict-mode-runtime-failure
+description: >
+  In strict mode, the engine validates the input against `input.schema` before
+  evaluation. When the input does not conform, the engine aborts the transform
+  and passes the original message through.
+  Validates FR-001-09 strict-mode runtime path and ADR-0001.
+tags: [schema, validation, strict-mode, runtime, fr-001-09, adr-0001]
+requires: [FR-001-09]
+
+config:
+  schema_validation: strict   # enable runtime validation
+
+spec:
+  id: validated-transform
+  version: "1.0.0"
+  input:
+    schema:
+      type: object
+      required: [userId, email]
+      properties:
+        userId: { type: string }
+        email: { type: string, format: email }
+  output:
+    schema:
+      type: object
+  transform:
+    lang: jslt
+    expr: '{ "id": .userId }'
+
+# Input does NOT conform: missing required 'email', 'userId' is integer not string
+input:
+  userId: 42
+  name: "Bob Jensen"
+
+# In strict mode, transform is aborted — original passes through unchanged
+expected_output:
+  userId: 42
+  name: "Bob Jensen"
+
+expected_log:
+  level: WARN
+  message_contains: "schema validation failed"
+  spec_id: validated-transform
+```
+
+---
+
 ## Scenario Index
 
 | ID | Name | Category | Tags |
@@ -2189,6 +2440,12 @@ expected_output:
 | S-001-47 | telemetry-listener-lifecycle | Observability | observability, telemetry, spi, adr-0007 |
 | S-001-48 | trace-context-propagation | Observability | observability, tracing, correlation, adr-0007 |
 | S-001-49 | profile-chain-jolt-then-jslt | Profile Chaining | profile-chaining, mixed-engine, jolt, jslt, adr-0008 |
+| S-001-50 | mapper-ref-resolves | Reusable Mappers | mappers, mapperRef, resolution, fr-001-08 |
+| S-001-51 | mapper-ref-missing-rejected | Reusable Mappers | mappers, mapperRef, validation, error, fr-001-08 |
+| S-001-52 | mapper-ref-circular-rejected | Reusable Mappers | mappers, mapperRef, circular, validation, error, fr-001-08 |
+| S-001-53 | schema-valid-load-time | Schema Validation | schema, validation, load-time, fr-001-09, adr-0001 |
+| S-001-54 | schema-invalid-rejected | Schema Validation | schema, validation, error, load-time, fr-001-09, adr-0001 |
+| S-001-55 | schema-strict-mode-runtime-failure | Schema Validation | schema, validation, strict-mode, runtime, fr-001-09, adr-0001 |
 
 ## Coverage Matrix
 
@@ -2201,8 +2458,8 @@ expected_output:
 | FR-001-05 (Transform Profiles) | S-001-41, S-001-42, S-001-43, S-001-44, S-001-45, S-001-46, S-001-49 |
 | FR-001-06 (Passthrough) | S-001-18, S-001-19 |
 | FR-001-07 (Error Handling) | S-001-24, S-001-28 |
-| FR-001-08 (Reusable Mappers) | *Not yet covered — add when mapperRef is specified* |
-| FR-001-09 (Schema Validation) | *Not yet covered — add input/output schema test vectors* |
+| FR-001-08 (Reusable Mappers) | S-001-50, S-001-51, S-001-52 |
+| FR-001-09 (Schema Validation) | S-001-53, S-001-54, S-001-55 |
 | FR-001-10 (Header Transforms) | S-001-33, S-001-34, S-001-35 |
 | FR-001-11 (Status Code Transforms) | S-001-36, S-001-37, S-001-38 |
 | NFR-001-01 (Stateless) | All — implicit in test harness design |
