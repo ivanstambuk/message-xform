@@ -53,3 +53,4 @@ they form an **ordered pipeline** executed in declaration order:
 - ADR-0008 — Single expression per direction (establishes profile-level chaining)
 - FR-001-05 — Transform Profiles (normative pipeline semantics)
 - S-001-49 — Mixed-engine chain scenario (JOLT → JSLT)
+- S-001-56 — Pipeline chain abort-on-failure scenario

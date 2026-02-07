@@ -1,43 +1,45 @@
 # Current Session
 
-Last updated: 2026-02-07T19:22:00+01:00
+Last updated: 2026-02-07T20:31:00+01:00
 
 ## Active Work
 
-Feature 001 — Message Transformation Engine (core specification)
+Feature 001 — Message Transformation Engine (core specification refinement)
 
 ## Session Progress
 
-### Open Questions Resolved (7/9)
-- Q-001: Mandatory JSON Schema → ADR-0001, FR-001-09
-- Q-002: Header transforms → ADR-0002, FR-001-10, S-001-33..35
-- Q-003: Status code transforms → ADR-0003, FR-001-11, S-001-36..38
-- Q-004: Engine support matrix → ADR-0004, FR-001-02 updated, S-001-39..40
-- Q-005: Version pinning → ADR-0005, FR-001-05 updated, S-001-41..43
-- Q-006: Profile match resolution → ADR-0006, NFR-001-08, S-001-44..46
-- Q-007: Observability → ADR-0007, NFR-001-09..10, S-001-47..48
+### Open Questions Resolved This Session (5)
+- Q-008: Chained/pipeline transforms → ADR-0008 (single expr per direction)
+- Q-009: Retroactive ADRs → ADR-0009, ADR-0010, ADR-0011
+- Q-010: SPI context for $headers/$status → TransformContext (ADR-0010 updated)
+- Q-011: Pipeline chaining execution semantics → ADR-0012
+- Q-012: Message copy-vs-wrapper → ADR-0013
+- Q-013: Hot reload scope → resolved by narrowing NFR-001-05 (adapter concern)
 
-### Governance Infrastructure Created
-- Retrofitted all ADRs (0001-0005) to JourneyForge-style format
-- Created: terminology.md, project-constitution.md, llms.txt
-- Created: feature-plan-template.md, feature-tasks-template.md
-- Created: docs-style.md, knowledge-map.md, analysis-gate-checklist.md
-- Created: _current-session.md
-- Updated AGENTS.md with key references, pre-implementation checklist,
-  agent persistence, exhaustive execution, no-silent-scope-narrowing
-- Upgraded all 3 workflows (/init, /retro, /handover) with SDD completeness checks
+### Spec Review Performed
+- 4 high-severity issues identified and resolved (Q-010 to Q-013)
+- 6 medium-severity issues registered (Q-014 to Q-019)
+- 3 low-severity polish fixes applied directly
 
-### SDD Retro Audit Results
-- Scenarios: ✅ (FR-001-08, FR-001-09 noted as pending; 3 NFR gaps documented)
-- Terminology: ✅ (all domain terms defined; "runtime" used in natural language OK)
-- ADRs: ✅ (ADR-0001 scenario reference added as pending)
-- Open Questions: ✅ (only Q-008, Q-009 remain, both genuinely open)
-- Spec Consistency: ✅ (FR-001-01..11 sequential, NFR-001-01..10 sequential)
+### Process Improvements
+- AGENTS.md Rule 8: added Resolution Checklist (7-step mandatory checklist)
+- AGENTS.md Rule 10: added Spec Review Protocol
 
-## Remaining Open Questions
+### Governance Updates
+- Created ADR-0008 through ADR-0013 (6 new ADRs)
+- Updated knowledge-map.md with all new ADRs
+- Updated llms.txt with all new ADRs
+- Updated terminology.md with 5 new terms
+- Added 3 new scenarios (S-001-56 to S-001-58)
 
-- Q-008: Chained/pipeline transforms
-- Q-009: Retroactive ADRs for early decisions (JSLT, SPI, JsonNode)
+## Remaining Open Questions (6 — all medium severity)
+
+- Q-014: mapperRef invocation model
+- Q-015: match block spec-vs-profile overlap
+- Q-016: Unidirectional direction semantics
+- Q-017: $status availability for requests
+- Q-018: Large/streaming body handling
+- Q-019: sensitive field YAML syntax
 
 ## Blocking Issues
 
@@ -47,18 +49,19 @@ None.
 
 | Decision | Option Chosen | ADR |
 |----------|---------------|-----|
-| Mandatory JSON Schema | A: Mandatory input/output schemas | ADR-0001 |
-| Header transforms | A: Declarative block + $headers | ADR-0002 |
-| Status code transforms | A: $status variable + declarative block | ADR-0003 |
-| Engine support matrix | A: Formal matrix in FR-001-02 | ADR-0004 |
-| Version pinning | B: Profiles pin to spec versions | ADR-0005 |
-| Profile match resolution | B: Most-specific-wins | ADR-0006 |
-| Observability | B: Full layered with TelemetryListener SPI | ADR-0007 |
+| Single expression per direction | A: One expression per direction, profile chaining for composition | ADR-0008 |
+| JSLT as default engine (retroactive) | Accepted | ADR-0009 |
+| Pluggable SPI (retroactive) | Accepted | ADR-0010 |
+| Jackson JsonNode body (retroactive) | Accepted | ADR-0011 |
+| TransformContext SPI parameter | A: Typed TransformContext interface | ADR-0010 (updated) |
+| Pipeline chaining semantics | A: Sequential pipeline with abort-on-failure | ADR-0012 |
+| Message adapter semantics | A: Copy-on-wrap | ADR-0013 |
+| Hot reload scope | Narrowed: core = atomic swap, trigger = adapter | — |
 
 ## Stats
 
-- ADRs: 7 (ADR-0001 through ADR-0007)
-- Scenarios: 48 (S-001-01 through S-001-48)
+- ADRs: 13 (ADR-0001 through ADR-0013)
+- Scenarios: 58 (S-001-01 through S-001-58)
 - FRs: 11 (FR-001-01 through FR-001-11)
 - NFRs: 10 (NFR-001-01 through NFR-001-10)
-- Governance docs: 8 new files
+- Open questions remaining: 6 (all medium severity)

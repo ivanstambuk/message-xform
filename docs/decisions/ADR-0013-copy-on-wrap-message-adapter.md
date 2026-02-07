@@ -69,3 +69,4 @@ if failure: discard Message copy → native untouched
 - ADR-0012 — Sequential pipeline with abort-on-failure
 - FR-001-04 — Message envelope (normative copy-on-wrap semantics)
 - NFR-001-01 — Stateless per-request
+- S-001-58 — Copy-on-wrap abort rollback scenario

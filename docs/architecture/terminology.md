@@ -108,6 +108,35 @@ terminology agreements must be captured here immediately.
     JSON, the engine passes it through **completely unmodified** — no body, header,
     or status code changes.
 
+## Pipeline chaining & message semantics
+
+- **TransformContext** (`TransformContext`, DO-001-07)
+  - A read-only context object passed to expression engines during evaluation.
+    Contains: `$headers` (JsonNode), `$status` (int, -1 for requests), request path,
+    request method. Engines consume whichever context they support.
+
+- **Pipeline chaining** (profile-level chaining)
+  - When multiple transform entries in a single profile match the same request,
+    they execute as an ordered pipeline: output of spec N feeds spec N+1.
+    `TransformContext` is re-read between steps. See ADR-0012.
+
+- **Abort-on-failure**
+  - If any step in a pipeline chain fails, the **entire chain aborts**. The original,
+    unmodified message passes through. No partial pipeline results reach the client.
+
+- **Copy-on-wrap**
+  - Adapter strategy where the gateway-native message is deep-copied when wrapped
+    into a `Message`. The engine mutates the copy; on success, `applyChanges()`
+    writes back to native; on failure, the copy is discarded and the native
+    message is untouched. See ADR-0013.
+
+- **Atomic registry swap**
+  - The core engine's ability to replace the full set of compiled specs and profiles
+    via `TransformEngine.reload()` using an immutable `TransformRegistry` snapshot and
+    `AtomicReference`. In-flight requests complete with their current registry; new
+    requests pick up the new one. Reload *trigger* mechanisms (file watching, polling)
+    are adapter concerns.
+
 ## Bidirectional transforms
 
 - **Forward transform**

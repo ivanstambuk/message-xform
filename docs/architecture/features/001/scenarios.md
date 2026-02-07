@@ -2387,6 +2387,140 @@ expected_log:
 
 ---
 
+## Category 12: Pipeline Chaining & Message Semantics
+
+Scenarios validating profile-level chaining (ADR-0012), TransformContext (DO-001-07),
+and copy-on-wrap adapter semantics (ADR-0013).
+
+### S-001-56: Pipeline Chain Abort on Failure
+
+When a chain of two specs is configured and the first spec fails, the entire chain
+aborts and the original message passes through unchanged.
+
+```yaml
+scenario: S-001-56
+name: pipeline-chain-abort-on-failure
+description: >
+  Profile chains spec-a → spec-b. spec-a has a deliberate error (references
+  undefined variable). The entire chain must abort — original message passes
+  through, spec-b never executes.
+tags: [profile-chaining, abort, error, adr-0012, adr-0013]
+requires: [FR-001-05, FR-001-07]
+
+profile:
+  transforms:
+    - spec: spec-a@1.0.0
+      direction: response
+      match: { path: "/api/orders" }
+    - spec: spec-b@1.0.0
+      direction: response
+      match: { path: "/api/orders" }
+
+specs:
+  spec-a:
+    lang: jslt
+    expr: |
+      { "result": $undefined_variable }
+  spec-b:
+    lang: jslt
+    expr: |
+      { "enriched": true, * : . }
+
+input:
+  orderId: 123
+  items: ["widget"]
+
+# spec-a fails → entire chain aborts → original passes through
+expected_output:
+  orderId: 123
+  items: ["widget"]
+
+expected_log:
+  level: ERROR
+  message_contains: "chain aborted at step 1/2"
+  spec_id: spec-a
+```
+
+### S-001-57: TransformContext — $headers Available in Body Expression
+
+The JSLT body expression can access `$headers` to inject header values into the
+transformed body.
+
+```yaml
+scenario: S-001-57
+name: transform-context-headers-in-body
+description: >
+  Validates DO-001-07 (TransformContext): the $headers variable is bound during
+  JSLT body evaluation, allowing header values to be embedded in the output body.
+tags: [transform-context, headers, body, do-001-07]
+requires: [FR-001-02, FR-001-10]
+
+transform:
+  lang: jslt
+  expr: |
+    {
+      "userId": .userId,
+      "requestedBy": $headers.X-Requested-By,
+      "correlationId": $headers.X-Correlation-Id
+    }
+
+context:
+  headers:
+    X-Requested-By: "frontend-app"
+    X-Correlation-Id: "abc-123"
+
+input:
+  userId: 42
+  name: "Alice"
+
+expected_output:
+  userId: 42
+  requestedBy: "frontend-app"
+  correlationId: "abc-123"
+```
+
+### S-001-58: Copy-on-Wrap — Failed Transform Leaves Native Untouched
+
+Validates that on transform failure, the adapter's copy is discarded and the native
+message state is completely unchanged.
+
+```yaml
+scenario: S-001-58
+name: copy-on-wrap-abort-rollback
+description: >
+  Validates ADR-0013 (copy-on-wrap): when a transform fails (e.g., JSLT error),
+  the Message copy is discarded. The native gateway message retains its original
+  body, headers, and status code.
+tags: [copy-on-wrap, abort, rollback, adr-0013]
+requires: [FR-001-04, FR-001-07]
+
+transform:
+  lang: jslt
+  expr: |
+    { "result": .nonexistent.deeply.nested.path.method() }
+
+headers:
+  add:
+    X-Transform-Applied: "true"
+
+input:
+  userId: 42
+
+# Transform fails → copy discarded → native unchanged
+expected_output:
+  userId: 42
+
+expected_native_state:
+  headers_unchanged: true
+  status_unchanged: true
+
+expected_log:
+  level: ERROR
+  message_contains: "expression evaluation failed"
+```
+
+---
+
 ## Scenario Index
 
 | ID | Name | Category | Tags |
@@ -2446,21 +2580,24 @@ expected_log:
 | S-001-53 | schema-valid-load-time | Schema Validation | schema, validation, load-time, fr-001-09, adr-0001 |
 | S-001-54 | schema-invalid-rejected | Schema Validation | schema, validation, error, load-time, fr-001-09, adr-0001 |
 | S-001-55 | schema-strict-mode-runtime-failure | Schema Validation | schema, validation, strict-mode, runtime, fr-001-09, adr-0001 |
+| S-001-56 | pipeline-chain-abort-on-failure | Pipeline Chaining & Message Semantics | profile-chaining, abort, error, adr-0012, adr-0013 |
+| S-001-57 | transform-context-headers-in-body | Pipeline Chaining & Message Semantics | transform-context, headers, body, do-001-07 |
+| S-001-58 | copy-on-wrap-abort-rollback | Pipeline Chaining & Message Semantics | copy-on-wrap, abort, rollback, adr-0013 |
 
 ## Coverage Matrix
 
 | Spec Requirement | Scenarios |
 |------------------|-----------|
 | FR-001-01 (Spec Format) | S-001-01 through S-001-17, S-001-49 |
-| FR-001-02 (Expression Engine SPI) | S-001-25, S-001-26, S-001-27, S-001-28, S-001-39, S-001-40 |
+| FR-001-02 (Expression Engine SPI) | S-001-25, S-001-26, S-001-27, S-001-28, S-001-39, S-001-40, S-001-57 |
 | FR-001-03 (Bidirectional) | S-001-02, S-001-29, S-001-30 |
-| FR-001-04 (Message Envelope) | S-001-19 |
-| FR-001-05 (Transform Profiles) | S-001-41, S-001-42, S-001-43, S-001-44, S-001-45, S-001-46, S-001-49 |
+| FR-001-04 (Message Envelope) | S-001-19, S-001-58 |
+| FR-001-05 (Transform Profiles) | S-001-41, S-001-42, S-001-43, S-001-44, S-001-45, S-001-46, S-001-49, S-001-56 |
 | FR-001-06 (Passthrough) | S-001-18, S-001-19 |
-| FR-001-07 (Error Handling) | S-001-24, S-001-28 |
+| FR-001-07 (Error Handling) | S-001-24, S-001-28, S-001-56, S-001-58 |
 | FR-001-08 (Reusable Mappers) | S-001-50, S-001-51, S-001-52 |
 | FR-001-09 (Schema Validation) | S-001-53, S-001-54, S-001-55 |
-| FR-001-10 (Header Transforms) | S-001-33, S-001-34, S-001-35 |
+| FR-001-10 (Header Transforms) | S-001-33, S-001-34, S-001-35, S-001-57 |
 | FR-001-11 (Status Code Transforms) | S-001-36, S-001-37, S-001-38 |
 | NFR-001-01 (Stateless) | All — implicit in test harness design |
 | NFR-001-03 (Latency <5ms) | S-001-23 |
