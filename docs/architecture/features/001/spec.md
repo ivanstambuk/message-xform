@@ -284,14 +284,21 @@ reverse:
 ```
 
 When only `transform` is provided (no `forward`/`reverse` wrapper), the spec is
-treated as unidirectional.
+**direction-agnostic** — it is a pure input→output function (ADR-0016). The profile's
+`direction` field (which is **always required**) tells the engine which HTTP message
+phase to apply the expression during:
+- `direction: response` → expression runs on the response body (from backend).
+- `direction: request` → expression runs on the request body (from client).
+The same unidirectional spec MAY be bound to both directions in different profile
+entries.
 
 | Aspect | Detail |
 |--------|--------|
 | Success path | Forward transform applied to response, reverse transform applied to request |
 | Validation path | Both forward and reverse compile successfully at load time |
+| Validation path | Profile entry without `direction` → reject at load time |
 | Failure path | Reverse expression errors at runtime → abort, pass original through |
-| Source | Novel — no existing gateway transformer supports bidirectional |
+| Source | Novel — no existing gateway transformer supports bidirectional, ADR-0016 |
 
 ### FR-001-04: Message Envelope
 
