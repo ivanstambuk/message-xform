@@ -304,6 +304,9 @@ interface:
 match criteria and direction. Profiles are NOT part of the core engine; they are
 user-supplied configuration.
 
+Profiles reference specs using the **`id@version`** syntax. Multiple versions of the
+same spec MAY be loaded concurrently, allowing gradual migration across routes:
+
 ```yaml
 # Profile: PingAM Callback Prettification
 profile: pingam-callback-prettify
@@ -311,28 +314,36 @@ description: "Transforms PingAM callback responses into clean JSON for frontend 
 version: "1.0.0"
 
 transforms:
-  - spec: callback-prettify
+  - spec: callback-prettify@2.0.0      # pinned to spec version 2.0.0
     direction: response
     match:
-      path: "/json/*/authenticate"
+      path: "/json/alpha/authenticate"
       method: POST
       content-type: "application/json"
 
-  - spec: callback-prettify
-    direction: request
-    reverse: true    # Use the reverse transform
+  - spec: callback-prettify@1.0.0      # legacy route still on v1
+    direction: response
     match:
-      path: "/json/*/authenticate"
+      path: "/json/bravo/authenticate"
       method: POST
       content-type: "application/json"
 ```
 
+The engine MUST:
+1. Load all versions of a spec (e.g., `callback-prettify@1.0.0` and `@2.0.0`) as
+   separate compiled `TransformSpec` instances.
+2. Resolve `spec: id@version` references at profile load time — fail fast if the
+   referenced version is not found.
+3. If a profile references `spec: callback-prettify` **without** a version suffix,
+   the engine MUST resolve to the **latest** loaded version (highest semver).
+
 | Aspect | Detail |
 |--------|--------|
-| Success path | Profile loaded → specs resolved → bound to URL patterns |
+| Success path | Profile loaded → versioned specs resolved → bound to URL patterns |
 | Validation path | Missing spec reference → fail at load time with descriptive error |
+| Validation path | Referenced version not loaded → fail at load time |
 | Failure path | Duplicate profile IDs → reject, no silent override |
-| Source | Kong route/plugin binding, Apigee flow attachment |
+| Source | Kong route/plugin binding, Apigee flow attachment, ADR-0005 |
 
 ### FR-001-06: Passthrough Behavior
 

@@ -21,7 +21,6 @@ Hard rules:
 
 | ID | Owner | Question | Options (A preferred) | Status | Asked | Notes |
 |----|-------|----------|------------------------|--------|-------|-------|
-| Q-005 | Ivan | What are the spec version compatibility rules? | A) Informational only (recommended) B) Profiles pin to spec versions C) Semver with breaking change policy | Open | 2026-02-07 | |
 | Q-006 | Ivan | What happens when multiple profiles match the same request? | A) First-match-wins by profile priority (recommended) B) Most-specific-wins (longest path) C) Error — ambiguous match rejected at load time | Open | 2026-02-07 | Critical for production. |
 | Q-007 | Ivan | Should we define structured observability (metrics, log format, trace correlation)? | A) Minimal — structured error logging + request-id passthrough (recommended) B) Full — metrics, histograms, OpenTelemetry C) Defer to implementation | Open | 2026-02-07 | |
 | Q-008 | Ivan | Should a single spec support chained/pipeline transforms? | A) No, one expression per direction — JSLT is expressive enough (recommended) B) Yes, pipeline of expressions | Open | 2026-02-07 | JourneyForge uses pipelines but their use case is different. |

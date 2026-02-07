@@ -1782,6 +1782,113 @@ expected_error:
 
 ---
 
+## Category 12: Version Pinning
+
+Scenarios validating profile-to-spec version pinning (ADR-0005, FR-001-05).
+
+### S-001-41: Concurrent Spec Versions — Different Routes Use Different Versions
+
+```yaml
+scenario: S-001-41
+name: concurrent-spec-versions
+description: >
+  Two profiles reference different versions of the same spec. Both must
+  resolve independently at load time. Validates ADR-0005 concurrent versioning.
+tags: [version, profile, concurrent, adr-0005]
+requires: [FR-001-05]
+
+loaded_specs:
+  - id: callback-prettify
+    version: "1.0.0"
+    transform:
+      lang: jslt
+      expr: '{ "v": 1, "data": .data }'
+  - id: callback-prettify
+    version: "2.0.0"
+    transform:
+      lang: jslt
+      expr: '{ "v": 2, "payload": .data }'
+
+profiles:
+  - spec: callback-prettify@1.0.0
+    match: { path: "/api/v1/*" }
+  - spec: callback-prettify@2.0.0
+    match: { path: "/api/v2/*" }
+
+# Request to /api/v1/test
+test_request:
+  path: "/api/v1/test"
+  input: { data: "hello" }
+  expected_output: { v: 1, data: "hello" }
+
+# Request to /api/v2/test
+test_request_2:
+  path: "/api/v2/test"
+  input: { data: "hello" }
+  expected_output: { v: 2, payload: "hello" }
+```
+
+### S-001-42: Missing Spec Version — Rejected at Load Time
+
+```yaml
+scenario: S-001-42
+name: missing-spec-version-rejected
+description: >
+  A profile references callback-prettify@3.0.0 but only v1 and v2 are loaded.
+  The engine must reject the profile at load time.
+  Validates ADR-0005 fail-fast version resolution.
+tags: [version, profile, validation, adr-0005]
+requires: [FR-001-05]
+
+loaded_specs:
+  - id: callback-prettify
+    version: "1.0.0"
+
+profiles:
+  - spec: callback-prettify@3.0.0
+    match: { path: "/api/v3/*" }
+
+expected_error:
+  type: "spec-not-found"
+  message: "spec 'callback-prettify@3.0.0' not found — available versions: 1.0.0"
+```
+
+### S-001-43: Bare Spec Reference — Resolves to Latest Version
+
+```yaml
+scenario: S-001-43
+name: bare-spec-resolves-to-latest
+description: >
+  A profile references 'callback-prettify' without a version suffix.
+  The engine must resolve to the latest loaded version (highest semver).
+  Validates ADR-0005 latest-version fallback.
+tags: [version, profile, latest, adr-0005]
+requires: [FR-001-05]
+
+loaded_specs:
+  - id: callback-prettify
+    version: "1.0.0"
+    transform:
+      lang: jslt
+      expr: '{ "v": 1, "data": .data }'
+  - id: callback-prettify
+    version: "2.0.0"
+    transform:
+      lang: jslt
+      expr: '{ "v": 2, "payload": .data }'
+
+profiles:
+  - spec: callback-prettify           # no @version
+    match: { path: "/api/latest/*" }
+
+test_request:
+  path: "/api/latest/test"
+  input: { data: "hello" }
+  expected_output: { v: 2, payload: "hello" }   # resolves to v2 (latest)
+```
+
+---
+
 ## Scenario Index
 
 | ID | Name | Category | Tags |
@@ -1826,6 +1933,9 @@ expected_error:
 | S-001-38 | unconditional-status-set | Status Code | status, unconditional, adr-0003 |
 | S-001-39 | jolt-unsupported-predicate-rejected | Engine Capability | engine, capability, jolt, validation, adr-0004 |
 | S-001-40 | jolt-unsupported-headers-rejected | Engine Capability | engine, capability, jolt, validation, adr-0004 |
+| S-001-41 | concurrent-spec-versions | Version Pinning | version, profile, concurrent, adr-0005 |
+| S-001-42 | missing-spec-version-rejected | Version Pinning | version, profile, validation, adr-0005 |
+| S-001-43 | bare-spec-resolves-to-latest | Version Pinning | version, profile, latest, adr-0005 |
 
 ## Coverage Matrix
 
@@ -1835,7 +1945,7 @@ expected_error:
 | FR-001-02 (Expression Engine SPI) | S-001-25, S-001-26, S-001-27, S-001-28, S-001-39, S-001-40 |
 | FR-001-03 (Bidirectional) | S-001-02, S-001-29, S-001-30 |
 | FR-001-04 (Message Envelope) | S-001-19 |
-| FR-001-05 (Transform Profiles) | All — profiles bind specs to URL patterns |
+| FR-001-05 (Transform Profiles) | S-001-41, S-001-42, S-001-43 |
 | FR-001-06 (Passthrough) | S-001-18, S-001-19 |
 | FR-001-07 (Error Handling) | S-001-24, S-001-28 |
 | FR-001-08 (Reusable Mappers) | *Not yet covered — add when mapperRef is specified* |
