@@ -103,9 +103,11 @@ output:
       authId: { type: string }
       fields: { type: array, items: { type: object } }
 
+# Prerequisite filter — declares what this spec can process (ADR-0015).
+# This is a capability declaration, NOT routing. URL/path/method binding is a
+# profile concern (FR-001-05). When absent, the spec accepts any content-type.
 match:
   content-type: "application/json"
-  # Specs do NOT bind to URLs here — URL binding is a profile concern.
 
 transform:
   lang: jslt                    # Expression engine selector (default: jslt)
@@ -370,14 +372,14 @@ transforms:
     match:
       path: "/json/alpha/authenticate"
       method: POST
-      content-type: "application/json"
+      # content-type is optional here — the spec's prerequisite (ADR-0015)
+      # already declares it handles JSON. Profile can further narrow.
 
   - spec: callback-prettify@1.0.0      # legacy route still on v1
     direction: response
     match:
       path: "/json/bravo/authenticate"
       method: POST
-      content-type: "application/json"
 ```
 
 The engine MUST:
@@ -427,7 +429,7 @@ structural shift → JSLT conditional enrichment on the same route.
 | Validation path | Two profiles with identical specificity and constraints → load-time error |
 | Failure path | Duplicate profile IDs → reject, no silent override |
 | Failure path | Chain step fails → entire chain aborts, original message passes through |
-| Source | Kong route/plugin binding, Apigee flow attachment, ADR-0005, ADR-0006, ADR-0008 |
+| Source | Kong route/plugin binding, Apigee flow attachment, ADR-0005, ADR-0006, ADR-0008, ADR-0015 |
 
 ### FR-001-06: Passthrough Behavior
 

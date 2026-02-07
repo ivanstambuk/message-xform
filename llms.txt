@@ -12,6 +12,7 @@ docs/architecture/features/001/spec.md
 docs/architecture/features/001/scenarios.md
 
 # Architecture decisions (newest first)
+docs/decisions/ADR-0015-spec-match-prerequisite.md
 docs/decisions/ADR-0014-mapper-invocation-model.md
 docs/decisions/ADR-0013-copy-on-wrap-message-adapter.md
 docs/decisions/ADR-0012-pipeline-chaining-semantics.md
