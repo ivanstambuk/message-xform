@@ -18,8 +18,6 @@ A **standalone transformation engine** with gateway-specific adapter plugins. Tr
 │  │              Core Engine                      │   │
 │  │  • YAML config parser (per-operation)         │   │
 │  │  • JSON transformation engine                 │   │
-│  │  • XML transformation engine                  │   │
-│  │  • JSON ↔ XML conversion                      │   │
 │  │  • Header manipulation (read/write/strip)     │   │
 │  │  • Payload field → header promotion           │   │
 │  │  • Header → payload field injection           │   │
@@ -108,11 +106,9 @@ operations:
 
 | # | Feature | Notes |
 |---|---------|-------|
-| 9 | **XML transformation** | XPath-based field mapping |
-| 10 | **JSON ↔ XML conversion** | Content-type negotiation between legacy and modern APIs |
-| 11 | **Kong adapter** | Second gateway target |
-| 12 | **NGINX adapter** | Third gateway target |
-| 13 | **Dockerized E2E testing** | Full gateway + upstream mock in Docker Compose |
+| 9 | **Kong adapter** | Second gateway target |
+| 10 | **NGINX adapter** | Third gateway target |
+| 11 | **Dockerized E2E testing** | Full gateway + upstream mock in Docker Compose |
 
 ### P2 — Could Have
 
@@ -132,7 +128,7 @@ operations:
 | Language | **Java 21** | PingAccess/PingAM ecosystem requirement |
 | Build tool | TBD | Maven or Gradle |
 | JSON processing | TBD | Jackson, Gson, or JsonPath |
-| XML processing | TBD | JAXB, StAX, or Saxon |
+
 | Config format | **YAML** | Human-readable, Git-diffable |
 | Testing | **Docker Compose** | E2E with real gateway instances |
 | Module system | **Multi-module project** | core + adapter per gateway |

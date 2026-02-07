@@ -61,7 +61,10 @@ wrappers).
 
 ## Non-Goals
 
-- N-001-01 – XML or non-JSON body transformation is out of scope for the initial version.
+- N-001-01 – The engine operates **exclusively on JSON bodies** (`application/json` and
+  `application/*+json`). XML, `application/x-www-form-urlencoded`, `multipart/form-data`,
+  and all other non-JSON content types are permanent non-goals. Non-JSON bodies pass
+  through unmodified (FR-001-06).
 - N-001-02 – Gateway adapter implementation details are NOT defined here. Each adapter
   gets its own feature spec.
 - N-001-03 – The engine does NOT perform protocol-level operations (TLS termination, rate
