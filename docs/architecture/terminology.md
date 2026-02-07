@@ -24,14 +24,43 @@ terminology agreements must be captured here immediately.
     `id@version` syntax), `match` criteria (path glob, method, content-type), and
     `direction` (request/response).
   - Profiles are **not portable** — they are specific to a deployment context.
-  - When multiple profiles match the same request, most-specific-wins resolution
-    applies (ADR-0006).
+  - When multiple entries **within a single profile** match the same request,
+    most-specific-wins resolution applies (ADR-0006). Cross-profile routing is
+    determined by the **gateway product's deployment model**, not by the engine.
 
 - **Engine** (core engine)
   - The message-xform execution component: loads transform specs, compiles
     expressions, matches profiles to requests, and evaluates transforms.
   - Preferred wording: "the engine" or "the transform engine". Avoid introducing
     "runtime" as a generic noun.
+
+- **Gateway product**
+  - The API gateway software into which message-xform is embedded: PingAccess,
+    PingGateway, Kong, Envoy, a standalone reverse proxy, etc.
+  - The gateway product owns request routing, TLS termination, authentication, and
+    rate limiting. message-xform is a plugin/rule/filter within the gateway product.
+  - Preferred wording: "the gateway product" or "the gateway". Avoid "host gateway",
+    "underlying platform", or "target gateway".
+
+- **Gateway adapter**
+  - The integration layer that bridges the gateway product's native API with the
+    message-xform engine. Each gateway product has its own adapter implementation
+    (e.g., PingAccess rule adapter, Kong plugin adapter, standalone servlet filter).
+  - The adapter wraps native messages into `Message` objects, invokes the engine,
+    and applies changes back to native. See ADR-0013 (copy-on-wrap), ADR-0018
+    (body buffering).
+  - Each adapter gets its own feature spec (N-001-02).
+
+- **Deployment model**
+  - How the gateway product is configured to invoke message-xform for incoming
+    requests. This is **product-defined** — not controlled by the engine.
+  - Examples:
+    - PingAccess: adapter rule bound per API operation, context root, or globally.
+      Multiple adapter instances may coexist, each with its own profile.
+    - Kong: plugin attached to a route or service.
+    - Standalone: deployment configuration maps routes to profiles.
+  - Cross-profile routing (whether multiple profiles can apply to the same request)
+    is a deployment model concern, not an engine concern.
 
 - **Expression engine** (pluggable)
   - A pluggable evaluation component selected via `lang: <engineId>` in a transform
@@ -86,9 +115,10 @@ terminology agreements must be captured here immediately.
     explicit version pinning.
 
 - **Specificity score**
-  - The count of literal (non-wildcard) path segments in a profile's match pattern.
-    Used for most-specific-wins resolution when multiple profiles match (ADR-0006).
-    Higher score = more specific = wins.
+  - The count of literal (non-wildcard) path segments in a profile entry's match
+    pattern. Used for most-specific-wins resolution when multiple entries **within
+    a single profile** match the same request (ADR-0006). Higher score = more
+    specific = wins.
 
 ## Transform lifecycle
 
@@ -104,9 +134,11 @@ terminology agreements must be captured here immediately.
   - Evaluation-time schema validation (strict/lenient mode) occurs here.
 
 - **Passthrough**
-  - When a message does not match any transform profile, or the body is not valid
-    JSON, the engine passes it through **completely unmodified** — no body, header,
-    or status code changes.
+  - When a message does not match any transform profile, the engine passes it
+    through **completely unmodified** — no body, header, or status code changes.
+  - Passthrough applies **only** to non-matching requests. When a profile matches
+    but the transformation fails, the engine returns an error response instead
+    (ADR-0022).
 
 ## Pipeline chaining & message semantics
 
@@ -199,6 +231,15 @@ terminology agreements must be captured here immediately.
 - Use **"transform profile"** for the deployment binding YAML.
 - Use **"the engine"** for the core execution component.
 - Use **"expression engine"** for the pluggable evaluation component (JSLT, JOLT, etc.).
+- Use **"gateway product"** for the API gateway software (PingAccess, Kong, etc.).
+  The shorter form **"the gateway"** is acceptable in context.
+- Use **"gateway adapter"** for the integration layer between a gateway product and
+  the engine. Each adapter is product-specific.
+- Use **"deployment model"** for how the gateway product invokes message-xform.
+  Cross-profile routing is a deployment model concern.
+- Use **"product-defined"** when a behaviour depends on the gateway product's
+  configuration, not the engine's. Avoid "implementation-defined" or
+  "adapter-defined" for cross-profile concerns.
 - Use **"load time"** for spec/profile loading and validation.
 - Use **"evaluation time"** for per-request transform execution (when the engine
   evaluates a compiled expression against a message).
@@ -214,11 +255,15 @@ terminology agreements must be captured here immediately.
 | transform profile | route config, binding config, deployment spec |
 | the engine | the runtime, the transformer, the processor |
 | expression engine | language plugin, eval plugin, script engine |
+| gateway product | host gateway, underlying platform, target gateway, gateway vendor |
+| gateway adapter | bridge, connector, integration layer |
+| deployment model | routing config, rule binding |
 | load time | deploy time, startup time, init time |
 | evaluation time | runtime, execution time (when referring to transform execution) |
 | body | payload (except in JourneyForge context), message body |
 | passthrough | bypass, skip, no-op |
 | specificity score | priority number, weight, rank |
+| product-defined | implementation-defined, adapter-defined (for cross-profile routing) |
 
 ### Process for improving terminology
 
