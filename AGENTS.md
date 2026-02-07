@@ -104,9 +104,9 @@ Update both `docs/architecture/roadmap.md` and the Roadmap table above when stat
    - **Resolution Checklist** — after the user decides, complete ALL steps before moving to the next question:
      1. ☐ Update `spec.md` with the decision (normative text, interfaces, examples).
      2. ☐ Create or update ADR under `docs/decisions/` (mandatory for high-severity; use judgement for medium).
-     3. ☐ Update `docs/architecture/knowledge-map.md` (dependency graph + traceability table) if new ADR created.
-     4. ☐ Update `llms.txt` if new ADR created.
-     5. ☐ Add or update scenario(s) in `scenarios.md` if the decision introduces new behaviour or edge cases.
+     3. ☐ **Add or update scenario(s)** in `scenarios.md` — MANDATORY if the decision introduces new behaviour, a new edge case, or changes an existing contract. Update the coverage matrix and scenario index. If unsure, add a scenario — false positives are cheap, missing coverage is expensive. (Rule 9 applies.)
+     4. ☐ Update `docs/architecture/knowledge-map.md` (dependency graph + traceability table) if new ADR created.
+     5. ☐ Update `llms.txt` if new ADR created.
      6. ☐ Remove the resolved row from `docs/architecture/open-questions.md`.
      7. ☐ Commit all changes in a single atomic commit.
    - Then move to the next question.
