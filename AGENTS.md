@@ -126,6 +126,15 @@ Update both `docs/architecture/roadmap.md` and the Roadmap table above when stat
     - **🔵 Obvious fixes** (low/polish): Apply directly to the spec in a commit. These are corrections or consistency issues, not architectural decisions — they don't need Decision Cards.
     - **Commit**: Always commit the new open questions in a single atomic commit so they are tracked in git history.
     - **Workflow**: After creating the questions, present the first 🔴 (high severity) question as a Decision Card and work through them in priority order.
+11. **No Implicit Decisions**: Every decision discussed with the user MUST be explicitly captured in a permanent artefact — never left as an implicit understanding from chat. Chat is ephemeral; decisions must survive across sessions.
+    - If a topic was discussed and a conclusion was reached, it MUST be recorded in at least one of:
+      - An **ADR** under `docs/decisions/` (for architectural/design decisions).
+      - The **spec** (`spec.md`) as normative text (for requirements-level decisions).
+      - **`terminology.md`** (for vocabulary agreements).
+      - **`scenarios.md`** (for behavioural contracts).
+    - **Test:** If a future agent or the user could reasonably re-raise the same question, the current capture is insufficient. The artefact must contain enough context that a reader can find it, understand the decision, and know it's settled.
+    - **When in doubt, create an ADR.** ADRs are cheap; rediscussion is expensive. Even a short ADR that says "we considered X and decided not to do it" prevents future rework.
+    - This rule applies even when the decision is "do nothing" or "this is out of scope" — the reasoning must still be recorded.
 
 ## Pre-Implementation Checklist (Mandatory)
 
