@@ -30,5 +30,8 @@ dependency-reduced-pom.xml
 # Logs
 *.log
 
+# Reference docs (local working copies — PDFs + extracted text)
+docs/reference/
+
 # Docker
 docker-compose.override.yml

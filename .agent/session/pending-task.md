@@ -1,13 +1,18 @@
 # Pending Task
 
-**Focus**: PingAM authentication API research (JSON format analysis)
-**Status**: Browser agent infrastructure is complete and verified. Research not yet started.
-**Next Step**: Use `browser_subagent` to access PingAM documentation and extract JSON structures for the `/json/authenticate` endpoint.
+**Focus**: PingAM authentication API research — COMPLETE
+**Status**: Full REST API documentation extracted from official PingAM 8 docs (353K lines, 14MB text).
+**Output**: `docs/research/pingam-authentication-api.md` — comprehensive reference covering endpoints, callback flows, session tokens, and transformation implications.
 
-## Context Notes
-- Browser agent is working — Chrome is pre-launched on port 9222 via `start-chrome.sh`
-- After server reboot or Antigravity restart, run `~/dev/message-xform/scripts/start-chrome.sh` before using `browser_subagent`
-- Chrome process may still be running from this session; check with `curl -s http://localhost:9222/json/version`
-- The original session goal was to research PingAM's callback-based auth format (NameCallback, PasswordCallback, authId, tokenId) for designing the transformation engine
-- Web search results from earlier provided some JSON examples but full documentation was not yet retrieved
-- PLAN.md was updated with SDD backlog item and polyglot strategy question (uncommitted — committed in handover)
+## What Was Done
+- Downloaded PingAM 8 official PDF (29MB) → `docs/reference/pingam-8.pdf`
+- Extracted to searchable text (14MB) → `docs/reference/pingam-8.txt`
+- Installed `poppler-utils` for PDF extraction
+- Researched `/json/authenticate` endpoint, callback mechanism, session tokens
+- Created comprehensive research notes at `docs/research/pingam-authentication-api.md`
+
+## Next Steps
+- [ ] Research PingAccess plugin API (extension points for request/response interception)
+- [ ] Bootstrap Java project structure (Maven/Gradle decision needed)
+- [ ] Design core transformation model based on PingAM JSON callback structures
+- [ ] Consider SDD adoption from reference projects
