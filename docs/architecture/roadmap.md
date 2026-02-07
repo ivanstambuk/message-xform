@@ -1,13 +1,82 @@
 # Roadmap – message-xform
 
-| # | Feature | Status | Spec | Dependencies |
-|---|---------|--------|------|--------------|
-| 1 | Message Transformation Engine (core) | 📝 Spec Draft | `docs/architecture/features/001/spec.md` | Research complete |
-| 2 | PingAM Callback Transform Profile | 🔲 Not Started | — | Feature 001 |
-| 3 | PingAccess Adapter | 🔲 Not Started | — | Feature 001 |
-| 4 | Standalone HTTP Proxy Mode | 🔲 Not Started | — | Feature 001 |
-| 5 | PingGateway Adapter | 🔲 Not Started | — | Feature 001 |
-| 6 | Transform Profile Configuration & Loading | 🔲 Not Started | — | Feature 001 |
+## Features
+
+| # | Feature | Status | Spec | Dependencies | Language |
+|---|---------|--------|------|--------------|----------|
+| 001 | Message Transformation Engine (core) | 📝 Spec Draft | `features/001/spec.md` | Research complete | Java 21 |
+| 002 | PingAccess Adapter | 🔲 Not Started | `features/002/spec.md` | Feature 001 | Java (SDK) |
+| 003 | PingGateway Adapter | 🔲 Not Started | `features/003/spec.md` | Feature 001 | Java / Groovy |
+| 004 | Standalone HTTP Proxy Mode | 🔲 Not Started | `features/004/spec.md` | Feature 001 | Java |
+| 005 | WSO2 API Manager Adapter | 🔲 Not Started | `features/005/spec.md` | Feature 001 | Java |
+| 006 | Apache APISIX Adapter | 🔲 Not Started | `features/006/spec.md` | Feature 001 | Java (Plugin Runner) |
+| 007 | Kong Gateway Adapter | 🔲 Not Started | `features/007/spec.md` | Feature 001 | Lua or sidecar |
+| 008 | NGINX Adapter | 🔲 Not Started | `features/008/spec.md` | Feature 001 | njs / sidecar |
+| 009 | PingAM Callback Transform Profile | 🔲 Not Started | `features/009/spec.md` | Feature 001 | YAML (spec) |
+
+## Feature Overview
+
+### Feature 001 — Message Transformation Engine (core)
+
+The gateway-agnostic core library. Pluggable expression engine SPI (JSLT, JOLT, jq,
+JSONata). Message envelope abstraction. Profile loading. Hot-reload. Error handling.
+**This is the foundation — all adapters depend on it.**
+
+### Feature 002 — PingAccess Adapter
+
+**Primary target.** PingAccess Java Add-on SDK using `RuleInterceptor` SPI.
+Wraps PingAccess `Exchange` (request/response) as the `Message` interface.
+Research complete: `docs/research/pingaccess-plugin-api.md`.
+
+### Feature 003 — PingGateway Adapter
+
+Same Ping vendor ecosystem. Java/Groovy filter/handler chain.
+Research pending: reference docs at `docs/reference/pinggateway-2025.11.txt`.
+
+### Feature 004 — Standalone HTTP Proxy Mode
+
+The engine running as an independent HTTP reverse proxy (no gateway needed).
+Receives requests, applies transforms, forwards to upstream, transforms response.
+Useful for development, testing, and deployments without a gateway.
+
+### Feature 005 — WSO2 API Manager Adapter
+
+Java-native, genuinely open source (Apache 2.0). Direct integration via Java
+extension API. No bridging needed — same JVM as the core.
+
+### Feature 006 — Apache APISIX Adapter
+
+OSS gateway with a dedicated Java Plugin Runner (Unix socket/RPC to APISIX).
+The Java core runs as-is inside the Plugin Runner. Supports hot-reload.
+
+### Feature 007 — Kong Gateway Adapter
+
+Kong's extension model is Lua (OpenResty) / Go / WASM — no direct Java path.
+Options: (a) Lua reimplementation (defeats shared core), (b) sidecar proxy,
+(c) WASM (immature). **Approach TBD during research phase.**
+
+### Feature 008 — NGINX Adapter
+
+Similar to Kong — no native Java. Four approaches documented:
+(a) njs (JavaScript), (b) OpenResty (Lua), (c) C module, (d) sidecar proxy.
+**Sidecar is the pragmatic default** — run standalone mode, NGINX proxies through.
+
+### Feature 009 — PingAM Callback Transform Profile
+
+Not a gateway adapter, but a **transform profile** — a YAML spec that defines
+how to transform PingAM callback JSON. Uses the core engine (Feature 001).
+This is the reference use case that drives the engine design.
+
+## Priority Order
+
+Based on the gateway candidate research (`docs/research/gateway-candidates.md`):
+
+| Tier | Features | Rationale |
+|------|----------|-----------|
+| **Tier 1** | 001 (core) + 002 (PingAccess) + 009 (PingAM profile) | MVP: core + primary adapter + reference use case |
+| **Tier 2** | 003 (PingGateway) + 004 (Standalone) | Same vendor ecosystem + dev/test tool |
+| **Tier 3** | 005 (WSO2) + 006 (APISIX) | OSS gateways, Java-native, broader market |
+| **Tier 4** | 007 (Kong) + 008 (NGINX) | Language gap — requires bridging strategy |
 
 ## Status Key
 
