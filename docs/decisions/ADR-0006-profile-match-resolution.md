@@ -18,7 +18,7 @@ Cross-profile routing (whether multiple profiles can apply to the same request) 
 **product-defined** — determined by the gateway product's deployment model (e.g.,
 PingAccess rule binding, Kong route/plugin attachment, context root vs per-operation
 configuration). The core engine does not define or detect cross-profile conflicts.
-See Q-027 resolution notes in FR-001-05.
+See ADR-0023.
 
 ### Options Considered
 
@@ -83,7 +83,7 @@ Follow-ups:
 - Consider a `--dry-run` mode that reports match resolution for a given request path
   without executing the transform, for operator debugging.
 - Document the specificity scoring algorithm with examples in the operator guide.
-- Cross-profile conflict handling is product-defined (not engine-defined). See FR-001-05.
+- Cross-profile conflict handling is product-defined (ADR-0023).
 
 References:
 - Feature 001 spec: `docs/architecture/features/001/spec.md` (FR-001-05, NFR-001-08)
