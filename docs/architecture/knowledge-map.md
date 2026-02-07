@@ -68,6 +68,8 @@ ADR-0008 (Single Expr/Dir) ── constrains ── FR-001-01, references ADR-00
 ADR-0009 (JSLT Default) ──── governs ──── FR-001-01, FR-001-02
 ADR-0010 (Pluggable SPI) ─── governs ──── FR-001-02, references ADR-0009
 ADR-0011 (JsonNode Body) ─── governs ──── FR-001-04, references ADR-0009, ADR-0010
+ADR-0012 (Pipeline Chain) ─── governs ── FR-001-05, references ADR-0008
+ADR-0013 (Copy-on-Wrap) ──── governs ── FR-001-04, references ADR-0011, ADR-0012
 ```
 
 ## Feature → ADR → NFR Traceability
@@ -77,8 +79,8 @@ ADR-0011 (JsonNode Body) ─── governs ──── FR-001-04, references AD
 | FR-001-01 (Spec Format) | ADR-0001, ADR-0008, ADR-0009 | — |
 | FR-001-02 (Expression Engine SPI) | ADR-0004, ADR-0009, ADR-0010 | NFR-001-02 |
 | FR-001-03 (Bidirectional) | — | — |
-| FR-001-04 (Message Envelope) | ADR-0011 | — |
-| FR-001-05 (Transform Profiles) | ADR-0005, ADR-0006 | NFR-001-08 |
+| FR-001-04 (Message Envelope) | ADR-0011, ADR-0013 | — |
+| FR-001-05 (Transform Profiles) | ADR-0005, ADR-0006, ADR-0012 | NFR-001-08 |
 | FR-001-10 (Header Transforms) | ADR-0002, ADR-0004 | — |
 | FR-001-11 (Status Code Transforms) | ADR-0003, ADR-0004 | — |
 | Observability | ADR-0007 | NFR-001-08, NFR-001-09, NFR-001-10 |
