@@ -25,6 +25,12 @@ See `PLAN.md` for full architecture and feature breakdown.
 4. **Self-Correcting Protocol**: When making a preventable mistake, proactively ask the user to update `AGENTS.md` or a workflow to prevent recurrence.
 5. **Commit Hygiene**: Bundle related changes in atomic commits with clear messages.
 6. **Autonomous Operations**: If you can run a command to verify or fix something, do it — don't instruct the user to do it.
+7. **Research Must Be Persisted**: When tasked with researching something — APIs, tools, design options, vendor comparisons — **always write findings to a file** in `docs/research/` (or `docs/decisions/` for ADRs). Never leave research as chat-only output. Research documents must be:
+   - Self-contained and comprehensible without the chat context
+   - Include source references (documentation URLs, file paths, line ranges)
+   - Summarize implications for message-xform
+   - Be committed to git so they survive across sessions
+   - Feed into the SDD specification pipeline when development begins
 
 ## Browser Agent (browser_subagent) — MANDATORY Setup
 
