@@ -1,23 +1,19 @@
 # Pending Task
 
-## Current State
-SDD workflow initialized. Feature 001 spec written (generic transformation engine).
-Research complete for transformation patterns (Kong, JOLT, JSONata, AWS VTL, Apigee).
+**Focus**: Feature 001 — Message Transformation Engine (core specification)
+**Status**: Spec draft ~85% complete. 7/9 open questions resolved. Governance infrastructure built.
+**Next Step**: Resolve Q-008 (chained/pipeline transforms) — Decision Card already prepared.
 
-## Completed This Session
-1. ✅ Researched SDD structure from openauth-sim and journeyforge (consumer projects)
-2. ✅ Created SDD infrastructure: templates, open-questions, roadmap, decisions
-3. ✅ Wrote Feature 001 spec (initially PingAM-specific, then generalized per user feedback)
-4. ✅ Researched transformation patterns: Kong, AWS VTL, Apigee, JOLT, JSONata, JMESPath
-5. ✅ Wrote `docs/research/transformation-patterns.md` with gap analysis
-6. ✅ Updated AGENTS.md with full SDD documentation hierarchy
+## Context Notes
+- Decision Card for Q-008 was presented but user chose to do retro before answering.
+  Resume by re-presenting Q-008.
+- After Q-008, resolve Q-009 (retroactive ADRs for JSLT/SPI/JsonNode choices).
+- After both Q's: spec is ready for plan.md and tasks.md authoring.
+- All governance infrastructure is in place (constitution, terminology, knowledge map,
+  docs style guide, analysis gate, templates, workflows).
 
-## Next Steps
-1. **Review Feature 001 spec with user** — get feedback on the pipeline operations,
-   bidirectional model, and profile/spec separation.
-2. **Write Feature 001 plan.md** — implementation plan for the core engine.
-3. **Write Feature 001 tasks.md** — task breakdown for implementation.
-4. **Bootstrap Maven project** — multi-module structure (core + adapters).
-5. **Write first transform profile** — PingAM callback prettification as a profile
-   using the generic engine.
-6. **Research PingGateway** — filter/handler API for the second adapter.
+## SDD Gaps (if any)
+- FR-001-08 (Reusable Mappers): scenarios pending — need mapperRef spec detail first.
+- FR-001-09 (Schema Validation): scenarios pending — need test vector design.
+- ADR-0001: validating scenarios marked as pending (blocked on FR-001-09 scenarios).
+- NFR-001-02, 05, 06: verified by static analysis / integration test, not scenario-testable.
