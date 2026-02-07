@@ -2123,6 +2123,9 @@ expected_log_entry:
 | NFR-001-03 (Latency <5ms) | S-001-23 |
 | NFR-001-04 (Open-world) | S-001-07, S-001-20 |
 | NFR-001-07 (Eval budget) | S-001-24 |
+| NFR-001-02 (Zero gateway deps) | *Verified by dependency analysis, not scenario-testable* |
+| NFR-001-05 (Hot reload) | *Integration test — add when adapter is implemented* |
+| NFR-001-06 (Sensitive fields) | *Static analysis + code review — add when engine is implemented* |
 | NFR-001-08 (Match logging) | S-001-44, S-001-46 (matched profile logged) |
 | NFR-001-09 (Telemetry SPI) | S-001-47 |
 | NFR-001-10 (Trace correlation) | S-001-48 |
