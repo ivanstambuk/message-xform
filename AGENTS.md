@@ -7,6 +7,37 @@
 **message-xform** is a standalone payload & header transformation engine for API Gateways.
 See `PLAN.md` for full architecture and feature breakdown.
 
+## Roadmap
+
+> Canonical source: `docs/architecture/roadmap.md`. Keep this summary in sync.
+
+| # | Feature | Status |
+|---|---------|--------|
+| 001 | Message Transformation Engine (core) | 📝 Spec Draft |
+| 002 | PingAccess Adapter | 🔲 Not Started |
+| 003 | PingGateway Adapter | 🔲 Not Started |
+| 004 | Standalone HTTP Proxy Mode | 🔲 Not Started |
+| 005 | WSO2 API Manager Adapter | 🔲 Not Started |
+| 006 | Apache APISIX Adapter | 🔲 Not Started |
+| 007 | Kong Gateway Adapter | 🔲 Not Started |
+| 008 | NGINX Adapter | 🔲 Not Started |
+
+**Priority:** Tier 1 (001+002) → Tier 2 (003+004) → Tier 3 (005+006) → Tier 4 (007+008)
+
+## Feature Lifecycle
+
+Every feature progresses through these steps. Do not skip steps.
+
+1. **Research** — Analyze the gateway's extension model, API, SDK. Write findings to `docs/research/<name>.md`.
+2. **Scenarios** — Define concrete test scenarios with input/output JSON pairs in `features/<NNN>/scenarios.md`.
+3. **Spec** — Write the feature specification (SDD) in `features/<NNN>/spec.md`.
+4. **Plan** — Break the spec into implementation phases in `features/<NNN>/plan.md`.
+5. **Tasks** — Granular task breakdown in `features/<NNN>/tasks.md`.
+6. **Implement** — Write code, tests, and documentation.
+7. **Verify** — Run integration tests against scenarios. All scenarios must pass.
+
+Update both `docs/architecture/roadmap.md` and the Roadmap table above when status changes.
+
 ## Conventions
 
 - **Config format**: YAML — human-readable, Git-diffable.
@@ -15,10 +46,11 @@ See `PLAN.md` for full architecture and feature breakdown.
   - `PLAN.md` — Vision, architecture, features, and open questions.
   - `AGENTS.md` — Agent rules and project conventions (this file).
   - `docs/architecture/features/<NNN>/spec.md` — Feature specifications (SDD).
+  - `docs/architecture/features/<NNN>/scenarios.md` — Test scenarios (input/output contracts).
   - `docs/architecture/features/<NNN>/plan.md` — Implementation plans.
   - `docs/architecture/features/<NNN>/tasks.md` — Task breakdowns.
   - `docs/architecture/open-questions.md` — Live open questions (scratchpad, not archive).
-  - `docs/architecture/roadmap.md` — Feature roadmap.
+  - `docs/architecture/roadmap.md` — Feature roadmap (canonical source).
   - `docs/decisions/` — Architecture Decision Records (ADRs).
   - `docs/research/` — Research notes (API analysis, gateway evaluations, etc.).
   - `docs/templates/` — Spec and document templates.
