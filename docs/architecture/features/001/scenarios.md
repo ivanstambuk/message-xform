@@ -2842,6 +2842,153 @@ expected_context:
 
 ---
 
+## Category 14: Error Type Catalogue (ADR-0024)
+
+Scenarios validating that the engine exposes the correct exception types to adapters
+and that error responses carry the correct URN `type` values.
+
+### S-001-66: Load-Time Error Type Discrimination
+
+Adapters must be able to distinguish different load-time failure causes by exception
+type (`TransformLoadException` subtypes).
+
+```yaml
+scenario: S-001-66
+name: load-time-error-type-discrimination
+description: >
+  Three different broken specs are loaded: one with invalid YAML, one with a bad
+  JSLT expression, one with an invalid JSON Schema. Each must produce a distinct
+  exception subtype of TransformLoadException, enabling the adapter to log and
+  respond specifically. Validates ADR-0024 load-time tier.
+tags: [error-catalogue, load-time, exception-hierarchy, adr-0024]
+requires: [FR-001-07]
+
+# Spec 1: Invalid YAML
+spec_yaml_broken:
+  raw: |
+    id: bad-yaml
+    version: "1.0.0"
+    transform:
+      lang: jslt
+      expr: |
+        this line has no colon and breaks yaml
+           bad_indent: true
+
+expected_error_1:
+  phase: load
+  type: SpecParseException
+  parent_type: TransformLoadException
+  message_contains: "YAML"
+
+# Spec 2: Invalid JSLT expression
+spec_jslt_broken:
+  id: bad-jslt
+  version: "1.0.0"
+  transform:
+    lang: jslt
+    expr: 'if (.x "bad"'   # missing closing paren
+
+expected_error_2:
+  phase: load
+  type: ExpressionCompileException
+  parent_type: TransformLoadException
+  message_contains: "compile"
+
+# Spec 3: Invalid JSON Schema
+spec_schema_broken:
+  id: bad-schema
+  version: "1.0.0"
+  input:
+    schema:
+      type: not-a-valid-type
+      required: 42
+  transform:
+    lang: jslt
+    expr: '.'
+
+expected_error_3:
+  phase: load
+  type: SchemaValidationException
+  parent_type: TransformLoadException
+  message_contains: "schema"
+```
+
+### S-001-67: Evaluation Budget Exceeded → EvalBudgetExceededException
+
+```yaml
+scenario: S-001-67
+name: eval-budget-exceeded-exception-type
+description: >
+  An expression exceeds the configured max-eval-ms budget. The engine must throw
+  EvalBudgetExceededException (a TransformEvalException subtype) and return an
+  error response with URN type 'urn:message-xform:error:eval-budget-exceeded'.
+  Validates ADR-0024 evaluation-time tier.
+tags: [error-catalogue, eval-time, budget, exception-hierarchy, adr-0024]
+requires: [FR-001-07]
+
+config:
+  engines:
+    defaults:
+      max-eval-ms: 1    # artificially low budget to force timeout
+
+transform:
+  lang: jslt
+  expr: |
+    {
+      "result": [for (1,2,3,4,5,6,7,8,9,10)
+        [for (1,2,3,4,5,6,7,8,9,10)
+          [for (1,2,3,4,5,6,7,8,9,10) .]
+        ]
+      ]
+    }
+
+input:
+  value: "test"
+
+expected_error_response:
+  type: "urn:message-xform:error:eval-budget-exceeded"
+  title: "Transform Failed"
+  status: 502
+  detail_contains: "budget exceeded"
+
+expected_exception:
+  type: EvalBudgetExceededException
+  parent_type: TransformEvalException
+  chain_step: null
+```
+
+### S-001-68: YAML Parse Error → SpecParseException with Source Path
+
+Validates that `SpecParseException` carries the `source` field pointing to the
+failing file path.
+
+```yaml
+scenario: S-001-68
+name: spec-parse-exception-source-path
+description: >
+  A spec file at a known path contains invalid YAML. The thrown
+  SpecParseException must carry the `source` field with the file path,
+  enabling the adapter to log exactly which file failed.
+  Validates ADR-0024 common exception fields.
+tags: [error-catalogue, load-time, source-path, adr-0024]
+requires: [FR-001-07]
+
+spec_path: "/config/specs/broken-spec.yaml"
+spec_content: |
+  id: broken
+  version: 1.0.0
+  transform:
+    - this is not valid yaml for a transform block
+
+expected_error:
+  phase: load
+  type: SpecParseException
+  source: "/config/specs/broken-spec.yaml"
+  message_contains: "YAML"
+```
+
+---
+
 ## Scenario Index
 
 | ID | Name | Category | Tags |
@@ -2911,6 +3058,9 @@ expected_context:
 | S-001-63 | nullable-status-integer-contract | Status Code | status, null, nullable, integer, adr-0020 |
 | S-001-64 | query-params-in-body-expression | TransformContext | query-params, context, branching, adr-0021 |
 | S-001-65 | cookies-in-body-expression | TransformContext | cookies, context, adr-0021 |
+| S-001-66 | load-time-error-type-discrimination | Error Type Catalogue | error-catalogue, load-time, exception-hierarchy, adr-0024 |
+| S-001-67 | eval-budget-exceeded-exception-type | Error Type Catalogue | error-catalogue, eval-time, budget, exception-hierarchy, adr-0024 |
+| S-001-68 | spec-parse-exception-source-path | Error Type Catalogue | error-catalogue, load-time, source-path, adr-0024 |
 
 ## Coverage Matrix
 
@@ -2922,7 +3072,7 @@ expected_context:
 | FR-001-04 (Message Envelope) | S-001-19, S-001-58 |
 | FR-001-05 (Transform Profiles) | S-001-41, S-001-42, S-001-43, S-001-44, S-001-45, S-001-46, S-001-49, S-001-56 |
 | FR-001-06 (Passthrough) | S-001-18, S-001-19 |
-| FR-001-07 (Error Handling) | S-001-24, S-001-28, S-001-56, S-001-58 |
+| FR-001-07 (Error Handling) | S-001-24, S-001-28, S-001-56, S-001-58, S-001-66, S-001-67, S-001-68 |
 | FR-001-08 (Reusable Mappers) | S-001-50, S-001-51, S-001-52, S-001-59 |
 | FR-001-09 (Schema Validation) | S-001-53, S-001-54, S-001-55 |
 | FR-001-10 (Header Transforms) | S-001-33, S-001-34, S-001-35, S-001-57 |

@@ -187,6 +187,7 @@ public interface ExpressionEngine {
      * Called once at spec load time.
      */
     CompiledExpression compile(String expr) throws ExpressionCompileException;
+    // ExpressionCompileException is a subtype of TransformLoadException — see Error Catalogue.
 }
 
 public interface CompiledExpression {
@@ -199,6 +200,7 @@ public interface CompiledExpression {
      */
     JsonNode evaluate(JsonNode input, TransformContext context)
         throws ExpressionEvalException;
+    // ExpressionEvalException is a subtype of TransformEvalException — see Error Catalogue.
 }
 
 /**
@@ -504,6 +506,12 @@ the engine MUST:
    downstream expects the transformed schema and will fail anyway (ADR-0022).
 4. Never return an empty, corrupted, or partially-evaluated message.
 
+All exceptions are typed according to the **Error Catalogue** (below, ADR-0024).
+Evaluation-time exceptions (`TransformEvalException` subtypes) are caught by the
+engine and translated into error responses. Load-time exceptions
+(`TransformLoadException` subtypes) propagate to the adapter for startup/reload
+handling.
+
 **Error response format** is configurable via `error-response.format`:
 - `rfc9457` (default): RFC 9457 Problem Details for HTTP APIs (`application/problem+json`).
 - `custom`: operator-defined JSON template with `{{error.detail}}`, `{{error.specId}}`,
@@ -525,7 +533,7 @@ error-response:
 **Example RFC 9457 error response:**
 ```json
 {
-  "type": "urn:message-xform:error:transform-failed",
+  "type": "urn:message-xform:error:expression-eval-failed",
   "title": "Transform Failed",
   "status": 502,
   "detail": "JSLT evaluation error in spec 'callback-prettify@1.0.0': undefined variable at line 3",
@@ -538,7 +546,75 @@ error-response:
 | Success path | Transform fails → log error → return configurable error response to caller |
 | Validation path | Error response config validated at engine startup |
 | Failure path | Engine itself crashes → gateway adapter catches exception, returns error response |
-| Source | Defensive design, ADR-0022 |
+| Source | Defensive design, ADR-0022, ADR-0024 |
+
+### Error Catalogue (ADR-0024)
+
+The engine defines a **two-tier exception hierarchy** that separates load-time
+configuration errors from per-request evaluation errors. All exceptions inherit
+from the abstract `TransformException`.
+
+```
+TransformException (abstract — never thrown directly)
+├── TransformLoadException (abstract — load-time parent)
+│   ├── SpecParseException
+│   ├── ExpressionCompileException        ← FR-001-02
+│   ├── SchemaValidationException
+│   ├── ProfileResolveException
+│   └── SensitivePathSyntaxError
+└── TransformEvalException (abstract — evaluation-time parent)
+    ├── ExpressionEvalException           ← FR-001-02
+    ├── EvalBudgetExceededException
+    └── InputSchemaViolation
+```
+
+#### Load-Time Exceptions (`TransformLoadException`)
+
+Thrown during `TransformEngine.loadSpec()` or `TransformEngine.loadProfile()`.
+These indicate **configuration problems** that must be resolved before traffic flows.
+
+| Exception | Cause | Example |
+|-----------|-------|---------|
+| `SpecParseException` | Invalid YAML syntax in a spec file | Missing colon, bad indentation |
+| `ExpressionCompileException` | Expression syntax error in any engine | `if (.x "bad"` — missing paren |
+| `SchemaValidationException` | JSON Schema block is invalid (2020-12) | `type: not-a-type` |
+| `ProfileResolveException` | Missing spec ref, unknown version, ambiguous match | `spec: foo@3.0.0` not loaded |
+| `SensitivePathSyntaxError` | Invalid RFC 9535 path in `sensitive` list | Missing `$` prefix |
+
+**Adapter contract:** Adapters MUST surface `TransformLoadException` during startup
+or reload. The engine MUST NOT silently accept broken configuration.
+
+#### Evaluation-Time Exceptions (`TransformEvalException`)
+
+Thrown per-request during `TransformEngine.transform()`. The engine catches these
+internally and produces a **configurable error response** (ADR-0022).
+
+| Exception | Cause | Example |
+|-----------|-------|---------|
+| `ExpressionEvalException` | Expression execution error | Undefined variable, type error |
+| `EvalBudgetExceededException` | `max-eval-ms` or `max-output-bytes` exceeded | 200ms vs 50ms budget |
+| `InputSchemaViolation` | Strict-mode input validation failure | Missing `required` field |
+
+**Error response `type` URNs** (RFC 9457):
+
+| Exception | URN |
+|-----------|-----|
+| `ExpressionEvalException` | `urn:message-xform:error:expression-eval-failed` |
+| `EvalBudgetExceededException` | `urn:message-xform:error:eval-budget-exceeded` |
+| `InputSchemaViolation` | `urn:message-xform:error:schema-validation-failed` |
+
+#### Common Exception Fields
+
+All exceptions carry:
+- `specId` (String, nullable) — the spec that triggered the error.
+- `detail` (String) — human-readable error description.
+- `phase` (enum: `LOAD`, `EVALUATION`) — derived from the tier.
+
+`TransformLoadException` additionally:
+- `source` (String, nullable) — file path or resource identifier.
+
+`TransformEvalException` additionally:
+- `chainStep` (Integer, nullable) — pipeline chain step index.
 
 ### FR-001-08: Reusable Mappers
 
