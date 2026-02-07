@@ -379,6 +379,24 @@ resolution (ADR-0006):
 3. **Structured logging**: every matched profile MUST be logged (NFR-001-08) so
    operators can trace exactly which profile was selected.
 
+**Profile-level chaining (pipeline semantics):** When multiple transform entries
+within a single profile match the same request (same path, method, content-type),
+they form an **ordered pipeline** executed in declaration order:
+
+1. Specs execute in the order they appear in the profile YAML.
+2. The **output body** of spec N becomes the **input body** of spec N+1.
+3. `TransformContext` (headers, status) is **re-read** from the `Message` envelope
+   before each step — so header changes applied by spec N's `headers` block are
+   visible to spec N+1's `$headers` variable.
+4. **Abort-on-failure**: if any spec in the chain fails at runtime (evaluation error,
+   budget exceeded), the **entire chain aborts**. The original, unmodified message
+   passes through. No partial pipeline results reach the client.
+5. Structured logging MUST include the chain step index (e.g., `chain_step: 2/3`)
+   alongside the spec id for each evaluated step.
+
+This is the mechanism that enables mixed-engine composition (ADR-0008), e.g., JOLT
+structural shift → JSLT conditional enrichment on the same route.
+
 | Aspect | Detail |
 |--------|--------|
 | Success path | Profile loaded → versioned specs resolved → bound to URL patterns |
@@ -386,7 +404,8 @@ resolution (ADR-0006):
 | Validation path | Referenced version not loaded → fail at load time |
 | Validation path | Two profiles with identical specificity and constraints → load-time error |
 | Failure path | Duplicate profile IDs → reject, no silent override |
-| Source | Kong route/plugin binding, Apigee flow attachment, ADR-0005, ADR-0006 |
+| Failure path | Chain step fails → entire chain aborts, original message passes through |
+| Source | Kong route/plugin binding, Apigee flow attachment, ADR-0005, ADR-0006, ADR-0008 |
 
 ### FR-001-06: Passthrough Behavior
 
