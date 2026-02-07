@@ -417,18 +417,31 @@ The engine MUST:
 3. If a profile references `spec: callback-prettify` **without** a version suffix,
    the engine MUST resolve to the **latest** loaded version (highest semver).
 
-When multiple profiles match the same request, the engine uses **most-specific-wins**
-resolution (ADR-0006):
+When multiple entries **within a single profile** match the same request, the engine
+uses **most-specific-wins** resolution (ADR-0006):
 
 1. **Specificity score**: count literal (non-wildcard) path segments. Higher score wins.
    - `/json/alpha/authenticate` (3 literals) beats `/json/*/authenticate` (2 literals).
    - `/json/*/authenticate` (2 literals) beats `/json/*` (1 literal).
-2. **Tie-breaking**: if two profiles have the same specificity score:
+2. **Tie-breaking**: if two entries have the same specificity score:
    a. More `match` constraints (method, content-type) wins.
    b. If still tied → **load-time error** (ambiguous match detected, must be resolved
       by the operator).
-3. **Structured logging**: every matched profile MUST be logged (NFR-001-08) so
-   operators can trace exactly which profile was selected.
+3. **Structured logging**: every matched entry MUST be logged (NFR-001-08) so
+   operators can trace exactly which entry was selected.
+
+**Cross-profile routing is product-defined.** Whether multiple profiles can apply to
+the same request — and in what order — is determined by the **gateway product's
+deployment model**, not by the core engine. Examples:
+- In PingAccess, an adapter instance is bound to a specific rule at the API operation,
+  context root, or global level. Each instance has its own profile configuration.
+- In Kong, a plugin instance is attached to a specific route or service.
+- In a standalone proxy, the deployment configuration determines routing.
+
+The core engine does not detect or resolve cross-profile conflicts. Each engine
+invocation processes one profile. If the gateway product routes a single request
+to multiple engine invocations (e.g., multiple adapter instances), the resulting
+behaviour is **product-defined**.
 
 **Profile-level chaining (pipeline semantics):** When multiple transform entries
 within a single profile match the same request (same path, method, content-type),

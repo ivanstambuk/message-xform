@@ -5,12 +5,20 @@ Date: 2026-02-07 | Status: Accepted
 ## Context
 
 FR-001-05 defines profiles with `match` criteria (path glob, method, content-type) that
-bind transform specs to URL patterns. When multiple profiles match the same request
-(e.g., `/json/alpha/authenticate` matches both `/json/*/authenticate` and `/json/alpha/*`),
-the engine needs a deterministic resolution strategy.
+bind transform specs to URL patterns. When multiple **entries within a single profile**
+match the same request (e.g., `/json/alpha/authenticate` matches both
+`/json/*/authenticate` and `/json/alpha/*` in the same profile), the engine needs a
+deterministic resolution strategy.
 
 This is critical for production — ambiguous matching leads to unpredictable behaviour
 that is nearly impossible to debug in live systems.
+
+**Scope:** This ADR applies to match resolution **within a single profile** only.
+Cross-profile routing (whether multiple profiles can apply to the same request) is
+**product-defined** — determined by the gateway product's deployment model (e.g.,
+PingAccess rule binding, Kong route/plugin attachment, context root vs per-operation
+configuration). The core engine does not define or detect cross-profile conflicts.
+See Q-027 resolution notes in FR-001-05.
 
 ### Options Considered
 
@@ -75,6 +83,7 @@ Follow-ups:
 - Consider a `--dry-run` mode that reports match resolution for a given request path
   without executing the transform, for operator debugging.
 - Document the specificity scoring algorithm with examples in the operator guide.
+- Cross-profile conflict handling is product-defined (not engine-defined). See FR-001-05.
 
 References:
 - Feature 001 spec: `docs/architecture/features/001/spec.md` (FR-001-05, NFR-001-08)
