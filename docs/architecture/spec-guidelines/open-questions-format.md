@@ -1,6 +1,6 @@
 # Open Questions – Decision Card Format
 
-Status: Draft | Last updated: 2025-12-14
+Status: Active | Last updated: 2026-02-07
 
 This document defines the standard “Decision Card” format for all medium‑ and high‑impact open questions that are presented to humans (for example in chat, design docs, or reviews).
 
@@ -18,10 +18,12 @@ When formatting an open question, use the following structure verbatim, adapting
 **Preferred option:** 🅰️ (**recommended**) Option A – Option title  
 
 **Context**  
-High/medium-level context that makes the decision self-contained. Include enough detail that the human can decide without follow-up questions.
+The context section uses **progressive disclosure** — move from plain-language overview to technical detail. The reader should understand the *what* and *why* before encountering any technical vocabulary. Structure the context using the following sub-bullets **in order**:
 
-- **Current behaviour / contract today:** What the repo currently specifies or implies (cite file paths/sections).
-- **Why this is a decision (what’s ambiguous):** The conflict, gap, or choice that must be settled.
+- **Plain-language problem statement:** In 2–4 sentences, explain the problem in terms a product owner could understand. No spec IDs, no config key names, no code. Answer: "What is this feature/concept? Why does it exist? What goes wrong if we don't decide?"
+- **Define before use:** If the decision involves domain-specific terms, modes, or config options that the reader may not have in working memory, define them here with a one-line explanation and a concrete example *before* they appear in the options below. Do NOT assume the reader remembers every spec concept — even the spec author may not recall details introduced weeks ago.
+- **Current behaviour / contract today:** What the repo currently specifies or implies (cite file paths/sections). This is where technical references belong — after the reader has context.
+- **Why this is a decision (what's ambiguous):** The conflict, gap, or choice that must be settled.
 - **Decision scope:** What this decision covers (and, optionally, what it explicitly does not cover).
 - **Stakeholders / impact:** Who/what is affected (security, UX, compatibility, ops).
 - **Key references:** Bullet list of the most relevant authoritative docs (DSL sections, ADRs, feature specs, OpenAPI).
@@ -110,6 +112,8 @@ Who needs to decide what, and where/when (for example:
 - Options must be listed in **preference order** (A is most preferred, then B, then C, etc.), consistent with `docs/4-architecture/open-questions.md`.
 - If there are more or fewer options than A/B/C, extend or shrink the list while keeping the same pattern (🅰️, 🅱️, 🅲, 🅳, …).
 - The Decision Card MUST include the **Context** section and it MUST be sufficient for an informed decision without follow-ups.
+- **Progressive disclosure (mandatory):** The Context section MUST follow the sub-bullet order defined in the template. Start with a plain-language problem statement, then define terms, *then* cite spec references and technical detail. The reader should never encounter a technical term (e.g., "strict mode", "lenient mode", "pipeline chaining") that hasn't been introduced in plain language first. If a reader needs to ask "what is this concept?" after reading the Context, the card has failed.
+- **Define before use (mandatory):** If the decision introduces or questions a domain-specific concept (a config option, a mode, a strategy), the Context MUST include a brief definition (1–2 sentences) explaining what it is, why it was introduced, and what it does in practice — *before* the options reference it. Do NOT assume context from previous conversations.
 - Do **not** add extra meta sections (no TL;DR, summary, criticism, etc.) beyond what is defined in the template.
 - **Workspace-first grounding:** the “Current behaviour / contract today” and “Key references” bullets MUST be based on the repository’s current authoritative documents (DSL reference, ADRs, feature specs, OpenAPI) and MUST cite concrete file paths/sections. Do not rely on chat memory as the primary source for these facts.
 - **Concrete examples are mandatory:** Every option MUST include a `Concrete example` block showing what the system would look like (spec YAML, API, config) if that option is adopted. The reader must be able to visualise the impact without follow-up questions.
