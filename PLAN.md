@@ -218,6 +218,71 @@ Study how Kong implements request/response transformation to inform a generalize
 
 **Goals**: Understand Kong's transformation model, configuration surface, and plugin architecture. Extract patterns that can be generalized across gateways (PingAccess, Kong, NGINX, standalone).
 
+### Research: PingGateway (formerly ForgeRock IG)
+
+PingGateway is a **separate product** from PingAccess within the Ping Identity suite. It's a programmable reverse proxy / identity gateway with its own filter/handler chain model. Since message-xform already targets the Ping ecosystem, PingGateway is a natural candidate.
+
+**Research goals:**
+- [ ] Understand PingGateway's filter/handler pipeline (how request/response interception works)
+- [ ] Evaluate Groovy scripting model for custom filters
+- [ ] Compare PingGateway's extension points with PingAccess plugin API
+- [ ] Determine if a shared Java core can serve both PingAccess and PingGateway adapters
+- [ ] Check PingAM 8 docs (`docs/reference/pingam-8.txt`) for PingGateway references
+
+### Research: NGINX Adapter
+
+Investigate how to integrate message-xform with NGINX. Unlike PingAccess/PingGateway/WSO2, NGINX has **no native Java interop**, so a bridging strategy is needed.
+
+**Possible approaches (decision deferred to implementation):**
+1. **njs (JavaScript)** — NGINX's built-in JS scripting. Lightweight, but limited API surface.
+2. **OpenResty (Lua)** — Lua scripting on NGINX (same ecosystem as Kong). Mature, but no Java core reuse.
+3. **C module** — Native NGINX module. Maximum performance, highest development cost, no Java core reuse.
+4. **Standalone sidecar proxy** — Run `message-xform-standalone` as a sidecar HTTP proxy; NGINX proxies through it. Avoids the language gap entirely and reuses the Java core as-is.
+
+**Research goals:**
+- [ ] Evaluate each approach for performance, complexity, and maintenance burden
+- [ ] Study existing NGINX transformation modules for design patterns
+- [ ] Determine if the sidecar proxy approach imposes acceptable latency overhead
+
+### Evaluate: Gateway Adapter Candidates
+
+Assess which API gateways are realistic targets for message-xform adapters, beyond the initially planned PingAccess/Kong/NGINX.
+
+**Evaluation criteria:**
+1. Java interop — can the gateway call Java code natively? (critical for core reuse)
+2. Open source — is the gateway OSS or does it require a commercial license?
+3. Market relevance — is it widely deployed in enterprise environments?
+4. Plugin complexity — how hard is it to write a request/response transformation plugin?
+
+**Candidate tiers (initial assessment):**
+
+#### Tier 1 — Java-native (can reuse core directly)
+| Gateway | Extension Model | OSS? | Notes |
+|---------|----------------|------|-------|
+| PingAccess | Java plugin API | No | Primary target, already planned |
+| PingGateway | Java + Groovy filters | No | Same Ping ecosystem |
+| WSO2 API Manager | Java + Ballerina | Yes | Full lifecycle, Java-native |
+| Gravitee.io | Java plugins + Groovy | Yes | Event-native, Kafka support |
+| Apache APISIX | Java Plugin Runner | Yes | Hot-reload, high performance |
+| Google Apigee | Java callouts | No (SaaS) | Enterprise, but commercial/SaaS lock-in |
+
+#### Tier 2 — Possible with bridging (Go/Lua, wrapper needed)
+| Gateway | Extension Model | OSS? | Notes |
+|---------|----------------|------|-------|
+| Kong | Lua, Go, WASM | Yes | Already planned, massive ecosystem |
+| Tyk | Go, JS, Python, Lua | Yes | Go-native, multi-language |
+| NGINX | njs (JS), C module | Yes | Already planned |
+
+#### Tier 3 — Poor fit (wrong ecosystem / philosophy mismatch)
+| Gateway | Why poor fit |
+|---------|-------------|
+| Zuplo | TypeScript-only, commercial SaaS, no Java interop |
+| KrakenD | Go-only, anti-scripting philosophy (speed over extensibility) |
+| Traefik | Go-only via Yaegi interpreter, no Java path |
+| Gloo Edge (Envoy) | WASM-based, Java→WASM compilation is immature |
+
+**Decision needed:** Which Tier 1/2 candidates to prioritize for adapter development after PingAccess?
+
 ---
 
 *Created: 2026-02-07*  
