@@ -58,7 +58,15 @@ structural reshaping capability, and production maturity.
   - Cons: Not Jackson-native (own internal model — requires serialization roundtrip).
     Smaller Java ecosystem than JSLT.
 
-- **Option E – JMESPath** (rejected)
+- **Option E – DataWeave (MuleSoft)** (rejected as default, available as future engine)
+  - MuleSoft's transformation language, recently open-sourced under BSD-3.
+  - Pros: Powerful conditional logic, pattern matching, passthrough via `-` operator.
+    Strong in enterprise integration (MuleSoft Anypoint).
+  - Cons: Not Jackson-native (own internal model — serialization roundtrip). Primarily
+    associated with MuleSoft ecosystem. Open-source version is new and immature
+    compared to JSLT.
+
+- **Option F – JMESPath** (rejected)
   - JSON query language used in AWS CLI.
   - Pros: Simple query syntax.
   - Cons: No conditional logic, no structural reshaping, no passthrough — too limited
@@ -83,15 +91,15 @@ Expression Engine SPI (ADR-0010) but are opt-in and may not support all capabili
 
 ### Evaluation Summary
 
-| Criterion             | JSLT       | JOLT     | jq           | JSONata    | JMESPath |
-|-----------------------|:----------:|:--------:|:------------:|:----------:|:--------:|
-| Readability           | ⭐⭐⭐⭐⭐ | ⭐⭐     | ⭐⭐⭐⭐     | ⭐⭐⭐⭐   | ⭐⭐⭐   |
-| Jackson-native        | ✅         | ✅       | ✅ (adapter) | ❌         | ❌       |
-| Conditional logic     | ✅         | ❌       | ✅           | ✅         | ❌       |
-| Structural reshaping  | ✅         | ✅       | ✅           | ✅         | ❌       |
-| Passthrough (`* : .`) | ✅         | ❌       | manual       | ❌         | ❌       |
-| Production maturity   | 9B/day     | NiFi     | preview      | IBM z/OS   | AWS CLI  |
-| Dependencies          | Jackson    | Jackson  | Jackson      | own model  | Jackson  |
+| Criterion             | JSLT       | JOLT     | jq           | JSONata    | DataWeave  | JMESPath |
+|-----------------------|:----------:|:--------:|:------------:|:----------:|:----------:|:--------:|
+| Readability           | ⭐⭐⭐⭐⭐ | ⭐⭐     | ⭐⭐⭐⭐     | ⭐⭐⭐⭐   | ⭐⭐⭐⭐   | ⭐⭐⭐   |
+| Jackson-native        | ✅         | ✅       | ✅ (adapter) | ❌         | ❌         | ❌       |
+| Conditional logic     | ✅         | ❌       | ✅           | ✅         | ✅         | ❌       |
+| Structural reshaping  | ✅         | ✅       | ✅           | ✅         | ✅         | ❌       |
+| Passthrough (`* : .`) | ✅         | ❌       | manual       | ❌         | ✅ (`-`)   | ❌       |
+| Production maturity   | 9B/day     | NiFi     | preview      | IBM z/OS   | MuleSoft   | AWS CLI  |
+| Dependencies          | Jackson    | Jackson  | Jackson      | own model  | own model  | Jackson  |
 
 Full comparison: `docs/research/expression-engine-evaluation.md`.
 
