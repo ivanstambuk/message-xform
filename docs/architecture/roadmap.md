@@ -12,7 +12,6 @@
 | 006 | Apache APISIX Adapter | 🔲 Not Started | `features/006/spec.md` | Feature 001 | Java (Plugin Runner) |
 | 007 | Kong Gateway Adapter | 🔲 Not Started | `features/007/spec.md` | Feature 001 | Lua or sidecar |
 | 008 | NGINX Adapter | 🔲 Not Started | `features/008/spec.md` | Feature 001 | njs / sidecar |
-| 009 | PingAM Callback Transform Profile | 🔲 Not Started | `features/009/spec.md` | Feature 001 | YAML (spec) |
 
 ## Feature Overview
 
@@ -61,11 +60,9 @@ Similar to Kong — no native Java. Four approaches documented:
 (a) njs (JavaScript), (b) OpenResty (Lua), (c) C module, (d) sidecar proxy.
 **Sidecar is the pragmatic default** — run standalone mode, NGINX proxies through.
 
-### Feature 009 — PingAM Callback Transform Profile
-
-Not a gateway adapter, but a **transform profile** — a YAML spec that defines
-how to transform PingAM callback JSON. Uses the core engine (Feature 001).
-This is the reference use case that drives the engine design.
+> **Note:** PingAM callback transformations are covered as **test scenarios** in Feature 001
+> (S-001-01 through S-001-05, S-001-29, S-001-32). They are validation data for the
+> core engine, not a separate feature.
 
 ## Priority Order
 
@@ -73,7 +70,7 @@ Based on the gateway candidate research (`docs/research/gateway-candidates.md`):
 
 | Tier | Features | Rationale |
 |------|----------|-----------|
-| **Tier 1** | 001 (core) + 002 (PingAccess) + 009 (PingAM profile) | MVP: core + primary adapter + reference use case |
+| **Tier 1** | 001 (core) + 002 (PingAccess) | MVP: core engine + primary adapter |
 | **Tier 2** | 003 (PingGateway) + 004 (Standalone) | Same vendor ecosystem + dev/test tool |
 | **Tier 3** | 005 (WSO2) + 006 (APISIX) | OSS gateways, Java-native, broader market |
 | **Tier 4** | 007 (Kong) + 008 (NGINX) | Language gap — requires bridging strategy |
