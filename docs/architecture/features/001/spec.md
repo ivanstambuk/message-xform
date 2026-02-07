@@ -319,11 +319,33 @@ interface:
 - PingGateway: `Request` / `Response` → `Message`
 - Standalone: `HttpServletRequest` / `HttpServletResponse` → `Message`
 
+**Copy-on-wrap semantics:** Adapters MUST create a **mutable copy** of the
+gateway-native message when wrapping (deep-copy of `JsonNode` body, copy of headers
+map, snapshot of status code). The core engine mutates this copy freely during
+transformation. After transformation completes successfully (including all chain
+steps), the adapter applies the final state back to the native message via
+`GatewayAdapter.applyChanges(Message, native)`.
+
+On abort-on-failure, the adapter **does not call `applyChanges()`** — the native
+message remains completely untouched. This provides clean rollback semantics for
+pipeline chaining (FR-001-05) and ensures no partial mutations leak to other
+gateway filters.
+
+```
+wrapResponse(native) → Message (copy)
+  ↓
+Engine mutates Message (body, headers, status)
+  ↓
+if success: applyChanges(Message, native) → writes back to native
+if failure: discard Message copy → native untouched
+```
+
 | Aspect | Detail |
 |--------|--------|
-| Success path | Adapter wraps native message → engine processes → adapter applies changes |
+| Success path | Adapter creates copy → engine processes → adapter applies changes back to native |
 | Validation path | Message body is not valid JSON → skip body transformation, apply header transforms only |
 | Failure path | Adapter cannot read body (e.g., streaming) → log warning, pass through |
+| Failure path | Transform fails → copy discarded, native message untouched |
 | Source | PingAccess `Exchange`, gateway adapter pattern, ADR-0011 |
 
 ### FR-001-05: Transform Profiles (Backend-Specific Definitions)

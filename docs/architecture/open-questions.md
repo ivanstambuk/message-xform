@@ -21,7 +21,6 @@ Hard rules:
 
 | ID | Owner | Question | Options (A preferred) | Status | Asked | Notes |
 |----|-------|----------|------------------------|--------|-------|-------|
-| Q-012 | Ivan | Should the `Message` adapter be a copy (own state) or a wrapper (shared with gateway)? | A) Copy-on-wrap (safe, no side effects) B) Wrapper with explicit apply-back (efficient but requires care) C) Configurable per adapter | Open | 2026-02-07 | severity: high — FR-001-04, NFR-001-01 |
 | Q-013 | Ivan | Hot reload (NFR-001-05): should reload be per-spec or transactional (all specs + profiles atomically)? | A) Transactional — snapshot all specs/profiles, swap atomically B) Per-spec with dependency resolution C) Per-spec with eventual consistency | Open | 2026-02-07 | severity: high — NFR-001-05 |
 | Q-014 | Ivan | `mapperRef` invocation model: how are mappers applied — transform-level directive, inline function, or both? | A) Transform-level sequential directive only B) Both transform-level and inline JSLT function C) Inline JSLT function only | Open | 2026-02-07 | severity: medium — FR-001-08 |
 | Q-015 | Ivan | `match` block in specs vs profiles — overlapping concerns. Where does content-type matching belong? | A) Spec-level match is a prerequisite (declares what the spec can handle); profile further narrows B) Remove spec-level match entirely — matching is 100% profile concern C) Keep both, profile overrides spec | Open | 2026-02-07 | severity: medium — FR-001-01, FR-001-05 |
