@@ -82,6 +82,7 @@ Update both `docs/architecture/roadmap.md` and the Roadmap table above when stat
      2. For **medium- or high-impact** decisions: automatically create an ADR under `docs/decisions/` with Context, Decision, Consequences, and Related sections.
      3. **Immediately remove** the resolved row from `docs/architecture/open-questions.md` — the file must never contain resolved questions.
    - Then move to the next question.
+9. **Decisions Must Be Testable**: Every ADR or resolved open question that changes the spec MUST produce at least one validating scenario in `scenarios.md`. Scenarios reference ADRs (via tags like `adr-0002`) and spec requirements (via `requires: [FR-001-10]`). The coverage matrix at the bottom of `scenarios.md` MUST be updated. When a discussion reveals a new edge case, add a scenario immediately — don't defer.
 
 ## Browser Agent (browser_subagent) — MANDATORY Setup
 

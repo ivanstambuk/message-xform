@@ -20,20 +20,20 @@ Header transforms use a **hybrid approach**:
 1. **Declarative `headers` block** in the transform spec for add/remove/rename operations,
    processed independently of the body expression. Glob patterns are supported for removal.
 2. **Read-only `$headers` variable** bound into the JSLT evaluation context, allowing body
-   expressions to reference header values via `$headers."X-Request-ID"`. This uses JSLT's
-   native external variable binding — no body input pollution.
+   expressions to reference header values via `$headers."X-Request-ID"` (**header-to-body**).
+3. **Dynamic `add` values** using `expr` sub-keys — JSLT expressions evaluated against the
+   **transformed** body, enabling **body-to-header injection** (e.g., extract error code
+   from body and emit as `X-Error-Code` header).
 
 Processing order: read headers → bind `$headers` → evaluate JSLT body → apply declarative
-header operations (remove → rename → add).
+header operations (remove → rename → static add → dynamic add).
 
 ## Consequences
 
 - **Clean separation**: body transforms use JSLT, header transforms use declarative rules.
   No mixing of concerns inside the expression.
-- **Header-to-body bridge**: `$headers` binding enables cross-domain injection without
-  merging headers into the body JSON input.
-- **No body-to-header bridge** (by design): JSLT output cannot set headers. Header values
-  are static or derived from the original request/response headers only.
+- **Bidirectional bridge**: `$headers` enables header-to-body; dynamic `expr` in `add`
+  enables body-to-header. Both directions are covered.
 - **Multi-value headers**: `$headers` exposes the first value only in v1. Full multi-value
   support is deferred to a future extension.
 - **FR-001-10** added to encode this requirement.
@@ -41,3 +41,4 @@ header operations (remove → rename → add).
 References:
 - Feature 001 spec: `docs/architecture/features/001/spec.md` (FR-001-10)
 - Kong transformer pattern: `docs/research/transformation-patterns.md`
+- Validating scenarios: S-001-33 (header-to-body), S-001-34 (body-to-header)

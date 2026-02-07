@@ -439,15 +439,24 @@ by the engine **independently** of the body JSLT expression.
 ```yaml
 headers:
   add:
-    X-Transformed-By: "message-xform"
-    X-Spec-Version: "1.0.0"
-  remove: ["X-Internal-*", "X-Debug-*"]   # glob patterns supported
+    X-Transformed-By: "message-xform"          # static value
+    X-Spec-Version: "1.0.0"                     # static value
+    X-Error-Code:                                # dynamic — from body
+      expr: .error.code
+    X-Auth-Method:                               # dynamic — from body
+      expr: if (.callbacks) "challenge" else "simple"
+  remove: ["X-Internal-*", "X-Debug-*"]         # glob patterns supported
   rename:
     X-Old-Header: X-New-Header
 ```
 
+Dynamic header values use an `expr` sub-key containing a JSLT expression evaluated
+against the **transformed** body. This enables **body-to-header injection** (e.g.,
+extract an error code from the body and emit it as a response header).
+
 Additionally, the engine MUST expose request/response headers as a **read-only JSLT
-variable** `$headers`, allowing JSLT body expressions to reference header values:
+variable** `$headers`, allowing JSLT body expressions to reference header values
+(**header-to-body injection**):
 
 ```yaml
 transform:
@@ -468,13 +477,18 @@ a future extension.
 Processing order:
 1. Engine reads headers from the `Message` envelope → binds as `$headers`.
 2. JSLT body expression evaluates with `$headers` available as read-only context.
-3. Declarative `headers` block applied (`remove` → `rename` → `add`).
+3. Declarative header operations applied:
+   a. `remove` — strip matching headers (glob patterns).
+   b. `rename` — rename header keys.
+   c. `add` (static) — set headers with literal string values.
+   d. `add` (dynamic) — evaluate `expr` against the **transformed** body, set result as header value.
 
 | Aspect | Detail |
 |--------|--------|
 | Success path | Headers block parsed → add/remove/rename applied after body transform |
 | Validation path | Invalid glob in `remove` → reject at load time |
 | Failure path | Referenced header missing → `$headers."X-Missing"` evaluates to `null` (JSLT default) |
+| Failure path | Dynamic header `expr` returns non-string → coerce to string or reject |
 | Source | Kong transformer add/remove/rename pattern, ADR-0002 |
 
 ## Non-Functional Requirements

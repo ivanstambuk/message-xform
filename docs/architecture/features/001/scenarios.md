@@ -1465,6 +1465,137 @@ expected_output:
 
 ---
 
+## Category 9: Header ↔ Body Transforms
+
+Scenarios validating header-to-body and body-to-header injection (ADR-0002, FR-001-10).
+
+### S-001-33: Header-to-Body Injection via `$headers`
+
+Inject a request header value into the transformed response body.
+
+```yaml
+scenario: S-001-33
+name: header-to-body-injection
+description: >
+  Inject the X-Request-ID header value into the response body using the
+  $headers read-only JSLT variable. Validates ADR-0002 header-to-body bridge.
+tags: [header, body, injection, adr-0002]
+requires: [FR-001-10]
+
+transform:
+  lang: jslt
+  expr: |
+    {
+      "requestId": $headers."X-Request-ID",
+      "correlationId": $headers."X-Correlation-ID",
+      "data": .data,
+      "status": .status
+    }
+
+request_headers:
+  X-Request-ID: "req-abc-123"
+  X-Correlation-ID: "corr-xyz-789"
+  Content-Type: "application/json"
+
+input:
+  data: "some payload"
+  status: "ok"
+
+expected_output:
+  requestId: "req-abc-123"
+  correlationId: "corr-xyz-789"
+  data: "some payload"
+  status: "ok"
+```
+
+### S-001-34: Body-to-Header Injection via Dynamic `expr`
+
+Extract values from the transformed body and emit them as response headers.
+
+```yaml
+scenario: S-001-34
+name: body-to-header-injection
+description: >
+  Extract error code and auth method from the response body and emit them
+  as response headers using dynamic expr in the headers.add block.
+  Validates ADR-0002 body-to-header bridge.
+tags: [header, body, injection, dynamic, adr-0002]
+requires: [FR-001-10]
+
+transform:
+  lang: jslt
+  expr: |
+    {
+      "type": if (.callbacks) "challenge" else "simple",
+      "authId": .authId,
+      "error": .error
+    }
+
+headers:
+  add:
+    X-Auth-Method:
+      expr: if (.callbacks) "challenge" else "simple"
+    X-Error-Code:
+      expr: .error.code
+    X-Transformed-By: "message-xform"
+  remove: ["X-Internal-*"]
+
+input:
+  authId: "eyJ0eXAi..."
+  callbacks:
+    - type: "NameCallback"
+  error:
+    code: "AUTH_REQUIRED"
+    message: "Authentication required"
+
+expected_output:
+  type: "challenge"
+  authId: "eyJ0eXAi..."
+  error:
+    code: "AUTH_REQUIRED"
+    message: "Authentication required"
+
+expected_headers:
+  X-Auth-Method: "challenge"
+  X-Error-Code: "AUTH_REQUIRED"
+  X-Transformed-By: "message-xform"
+```
+
+### S-001-35: Missing Header — `$headers` Returns Null
+
+Edge case: referencing a header that doesn't exist returns null.
+
+```yaml
+scenario: S-001-35
+name: missing-header-returns-null
+description: >
+  When $headers references a header that was not sent, JSLT returns null.
+  The transform should handle this gracefully.
+tags: [header, edge-case, null, adr-0002]
+requires: [FR-001-10]
+
+transform:
+  lang: jslt
+  expr: |
+    {
+      "requestId": $headers."X-Request-ID",
+      "data": .data
+    }
+
+request_headers:
+  Content-Type: "application/json"
+  # Note: X-Request-ID is NOT present
+
+input:
+  data: "payload"
+
+expected_output:
+  requestId: null
+  data: "payload"
+```
+
+---
+
 ## Scenario Index
 
 | ID | Name | Category | Tags |
@@ -1501,6 +1632,9 @@ expected_output:
 | S-001-30 | bidirectional-flat-nested | Bidirectional | bidirectional, structural, round-trip |
 | S-001-31 | error-normalize-rfc9457 | Error Normalization | error-normalization, rfc9457 |
 | S-001-32 | pingam-error-normalization | Error Normalization | pingam, error-normalization |
+| S-001-33 | header-to-body-injection | Header ↔ Body | header, body, injection, adr-0002 |
+| S-001-34 | body-to-header-injection | Header ↔ Body | header, body, injection, dynamic, adr-0002 |
+| S-001-35 | missing-header-returns-null | Header ↔ Body | header, edge-case, null, adr-0002 |
 
 ## Coverage Matrix
 
@@ -1514,6 +1648,8 @@ expected_output:
 | FR-001-06 (Passthrough) | S-001-18, S-001-19 |
 | FR-001-07 (Error Handling) | S-001-24, S-001-28 |
 | FR-001-08 (Reusable Mappers) | *Not yet covered — add when mapperRef is specified* |
+| FR-001-09 (Schema Validation) | *Not yet covered — add input/output schema test vectors* |
+| FR-001-10 (Header Transforms) | S-001-33, S-001-34, S-001-35 |
 | NFR-001-01 (Stateless) | All — implicit in test harness design |
 | NFR-001-03 (Latency <5ms) | S-001-23 |
 | NFR-001-04 (Open-world) | S-001-07, S-001-20 |
