@@ -288,6 +288,31 @@ Assess which API gateways are realistic targets for message-xform adapters, beyo
 
 **Decision needed:** Which Tier 1/2 candidates to prioritize for adapter development after PingAccess?
 
+### Cross-Language Portability Audit
+
+Revisit all Feature 001 specs, ADRs, and interface contracts to evaluate whether they
+are **language-agnostic** enough to support non-Java implementations (Lua, Go, C, Python).
+
+The core engine is Java-first, but Tier 2 gateways (Kong=Lua, Tyk=Go, NGINX=C) may need
+native engine reimplementations or sidecar bridge protocols. The spec-level contracts
+(TransformContext, Message, ExpressionEngine SPI, GatewayAdapter SPI) should be expressible
+in any language without Java-isms leaking through.
+
+**Triggered by:** ADR-0020 (nullable status code) exposed that a Java `int` sentinel
+was incompatible with the language-neutral `null` contract. Other contracts may have
+similar issues.
+
+**Audit scope:**
+- [ ] Review all Java interface contracts (TransformContext, Message, ExpressionEngine,
+      CompiledExpression, GatewayAdapter) for Java-specific assumptions
+- [ ] Review all ADRs for language-specific implications
+- [ ] Document a "JSON wire protocol" spec for the sidecar/bridge pattern — this is the
+      language-neutral serialization of TransformContext, Message, and TransformResult
+- [ ] Evaluate whether the expression engine SPI should define a cross-language contract
+      (e.g., WASM, gRPC) or remain Java-only with sidecar as the bridge
+
+**When:** After all current open questions (Q-021 through Q-027) are resolved.
+
 ### E2E Gateway Integration Testing
 
 Build and validate message-xform adapters against real gateway instances, end-to-end. For each gateway, the workflow is:
