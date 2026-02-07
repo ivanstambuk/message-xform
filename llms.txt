@@ -1,0 +1,31 @@
+# message-xform — LLM Context Manifest
+# High-signal specs for LLM context windows.
+# Listed in priority order: load these first when token budget is limited.
+
+# Governance & conventions
+AGENTS.md
+docs/decisions/project-constitution.md
+docs/architecture/terminology.md
+
+# Feature 001 — Message Transformation Engine (core)
+docs/architecture/features/001/spec.md
+docs/architecture/features/001/scenarios.md
+
+# Architecture decisions (newest first)
+docs/decisions/ADR-0007-layered-observability.md
+docs/decisions/ADR-0006-profile-match-resolution.md
+docs/decisions/ADR-0005-profile-spec-version-pinning.md
+docs/decisions/ADR-0004-engine-support-matrix.md
+docs/decisions/ADR-0003-status-code-transforms.md
+docs/decisions/ADR-0002-header-transforms.md
+docs/decisions/ADR-0001-mandatory-json-schema.md
+
+# Roadmap & open questions
+docs/architecture/roadmap.md
+docs/architecture/open-questions.md
+
+# Research
+docs/research/pingam-callback-api.md
+
+# Plan
+PLAN.md

@@ -5,7 +5,24 @@
 ## Project Overview
 
 **message-xform** is a standalone payload & header transformation engine for API Gateways.
-See `PLAN.md` for full architecture and feature breakdown.
+See `PLAN.md` for full architecture and feature breakdown. Read the project
+constitution in `docs/decisions/project-constitution.md` before acting.
+
+## Key References
+
+| Document | Purpose |
+|----------|---------|
+| `PLAN.md` | Vision, architecture, features |
+| `docs/decisions/project-constitution.md` | Non-negotiable SDD principles & governance |
+| `docs/architecture/terminology.md` | Canonical term definitions (golden source) |
+| `docs/architecture/knowledge-map.md` | Module structure, concept map, ADR dependencies |
+| `docs/architecture/roadmap.md` | Feature roadmap (canonical source) |
+| `docs/architecture/open-questions.md` | Live open questions (scratchpad, not archive) |
+| `docs/architecture/spec-guidelines/docs-style.md` | Docs formatting & cross-reference conventions |
+| `docs/architecture/spec-guidelines/open-questions-format.md` | Decision Card format for open questions |
+| `docs/operations/analysis-gate-checklist.md` | Pre-implementation & drift gate verification |
+| `llms.txt` | High-signal specs manifest for LLM context windows |
+| `docs/_current-session.md` | Live session snapshot for agent handoffs |
 
 ## Roadmap
 
@@ -51,11 +68,18 @@ Update both `docs/architecture/roadmap.md` and the Roadmap table above when stat
   - `docs/architecture/features/<NNN>/tasks.md` — Task breakdowns.
   - `docs/architecture/open-questions.md` — Live open questions (scratchpad, not archive).
   - `docs/architecture/roadmap.md` — Feature roadmap (canonical source).
+  - `docs/architecture/terminology.md` — Project terminology (golden source).
+  - `docs/architecture/knowledge-map.md` — Module/concept dependency graph.
+  - `docs/architecture/spec-guidelines/` — Docs style, open questions format.
   - `docs/decisions/` — Architecture Decision Records (ADRs).
+  - `docs/decisions/project-constitution.md` — Project constitution.
+  - `docs/operations/` — Gate checklists and operational runbooks.
   - `docs/research/` — Research notes (API analysis, gateway evaluations, etc.).
-  - `docs/templates/` — Spec and document templates.
+  - `docs/templates/` — Spec, plan, tasks, and ADR templates.
+  - `docs/_current-session.md` — Session state for agent handoffs.
   - `.agent/workflows/` — Session lifecycle workflows.
   - `.agent/session/` — Ephemeral session state (pending tasks).
+  - `llms.txt` — High-signal specs manifest for LLM context.
 
 ## Rules
 
@@ -83,6 +107,54 @@ Update both `docs/architecture/roadmap.md` and the Roadmap table above when stat
      3. **Immediately remove** the resolved row from `docs/architecture/open-questions.md` — the file must never contain resolved questions.
    - Then move to the next question.
 9. **Decisions Must Be Testable**: Every ADR or resolved open question that changes the spec MUST produce at least one validating scenario in `scenarios.md`. Scenarios reference ADRs (via tags like `adr-0002`) and spec requirements (via `requires: [FR-001-10]`). The coverage matrix at the bottom of `scenarios.md` MUST be updated. When a discussion reveals a new edge case, add a scenario immediately — don't defer.
+
+## Pre-Implementation Checklist (Mandatory)
+
+> Before writing ANY production code, verify:
+> - [ ] Feature spec exists at `docs/architecture/features/<NNN>/spec.md`
+> - [ ] Spec has been reviewed/acknowledged by owner
+> - [ ] Feature plan exists at `docs/architecture/features/<NNN>/plan.md`
+> - [ ] Feature tasks exist at `docs/architecture/features/<NNN>/tasks.md`
+> - [ ] Scenarios with input/output contracts exist
+> - [ ] Analysis gate checklist (`docs/operations/analysis-gate-checklist.md`) passed
+> - [ ] Current task is marked "in-progress" in tasks.md
+>
+> If ANY box is unchecked, STOP and complete that step first.
+
+## Agent Persistence & Token Budget
+
+- Assume a large token and context budget. Do not prematurely truncate work,
+  over-summarise, or stop early due to token concerns. Prefer complete, fully
+  verified solutions over minimal answers.
+- Aggressively leverage existing specs, docs, and code instead of asking the user
+  to restate information recoverable from the repository.
+- Be **brave and persistent**: for any scoped task, keep going through exploration →
+  design → implementation → verification until the task is clearly done.
+- The owner explicitly encourages long-running, self-directed work to minimise
+  babysitting. Run multiple commands, apply patches, and iterate deeply.
+- Balance persistence with the SDD workflow and project guardrails. When you must
+  stop early, state clearly what blocked you and what you would do next.
+
+## Exhaustive Execution for Scoped Tasks
+
+- When the owner describes a task with an explicit scope (e.g., "all scenarios",
+  "every ADR", "execute entire Phase X"), treat that scope as **exhaustive by
+  default**, not "best-effort".
+- Do **not** silently narrow scope unless the owner explicitly approves.
+- Before declaring a task "complete", you MUST:
+  - Define concrete acceptance conditions (e.g., "no uncovered FRs in coverage matrix").
+  - Use repo-wide search commands (`rg`, `grep`) to confirm zero remaining
+    occurrences of the old pattern in the declared scope.
+- If you cannot finish the full scope, you MUST say explicitly that the task is
+  **partial**, list what remains, and stop without marking it complete.
+
+## No Silent Scope Narrowing
+
+- When the owner asks to "do X" or "update all Y", assume they mean **all
+  artifacts covered by that scope** unless they explicitly say otherwise.
+- If an exhaustive pass would be unusually large, pause and ask whether to:
+  A) still do the exhaustive pass; or
+  B) limit to a subset, and record the agreed scope.
 
 ## Browser Agent (browser_subagent) — MANDATORY Setup
 
