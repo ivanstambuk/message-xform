@@ -430,7 +430,7 @@ uses **most-specific-wins** resolution (ADR-0006):
 3. **Structured logging**: every matched entry MUST be logged (NFR-001-08) so
    operators can trace exactly which entry was selected.
 
-**Cross-profile routing is product-defined.** Whether multiple profiles can apply to
+**Cross-profile routing is product-defined (ADR-0023).** Whether multiple profiles can apply to
 the same request — and in what order — is determined by the **gateway product's
 deployment model**, not by the core engine. Examples:
 - In PingAccess, an adapter instance is bound to a specific rule at the API operation,

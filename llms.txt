@@ -27,6 +27,8 @@ docs/decisions/ADR-0010-pluggable-expression-engine-spi.md
 docs/decisions/ADR-0009-jslt-as-default-expression-engine.md
 docs/decisions/ADR-0008-single-expression-per-direction.md
 docs/decisions/ADR-0007-layered-observability.md
+docs/decisions/ADR-0023-cross-profile-routing-is-product-defined.md
+docs/decisions/ADR-0022-error-response-on-transform-failure.md
 docs/decisions/ADR-0006-profile-match-resolution.md
 docs/decisions/ADR-0005-profile-spec-version-pinning.md
 docs/decisions/ADR-0004-engine-support-matrix.md
