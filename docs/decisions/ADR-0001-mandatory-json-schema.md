@@ -1,10 +1,6 @@
-# ADR-0001: Mandatory Input/Output JSON Schema on Transform Specs
+# ADR-0001 – Mandatory Input/Output JSON Schema on Transform Specs
 
-| Field | Value |
-|-------|-------|
-| Status | Accepted |
-| Date | 2026-02-07 |
-| Feature | F-001 – Message Transformation Engine |
+Date: 2026-02-07 | Status: Accepted
 
 ## Context
 
@@ -19,8 +15,8 @@ or deferred to a future version.
 
 ## Decision
 
-**Every transform spec MUST declare `input.schema` and `output.schema` using JSON Schema
-2020-12.** Schemas are required fields on the `TransformSpec` domain object.
+Every transform spec MUST declare `input.schema` and `output.schema` using JSON Schema
+2020-12. Schemas are required fields on the `TransformSpec` domain object.
 
 At load time, the engine validates that schemas are syntactically valid JSON Schema.
 At evaluation time, runtime schema validation is configurable:
@@ -44,7 +40,6 @@ allowed core dependencies alongside Jackson, SnakeYAML, and JSLT.
 - **FR-001-09** added to encode this requirement.
 - **DO-001-02** (`TransformSpec`) updated with `inputSchema` and `outputSchema` fields.
 
-## Related
-
+References:
 - Feature 001 spec: `docs/architecture/features/001/spec.md` (FR-001-09, NFR-001-02)
 - JourneyForge schema pattern: `docs/research/journeyforge-dsl-patterns.md`, lines 333–358
