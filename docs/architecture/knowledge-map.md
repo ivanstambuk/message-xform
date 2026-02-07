@@ -73,6 +73,7 @@ ADR-0013 (Copy-on-Wrap) ──── governs ── FR-001-04, references ADR-00
 ADR-0014 (Mapper Invoke) ─── governs ── FR-001-08, references ADR-0008, ADR-0010, ADR-0012
 ADR-0015 (Spec Match)  ───── governs ── FR-001-01, FR-001-05, references ADR-0006
 ADR-0016 (Uni Direction) ─── governs ── FR-001-03, references ADR-0015
+ADR-0017 (Status Null)   ──── governs ── FR-001-11, references ADR-0003, ADR-0016
 ```
 
 ## Feature → ADR → NFR Traceability
@@ -86,7 +87,7 @@ ADR-0016 (Uni Direction) ─── governs ── FR-001-03, references ADR-0015
 | FR-001-04 (Message Envelope) | ADR-0011, ADR-0013 | — |
 | FR-001-05 (Transform Profiles) | ADR-0005, ADR-0006, ADR-0012, ADR-0015 | NFR-001-08 |
 | FR-001-10 (Header Transforms) | ADR-0002, ADR-0004 | — |
-| FR-001-11 (Status Code Transforms) | ADR-0003, ADR-0004 | — |
+| FR-001-11 (Status Code Transforms) | ADR-0003, ADR-0004, ADR-0017 | — |
 | Observability | ADR-0007 | NFR-001-08, NFR-001-09, NFR-001-10 |
 
 ## Research Documents

@@ -21,6 +21,5 @@ Hard rules:
 
 | ID | Owner | Question | Options (A preferred) | Status | Asked | Notes |
 |----|-------|----------|------------------------|--------|-------|-------|
-| Q-017 | Ivan | `$status` availability: should `$status` be available for request transforms (where no status exists yet)? | A) `$status` is `null` for request transforms — documented explicitly B) `$status` is only bound for response transforms — referencing it in request context is a load-time error C) Always available — default to 0 for requests | Open | 2026-02-07 | severity: medium — FR-001-11 |
 | Q-018 | Ivan | Large/streaming body handling: should the spec mandate full-body buffering by adapters? | A) Yes — spec mandates adapters MUST buffer full body before passing to engine; add max-input-bytes config B) No explicit mandate — leave to adapter implementation C) Support streaming via chunked JsonNode processing (future) | Open | 2026-02-07 | severity: medium — FR-001-04 |
 | Q-019 | Ivan | `sensitive` field marking (NFR-001-06): what is the YAML syntax for declaring fields as sensitive? | A) Add `sensitive: [fieldPath1, fieldPath2]` block to spec YAML B) Use JSON Schema `x-sensitive: true` annotation in field definition C) Mark at profile level, not spec level | Open | 2026-02-07 | severity: medium — NFR-001-06, FR-001-01 |

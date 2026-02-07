@@ -12,6 +12,7 @@ docs/architecture/features/001/spec.md
 docs/architecture/features/001/scenarios.md
 
 # Architecture decisions (newest first)
+docs/decisions/ADR-0017-status-null-for-requests.md
 docs/decisions/ADR-0016-unidirectional-spec-direction.md
 docs/decisions/ADR-0015-spec-match-prerequisite.md
 docs/decisions/ADR-0014-mapper-invocation-model.md

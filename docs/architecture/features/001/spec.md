@@ -665,7 +665,9 @@ If `when` is omitted, the status is set unconditionally. If present, the status 
 only changed when the predicate evaluates to `true`.
 
 The `$status` variable is an integer bound before JSLT body evaluation, allowing
-status-aware body transforms:
+status-aware body transforms. **For request transforms, `$status` is `null`** because
+no HTTP status exists yet (ADR-0017). Authors who use `$status` in direction-agnostic
+specs (ADR-0016) SHOULD guard with `if ($status)` or `$status != null`.
 
 ```yaml
 transform:
@@ -683,7 +685,8 @@ status:
 ```
 
 Processing order:
-1. Engine reads status code from the `Message` envelope → binds as `$status` (integer).
+1. Engine reads status code from the `Message` envelope → binds as `$status` (integer
+   for response transforms, `null` for request transforms).
 2. JSLT body expression evaluates with `$status` and `$headers` available.
 3. Declarative header operations applied (FR-001-10).
 4. Status `when` predicate evaluated against the **transformed** body.
@@ -694,7 +697,7 @@ Processing order:
 | Success path | Status block parsed → predicate evaluated → status updated |
 | Validation path | `set` not a valid HTTP status code (100–599) → reject at load time |
 | Failure path | `when` predicate evaluation error → abort, keep original status |
-| Source | ADR-0003 |
+| Source | ADR-0003, ADR-0017 |
 
 ## Non-Functional Requirements
 
@@ -883,7 +886,7 @@ domain_objects:
         note: "Read-only $headers — keys are header names, values are first value"
       - name: statusCode
         type: int
-        note: "$status — returns -1 for request transforms"
+        note: "$status — null for request transforms (ADR-0017)"
       - name: requestPath
         type: string
         note: "e.g. /json/alpha/authenticate"
