@@ -191,6 +191,11 @@ operations:
 
 Adopt the SDD methodology used in sibling projects. SDD mandates that every feature flows through a specification pipeline before implementation: **spec → plan → tasks → test → code**.
 
+**Key principle: Specs are gateway-agnostic, implementations are gateway-specific.**
+- **Specifications** describe *what* the transformation does — field mappings, header promotions, callback handling — in language- and platform-neutral terms. One spec covers all gateways.
+- **Implementation plans** describe *how* a specific adapter realizes the spec — Java plugin API for PingAccess, Groovy filter for PingGateway, Lua plugin for Kong, etc.
+- This separation means the spec pipeline is **highly reusable** across adapters. The same spec drives PingAccess, PingGateway, WSO2, NGINX, and standalone implementations. Only the implementation plan and tasks diverge per gateway.
+
 **Reference projects** (all under `~/dev/`):
 - **`sdd-specs/`** — Spec-only repo with templates, schemas, catalogs, and validation tooling. Start here for the spec format and authoring guidelines.
 - **`sdd-sample-bundle/`** — Example SDD bundle (`sdd-bundle.yaml`) with document types (Feature, Requirement, Task, ADR, Component, etc.) and layout conventions.
