@@ -21,4 +21,3 @@ Hard rules:
 
 | ID | Owner | Question | Options (A preferred) | Status | Asked | Notes |
 |----|-------|----------|------------------------|--------|-------|-------|
-| Q-019 | Ivan | `sensitive` field marking (NFR-001-06): what is the YAML syntax for declaring fields as sensitive? | A) Add `sensitive: [fieldPath1, fieldPath2]` block to spec YAML B) Use JSON Schema `x-sensitive: true` annotation in field definition C) Mark at profile level, not spec level | Open | 2026-02-07 | severity: medium — NFR-001-06, FR-001-01 |

@@ -103,6 +103,12 @@ output:
       authId: { type: string }
       fields: { type: array, items: { type: object } }
 
+# Sensitive fields — JSON path expressions for fields that MUST be redacted
+# from logs, caches, and telemetry (NFR-001-06, ADR-0019).
+sensitive:
+  - "$.authId"
+  - "$.callbacks[*].input[*].value"
+
 # Prerequisite filter — declares what this spec can process (ADR-0015).
 # This is a capability declaration, NOT routing. URL/path/method binding is a
 # profile concern (FR-001-05). When absent, the spec accepts any content-type.
@@ -715,7 +721,7 @@ Processing order:
 | NFR-001-03 | Transformation latency MUST be < 5ms for a typical message (<50KB body). Compiled JSLT expressions are evaluated per-request; compilation happens once at spec load time. | Gateway rules are in the critical path; latency is unacceptable. | Microbenchmark with JMH using representative payloads. | Core only. | Performance. |
 | NFR-001-04 | Unknown/unrecognized fields in the input message MUST NOT cause transformation failure. JSLT supports `* : .` (object matching) to pass through unmentioned fields. | Upstream services may add fields at any time; transformation must be forward-compatible. | Test with input containing extra fields not in spec. | Core. | Robustness. |
 | NFR-001-05 | The core engine MUST support **atomic registry swap**: the ability to replace the full set of compiled specs and profiles via `TransformEngine.reload()`. The swap MUST use an immutable `TransformRegistry` snapshot and `AtomicReference` (or equivalent) so that in-flight requests complete with their current registry while new requests pick up the new one. Reload trigger mechanisms (file watching, polling, gateway lifecycle hooks) are adapter concerns, NOT core. | Core must be designed for safe concurrent registry replacement. | Unit test: concurrent reads during swap observe either old or new registry, never a mix. | Core. | Architecture, ADR-0012. |
-| NFR-001-06 | The engine MUST NOT log, cache, or inspect the content of fields marked as `sensitive` in the spec. | Security — passwords, tokens, and secrets must never appear in logs. | Static analysis + code review to confirm no sensitive-field logging. | Core. | Security. |
+| NFR-001-06 | The engine MUST NOT log, cache, or inspect the content of fields marked as `sensitive` in the spec. Sensitive fields are declared via a top-level `sensitive` list of JSON path expressions (ADR-0019). Paths use RFC 9535 dot-notation with `[*]` wildcard. The engine validates path syntax at load time. Matched fields are replaced with `"[REDACTED]"` in structured logs and MUST NOT appear in cache keys or telemetry payloads. | Security — passwords, tokens, and secrets must never appear in logs. | Static analysis + code review to confirm no sensitive-field logging. | Core. | Security, ADR-0019. |
 | NFR-001-07 | Expression evaluation MUST be bounded by configurable time (`max-eval-ms`) and output size (`max-output-bytes`) limits. Exceeding either budget MUST abort the evaluation. | Prevents runaway expressions from blocking gateway threads. | Test with deliberately slow/large expressions. | Core. | Safety. |
 | NFR-001-08 | When a profile matches a request, the engine MUST emit a structured log entry containing: matched profile id, matched spec id@version, request path, match specificity score, and evaluation duration. Format: JSON structured log line. | Operational traceability — operators must always know which profile was selected and why. | Integration test: verify log output contains required fields for each matched request. | Core + SLF4J or equivalent. | Observability, ADR-0006. |
 | NFR-001-09 | The core engine MUST define a `TelemetryListener` SPI interface for semantic transform events (started, completed, failed, matched, loaded, rejected). The SPI is a plain Java interface with zero external dependencies. Adapter modules provide concrete OTel/Micrometer bindings. Core metrics vocabulary: `transform_evaluations_total`, `transform_duration_seconds`, `profile_matches_total`, `spec_load_errors_total`. | Production-grade observability without violating NFR-001-02 (zero gateway deps). Consistent with JourneyForge ADR-0025. | Integration test: verify TelemetryListener receives events for each transform lifecycle stage. | Core (SPI interface only). | Observability, ADR-0007. |

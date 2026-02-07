@@ -12,6 +12,7 @@ docs/architecture/features/001/spec.md
 docs/architecture/features/001/scenarios.md
 
 # Architecture decisions (newest first)
+docs/decisions/ADR-0019-sensitive-field-marking.md
 docs/decisions/ADR-0018-body-buffering-is-adapter-concern.md
 docs/decisions/ADR-0017-status-null-for-requests.md
 docs/decisions/ADR-0016-unidirectional-spec-direction.md
