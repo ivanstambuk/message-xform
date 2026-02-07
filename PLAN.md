@@ -146,6 +146,7 @@ operations:
 - [ ] **journeyoforge stateless flows** — Extract applicable patterns for stateless transformation chains
 - [ ] **Kong plugin development** — Lua vs. Go plugin SDK
 - [ ] **NGINX transformation** — njs (JavaScript) vs. native module approach
+- [ ] **SDD adoption** — Study spec-driven development patterns from `sdd-specs/`, `journeyforge/`, and `openauth-sim/` for adoption in this project
 
 ---
 
@@ -180,6 +181,42 @@ operations:
 5. **PingAccess version target?** (determines plugin API compatibility)
 6. **Logging framework?** SLF4J + Logback standard, or gateway-specific?
 7. **Performance requirements?** Max latency budget per transformation?
+8. **Polyglot adapter strategy?** PingAccess requires Java, Kong plugins use Lua or Go, NGINX uses njs or C modules. Do we need a multi-language approach? Options: shared YAML config with language-specific adapter implementations, GraalVM polyglot, or WASM-based portable plugins.
+
+---
+
+## Backlog
+
+### Adopt Spec-Driven Development (SDD)
+
+Adopt the SDD methodology used in sibling projects. SDD mandates that every feature flows through a specification pipeline before implementation: **spec → plan → tasks → test → code**.
+
+**Reference projects** (all under `~/dev/`):
+- **`sdd-specs/`** — Spec-only repo with templates, schemas, catalogs, and validation tooling. Start here for the spec format and authoring guidelines.
+- **`sdd-sample-bundle/`** — Example SDD bundle (`sdd-bundle.yaml`) with document types (Feature, Requirement, Task, ADR, Component, etc.) and layout conventions.
+- **`journeyforge/`** — Full SDD adoption in a Java project: spec-first workflow, feature specs at `docs/4-architecture/features/<NNN>/`, ADRs, open-questions log, and two-phase LLM interaction protocol.
+- **`openauth-sim/`** — Mature SDD example: mandatory spec pipeline, pre-implementation checklist, analysis gates, `llms.txt` manifest, and `ReadMe.LLM` for AI agents.
+
+**Adoption tasks**:
+- [ ] Set up `docs/` structure: templates, architecture, decisions, operations
+- [ ] Create feature spec template adapted from `sdd-specs/specs/_template-spec-unit/`
+- [ ] Create ADR template for architectural decisions
+- [ ] Add `open-questions.md` for tracking ambiguities
+- [ ] Define the spec → plan → tasks → code pipeline in `AGENTS.md`
+- [ ] Optionally: create an SDD bundle for this project using `sdd-sample-bundle` as reference
+
+### Research: Kong Transformer Plugins
+
+Study how Kong implements request/response transformation to inform a generalized, gateway-agnostic design.
+
+**Links to investigate**:
+- [AI Request Transformer](https://developer.konghq.com/plugins/ai-request-transformer/)
+- [AI Response Transformer](https://developer.konghq.com/plugins/ai-response-transformer/)
+- [Request Transformer Advanced](https://developer.konghq.com/plugins/request-transformer-advanced/)
+- [Response Transformer Advanced](https://developer.konghq.com/plugins/response-transformer-advanced/)
+- [Custom Plugins](https://developer.konghq.com/custom-plugins/)
+
+**Goals**: Understand Kong's transformation model, configuration surface, and plugin architecture. Extract patterns that can be generalized across gateways (PingAccess, Kong, NGINX, standalone).
 
 ---
 
