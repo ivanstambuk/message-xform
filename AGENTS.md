@@ -71,7 +71,17 @@ Update both `docs/architecture/roadmap.md` and the Roadmap table above when stat
    - Summarize implications for message-xform
    - Be committed to git so they survive across sessions
    - Feed into the SDD specification pipeline when development begins
-8. **One Question at a Time**: When resolving open questions (spec refinement, design decisions, ADRs), present them **one by one** using the **Decision Card** format defined in `docs/architecture/spec-guidelines/open-questions-format.md`. Always include your recommendation (Option A = preferred). Wait for the user's answer, record the decision, then move to the next question. Never dump multiple questions in bulk.
+8. **Open Question Resolution Protocol**: When resolving open questions (spec refinement, design decisions), follow this protocol:
+   - Present questions **one by one** using the **Decision Card** format from `docs/architecture/spec-guidelines/open-questions-format.md`.
+   - **Decision Card isolation**: Send *only* the Decision Card in the message — no extra background, explanations, or additional questions.
+   - **Workspace-first grounding**: The Decision Card's "Current behaviour" and "Key references" MUST cite concrete file paths/sections from the repo, not chat memory.
+   - **Always recommend**: Option A MUST be the recommended option. Include clear pros/cons for every option.
+   - **Wait for answer**: Do not proceed until the user chooses an option.
+   - **Record the decision**: After the user decides:
+     1. Update the relevant spec section (`spec.md`) to encode the decision.
+     2. For **medium- or high-impact** decisions: automatically create an ADR under `docs/decisions/` with Context, Decision, Consequences, and Related sections.
+     3. **Immediately remove** the resolved row from `docs/architecture/open-questions.md` — the file must never contain resolved questions.
+   - Then move to the next question.
 
 ## Browser Agent (browser_subagent) — MANDATORY Setup
 
