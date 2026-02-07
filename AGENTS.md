@@ -14,6 +14,14 @@ See `PLAN.md` for full architecture and feature breakdown.
 - **Documentation hierarchy**:
   - `PLAN.md` — Vision, architecture, features, and open questions.
   - `AGENTS.md` — Agent rules and project conventions (this file).
+  - `docs/architecture/features/<NNN>/spec.md` — Feature specifications (SDD).
+  - `docs/architecture/features/<NNN>/plan.md` — Implementation plans.
+  - `docs/architecture/features/<NNN>/tasks.md` — Task breakdowns.
+  - `docs/architecture/open-questions.md` — Live open questions (scratchpad, not archive).
+  - `docs/architecture/roadmap.md` — Feature roadmap.
+  - `docs/decisions/` — Architecture Decision Records (ADRs).
+  - `docs/research/` — Research notes (API analysis, gateway evaluations, etc.).
+  - `docs/templates/` — Spec and document templates.
   - `.agent/workflows/` — Session lifecycle workflows.
   - `.agent/session/` — Ephemeral session state (pending tasks).
 
