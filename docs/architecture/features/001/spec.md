@@ -428,8 +428,54 @@ At evaluation time (optional, configurable):
 | Success path | Schemas parse as valid JSON Schema 2020-12 → stored with spec |
 | Validation path | Invalid JSON Schema syntax → reject spec at load time |
 | Failure path | Runtime validation failure (strict mode) → abort, pass original through |
-| Failure path | Circular mapperRef → reject at load time |
-| Source | JourneyForge `spec.mappers` + `mapperRef` pattern |
+| Source | JourneyForge schema validation pattern, ADR-0001 |
+
+### FR-001-10: Header Transformations
+
+**Requirement:** Transform specs MAY include an optional `headers` block with
+declarative `add`, `remove`, and `rename` operations. Header transforms are processed
+by the engine **independently** of the body JSLT expression.
+
+```yaml
+headers:
+  add:
+    X-Transformed-By: "message-xform"
+    X-Spec-Version: "1.0.0"
+  remove: ["X-Internal-*", "X-Debug-*"]   # glob patterns supported
+  rename:
+    X-Old-Header: X-New-Header
+```
+
+Additionally, the engine MUST expose request/response headers as a **read-only JSLT
+variable** `$headers`, allowing JSLT body expressions to reference header values:
+
+```yaml
+transform:
+  lang: jslt
+  expr: |
+    {
+      "requestId": $headers."X-Request-ID",
+      "authId": .authId,
+      "fields": [for (.callbacks) { "label": .output[0].value }]
+    }
+```
+
+The `$headers` variable is a `JsonNode` object where each key is a header name and
+each value is the first header value (string). Multi-value headers are accessible
+via `$headers."Set-Cookie"` returning the first value; accessing all values requires
+a future extension.
+
+Processing order:
+1. Engine reads headers from the `Message` envelope → binds as `$headers`.
+2. JSLT body expression evaluates with `$headers` available as read-only context.
+3. Declarative `headers` block applied (`remove` → `rename` → `add`).
+
+| Aspect | Detail |
+|--------|--------|
+| Success path | Headers block parsed → add/remove/rename applied after body transform |
+| Validation path | Invalid glob in `remove` → reject at load time |
+| Failure path | Referenced header missing → `$headers."X-Missing"` evaluates to `null` (JSLT default) |
+| Source | Kong transformer add/remove/rename pattern, ADR-0002 |
 
 ## Non-Functional Requirements
 
