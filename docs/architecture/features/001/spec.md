@@ -606,24 +606,25 @@ Processing order:
 
 ## Branch & Scenario Matrix
 
+> Full scenario definitions, test vectors, and coverage matrix are maintained in
+> [`scenarios.md`](scenarios.md) (55 scenarios: S-001-01 through S-001-55).
+> This summary lists representative scenarios for quick reference.
+
 | Scenario ID | Description / Expected outcome |
 |-------------|--------------------------------|
 | S-001-01 | JSLT transform: flat input → restructured output (rename, nest, derive) |
 | S-001-02 | Bidirectional transform: forward applied to response, reverse applied to request |
 | S-001-03 | Non-matching request → passed through unmodified |
-| S-001-04 | Invalid JSON body → passed through unmodified, header transforms still applied |
 | S-001-05 | Unknown fields in input → preserved in output via `* : .` (open-world) |
-| S-001-06 | Conditional logic in JSLT: `if/else` produces different output shapes |
-| S-001-07 | Array reshaping: `[for ...]` maps nested arrays to flat arrays with derived fields |
 | S-001-08 | Strict mode: JSLT evaluation error → transformation aborted, original passed through |
-| S-001-09 | Lenient mode: JSLT evaluation error → partial result used where safe |
-| S-001-10 | Header transformation: add/remove/rename headers alongside body transforms |
-| S-001-11 | Status code transformation: map upstream 200 + error body → 400 response |
-| S-001-12 | Multiple profiles loaded: different transform specs for different URL patterns |
-| S-001-13 | Spec hot-reload: spec file changes → JSLT recompiled, next request uses new spec |
 | S-001-14 | Alternative engine: spec declares `lang: jolt` → JOLT engine handles transform |
-| S-001-15 | Engine time budget exceeded → evaluation aborted, original passed through |
-| S-001-16 | Reusable mapper: `mapperRef: strip-internal` resolves and applies correctly |
+| S-001-33 | Header add/remove/rename alongside body transforms |
+| S-001-36 | Status code override via conditional `when` predicate |
+| S-001-41 | Profile matches request by path, method, and content-type |
+| S-001-49 | Profile-level chaining: JOLT → JSLT mixed-engine pipeline |
+| S-001-50 | Reusable mapper: `mapperRef` resolves to named expression |
+| S-001-53 | JSON Schema validated and stored at spec load time |
+| S-001-55 | Strict-mode runtime schema validation rejects non-conforming input |
 
 ## Test Strategy
 
@@ -692,6 +693,7 @@ Processing order:
 | CFG-001-05 | `engines.defaults.max-eval-ms` | int | Per-expression evaluation time budget (default: 50ms) |
 | CFG-001-06 | `engines.defaults.max-output-bytes` | int | Max output size per evaluation (default: 1MB) |
 | CFG-001-07 | `engines.<id>.enabled` | boolean | Enable/disable a specific expression engine |
+| CFG-001-08 | `schema-validation-mode` | enum | `strict` (validate input/output schemas at runtime) or `lenient` (skip, default). Separate from `error-mode` (CFG-001-03) which governs transform failure handling. |
 
 ### Fixtures & Sample Data
 
@@ -729,6 +731,9 @@ domain_objects:
         type: string
       - name: version
         type: string
+      - name: description
+        type: string
+        constraints: "optional — human-readable summary"
       - name: lang
         type: string
         constraints: "default: jslt"
