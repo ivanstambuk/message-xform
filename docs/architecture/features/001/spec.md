@@ -337,13 +337,27 @@ The engine MUST:
 3. If a profile references `spec: callback-prettify` **without** a version suffix,
    the engine MUST resolve to the **latest** loaded version (highest semver).
 
+When multiple profiles match the same request, the engine uses **most-specific-wins**
+resolution (ADR-0006):
+
+1. **Specificity score**: count literal (non-wildcard) path segments. Higher score wins.
+   - `/json/alpha/authenticate` (3 literals) beats `/json/*/authenticate` (2 literals).
+   - `/json/*/authenticate` (2 literals) beats `/json/*` (1 literal).
+2. **Tie-breaking**: if two profiles have the same specificity score:
+   a. More `match` constraints (method, content-type) wins.
+   b. If still tied → **load-time error** (ambiguous match detected, must be resolved
+      by the operator).
+3. **Structured logging**: every matched profile MUST be logged (NFR-001-08) so
+   operators can trace exactly which profile was selected.
+
 | Aspect | Detail |
 |--------|--------|
 | Success path | Profile loaded → versioned specs resolved → bound to URL patterns |
 | Validation path | Missing spec reference → fail at load time with descriptive error |
 | Validation path | Referenced version not loaded → fail at load time |
+| Validation path | Two profiles with identical specificity and constraints → load-time error |
 | Failure path | Duplicate profile IDs → reject, no silent override |
-| Source | Kong route/plugin binding, Apigee flow attachment, ADR-0005 |
+| Source | Kong route/plugin binding, Apigee flow attachment, ADR-0005, ADR-0006 |
 
 ### FR-001-06: Passthrough Behavior
 
@@ -577,6 +591,7 @@ Processing order:
 | NFR-001-05 | Transform specs MUST be hot-reloadable without restarting the gateway or proxy. On reload, JSLT expressions are recompiled and atomically swapped. | Operational requirement for production deployments. | Integration test: modify spec file → verify next request uses new spec. | File-watching or config polling. | Operations. |
 | NFR-001-06 | The engine MUST NOT log, cache, or inspect the content of fields marked as `sensitive` in the spec. | Security — passwords, tokens, and secrets must never appear in logs. | Static analysis + code review to confirm no sensitive-field logging. | Core. | Security. |
 | NFR-001-07 | Expression evaluation MUST be bounded by configurable time (`max-eval-ms`) and output size (`max-output-bytes`) limits. Exceeding either budget MUST abort the evaluation. | Prevents runaway expressions from blocking gateway threads. | Test with deliberately slow/large expressions. | Core. | Safety. |
+| NFR-001-08 | When a profile matches a request, the engine MUST emit a structured log entry containing: matched profile id, matched spec id@version, request path, match specificity score, and evaluation duration. Format: JSON structured log line. | Operational traceability — operators must always know which profile was selected and why. | Integration test: verify log output contains required fields for each matched request. | Core + SLF4J or equivalent. | Observability, ADR-0006. |
 
 ## Branch & Scenario Matrix
 

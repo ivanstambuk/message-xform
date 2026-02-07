@@ -1889,6 +1889,101 @@ test_request:
 
 ---
 
+## Category 13: Profile Match Resolution
+
+Scenarios validating most-specific-wins profile matching (ADR-0006, FR-001-05, NFR-001-08).
+
+### S-001-44: Specific Path Beats Wildcard
+
+```yaml
+scenario: S-001-44
+name: specific-path-beats-wildcard
+description: >
+  Two profiles match the same request. The profile with more literal path
+  segments wins. Validates ADR-0006 specificity scoring.
+tags: [profile, match, specificity, adr-0006]
+requires: [FR-001-05]
+
+profiles:
+  - id: catch-all
+    spec: generic-transform@1.0.0
+    match: { path: "/json/*" }              # 1 literal segment
+
+  - id: auth-specific
+    spec: auth-transform@1.0.0
+    match: { path: "/json/*/authenticate" }  # 2 literal segments
+
+test_request:
+  path: "/json/alpha/authenticate"
+
+expected_match:
+  profile: auth-specific
+  reason: "specificity score 2 > 1"
+```
+
+### S-001-45: Ambiguous Tie — Rejected at Load Time
+
+```yaml
+scenario: S-001-45
+name: ambiguous-tie-rejected
+description: >
+  Two profiles have the same specificity score and same constraint count.
+  The engine must reject both at load time as ambiguous.
+  Validates ADR-0006 tie-breaking rules.
+tags: [profile, match, ambiguous, validation, adr-0006]
+requires: [FR-001-05]
+
+profiles:
+  - id: profile-a
+    spec: transform-a@1.0.0
+    match: { path: "/api/*/users" }         # 2 literal segments
+
+  - id: profile-b
+    spec: transform-b@1.0.0
+    match: { path: "/api/v1/*" }            # 2 literal segments
+
+expected_error:
+  type: "ambiguous-match"
+  message: "profiles 'profile-a' and 'profile-b' have identical specificity — resolve ambiguity"
+```
+
+### S-001-46: Constraint Count Tie-Breaking
+
+```yaml
+scenario: S-001-46
+name: constraint-count-tiebreaker
+description: >
+  Two profiles have the same specificity score but different constraint counts.
+  The profile with more constraints (method, content-type) wins.
+  Validates ADR-0006 tie-breaking by constraint count.
+tags: [profile, match, tiebreaker, adr-0006]
+requires: [FR-001-05]
+
+profiles:
+  - id: broad
+    spec: transform-a@1.0.0
+    match:
+      path: "/api/*/users"                  # 2 literal segments, 1 constraint
+
+  - id: narrow
+    spec: transform-b@1.0.0
+    match:
+      path: "/api/*/users"                  # 2 literal segments
+      method: POST                           # +1 constraint
+      content-type: "application/json"       # +1 constraint = 3 total
+
+test_request:
+  path: "/api/v1/users"
+  method: POST
+  content-type: "application/json"
+
+expected_match:
+  profile: narrow
+  reason: "equal specificity, 3 constraints > 1 constraint"
+```
+
+---
+
 ## Scenario Index
 
 | ID | Name | Category | Tags |
@@ -1936,6 +2031,9 @@ test_request:
 | S-001-41 | concurrent-spec-versions | Version Pinning | version, profile, concurrent, adr-0005 |
 | S-001-42 | missing-spec-version-rejected | Version Pinning | version, profile, validation, adr-0005 |
 | S-001-43 | bare-spec-resolves-to-latest | Version Pinning | version, profile, latest, adr-0005 |
+| S-001-44 | specific-path-beats-wildcard | Match Resolution | profile, match, specificity, adr-0006 |
+| S-001-45 | ambiguous-tie-rejected | Match Resolution | profile, match, ambiguous, validation, adr-0006 |
+| S-001-46 | constraint-count-tiebreaker | Match Resolution | profile, match, tiebreaker, adr-0006 |
 
 ## Coverage Matrix
 
@@ -1945,7 +2043,7 @@ test_request:
 | FR-001-02 (Expression Engine SPI) | S-001-25, S-001-26, S-001-27, S-001-28, S-001-39, S-001-40 |
 | FR-001-03 (Bidirectional) | S-001-02, S-001-29, S-001-30 |
 | FR-001-04 (Message Envelope) | S-001-19 |
-| FR-001-05 (Transform Profiles) | S-001-41, S-001-42, S-001-43 |
+| FR-001-05 (Transform Profiles) | S-001-41, S-001-42, S-001-43, S-001-44, S-001-45, S-001-46 |
 | FR-001-06 (Passthrough) | S-001-18, S-001-19 |
 | FR-001-07 (Error Handling) | S-001-24, S-001-28 |
 | FR-001-08 (Reusable Mappers) | *Not yet covered — add when mapperRef is specified* |
@@ -1956,3 +2054,4 @@ test_request:
 | NFR-001-03 (Latency <5ms) | S-001-23 |
 | NFR-001-04 (Open-world) | S-001-07, S-001-20 |
 | NFR-001-07 (Eval budget) | S-001-24 |
+| NFR-001-08 (Match logging) | S-001-44, S-001-46 (matched profile logged) |
