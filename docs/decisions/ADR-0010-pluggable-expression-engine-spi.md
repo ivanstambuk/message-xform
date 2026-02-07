@@ -62,7 +62,15 @@ public interface ExpressionEngine {
 }
 
 public interface CompiledExpression {
-    JsonNode evaluate(JsonNode input) throws ExpressionEvalException;
+    JsonNode evaluate(JsonNode input, TransformContext context)
+        throws ExpressionEvalException;
+}
+
+public interface TransformContext {
+    JsonNode getHeaders();       // $headers — read-only
+    int getStatusCode();         // $status — -1 for request transforms
+    String getRequestPath();     // request path
+    String getRequestMethod();   // HTTP method
 }
 ```
 

@@ -182,8 +182,28 @@ public interface CompiledExpression {
     /**
      * Evaluate the compiled expression against the input JSON.
      * Called per-request on the gateway hot path — MUST be fast and thread-safe.
+     *
+     * @param input   the JSON message body
+     * @param context read-only transform context (headers, status, request metadata)
      */
-    JsonNode evaluate(JsonNode input) throws ExpressionEvalException;
+    JsonNode evaluate(JsonNode input, TransformContext context)
+        throws ExpressionEvalException;
+}
+
+/**
+ * Read-only context passed to expression engines during evaluation.
+ * Engines consume whichever context they support (e.g., JSLT binds $headers
+ * and $status as variables; JOLT ignores them).
+ */
+ public interface TransformContext {
+    /** HTTP headers as a JsonNode object (keys = header names, values = first value). */
+    JsonNode getHeaders();
+    /** HTTP status code. Returns -1 for request transforms (no status yet). */
+    int getStatusCode();
+    /** Request path (e.g., "/json/alpha/authenticate"). */
+    String getRequestPath();
+    /** HTTP method (e.g., "POST"). */
+    String getRequestMethod();
 }
 ```
 
@@ -655,6 +675,7 @@ Processing order:
 | DO-001-04 | `TransformProfile` — user-supplied binding of specs to URL/method/content-type patterns | core |
 | DO-001-05 | `TransformResult` — outcome of applying a spec (success/aborted + diagnostics) | core |
 | DO-001-06 | `ExpressionEngine` — pluggable engine SPI (compile + evaluate) | core |
+| DO-001-07 | `TransformContext` — read-only context passed to engines (headers, status, request path/method) | core |
 
 ### Core Engine API
 
@@ -672,7 +693,7 @@ Processing order:
 |----|--------|-------------|
 | SPI-001-01 | `ExpressionEngine.id()` | Return engine identifier (e.g., `"jslt"`) |
 | SPI-001-02 | `ExpressionEngine.compile(String expr)` | Compile expression string → `CompiledExpression` |
-| SPI-001-03 | `CompiledExpression.evaluate(JsonNode input)` | Evaluate expression against input → output `JsonNode` |
+| SPI-001-03 | `CompiledExpression.evaluate(JsonNode input, TransformContext context)` | Evaluate expression against input + context → output `JsonNode` |
 
 ### Gateway Adapter SPI
 
@@ -766,8 +787,23 @@ domain_objects:
     name: CompiledExpression
     fields:
       - name: evaluate
-        type: "(JsonNode) → JsonNode"
+        type: "(JsonNode, TransformContext) → JsonNode"
         note: "Thread-safe, called per-request"
+  - id: DO-001-07
+    name: TransformContext
+    fields:
+      - name: headers
+        type: JsonNode
+        note: "Read-only $headers — keys are header names, values are first value"
+      - name: statusCode
+        type: int
+        note: "$status — returns -1 for request transforms"
+      - name: requestPath
+        type: string
+        note: "e.g. /json/alpha/authenticate"
+      - name: requestMethod
+        type: string
+        note: "e.g. POST"
 
 engine_api:
   - id: API-001-01
@@ -794,7 +830,7 @@ expression_engine_spi:
     outputs: [CompiledExpression]
   - id: SPI-001-03
     method: evaluate
-    inputs: [JsonNode]
+    inputs: [JsonNode, TransformContext]
     outputs: [JsonNode]
 
 adapter_spi:

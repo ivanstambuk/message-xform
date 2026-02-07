@@ -21,7 +21,6 @@ Hard rules:
 
 | ID | Owner | Question | Options (A preferred) | Status | Asked | Notes |
 |----|-------|----------|------------------------|--------|-------|-------|
-| Q-010 | Ivan | `CompiledExpression.evaluate(JsonNode)` cannot receive `$headers`/`$status` — how should the SPI pass transform context? | A) Add `TransformContext` parameter (headers, status, metadata) B) Add `Map<String, JsonNode> variables` parameter C) Keep as-is, let engines access context via thread-local | Open | 2026-02-07 | severity: high — FR-001-02, FR-001-10, FR-001-11 |
 | Q-011 | Ivan | When multiple specs in a profile match the same request (profile-level chaining), what are the execution semantics? | A) Sequential pipeline (output of spec N feeds spec N+1) B) Parallel (all applied to original independently) C) Sequential but abort chain on first failure | Open | 2026-02-07 | severity: high — FR-001-05, ADR-0008 |
 | Q-012 | Ivan | Should the `Message` adapter be a copy (own state) or a wrapper (shared with gateway)? | A) Copy-on-wrap (safe, no side effects) B) Wrapper with explicit apply-back (efficient but requires care) C) Configurable per adapter | Open | 2026-02-07 | severity: high — FR-001-04, NFR-001-01 |
 | Q-013 | Ivan | Hot reload (NFR-001-05): should reload be per-spec or transactional (all specs + profiles atomically)? | A) Transactional — snapshot all specs/profiles, swap atomically B) Per-spec with dependency resolution C) Per-spec with eventual consistency | Open | 2026-02-07 | severity: high — NFR-001-05 |
