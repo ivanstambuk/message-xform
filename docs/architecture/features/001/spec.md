@@ -357,6 +357,13 @@ if failure: discard Message copy → native untouched
 | Failure path | Transform fails → copy discarded, native message untouched |
 | Source | PingAccess `Exchange`, gateway adapter pattern, ADR-0011 |
 
+**Body buffering (ADR-0018):** The core engine does NOT mandate body-size limits or
+buffering strategies. The `Message.getBodyAsJson()` contract assumes a complete `JsonNode`
+is provided. How the adapter buffers the body, and any size limits, are gateway-level
+NFRs handled by the adapter's gateway configuration (e.g., PingAccess request body limits,
+Kong/NGINX `client_max_body_size`). Adapter feature specs SHOULD document their gateway's
+body-size configuration.
+
 ### FR-001-05: Transform Profiles (Backend-Specific Definitions)
 
 **Requirement:** Backend-specific transformation details MUST be packaged as
