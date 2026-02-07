@@ -1,0 +1,34 @@
+# Build
+target/
+build/
+out/
+*.class
+*.jar
+*.war
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.project
+.classpath
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Gradle
+.gradle/
+gradle-app.setting
+
+# Maven
+dependency-reduced-pom.xml
+
+# Logs
+*.log
+
+# Docker
+docker-compose.override.yml
