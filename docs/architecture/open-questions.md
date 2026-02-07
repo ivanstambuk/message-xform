@@ -9,20 +9,24 @@ Hard rules:
 - When a question is resolved, its outcome **must be captured** in the relevant
   spec's normative artefacts (`spec.md`, `plan.md`) or in an ADR under `docs/decisions/`,
   and the corresponding row **must be deleted** from this file.
+- Resolved questions **must not be archived** here; any details must be removed when
+  the row is removed.
 - Question IDs (e.g., `Q-001`) are local to this project and chat transcripts;
   they must never be referenced from external docs.
 - This file is **never** a source of truth; once resolved, no record remains here.
+- When presenting a question to a human, use the **Decision Card** format from
+  `docs/architecture/spec-guidelines/open-questions-format.md`.
 
 <!-- Add new rows below with Status set to Open only. Remove the row once resolved and documented elsewhere. -->
 
-| ID | Feature | Question | Options | Status | Asked |
-|----|---------|----------|---------|--------|-------|
-| Q-001 | 001 | Should transform specs support optional input/output JSON Schema for compile-time validation? | (A) Yes, optional — validate at load time if present. (B) No, defer to v2. (C) Yes, mandatory. | Open | 2026-02-07 |
-| Q-002 | 001 | How should header transforms be expressed? | (A) Separate `headers` block with add/remove/rename. (B) Headers injected into JSLT as `_headers`. (C) Headers are adapter-level only. | Open | 2026-02-07 |
-| Q-003 | 001 | How should status code transforms be defined? | (A) Separate `status` block. (B) JSLT sets `_status` magic field. (C) Adapter-level only. | Open | 2026-02-07 |
-| Q-004 | 001 | Should we define a formal engine support matrix (what each engine can/cannot do)? | (A) Yes, in spec. (B) No, document per-engine in adapter specs. | Open | 2026-02-07 |
-| Q-005 | 001 | What are the spec version compatibility rules? | (A) Informational only. (B) Profiles pin to spec versions. (C) Semver with breaking change policy. | Open | 2026-02-07 |
-| Q-006 | 001 | What happens when multiple profiles match the same request? | (A) First-match-wins (profile load order). (B) Most-specific-wins (longest path match). (C) Error — ambiguous match rejected at load time. | Open | 2026-02-07 |
-| Q-007 | 001 | Should we define structured observability (metrics, log format, trace correlation)? | (A) Yes, in spec. (B) Minimal — just structured error logging. (C) Defer to implementation. | Open | 2026-02-07 |
-| Q-008 | 001 | Should a single spec support chained/pipeline transforms (multiple expressions)? | (A) Yes, pipeline of expressions. (B) No, one expression per direction — JSLT is expressive enough. | Open | 2026-02-07 |
-| Q-009 | 001 | Should we create ADRs for key decisions already made (JSLT, pluggable SPI, JsonNode body type)? | (A) Yes, create ADR-001/002/003 now. (B) No, spec appendix is sufficient. | Open | 2026-02-07 |
+| ID | Owner | Question | Options (A preferred) | Status | Asked | Notes |
+|----|-------|----------|------------------------|--------|-------|-------|
+| Q-001 | Ivan | Should transform specs support optional input/output JSON Schema for compile-time validation? | A) Yes, mandatory (recommended) B) Yes, optional — validate if present C) No, defer to v2 | Open | 2026-02-07 | JourneyForge uses JSON Schema 2020-12 for input/output. |
+| Q-002 | Ivan | How should header transforms be expressed? | A) Separate `headers` block with add/remove/rename (recommended) B) Headers injected into JSLT as `_headers` C) Headers are adapter-level only | Open | 2026-02-07 | FR-001-04 says we transform headers but no format defined. |
+| Q-003 | Ivan | How should status code transforms be defined? | A) JSLT sets `_status` magic field (recommended) B) Separate `status` block C) Adapter-level only | Open | 2026-02-07 | S-001-11 mentions status mapping but no spec format. |
+| Q-004 | Ivan | Should we define a formal engine support matrix? | A) Yes, in spec (recommended) B) No, per-engine in adapter specs | Open | 2026-02-07 | JourneyForge blocks JOLT from predicates. |
+| Q-005 | Ivan | What are the spec version compatibility rules? | A) Informational only (recommended) B) Profiles pin to spec versions C) Semver with breaking change policy | Open | 2026-02-07 | |
+| Q-006 | Ivan | What happens when multiple profiles match the same request? | A) First-match-wins by profile priority (recommended) B) Most-specific-wins (longest path) C) Error — ambiguous match rejected at load time | Open | 2026-02-07 | Critical for production. |
+| Q-007 | Ivan | Should we define structured observability (metrics, log format, trace correlation)? | A) Minimal — structured error logging + request-id passthrough (recommended) B) Full — metrics, histograms, OpenTelemetry C) Defer to implementation | Open | 2026-02-07 | |
+| Q-008 | Ivan | Should a single spec support chained/pipeline transforms? | A) No, one expression per direction — JSLT is expressive enough (recommended) B) Yes, pipeline of expressions | Open | 2026-02-07 | JourneyForge uses pipelines but their use case is different. |
+| Q-009 | Ivan | Should we create ADRs for key decisions already made (JSLT, pluggable SPI, JsonNode)? | A) Yes, create ADR-001/002/003 now (recommended) B) No, spec appendix is sufficient | Open | 2026-02-07 | |
