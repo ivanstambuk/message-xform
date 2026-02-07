@@ -123,14 +123,16 @@ terminology agreements must be captured here immediately.
     `TransformContext` is re-read between steps. See ADR-0012.
 
 - **Abort-on-failure**
-  - If any step in a pipeline chain fails, the **entire chain aborts**. The original,
-    unmodified message passes through. No partial pipeline results reach the client.
+  - If any step in a pipeline chain fails, the **entire chain aborts**. The engine
+    returns a **configurable error response** to the caller (ADR-0022). No partial
+    pipeline results reach the client or downstream service. The original message is
+    NOT passed through — the downstream expects the transformed schema and would fail.
 
 - **Copy-on-wrap**
   - Adapter strategy where the gateway-native message is deep-copied when wrapped
     into a `Message`. The engine mutates the copy; on success, `applyChanges()`
-    writes back to native; on failure, the copy is discarded and the native
-    message is untouched. See ADR-0013.
+    writes back to native; on failure, the copy is discarded and the adapter
+    returns an error response to the caller (ADR-0022). See ADR-0013.
 
 - **Atomic registry swap**
   - The core engine's ability to replace the full set of compiled specs and profiles

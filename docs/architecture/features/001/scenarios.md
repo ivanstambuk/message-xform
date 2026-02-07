@@ -1084,19 +1084,20 @@ expected_output:
     # ... (100 entries, no _internal field)
 ```
 
-### S-001-24: Strict Mode — JSLT Evaluation Error
+### S-001-24: JSLT Evaluation Error → Error Response
 
-In strict mode, a JSLT error should abort the transformation and pass
-through the original message.
+When a JSLT expression fails, the engine returns a configurable error response
+to the caller (ADR-0022). The original message is NOT passed through.
 
 ```yaml
 scenario: S-001-24
-name: strict-mode-evaluation-error
+name: evaluation-error-returns-error-response
 description: >
-  In strict error mode, when a JSLT expression references a function that
-  doesn't exist, the engine MUST abort and pass through the original.
-tags: [error, strict-mode, safety]
-error_mode: strict
+  When a JSLT expression references a function that doesn't exist, the engine
+  MUST abort and return a configurable error response (ADR-0022). The original
+  message is NOT passed through — the downstream service expects the transformed
+  schema and would fail anyway.
+tags: [error, error-response, safety, adr-0022]
 
 transform:
   lang: jslt
@@ -1108,11 +1109,13 @@ transform:
 input:
   value: "test"
 
-expected_error:
-  type: "expression_compile_error"
-  engine: "jslt"
-  # Original message passed through unchanged
-expected_passthrough: true
+expected_error_response:
+  type: "urn:message-xform:error:transform-failed"
+  title: "Transform Failed"
+  status: 502
+  detail_contains: "nonexistent-function"
+  # Original message is NOT passed through
+expected_passthrough: false
 ```
 
 ---
@@ -2422,10 +2425,12 @@ input:
   userId: 42
   name: "Bob Jensen"
 
-# In strict mode, transform is aborted — original passes through unchanged
-expected_output:
-  userId: 42
-  name: "Bob Jensen"
+# In strict mode, schema validation fails → error response returned (ADR-0022)
+expected_error_response:
+  type: "urn:message-xform:error:schema-validation-failed"
+  title: "Schema Validation Failed"
+  status: 502
+  detail_contains: "schema validation failed"
 
 expected_log:
   level: WARN
@@ -2443,15 +2448,15 @@ and copy-on-wrap adapter semantics (ADR-0013).
 ### S-001-56: Pipeline Chain Abort on Failure
 
 When a chain of two specs is configured and the first spec fails, the entire chain
-aborts and the original message passes through unchanged.
+aborts and returns an error response (ADR-0022).
 
 ```yaml
 scenario: S-001-56
 name: pipeline-chain-abort-on-failure
 description: >
   Profile chains spec-a → spec-b. spec-a has a deliberate error (references
-  undefined variable). The entire chain must abort — original message passes
-  through, spec-b never executes.
+  undefined variable). The entire chain must abort — error response returned,
+  spec-b never executes. Original message is NOT passed through (ADR-0022).
 tags: [profile-chaining, abort, error, adr-0012, adr-0013]
 requires: [FR-001-05, FR-001-07]
 
@@ -2478,14 +2483,12 @@ input:
   orderId: 123
   items: ["widget"]
 
-# spec-a fails → entire chain aborts → original passes through
-expected_output:
-  orderId: 123
-  items: ["widget"]
-
-expected_log:
-  level: ERROR
-  message_contains: "chain aborted at step 1/2"
+# spec-a fails → entire chain aborts → error response returned (ADR-0022)
+expected_error_response:
+  type: "urn:message-xform:error:transform-failed"
+  title: "Transform Failed"
+  status: 502
+  detail_contains: "chain aborted at step 1/2"
   spec_id: spec-a
 ```
 
@@ -2527,19 +2530,20 @@ expected_output:
   correlationId: "abc-123"
 ```
 
-### S-001-58: Copy-on-Wrap — Failed Transform Leaves Native Untouched
+### S-001-58: Copy-on-Wrap — Failed Transform Returns Error Response
 
-Validates that on transform failure, the adapter's copy is discarded and the native
-message state is completely unchanged.
+Validates that on transform failure, the adapter's copy is discarded and an
+error response is returned to the caller (ADR-0022).
 
 ```yaml
 scenario: S-001-58
-name: copy-on-wrap-abort-rollback
+name: copy-on-wrap-abort-error-response
 description: >
-  Validates ADR-0013 (copy-on-wrap): when a transform fails (e.g., JSLT error),
-  the Message copy is discarded. The native gateway message retains its original
-  body, headers, and status code.
-tags: [copy-on-wrap, abort, rollback, adr-0013]
+  Validates ADR-0013 (copy-on-wrap) + ADR-0022 (error-response-on-failure):
+  when a transform fails (e.g., JSLT error), the Message copy is discarded
+  and an error response is returned to the caller. The native gateway message
+  is NOT forwarded.
+tags: [copy-on-wrap, abort, error-response, adr-0013, adr-0022]
 requires: [FR-001-04, FR-001-07]
 
 transform:
@@ -2554,17 +2558,17 @@ headers:
 input:
   userId: 42
 
-# Transform fails → copy discarded → native unchanged
-expected_output:
-  userId: 42
+# Transform fails → copy discarded → error response returned
+expected_error_response:
+  type: "urn:message-xform:error:transform-failed"
+  title: "Transform Failed"
+  status: 502
+  detail_contains: "expression evaluation failed"
 
 expected_native_state:
   headers_unchanged: true
   status_unchanged: true
-
-expected_log:
-  level: ERROR
-  message_contains: "expression evaluation failed"
+  not_forwarded: true
 ```
 
 ---
@@ -2865,7 +2869,7 @@ expected_context:
 | S-001-21 | empty-input-object | Edge Cases | edge-case, empty, robustness |
 | S-001-22 | null-values-in-input | Edge Cases | edge-case, null, robustness |
 | S-001-23 | large-array-performance | Edge Cases | performance, array, large |
-| S-001-24 | strict-mode-evaluation-error | Edge Cases | error, strict-mode, safety |
+| S-001-24 | evaluation-error-returns-error-response | Edge Cases | error, error-response, safety, adr-0022 |
 | S-001-25 | multi-engine-rename-jslt | Multi-Engine | multi-engine, jslt, rename |
 | S-001-26 | multi-engine-rename-jolt | Multi-Engine | multi-engine, jolt, rename |
 | S-001-27 | multi-engine-rename-jq | Multi-Engine | multi-engine, jq, rename |
@@ -2899,7 +2903,7 @@ expected_context:
 | S-001-55 | schema-strict-mode-runtime-failure | Schema Validation | schema, validation, strict-mode, runtime, fr-001-09, adr-0001 |
 | S-001-56 | pipeline-chain-abort-on-failure | Pipeline Chaining & Message Semantics | profile-chaining, abort, error, adr-0012, adr-0013 |
 | S-001-57 | transform-context-headers-in-body | Pipeline Chaining & Message Semantics | transform-context, headers, body, do-001-07 |
-| S-001-58 | copy-on-wrap-abort-rollback | Pipeline Chaining & Message Semantics | copy-on-wrap, abort, rollback, adr-0013 |
+| S-001-58 | copy-on-wrap-abort-error-response | Pipeline | copy-on-wrap, abort, error-response, adr-0013, adr-0022 |
 | S-001-59 | apply-directive-missing-expr-rejected | Reusable Mappers | mappers, apply, validation, error, fr-001-08, adr-0014 |
 | S-001-60 | direction-agnostic-both-bindings | Direction Semantics | direction, agnostic, profile, adr-0016 |
 | S-001-61 | status-null-in-request-transform | Status Code | status, null, request, direction, adr-0017 |

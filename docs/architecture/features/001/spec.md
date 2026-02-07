@@ -258,7 +258,7 @@ the engine MUST reject the spec at load time with a diagnostic message (e.g.,
 | Success path | Spec declares `lang: jslt` → engine registry resolves → expression compiled |
 | Validation path | Unknown engine id → reject spec at load time with clear message |
 | Validation path | Spec uses capability engine doesn't support → reject at load time |
-| Failure path | Engine evaluation exceeds time/size budget → abort, pass original through |
+| Failure path | Engine evaluation exceeds time/size budget → abort, return error response (ADR-0022) |
 | Source | JourneyForge ADR-0027 (Expression Engines and `lang` Extensibility), ADR-0004, ADR-0009, ADR-0010 |
 
 ### FR-001-03: Bidirectional Transformation
@@ -310,7 +310,7 @@ entries.
 | Success path | Forward transform applied to response, reverse transform applied to request |
 | Validation path | Both forward and reverse compile successfully at load time |
 | Validation path | Profile entry without `direction` → reject at load time |
-| Failure path | Reverse expression errors at evaluation time → abort, pass original through |
+| Failure path | Reverse expression errors at evaluation time → abort, return error response (ADR-0022) |
 | Source | Novel — no existing gateway transformer supports bidirectional, ADR-0016 |
 
 ### FR-001-04: Message Envelope
@@ -366,8 +366,8 @@ if failure: discard Message copy → native untouched
 |--------|--------|
 | Success path | Adapter creates copy → engine processes → adapter applies changes back to native |
 | Validation path | Message body is not valid JSON → skip body transformation, apply header transforms only |
-| Failure path | Adapter cannot read body (e.g., streaming) → log warning, pass through |
-| Failure path | Transform fails → copy discarded, native message untouched |
+| Failure path | Adapter cannot read body (e.g., streaming) → log warning, return error response (ADR-0022) |
+| Failure path | Transform fails → copy discarded, adapter returns error response (ADR-0022) |
 | Source | PingAccess `Exchange`, gateway adapter pattern, ADR-0011 |
 
 **Body buffering (ADR-0018):** The core engine does NOT mandate body-size limits or
@@ -440,8 +440,9 @@ they form an **ordered pipeline** executed in declaration order:
    before each step — so header changes applied by spec N's `headers` block are
    visible to spec N+1's `$headers` variable.
 4. **Abort-on-failure**: if any spec in the chain fails at evaluation time (evaluation error,
-   budget exceeded), the **entire chain aborts**. The original, unmodified message
-   passes through. No partial pipeline results reach the client.
+   budget exceeded), the **entire chain aborts**. The engine returns a configurable
+   error response to the caller (ADR-0022). No partial pipeline results reach the
+   client or the downstream service.
 5. Structured logging MUST include the chain step index (e.g., `chain_step: 2/3`)
    alongside the spec id for each evaluated step.
 
@@ -455,38 +456,76 @@ structural shift → JSLT conditional enrichment on the same route.
 | Validation path | Referenced version not loaded → fail at load time |
 | Validation path | Two profiles with identical specificity and constraints → load-time error |
 | Failure path | Duplicate profile IDs → reject, no silent override |
-| Failure path | Chain step fails → entire chain aborts, original message passes through |
+| Failure path | Chain step fails → entire chain aborts, error response returned (ADR-0022) |
 | Source | Kong route/plugin binding, Apigee flow attachment, ADR-0005, ADR-0006, ADR-0008, ADR-0015 |
 
 ### FR-001-06: Passthrough Behavior
 
-**Requirement:** When a message does not match any transform profile, or when the
-body is not valid JSON, the engine MUST pass the message through **completely
-unmodified**. No headers, body, or status code changes. This is the default behavior.
+**Requirement:** When a message does not match any transform profile, the engine
+MUST pass the message through **completely unmodified**. No headers, body, or status
+code changes. This is the default behavior for non-matching requests.
+
+**Important:** Passthrough applies **only** when no profile matches. When a profile
+matches but the transformation fails (expression error, schema violation, etc.), the
+engine returns a **configurable error response** — NOT passthrough (ADR-0022). The
+downstream service expects the transformed schema; sending the untransformed message
+would cause a downstream failure with no clear error signal.
 
 | Aspect | Detail |
 |--------|--------|
 | Success path | Non-matching request → forwarded unmodified |
 | Validation path | N/A |
-| Failure path | N/A — passthrough is always safe |
-| Source | Fundamental safety principle |
+| Failure path | N/A — passthrough only applies to non-matching requests |
+| Source | Fundamental safety principle, ADR-0022 |
 
 ### FR-001-07: Error Handling
 
-**Requirement:** When a transformation fails at evaluation time (e.g., JSLT evaluation error,
-missing field, output size exceeded), the engine MUST:
-1. Log a structured warning with the spec ID, engine id, and error detail.
-2. Depending on configuration: either **abort the transformation** and pass the
-   original message through (strict mode, default), or **use partial output** where
-   possible (lenient mode).
-3. Never return an empty or corrupted message to the client.
+**Requirement:** When a transformation fails at evaluation time (e.g., JSLT evaluation
+error, missing field, output size exceeded, schema validation failure in strict mode),
+the engine MUST:
+1. Log a structured error entry with the spec ID, engine id, error detail, and chain
+   step index (if applicable).
+2. Produce a **configurable error response** and signal the adapter to return it to
+   the caller.
+3. Never pass the untransformed message through to the downstream service — the
+   downstream expects the transformed schema and will fail anyway (ADR-0022).
+4. Never return an empty, corrupted, or partially-evaluated message.
+
+**Error response format** is configurable via `error-response.format`:
+- `rfc9457` (default): RFC 9457 Problem Details for HTTP APIs (`application/problem+json`).
+- `custom`: operator-defined JSON template with `{{error.detail}}`, `{{error.specId}}`,
+  `{{error.type}}` placeholders.
+
+```yaml
+# Engine-level error response config
+error-response:
+  format: rfc9457                # "rfc9457" (default) or "custom"
+  status: 502                    # default HTTP status for transform failures
+  custom-template: |             # only used when format: custom
+    {
+      "errorCode": "TRANSFORM_FAILED",
+      "message": "{{error.detail}}",
+      "specId": "{{error.specId}}"
+    }
+```
+
+**Example RFC 9457 error response:**
+```json
+{
+  "type": "urn:message-xform:error:transform-failed",
+  "title": "Transform Failed",
+  "status": 502,
+  "detail": "JSLT evaluation error in spec 'callback-prettify@1.0.0': undefined variable at line 3",
+  "instance": "/json/alpha/authenticate"
+}
+```
 
 | Aspect | Detail |
 |--------|--------|
-| Success path | Transform fails → abort per config → original passes through |
-| Validation path | Configuration must explicitly choose lenient or strict |
-| Failure path | Engine itself crashes → gateway adapter catches exception, passes through |
-| Source | Defensive design — transformations must not break production traffic |
+| Success path | Transform fails → log error → return configurable error response to caller |
+| Validation path | Error response config validated at engine startup |
+| Failure path | Engine itself crashes → gateway adapter catches exception, returns error response |
+| Source | Defensive design, ADR-0022 |
 
 ### FR-001-08: Reusable Mappers
 
@@ -604,7 +643,7 @@ At evaluation time (optional, configurable):
 |--------|--------|
 | Success path | Schemas parse as valid JSON Schema 2020-12 → stored with spec |
 | Validation path | Invalid JSON Schema syntax → reject spec at load time |
-| Failure path | Evaluation-time validation failure (strict mode) → abort, pass original through |
+| Failure path | Evaluation-time validation failure (strict mode) → return error response (ADR-0022) |
 | Source | JourneyForge schema validation pattern, ADR-0001 |
 
 ### FR-001-10: Header Transformations
@@ -746,7 +785,7 @@ Processing order:
 | S-001-02 | Bidirectional transform: forward applied to response, reverse applied to request |
 | S-001-03 | Non-matching request → passed through unmodified |
 | S-001-05 | Unknown fields in input → preserved in output via `* : .` (open-world) |
-| S-001-08 | Strict mode: JSLT evaluation error → transformation aborted, original passed through |
+| S-001-08 | JSLT evaluation error → transformation aborted, error response returned (ADR-0022) |
 | S-001-14 | Alternative engine: spec declares `lang: jolt` → JOLT engine handles transform |
 | S-001-33 | Header add/remove/rename alongside body transforms |
 | S-001-36 | Status code override via conditional `when` predicate |
@@ -819,7 +858,9 @@ Processing order:
 |----|-----------|------|-------------|
 | CFG-001-01 | `specs-dir` | path | Directory containing transform spec YAML files |
 | CFG-001-02 | `profiles-dir` | path | Directory containing transform profile YAML files |
-| CFG-001-03 | `error-mode` | enum | `strict` (abort on failure, default) or `lenient` |
+| CFG-001-03 | `error-response.format` | enum | `rfc9457` (default) or `custom` — error response format for transform failures (ADR-0022) |
+| CFG-001-04 | `error-response.status` | int | Default HTTP status code for transform failure error responses (default: 502) |
+| CFG-001-09 | `error-response.custom-template` | string | JSON template with `{{error.*}}` placeholders — used when `error-response.format: custom` |
 | CFG-001-05 | `engines.defaults.max-eval-ms` | int | Per-expression evaluation time budget (default: 50ms) |
 | CFG-001-06 | `engines.defaults.max-output-bytes` | int | Max output size per evaluation (default: 1MB) |
 | CFG-001-07 | `engines.<id>.enabled` | boolean | Enable/disable a specific expression engine |

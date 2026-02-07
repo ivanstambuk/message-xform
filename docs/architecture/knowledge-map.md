@@ -88,11 +88,14 @@ ADR-0021 (Query+Cookies) ─── governs ── FR-001-02, references ADR-0020
 | FR-001-02 (Expression Engine SPI) | ADR-0004, ADR-0009, ADR-0010, ADR-0020, ADR-0021 | NFR-001-02 |
 | FR-001-03 (Bidirectional) | ADR-0016 | — |
 | FR-001-08 (Reusable Mappers) | ADR-0014 | — |
-| FR-001-04 (Message Envelope) | ADR-0011, ADR-0013, ADR-0018 | — |
-| FR-001-05 (Transform Profiles) | ADR-0005, ADR-0006, ADR-0012, ADR-0015 | NFR-001-08 |
+| FR-001-04 (Message Envelope) | ADR-0011, ADR-0013, ADR-0018, ADR-0022 | — |
+| FR-001-05 (Transform Profiles) | ADR-0005, ADR-0006, ADR-0012, ADR-0015, ADR-0022 | NFR-001-08 |
 | FR-001-10 (Header Transforms) | ADR-0002, ADR-0004 | — |
 | FR-001-11 (Status Code Transforms) | ADR-0003, ADR-0004, ADR-0017, ADR-0020 | — |
 | Observability | ADR-0007 | NFR-001-08, NFR-001-09, NFR-001-10 |
+| FR-001-06 (Passthrough) | ADR-0022 | — |
+| FR-001-07 (Error Handling) | ADR-0022 | — |
+| FR-001-09 (Schema Validation) | ADR-0001, ADR-0022 | — |
 
 ## Research Documents
 
