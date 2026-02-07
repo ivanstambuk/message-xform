@@ -101,10 +101,14 @@ Update both `docs/architecture/roadmap.md` and the Roadmap table above when stat
    - **Workspace-first grounding**: The Decision Card's "Current behaviour" and "Key references" MUST cite concrete file paths/sections from the repo, not chat memory.
    - **Always recommend**: Option A MUST be the recommended option. Include clear pros/cons for every option.
    - **Wait for answer**: Do not proceed until the user chooses an option.
-   - **Record the decision**: After the user decides:
-     1. Update the relevant spec section (`spec.md`) to encode the decision.
-     2. For **medium- or high-impact** decisions: automatically create an ADR under `docs/decisions/` with Context, Decision, Consequences, and Related sections.
-     3. **Immediately remove** the resolved row from `docs/architecture/open-questions.md` — the file must never contain resolved questions.
+   - **Resolution Checklist** — after the user decides, complete ALL steps before moving to the next question:
+     1. ☐ Update `spec.md` with the decision (normative text, interfaces, examples).
+     2. ☐ Create or update ADR under `docs/decisions/` (mandatory for high-severity; use judgement for medium).
+     3. ☐ Update `docs/architecture/knowledge-map.md` (dependency graph + traceability table) if new ADR created.
+     4. ☐ Update `llms.txt` if new ADR created.
+     5. ☐ Add or update scenario(s) in `scenarios.md` if the decision introduces new behaviour or edge cases.
+     6. ☐ Remove the resolved row from `docs/architecture/open-questions.md`.
+     7. ☐ Commit all changes in a single atomic commit.
    - Then move to the next question.
    - **Follow-up analysis in ADRs**: When a Decision Card triggers follow-up discussion
      (e.g., capability comparisons, use-case explorations, trade-off deep dives), capture
