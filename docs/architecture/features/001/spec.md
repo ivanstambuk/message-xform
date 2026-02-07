@@ -7,6 +7,7 @@
 | Owners | Ivan |
 | Linked plan | `docs/architecture/features/001/plan.md` |
 | Linked tasks | `docs/architecture/features/001/tasks.md` |
+| Linked scenarios | `docs/architecture/features/001/scenarios.md` |
 | Roadmap entry | #1 – Message Transformation Engine |
 
 > Guardrail: This specification is the single normative source of truth for the feature.
