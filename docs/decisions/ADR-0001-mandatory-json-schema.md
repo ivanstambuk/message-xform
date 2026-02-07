@@ -13,7 +13,32 @@ JourneyForge (ADR-0027) supports optional inline JSON Schema 2020-12 on its tran
 states. The question for message-xform was whether schemas should be mandatory, optional,
 or deferred to a future version.
 
+### Options Considered
+
+- **Option A – Mandatory schemas** (chosen)
+  - Every transform spec MUST declare `input.schema` and `output.schema` using JSON
+    Schema 2020-12. Schemas are required fields on `TransformSpec`.
+  - Pros: deploy-time safety, self-documenting specs, enables future tooling
+    (compatibility checks, migration diffs).
+  - Cons: raises the authoring barrier — every spec needs two extra schema blocks.
+
+- **Option B – Optional schemas** (rejected)
+  - Schemas are optional. If present, validated at load time; if absent, skipped.
+  - Pros: lower authoring friction for simple specs.
+  - Cons: no guarantee of deploy-time safety — specs without schemas silently break
+    at runtime. Defeats the purpose of contract-driven design.
+
+- **Option C – Deferred to v2** (rejected)
+  - No schema support in v1, add it later.
+  - Pros: fastest to implement.
+  - Cons: retrofitting mandatory schemas later is a breaking change to all specs.
+
+Related ADRs:
+- JourneyForge ADR-0027 – Expression Engines and `lang` Extensibility
+
 ## Decision
+
+We adopt **Option A – Mandatory schemas**.
 
 Every transform spec MUST declare `input.schema` and `output.schema` using JSON Schema
 2020-12. Schemas are required fields on the `TransformSpec` domain object.
@@ -28,17 +53,21 @@ allowed core dependencies alongside Jackson, SnakeYAML, and JSLT.
 
 ## Consequences
 
-- **Spec authors** must write JSON Schema for every transform spec. This raises the
-  authorship barrier but produces self-documenting, contract-driven specs.
-- **Deploy-time safety**: structural mismatches between the spec's assumptions and
-  the actual upstream API are caught when the spec is loaded, not at runtime.
-- **Dependency**: one additional library in the core module. The chosen library must
-  be Jackson-native (operates on `JsonNode`) for consistency.
-- **Future tooling**: schemas enable compatibility checking, diff reports, and
-  automated migration tooling between spec versions.
-- **NFR-001-02** updated to include JSON Schema validator in allowed dependencies.
-- **FR-001-09** added to encode this requirement.
-- **DO-001-02** (`TransformSpec`) updated with `inputSchema` and `outputSchema` fields.
+Positive:
+- Spec authors produce self-documenting, contract-driven specs.
+- Deploy-time safety: structural mismatches caught when the spec is loaded, not at runtime.
+- Future tooling: schemas enable compatibility checking, diff reports, and automated
+  migration tooling between spec versions.
+
+Negative / trade-offs:
+- Every spec now requires two JSON Schema blocks, raising the authoring barrier.
+- One additional library (`json-schema-validator`) in the core module. Must be
+  Jackson-native (operates on `JsonNode`) for consistency.
+
+Follow-ups:
+- NFR-001-02 updated to include JSON Schema validator in allowed dependencies.
+- FR-001-09 added to encode this requirement.
+- DO-001-02 (`TransformSpec`) updated with `inputSchema` and `outputSchema` fields.
 
 References:
 - Feature 001 spec: `docs/architecture/features/001/spec.md` (FR-001-09, NFR-001-02)

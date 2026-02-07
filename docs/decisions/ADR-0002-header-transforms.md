@@ -1,4 +1,4 @@
-# ADR-0002 – Declarative Header Transforms with Read-Only JSLT Binding
+# ADR-0002 – Declarative Header Transforms with Bidirectional JSLT Binding
 
 Date: 2026-02-07 | Status: Accepted
 
@@ -10,35 +10,65 @@ operate on `JsonNode` (the body), not on HTTP headers (`Map<String, List<String>
 
 Two concerns must be addressed:
 1. **Header manipulation** — add, remove, rename headers (e.g., strip `X-Internal-*`).
-2. **Header-to-body injection** — reference header values inside the JSLT body expression
-   (e.g., inject `X-Request-ID` into the response body).
+2. **Header ↔ body injection** — reference header values inside the JSLT body expression
+   (header-to-body), and extract body values into headers (body-to-header).
+
+### Options Considered
+
+- **Option A – Separate `headers` block with add/remove/rename + bidirectional binding** (chosen)
+  - Declarative header operations + `$headers` read-only JSLT variable for header-to-body +
+    dynamic `expr` in `add` for body-to-header.
+  - Pros: clean separation of concerns, bidirectional bridge without polluting body JSON,
+    consistent with Kong transformer pattern.
+  - Cons: two mechanisms (declarative block + JSLT variable) — slightly more surface area.
+
+- **Option B – Headers injected into JSLT body as `_headers`** (rejected)
+  - Merge headers into the body JSON input under a reserved `_headers` key. JSLT operates
+    on the merged object.
+  - Pros: unified — one JSLT expression handles everything.
+  - Cons: pollutes body input with header data, risk of `_headers` key collision with real
+    body fields, cannot do declarative add/remove/rename without JSLT.
+
+- **Option C – Headers are adapter-level only** (rejected)
+  - No header transform support in core engine. Adapters handle headers natively.
+  - Pros: simplest core.
+  - Cons: breaks G-001-03 (full envelope), no portable header transforms across gateways.
+
+Related ADRs:
+- ADR-0003 – Status Code Transforms (mirrors this pattern)
 
 ## Decision
 
-Header transforms use a **hybrid approach**:
+We adopt **Option A – Separate `headers` block with bidirectional JSLT binding**.
 
-1. **Declarative `headers` block** in the transform spec for add/remove/rename operations,
-   processed independently of the body expression. Glob patterns are supported for removal.
-2. **Read-only `$headers` variable** bound into the JSLT evaluation context, allowing body
-   expressions to reference header values via `$headers."X-Request-ID"` (**header-to-body**).
-3. **Dynamic `add` values** using `expr` sub-keys — JSLT expressions evaluated against the
-   **transformed** body, enabling **body-to-header injection** (e.g., extract error code
-   from body and emit as `X-Error-Code` header).
+Header transforms use a hybrid approach:
+
+1. **Declarative `headers` block** for add/remove/rename operations (glob patterns for removal).
+2. **Read-only `$headers` variable** for header-to-body injection in JSLT expressions.
+3. **Dynamic `add` values** using `expr` sub-keys — JSLT evaluated against the transformed
+   body for body-to-header injection.
 
 Processing order: read headers → bind `$headers` → evaluate JSLT body → apply declarative
 header operations (remove → rename → static add → dynamic add).
 
 ## Consequences
 
-- **Clean separation**: body transforms use JSLT, header transforms use declarative rules.
-  No mixing of concerns inside the expression.
-- **Bidirectional bridge**: `$headers` enables header-to-body; dynamic `expr` in `add`
-  enables body-to-header. Both directions are covered.
-- **Multi-value headers**: `$headers` exposes the first value only in v1. Full multi-value
+Positive:
+- Clean separation: body transforms use JSLT, header transforms use declarative rules.
+- Bidirectional bridge: `$headers` for header-to-body, dynamic `expr` for body-to-header.
+- Consistent with Kong/Apigee transformer patterns.
+
+Negative / trade-offs:
+- Multi-value headers: `$headers` exposes the first value only in v1. Full multi-value
   support is deferred to a future extension.
-- **FR-001-10** added to encode this requirement.
+- Dynamic header `expr` evaluated against the **transformed** body — could return non-string
+  values that need coercion.
+
+Follow-ups:
+- FR-001-10 added to encode this requirement.
+- Multi-value header support tracked for a future version.
 
 References:
 - Feature 001 spec: `docs/architecture/features/001/spec.md` (FR-001-10)
 - Kong transformer pattern: `docs/research/transformation-patterns.md`
-- Validating scenarios: S-001-33 (header-to-body), S-001-34 (body-to-header)
+- Validating scenarios: S-001-33 (header-to-body), S-001-34 (body-to-header), S-001-35 (missing header)
