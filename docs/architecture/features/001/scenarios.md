@@ -1714,6 +1714,74 @@ expected_status: 202
 
 ---
 
+## Category 11: Engine Capability Validation
+
+Scenarios validating engine support matrix enforcement (ADR-0004, FR-001-02).
+
+### S-001-39: JOLT Engine with Unsupported Predicate — Rejected at Load Time
+
+A spec using `lang: jolt` with a `when` predicate must be rejected.
+
+```yaml
+scenario: S-001-39
+name: jolt-unsupported-predicate-rejected
+description: >
+  A spec declares lang: jolt with a when predicate. Since JOLT does not
+  support predicates (per engine support matrix), the engine must reject
+  the spec at load time with a clear diagnostic.
+  Validates ADR-0004 load-time capability validation.
+tags: [engine, capability, jolt, validation, adr-0004]
+requires: [FR-001-02]
+
+transform:
+  lang: jolt
+  expr: |
+    [{"operation": "shift", "spec": {"id": "userId"}}]
+
+status:
+  set: 400
+  when: '.error != null'
+
+input:
+  id: "usr-42"
+
+expected_error:
+  type: "capability-violation"
+  message: "engine 'jolt' does not support predicates — use 'jslt' or 'jq'"
+```
+
+### S-001-40: JOLT Engine with `$headers` Reference — Rejected at Load Time
+
+```yaml
+scenario: S-001-40
+name: jolt-unsupported-headers-rejected
+description: >
+  A spec declares lang: jolt and references $headers. Since JOLT does not
+  support context variables, the engine must reject at load time.
+  Validates ADR-0004 load-time capability validation.
+tags: [engine, capability, jolt, validation, adr-0004]
+requires: [FR-001-02]
+
+transform:
+  lang: jolt
+  expr: |
+    [{"operation": "shift", "spec": {"id": "userId"}}]
+
+headers:
+  add:
+    X-Error-Code:
+      expr: .error.code
+
+input:
+  id: "usr-42"
+
+expected_error:
+  type: "capability-violation"
+  message: "engine 'jolt' does not support context variables ($headers/$status)"
+```
+
+---
+
 ## Scenario Index
 
 | ID | Name | Category | Tags |
@@ -1756,13 +1824,15 @@ expected_status: 202
 | S-001-36 | conditional-status-error-body | Status Code | status, conditional, error, adr-0003 |
 | S-001-37 | status-in-body-expression | Status Code | status, body, variable, adr-0003 |
 | S-001-38 | unconditional-status-set | Status Code | status, unconditional, adr-0003 |
+| S-001-39 | jolt-unsupported-predicate-rejected | Engine Capability | engine, capability, jolt, validation, adr-0004 |
+| S-001-40 | jolt-unsupported-headers-rejected | Engine Capability | engine, capability, jolt, validation, adr-0004 |
 
 ## Coverage Matrix
 
 | Spec Requirement | Scenarios |
 |------------------|-----------|
 | FR-001-01 (Spec Format) | S-001-01 through S-001-17 |
-| FR-001-02 (Expression Engine SPI) | S-001-25, S-001-26, S-001-27, S-001-28 |
+| FR-001-02 (Expression Engine SPI) | S-001-25, S-001-26, S-001-27, S-001-28, S-001-39, S-001-40 |
 | FR-001-03 (Bidirectional) | S-001-02, S-001-29, S-001-30 |
 | FR-001-04 (Message Envelope) | S-001-19 |
 | FR-001-05 (Transform Profiles) | All — profiles bind specs to URL patterns |

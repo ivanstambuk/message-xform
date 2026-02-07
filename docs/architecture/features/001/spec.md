@@ -194,12 +194,28 @@ engines:
     enabled: false
 ```
 
+Engine support matrix — the engine MUST validate at load time that a spec does not
+use capabilities the declared engine does not support:
+
+| Engine    | Body Transform | Predicates (`when`) | `$headers` / `$status` | Bidirectional | Status |
+|-----------|:-:|:-:|:-:|:-:|-----------|
+| `jslt`    | ✅ | ✅ | ✅ | ✅ | Baseline — always available |
+| `jolt`    | ✅ | ❌ | ❌ | ❌ | Structural shift/default/remove only |
+| `jq`      | ✅ | ✅ | ✅ | ✅ | Future — via adapter |
+| `jsonata` | ✅ | ✅ | ✅ | ✅ | Future — via adapter |
+| `dataweave` | ✅ | ✅ | ✅ | ✅ | Future — being open-sourced by MuleSoft (BSD-3), via adapter |
+
+If a spec declares `lang: jolt` with a `when` predicate or `$headers` reference,
+the engine MUST reject the spec at load time with a diagnostic message (e.g.,
+"engine 'jolt' does not support predicates — use 'jslt' or 'jq'").
+
 | Aspect | Detail |
 |--------|--------|
 | Success path | Spec declares `lang: jslt` → engine registry resolves → expression compiled |
 | Validation path | Unknown engine id → reject spec at load time with clear message |
+| Validation path | Spec uses capability engine doesn't support → reject at load time |
 | Failure path | Engine evaluation exceeds time/size budget → abort, pass original through |
-| Source | JourneyForge ADR-0027 (Expression Engines and `lang` Extensibility) |
+| Source | JourneyForge ADR-0027 (Expression Engines and `lang` Extensibility), ADR-0004 |
 
 ### FR-001-03: Bidirectional Transformation
 
