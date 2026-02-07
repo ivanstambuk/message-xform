@@ -21,6 +21,5 @@ Hard rules:
 
 | ID | Owner | Question | Options (A preferred) | Status | Asked | Notes |
 |----|-------|----------|------------------------|--------|-------|-------|
-| Q-007 | Ivan | Should we define structured observability (metrics, log format, trace correlation)? | A) Minimal — structured error logging + request-id passthrough (recommended) B) Full — metrics, histograms, OpenTelemetry C) Defer to implementation | Open | 2026-02-07 | |
 | Q-008 | Ivan | Should a single spec support chained/pipeline transforms? | A) No, one expression per direction — JSLT is expressive enough (recommended) B) Yes, pipeline of expressions | Open | 2026-02-07 | JourneyForge uses pipelines but their use case is different. |
 | Q-009 | Ivan | Should we create ADRs for key decisions already made (JSLT, pluggable SPI, JsonNode)? | A) Yes, create ADR-001/002/003 now (recommended) B) No, spec appendix is sufficient | Open | 2026-02-07 | |

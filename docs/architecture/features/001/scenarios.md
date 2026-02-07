@@ -1984,6 +1984,73 @@ expected_match:
 
 ---
 
+## Category 14: Observability
+
+Scenarios validating the telemetry SPI and trace correlation (ADR-0007, NFR-001-09, NFR-001-10).
+
+### S-001-47: TelemetryListener Receives Transform Lifecycle Events
+
+```yaml
+scenario: S-001-47
+name: telemetry-listener-lifecycle
+description: >
+  A registered TelemetryListener receives onTransformStarted,
+  onTransformCompleted (or onTransformFailed) events for every transform
+  evaluation. Events carry specId, specVersion, direction, and duration —
+  but never body content or header values.
+  Validates NFR-001-09 telemetry SPI.
+tags: [observability, telemetry, spi, adr-0007]
+requires: [NFR-001-09]
+
+setup:
+  telemetry_listener: mock          # test double captures events
+
+transform:
+  spec: callback-prettify@1.0.0
+  direction: response
+  input: { data: "hello" }
+
+expected_telemetry_events:
+  - type: TransformStarted
+    specId: callback-prettify
+    specVersion: "1.0.0"
+    direction: response
+  - type: TransformCompleted
+    specId: callback-prettify
+    specVersion: "1.0.0"
+    direction: response
+    duration_ms: ">= 0"
+    # MUST NOT contain: body, header values, sensitive data
+```
+
+### S-001-48: Trace Context Propagation — X-Request-ID in Log Output
+
+```yaml
+scenario: S-001-48
+name: trace-context-propagation
+description: >
+  The engine propagates incoming X-Request-ID through all structured
+  log entries and telemetry events. No new traces are created.
+  Validates NFR-001-10 trace correlation.
+tags: [observability, tracing, correlation, adr-0007]
+requires: [NFR-001-10]
+
+request:
+  headers:
+    X-Request-ID: "abc-123-def"
+    traceparent: "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+  body: { data: "hello" }
+
+expected_log_entry:
+  fields:
+    request_id: "abc-123-def"
+    trace_id: "4bf92f3577b34da6a3ce929d0e0e4736"
+    profile_id: "*"                  # whatever matched
+    spec_id: "*"
+```
+
+---
+
 ## Scenario Index
 
 | ID | Name | Category | Tags |
@@ -2034,6 +2101,8 @@ expected_match:
 | S-001-44 | specific-path-beats-wildcard | Match Resolution | profile, match, specificity, adr-0006 |
 | S-001-45 | ambiguous-tie-rejected | Match Resolution | profile, match, ambiguous, validation, adr-0006 |
 | S-001-46 | constraint-count-tiebreaker | Match Resolution | profile, match, tiebreaker, adr-0006 |
+| S-001-47 | telemetry-listener-lifecycle | Observability | observability, telemetry, spi, adr-0007 |
+| S-001-48 | trace-context-propagation | Observability | observability, tracing, correlation, adr-0007 |
 
 ## Coverage Matrix
 
@@ -2055,3 +2124,5 @@ expected_match:
 | NFR-001-04 (Open-world) | S-001-07, S-001-20 |
 | NFR-001-07 (Eval budget) | S-001-24 |
 | NFR-001-08 (Match logging) | S-001-44, S-001-46 (matched profile logged) |
+| NFR-001-09 (Telemetry SPI) | S-001-47 |
+| NFR-001-10 (Trace correlation) | S-001-48 |
