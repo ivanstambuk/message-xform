@@ -1596,6 +1596,124 @@ expected_output:
 
 ---
 
+## Category 10: Status Code Transforms
+
+Scenarios validating status code transformation (ADR-0003, FR-001-11).
+
+### S-001-36: Conditional Status Change — Error Body → 400
+
+The key use case: upstream returns 200 but body contains an error → change to 400.
+
+```yaml
+scenario: S-001-36
+name: conditional-status-error-body
+description: >
+  Upstream returns 200 with an error in the body. The status block changes
+  the response to 400 when the error field is present.
+  Validates ADR-0003 conditional when predicate.
+tags: [status, conditional, error, adr-0003]
+requires: [FR-001-11]
+
+transform:
+  lang: jslt
+  expr: |
+    {
+      "success": false,
+      "error": .error,
+      "message": .error_description
+    }
+
+status:
+  set: 400
+  when: '.error != null'
+
+input:
+  error: "invalid_grant"
+  error_description: "The provided grant is invalid or expired"
+
+request_status: 200
+
+expected_output:
+  success: false
+  error: "invalid_grant"
+  message: "The provided grant is invalid or expired"
+
+expected_status: 400
+```
+
+### S-001-37: `$status` in Body Expression
+
+Use the original status code inside the JSLT body expression.
+
+```yaml
+scenario: S-001-37
+name: status-in-body-expression
+description: >
+  Use $status to include the original HTTP status code in the transformed
+  body. Validates ADR-0003 $status read-only variable.
+tags: [status, body, variable, adr-0003]
+requires: [FR-001-11]
+
+transform:
+  lang: jslt
+  expr: |
+    {
+      "success": $status < 400,
+      "httpStatus": $status,
+      "data": .data
+    }
+
+input:
+  data: "payload"
+
+request_status: 200
+
+expected_output:
+  success: true
+  httpStatus: 200
+  data: "payload"
+
+expected_status: 200
+```
+
+### S-001-38: Unconditional Status Set
+
+Set status code unconditionally (no `when` predicate).
+
+```yaml
+scenario: S-001-38
+name: unconditional-status-set
+description: >
+  Set the response status code to 202 unconditionally, regardless of body.
+  Validates ADR-0003 unconditional status set.
+tags: [status, unconditional, adr-0003]
+requires: [FR-001-11]
+
+transform:
+  lang: jslt
+  expr: |
+    {
+      "accepted": true,
+      "id": .id
+    }
+
+status:
+  set: 202
+
+input:
+  id: "job-42"
+
+request_status: 200
+
+expected_output:
+  accepted: true
+  id: "job-42"
+
+expected_status: 202
+```
+
+---
+
 ## Scenario Index
 
 | ID | Name | Category | Tags |
@@ -1635,6 +1753,9 @@ expected_output:
 | S-001-33 | header-to-body-injection | Header ↔ Body | header, body, injection, adr-0002 |
 | S-001-34 | body-to-header-injection | Header ↔ Body | header, body, injection, dynamic, adr-0002 |
 | S-001-35 | missing-header-returns-null | Header ↔ Body | header, edge-case, null, adr-0002 |
+| S-001-36 | conditional-status-error-body | Status Code | status, conditional, error, adr-0003 |
+| S-001-37 | status-in-body-expression | Status Code | status, body, variable, adr-0003 |
+| S-001-38 | unconditional-status-set | Status Code | status, unconditional, adr-0003 |
 
 ## Coverage Matrix
 
@@ -1650,6 +1771,7 @@ expected_output:
 | FR-001-08 (Reusable Mappers) | *Not yet covered — add when mapperRef is specified* |
 | FR-001-09 (Schema Validation) | *Not yet covered — add input/output schema test vectors* |
 | FR-001-10 (Header Transforms) | S-001-33, S-001-34, S-001-35 |
+| FR-001-11 (Status Code Transforms) | S-001-36, S-001-37, S-001-38 |
 | NFR-001-01 (Stateless) | All — implicit in test harness design |
 | NFR-001-03 (Latency <5ms) | S-001-23 |
 | NFR-001-04 (Open-world) | S-001-07, S-001-20 |

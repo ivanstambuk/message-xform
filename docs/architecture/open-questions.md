@@ -21,7 +21,6 @@ Hard rules:
 
 | ID | Owner | Question | Options (A preferred) | Status | Asked | Notes |
 |----|-------|----------|------------------------|--------|-------|-------|
-| Q-003 | Ivan | How should status code transforms be defined? | A) JSLT sets `_status` magic field (recommended) B) Separate `status` block C) Adapter-level only | Open | 2026-02-07 | S-001-11 mentions status mapping but no spec format. |
 | Q-004 | Ivan | Should we define a formal engine support matrix? | A) Yes, in spec (recommended) B) No, per-engine in adapter specs | Open | 2026-02-07 | JourneyForge blocks JOLT from predicates. |
 | Q-005 | Ivan | What are the spec version compatibility rules? | A) Informational only (recommended) B) Profiles pin to spec versions C) Semver with breaking change policy | Open | 2026-02-07 | |
 | Q-006 | Ivan | What happens when multiple profiles match the same request? | A) First-match-wins by profile priority (recommended) B) Most-specific-wins (longest path) C) Error — ambiguous match rejected at load time | Open | 2026-02-07 | Critical for production. |

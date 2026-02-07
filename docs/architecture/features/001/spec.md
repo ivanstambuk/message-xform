@@ -491,6 +491,54 @@ Processing order:
 | Failure path | Dynamic header `expr` returns non-string → coerce to string or reject |
 | Source | Kong transformer add/remove/rename pattern, ADR-0002 |
 
+### FR-001-11: Status Code Transformations
+
+**Requirement:** Transform specs MAY include an optional `status` block to modify
+the HTTP response status code. The engine MUST expose the current status code as a
+**read-only JSLT variable** `$status`.
+
+```yaml
+status:
+  set: 400                          # target status code
+  when: '.error != null'            # optional JSLT predicate — only set if true
+```
+
+The `when` predicate is a JSLT expression evaluated against the **transformed** body.
+If `when` is omitted, the status is set unconditionally. If present, the status is
+only changed when the predicate evaluates to `true`.
+
+The `$status` variable is an integer bound before JSLT body evaluation, allowing
+status-aware body transforms:
+
+```yaml
+transform:
+  lang: jslt
+  expr: |
+    {
+      "success": $status < 400,
+      "httpStatus": $status,
+      "data": .data
+    }
+
+status:
+  set: 400
+  when: '.error != null'
+```
+
+Processing order:
+1. Engine reads status code from the `Message` envelope → binds as `$status` (integer).
+2. JSLT body expression evaluates with `$status` and `$headers` available.
+3. Declarative header operations applied (FR-001-10).
+4. Status `when` predicate evaluated against the **transformed** body.
+5. If `when` is true (or absent), status code set to `set` value.
+
+| Aspect | Detail |
+|--------|--------|
+| Success path | Status block parsed → predicate evaluated → status updated |
+| Validation path | `set` not a valid HTTP status code (100–599) → reject at load time |
+| Failure path | `when` predicate evaluation error → abort, keep original status |
+| Source | ADR-0003 |
+
 ## Non-Functional Requirements
 
 | ID | Requirement | Driver | Measurement | Dependencies | Source |
