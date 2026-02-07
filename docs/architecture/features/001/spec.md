@@ -224,7 +224,7 @@ the engine MUST reject the spec at load time with a diagnostic message (e.g.,
 | Validation path | Unknown engine id → reject spec at load time with clear message |
 | Validation path | Spec uses capability engine doesn't support → reject at load time |
 | Failure path | Engine evaluation exceeds time/size budget → abort, pass original through |
-| Source | JourneyForge ADR-0027 (Expression Engines and `lang` Extensibility), ADR-0004 |
+| Source | JourneyForge ADR-0027 (Expression Engines and `lang` Extensibility), ADR-0004, ADR-0009, ADR-0010 |
 
 ### FR-001-03: Bidirectional Transformation
 
@@ -304,7 +304,7 @@ interface:
 | Success path | Adapter wraps native message → engine processes → adapter applies changes |
 | Validation path | Message body is not valid JSON → skip body transformation, apply header transforms only |
 | Failure path | Adapter cannot read body (e.g., streaming) → log warning, pass through |
-| Source | PingAccess `Exchange`, gateway adapter pattern |
+| Source | PingAccess `Exchange`, gateway adapter pattern, ADR-0011 |
 
 ### FR-001-05: Transform Profiles (Backend-Specific Definitions)
 

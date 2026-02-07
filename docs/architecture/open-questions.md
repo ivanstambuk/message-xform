@@ -21,4 +21,3 @@ Hard rules:
 
 | ID | Owner | Question | Options (A preferred) | Status | Asked | Notes |
 |----|-------|----------|------------------------|--------|-------|-------|
-| Q-009 | Ivan | Should we create ADRs for key decisions already made (JSLT, pluggable SPI, JsonNode)? | A) Yes, create ADR-001/002/003 now (recommended) B) No, spec appendix is sufficient | Open | 2026-02-07 | |

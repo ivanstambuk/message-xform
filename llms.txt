@@ -12,6 +12,9 @@ docs/architecture/features/001/spec.md
 docs/architecture/features/001/scenarios.md
 
 # Architecture decisions (newest first)
+docs/decisions/ADR-0011-jackson-jsonnode-body-representation.md
+docs/decisions/ADR-0010-pluggable-expression-engine-spi.md
+docs/decisions/ADR-0009-jslt-as-default-expression-engine.md
 docs/decisions/ADR-0008-single-expression-per-direction.md
 docs/decisions/ADR-0007-layered-observability.md
 docs/decisions/ADR-0006-profile-match-resolution.md

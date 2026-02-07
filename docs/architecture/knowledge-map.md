@@ -65,14 +65,19 @@ ADR-0005 (Version Pinning) ──── governs ──── FR-001-05
 ADR-0006 (Match Resolution) ── governs ── FR-001-05, introduces NFR-001-08
 ADR-0007 (Observability) ──── introduces ──── NFR-001-09, NFR-001-10
 ADR-0008 (Single Expr/Dir) ── constrains ── FR-001-01, references ADR-0004
+ADR-0009 (JSLT Default) ──── governs ──── FR-001-01, FR-001-02
+ADR-0010 (Pluggable SPI) ─── governs ──── FR-001-02, references ADR-0009
+ADR-0011 (JsonNode Body) ─── governs ──── FR-001-04, references ADR-0009, ADR-0010
 ```
 
 ## Feature → ADR → NFR Traceability
 
 | Feature | ADRs | NFRs |
 |---------|------|------|
-| FR-001-01 (Spec Format) | ADR-0001, ADR-0008 | — |
-| FR-001-02 (Expression Engine SPI) | ADR-0004 | NFR-001-02 |
+| FR-001-01 (Spec Format) | ADR-0001, ADR-0008, ADR-0009 | — |
+| FR-001-02 (Expression Engine SPI) | ADR-0004, ADR-0009, ADR-0010 | NFR-001-02 |
+| FR-001-03 (Bidirectional) | — | — |
+| FR-001-04 (Message Envelope) | ADR-0011 | — |
 | FR-001-05 (Transform Profiles) | ADR-0005, ADR-0006 | NFR-001-08 |
 | FR-001-10 (Header Transforms) | ADR-0002, ADR-0004 | — |
 | FR-001-11 (Status Code Transforms) | ADR-0003, ADR-0004 | — |
