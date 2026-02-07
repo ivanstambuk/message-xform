@@ -1,18 +1,20 @@
 # Pending Task
 
-**Focus**: Feature 001 — Message Transformation Engine (core)
-**Status**: Specification phase COMPLETE. All 19 open questions resolved (Q-001 through Q-019). 19 ADRs documented. 62 scenarios defined. Spec is fully normative.
-**Next Step**: Run the analysis gate checklist, then begin implementation planning (task breakdown, Java module structure).
+**Focus**: Resolving remaining open questions for Feature 001 (Q-022 through Q-027)
+**Status**: Q-022 decision card was presented in the previous session — user has not yet decided
+**Next Step**: Re-present Q-022 decision card (Content-Type negotiation) and get user's choice, then resolve
 
 ## Context Notes
-- All open questions are resolved — `open-questions.md` is empty.
-- The spec (`docs/architecture/features/001/spec.md`) is the source of truth.
-- Decision Card format was tightened this session — all future cards must include
-  concrete YAML/code examples and a comparison matrix.
-- AGENTS.md Resolution Checklist was strengthened — scenario creation is now step 3
-  (mandatory, not conditional). This was a retro finding.
+- Q-022 recommendation is Option A (adapter responsibility for form→JSON coercion)
+- Two HIGH-severity questions remain: Q-025 (lenient mode) and Q-027 (cross-profile conflicts) — prioritize these
+- The retro found and fixed all SDD gaps — scenarios, terminology, ADR refs are clean
+- AGENTS.md now has Rule 5 (Incremental Auto-Commit Protocol) — commit after each logical increment
 
 ## SDD Gaps (if any)
-- None identified. Retro audit was clean after applying fixes.
-- Future: when implementation begins, NFR-001-06 (sensitive fields) and NFR-001-05
-  (hot reload) scenarios are marked as deferred until the engine/adapter exists.
+- None — retro audit cleared all gaps
+- ADR-0020 and ADR-0021 now have validating scenarios (S-001-63/64/65)
+- Terminology updated for $queryParams, $cookies, nullable Integer
+
+## After Open Questions
+- Run the Cross-Language Portability Audit (backlog item in PLAN.md)
+- Then proceed to Feature 001 implementation planning
