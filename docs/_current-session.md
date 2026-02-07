@@ -1,53 +1,43 @@
-# Current Session — 2026-02-07 (Session 4)
+# Current Session State
 
-## Active Work
-Feature 001 spec refinement — resolving open questions, terminology alignment.
+**Date:** 2026-02-08  
+**Status:** Completed (retro done)
 
-## Session Progress
+## Work Completed This Session
 
-### Terminology
-- Replaced all 11 instances of "runtime" → "evaluation time" in `spec.md`.
-- Strengthened `terminology.md` with JourneyForge convention alignment.
+### 1. Error Handling Strategy — ADR-0022 (Q-025 resolved)
+- Eliminated ambiguous "lenient mode" for expression failures
+- Transform failures now always return configurable error response (RFC 9457 default)
+- Passthrough narrowed to non-matching requests only
+- Updated spec, scenarios, terminology, knowledge map
 
-### ADRs Created
-| ADR | Decision | Q-ID |
-|-----|----------|------|
-| ADR-0020 | `TransformContext.getStatusCode()` → nullable `Integer` (was `int`/-1 sentinel) | Q-020 |
-| ADR-0021 | Added `$queryParams` and `$cookies` to `TransformContext` | Q-021 |
+### 2. Decision Card Format Refinement
+- Added **progressive disclosure** rules: Introduction → Define before use → Technical detail
+- Added **define-before-use** mandatory rule
+- Renamed "Plain-language problem statement" to "Introduction" per user feedback
+- Status upgraded from Draft to Active
 
-### Scenarios Added
-| ID | Name | Validates |
-|----|------|-----------|
-| S-001-63 | nullable-status-integer-contract | ADR-0020 |
-| S-001-64 | query-params-in-body-expression | ADR-0021 |
-| S-001-65 | cookies-in-body-expression | ADR-0021 |
+### 3. Cross-Profile Routing — ADR-0023 (Q-027 resolved)
+- Decision: cross-profile conflict handling is **product-defined**, not engine-defined
+- ADR-0006 narrowed to intra-profile match resolution only
+- Gateway product owns request routing through its deployment model
 
-### Other Changes
-- Backlog item: Cross-Language Portability Audit added to `PLAN.md`.
-- AGENTS.md Rule 5: Incremental Auto-Commit Protocol (adapted from PKB project).
-- terminology.md: TransformContext definition updated (nullable Integer, $queryParams, $cookies).
-- terminology.md: Fixed stale "Runtime schema validation" → "Evaluation-time".
+### 4. Terminology Codification
+- New canonical terms: **gateway product**, **gateway adapter**, **deployment model**, **product-defined**
+- Canonical term map updated with avoid-terms
+- Passthrough and specificity score definitions updated
 
-## Remaining Open Questions (6)
-| Q-ID | Topic | Severity | Status |
-|------|-------|----------|--------|
-| Q-022 | Content-Type negotiation beyond JSON | MEDIUM | Decision card presented, awaiting user choice |
-| Q-023 | Multi-value header access | LOW-MEDIUM | Not yet started |
-| Q-024 | Error type hierarchy underspecified | MEDIUM | Not yet started |
-| Q-025 | Lenient mode underspecified | HIGH | Not yet started |
-| Q-026 | GatewayAdapter SPI lifecycle gaps | MEDIUM | Not yet started |
-| Q-027 | Cross-profile match conflicts | HIGH | Not yet started |
+### 5. AGENTS.md Rule 11 — No Implicit Decisions
+- Every decision discussed with the user must be explicitly captured
+- Litmus test: "if a future agent could re-raise, capture is insufficient"
 
-## Blocking Issues
-None — all work is spec-level, no implementation blockers.
+## Remaining Open Questions
+| ID | Severity | Topic |
+|----|----------|-------|
+| Q-023 | LOW-MEDIUM | Multi-value header access |
+| Q-024 | MEDIUM | Error type hierarchy |
+| Q-026 | MEDIUM | GatewayAdapter SPI lifecycle gaps |
 
-## Commits This Session
-```
-9c45abc terminology: replace all 'runtime' with 'evaluation time'
-758ca03 Q-020 resolved: nullable Integer for status code (ADR-0020)
-69ccd00 Q-021 resolved: add $queryParams and $cookies (ADR-0021)
-c62bc63 backlog: add cross-language portability audit
-ae57d6c retro: SDD completeness audit — scenarios + terminology fixes
-e2c2f18 session: update current session state
-<latest> docs: add Incremental Auto-Commit Protocol to AGENTS.md (Rule 5)
-```
+## Next Steps
+- Continue with Q-024 (error type hierarchy) or Q-026 (adapter SPI lifecycle)
+- Both are MEDIUM severity — Q-024 is more relevant for implementation planning
