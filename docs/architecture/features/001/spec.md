@@ -139,12 +139,21 @@ with embedded expressions (`.authId`, `.callbacks`, `if/else`) for dynamic value
 is fundamentally different from the JOLT approach of specifying structural operations
 (shift, default, remove) — instead, you declare what you want and the engine produces it.
 
+**Single expression per direction (ADR-0008):** A transform spec defines exactly **one**
+expression per direction — a single `transform.expr` (unidirectional) or `forward.expr` /
+`reverse.expr` (bidirectional). The spec format does NOT support pipeline/chaining within
+a single spec. Multi-step logic is expressed using each engine's native staged-computation
+features (JSLT `let` bindings, jq pipe `|`, JSONata `~>`, DataWeave `var`). When
+mixed-engine composition is needed (e.g., JOLT structural shift → JSLT conditional
+enrichment), compose at the **profile level** by binding multiple specs to the same route
+in sequence.
+
 | Aspect | Detail |
 |--------|--------|
 | Success path | Valid YAML spec → schemas parsed → JSLT expression compiled → immutable `Expression` object cached |
 | Validation path | Invalid YAML → fail fast with descriptive parse error including line/column |
 | Failure path | JSLT syntax error → reject at load time, not at runtime |
-| Source | JSLT (Schibsted), JourneyForge transform state pattern |
+| Source | JSLT (Schibsted), JourneyForge transform state pattern, ADR-0008 |
 
 ### FR-001-02: Expression Engine SPI (Pluggable Engines)
 

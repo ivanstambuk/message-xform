@@ -2051,6 +2051,91 @@ expected_log_entry:
 
 ---
 
+## Category 10: Profile-Level Chaining (ADR-0008)
+
+Mixed-engine composition at the profile level — the sanctioned approach per ADR-0008.
+
+### S-001-49: Profile-Level Chaining — JOLT Structural Shift → JSLT Conditional Enrichment
+
+```yaml
+scenario: S-001-49
+name: profile-chain-jolt-then-jslt
+description: >
+  Validates that profile-level chaining enables mixed-engine composition:
+  JOLT performs a structural shift (rename fields), then JSLT adds conditional
+  logic and header-aware enrichment. Two separate specs, same route in profile.
+  This is the sanctioned approach per ADR-0008 (no spec-level pipelines).
+tags: [profile-chaining, mixed-engine, jolt, jslt, adr-0008]
+requires: [FR-001-01, FR-001-05]
+
+# Spec 1: JOLT structural shift (rename user_id → userId, etc.)
+spec_1:
+  id: rename-to-camelcase
+  version: "1.0.0"
+  transform:
+    lang: jolt
+    expr:
+      - operation: shift
+        spec:
+          user_id: userId
+          first_name: firstName
+          last_name: lastName
+          email_address: email
+          is_active: active
+
+# Spec 2: JSLT conditional enrichment (adds metadata using $headers)
+spec_2:
+  id: add-auth-metadata
+  version: "1.0.0"
+  transform:
+    lang: jslt
+    expr: |
+      . + {
+        "_auth": {
+          "authenticatedBy": $headers."X-Auth-Method",
+          "tier": if (.active) "premium" else "basic"
+        }
+      }
+
+# Profile: chains spec_1 → spec_2 on the same route
+profile:
+  id: user-api-v2
+  transforms:
+    - spec: rename-to-camelcase@1.0.0
+      direction: response
+      match:
+        path: "/api/v2/users/*"
+        method: GET
+    - spec: add-auth-metadata@1.0.0
+      direction: response
+      match:
+        path: "/api/v2/users/*"
+        method: GET
+
+request:
+  headers:
+    X-Auth-Method: "OAuth2"
+  body:
+    user_id: "usr-42"
+    first_name: "Bob"
+    last_name: "Jensen"
+    email_address: "bjensen@example.com"
+    is_active: true
+
+# After JOLT: fields renamed. After JSLT: metadata added.
+expected_output:
+  userId: "usr-42"
+  firstName: "Bob"
+  lastName: "Jensen"
+  email: "bjensen@example.com"
+  active: true
+  _auth:
+    authenticatedBy: "OAuth2"
+    tier: "premium"
+```
+
+---
+
 ## Scenario Index
 
 | ID | Name | Category | Tags |
@@ -2103,16 +2188,17 @@ expected_log_entry:
 | S-001-46 | constraint-count-tiebreaker | Match Resolution | profile, match, tiebreaker, adr-0006 |
 | S-001-47 | telemetry-listener-lifecycle | Observability | observability, telemetry, spi, adr-0007 |
 | S-001-48 | trace-context-propagation | Observability | observability, tracing, correlation, adr-0007 |
+| S-001-49 | profile-chain-jolt-then-jslt | Profile Chaining | profile-chaining, mixed-engine, jolt, jslt, adr-0008 |
 
 ## Coverage Matrix
 
 | Spec Requirement | Scenarios |
 |------------------|-----------|
-| FR-001-01 (Spec Format) | S-001-01 through S-001-17 |
+| FR-001-01 (Spec Format) | S-001-01 through S-001-17, S-001-49 |
 | FR-001-02 (Expression Engine SPI) | S-001-25, S-001-26, S-001-27, S-001-28, S-001-39, S-001-40 |
 | FR-001-03 (Bidirectional) | S-001-02, S-001-29, S-001-30 |
 | FR-001-04 (Message Envelope) | S-001-19 |
-| FR-001-05 (Transform Profiles) | S-001-41, S-001-42, S-001-43, S-001-44, S-001-45, S-001-46 |
+| FR-001-05 (Transform Profiles) | S-001-41, S-001-42, S-001-43, S-001-44, S-001-45, S-001-46, S-001-49 |
 | FR-001-06 (Passthrough) | S-001-18, S-001-19 |
 | FR-001-07 (Error Handling) | S-001-24, S-001-28 |
 | FR-001-08 (Reusable Mappers) | *Not yet covered — add when mapperRef is specified* |

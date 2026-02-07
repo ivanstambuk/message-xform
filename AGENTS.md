@@ -106,6 +106,10 @@ Update both `docs/architecture/roadmap.md` and the Roadmap table above when stat
      2. For **medium- or high-impact** decisions: automatically create an ADR under `docs/decisions/` with Context, Decision, Consequences, and Related sections.
      3. **Immediately remove** the resolved row from `docs/architecture/open-questions.md` — the file must never contain resolved questions.
    - Then move to the next question.
+   - **Follow-up analysis in ADRs**: When a Decision Card triggers follow-up discussion
+     (e.g., capability comparisons, use-case explorations, trade-off deep dives), capture
+     that analysis as dedicated sections in the ADR — not only in chat. ADRs are the
+     permanent record; chat is ephemeral.
 9. **Decisions Must Be Testable**: Every ADR or resolved open question that changes the spec MUST produce at least one validating scenario in `scenarios.md`. Scenarios reference ADRs (via tags like `adr-0002`) and spec requirements (via `requires: [FR-001-10]`). The coverage matrix at the bottom of `scenarios.md` MUST be updated. When a discussion reveals a new edge case, add a scenario immediately — don't defer.
 
 ## Pre-Implementation Checklist (Mandatory)
