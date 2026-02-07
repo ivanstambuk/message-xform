@@ -85,6 +85,24 @@ A transformation spec consists of:
 id: callback-prettify
 version: "1.0.0"
 
+input:
+  schema:
+    type: object
+    required: [callbacks, authId]
+    properties:
+      callbacks: { type: array, items: { type: object } }
+      authId: { type: string }
+      stage: { type: string }
+
+output:
+  schema:
+    type: object
+    required: [fields, type]
+    properties:
+      type: { type: string, enum: [challenge, simple] }
+      authId: { type: string }
+      fields: { type: array, items: { type: object } }
+
 match:
   content-type: "application/json"
   # Specs do NOT bind to URLs here — URL binding is a profile concern.
@@ -123,7 +141,7 @@ is fundamentally different from the JOLT approach of specifying structural opera
 
 | Aspect | Detail |
 |--------|--------|
-| Success path | Valid YAML spec → JSLT expression compiled → immutable `Expression` object cached |
+| Success path | Valid YAML spec → schemas parsed → JSLT expression compiled → immutable `Expression` object cached |
 | Validation path | Invalid YAML → fail fast with descriptive parse error including line/column |
 | Failure path | JSLT syntax error → reject at load time, not at runtime |
 | Source | JSLT (Schibsted), JourneyForge transform state pattern |
@@ -366,12 +384,59 @@ mappers:
 | Failure path | Circular mapperRef → reject at load time |
 | Source | JourneyForge `spec.mappers` + `mapperRef` pattern |
 
+### FR-001-09: Input/Output Schema Validation
+
+**Requirement:** Every transform spec MUST declare `input.schema` and `output.schema`
+using JSON Schema 2020-12. The engine MUST validate these schemas at **load time**
+(spec compilation), not at runtime.
+
+```yaml
+id: callback-prettify
+version: "1.0.0"
+
+input:
+  schema:
+    type: object
+    required: [callbacks, authId]
+    properties:
+      callbacks: { type: array }
+      authId: { type: string }
+
+output:
+  schema:
+    type: object
+    required: [fields, type]
+    properties:
+      fields: { type: array }
+      type: { type: string }
+```
+
+At load time, the engine:
+1. Parses the JSON Schema blocks from the spec YAML.
+2. Validates that the schemas themselves are valid JSON Schema 2020-12.
+3. Stores them alongside the compiled expression for optional runtime validation
+   (e.g., in development/debug mode).
+
+At evaluation time (optional, configurable):
+- In `strict` mode: validate input against `input.schema` before evaluation and
+  output against `output.schema` after evaluation.
+- In `lenient` mode: skip runtime schema validation (production default for
+  performance).
+
+| Aspect | Detail |
+|--------|--------|
+| Success path | Schemas parse as valid JSON Schema 2020-12 → stored with spec |
+| Validation path | Invalid JSON Schema syntax → reject spec at load time |
+| Failure path | Runtime validation failure (strict mode) → abort, pass original through |
+| Failure path | Circular mapperRef → reject at load time |
+| Source | JourneyForge `spec.mappers` + `mapperRef` pattern |
+
 ## Non-Functional Requirements
 
 | ID | Requirement | Driver | Measurement | Dependencies | Source |
 |----|-------------|--------|-------------|--------------|--------|
 | NFR-001-01 | The engine MUST be stateless per-request — no server-side session, cache, or shared mutable state between requests. JSLT `Expression` objects are immutable and shared across threads. | Horizontal scalability; gateway deployments must not require shared state. | Unit tests confirm no mutable static state or cross-request side effects. | None. | Architecture. |
-| NFR-001-02 | The core engine library MUST have zero gateway-specific dependencies. Allowed dependencies: Jackson (JSON), SnakeYAML (YAML parsing), and JSLT (transformation). | Gateway-agnostic core enables adapter reuse across PingAccess, PingGateway, Kong, standalone. | Maven/Gradle dependency analysis confirms no gateway SDK imports in `core`. | Module structure. | `PLAN.md`. |
+| NFR-001-02 | The core engine library MUST have zero gateway-specific dependencies. Allowed dependencies: Jackson (JSON), SnakeYAML (YAML parsing), JSLT (transformation), and a JSON Schema validator (e.g., `networknt/json-schema-validator`). | Gateway-agnostic core enables adapter reuse across PingAccess, PingGateway, Kong, standalone. | Maven/Gradle dependency analysis confirms no gateway SDK imports in `core`. | Module structure. | `PLAN.md`, ADR-0001. |
 | NFR-001-03 | Transformation latency MUST be < 5ms for a typical message (<50KB body). Compiled JSLT expressions are evaluated per-request; compilation happens once at spec load time. | Gateway rules are in the critical path; latency is unacceptable. | Microbenchmark with JMH using representative payloads. | Core only. | Performance. |
 | NFR-001-04 | Unknown/unrecognized fields in the input message MUST NOT cause transformation failure. JSLT supports `* : .` (object matching) to pass through unmentioned fields. | Upstream services may add fields at any time; transformation must be forward-compatible. | Test with input containing extra fields not in spec. | Core. | Robustness. |
 | NFR-001-05 | Transform specs MUST be hot-reloadable without restarting the gateway or proxy. On reload, JSLT expressions are recompiled and atomically swapped. | Operational requirement for production deployments. | Integration test: modify spec file → verify next request uses new spec. | File-watching or config polling. | Operations. |
@@ -423,7 +488,7 @@ mappers:
 | ID | Description | Modules |
 |----|-------------|---------|
 | DO-001-01 | `Message` — generic HTTP message envelope (JsonNode body, headers, status) | core |
-| DO-001-02 | `TransformSpec` — parsed spec (id, version, compiled JSLT expression, engine id) | core |
+| DO-001-02 | `TransformSpec` — parsed spec (id, version, input/output JSON Schema, compiled JSLT expression, engine id) | core |
 | DO-001-03 | `CompiledExpression` — immutable, thread-safe compiled expression handle | core |
 | DO-001-04 | `TransformProfile` — user-supplied binding of specs to URL/method/content-type patterns | core |
 | DO-001-05 | `TransformResult` — outcome of applying a spec (success/aborted + diagnostics) | core |
@@ -506,6 +571,14 @@ domain_objects:
       - name: lang
         type: string
         constraints: "default: jslt"
+      - name: inputSchema
+        type: JsonSchema
+        constraints: "required — JSON Schema 2020-12"
+        note: "Validated at load time; optional runtime validation in strict mode"
+      - name: outputSchema
+        type: JsonSchema
+        constraints: "required — JSON Schema 2020-12"
+        note: "Validated at load time; optional runtime validation in strict mode"
       - name: compiledExpr
         type: CompiledExpression
         note: "Immutable, thread-safe — compiled at load time"

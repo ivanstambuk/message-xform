@@ -21,7 +21,6 @@ Hard rules:
 
 | ID | Owner | Question | Options (A preferred) | Status | Asked | Notes |
 |----|-------|----------|------------------------|--------|-------|-------|
-| Q-001 | Ivan | Should transform specs support optional input/output JSON Schema for compile-time validation? | A) Yes, mandatory (recommended) B) Yes, optional — validate if present C) No, defer to v2 | Open | 2026-02-07 | JourneyForge uses JSON Schema 2020-12 for input/output. |
 | Q-002 | Ivan | How should header transforms be expressed? | A) Separate `headers` block with add/remove/rename (recommended) B) Headers injected into JSLT as `_headers` C) Headers are adapter-level only | Open | 2026-02-07 | FR-001-04 says we transform headers but no format defined. |
 | Q-003 | Ivan | How should status code transforms be defined? | A) JSLT sets `_status` magic field (recommended) B) Separate `status` block C) Adapter-level only | Open | 2026-02-07 | S-001-11 mentions status mapping but no spec format. |
 | Q-004 | Ivan | Should we define a formal engine support matrix? | A) Yes, in spec (recommended) B) No, per-engine in adapter specs | Open | 2026-02-07 | JourneyForge blocks JOLT from predicates. |
