@@ -71,6 +71,7 @@ Update both `docs/architecture/roadmap.md` and the Roadmap table above when stat
    - Summarize implications for message-xform
    - Be committed to git so they survive across sessions
    - Feed into the SDD specification pipeline when development begins
+8. **One Question at a Time**: When resolving open questions (spec refinement, design decisions, ADRs), present them **one by one**. Ask a single question, wait for the user's answer, record the decision, then move to the next question. Never dump multiple questions in bulk — each decision deserves focused attention.
 
 ## Browser Agent (browser_subagent) — MANDATORY Setup
 
