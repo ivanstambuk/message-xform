@@ -1,20 +1,15 @@
 # Pending Task
 
-**Focus**: Resolving remaining open questions for Feature 001 (Q-022 through Q-027)
-**Status**: Q-022 decision card was presented in the previous session — user has not yet decided
-**Next Step**: Re-present Q-022 decision card (Content-Type negotiation) and get user's choice, then resolve
+**Focus**: Feature 001 open question resolution
+**Status**: 2 of 5 high/medium questions resolved this session (Q-025, Q-027). 3 remain.
+**Next Step**: Present Q-024 (Error type hierarchy) as a Decision Card.
 
 ## Context Notes
-- Q-022 recommendation is Option A (adapter responsibility for form→JSON coercion)
-- Two HIGH-severity questions remain: Q-025 (lenient mode) and Q-027 (cross-profile conflicts) — prioritize these
-- The retro found and fixed all SDD gaps — scenarios, terminology, ADR refs are clean
-- AGENTS.md now has Rule 5 (Incremental Auto-Commit Protocol) — commit after each logical increment
+- Q-024 asks whether the spec should enumerate a full error type catalogue (SpecLoadException, ProfileLoadException, SchemaValidationException, etc.) for adapter implementors. PingAccess specifically needs error-to-Outcome mapping.
+- Q-026 asks about adapter SPI lifecycle (init, shutdown, reload). This may be scoped down by ADR-0023's insight that much adapter behaviour is product-defined.
+- Q-023 (multi-value headers) is LOW-MEDIUM and can be deferred.
+- Decision Card format was updated this session — use the new progressive disclosure template (Introduction → Define before use → Technical detail).
+- AGENTS.md Rule 11 (No Implicit Decisions) is new — every decision must be captured in an ADR, spec, terminology, or scenarios. Never leave decisions as implicit chat understanding.
 
 ## SDD Gaps (if any)
-- None — retro audit cleared all gaps
-- ADR-0020 and ADR-0021 now have validating scenarios (S-001-63/64/65)
-- Terminology updated for $queryParams, $cookies, nullable Integer
-
-## After Open Questions
-- Run the Cross-Language Portability Audit (backlog item in PLAN.md)
-- Then proceed to Feature 001 implementation planning
+- None identified in retro audit. All checks passed.
