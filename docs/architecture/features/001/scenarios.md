@@ -2569,6 +2569,134 @@ expected_log:
 
 ---
 
+### S-001-60: Direction-Agnostic Spec Bound to Both Directions
+
+Validates that the same unidirectional spec can be bound to both `request` and
+`response` directions in a profile (ADR-0016).
+
+```yaml
+scenario: S-001-60
+name: direction-agnostic-both-bindings
+description: >
+  A unidirectional spec with only `transform` is bound to both `direction: response`
+  and `direction: request` in the same profile. The engine applies the same expression
+  in both phases. Validates ADR-0016.
+tags: [direction, agnostic, profile, adr-0016]
+requires: [FR-001-03]
+
+spec:
+  id: strip-debug
+  version: "1.0.0"
+  transform:
+    lang: jslt
+    expr: |
+      { * : . } - "_debug"
+
+profile:
+  id: cleanup-profile
+  transforms:
+    - spec: strip-debug@1.0.0
+      direction: response
+      match:
+        path: "/api/users"
+    - spec: strip-debug@1.0.0
+      direction: request
+      match:
+        path: "/api/admin"
+
+# Response direction test:
+input_response:
+  userId: 42
+  _debug: "trace-abc"
+
+expected_output_response:
+  userId: 42
+
+# Request direction test (same spec, same logic):
+input_request:
+  action: "delete"
+  _debug: "trace-xyz"
+
+expected_output_request:
+  action: "delete"
+```
+
+---
+
+### S-001-61: `$status` is Null in Request Transform
+
+Validates that `$status` is `null` during request-phase transforms (ADR-0017).
+
+```yaml
+scenario: S-001-61
+name: status-null-in-request-transform
+description: >
+  A spec references `$status` in its expression. When bound to `direction: request`,
+  `$status` is `null` because no HTTP status exists yet. The expression guards with
+  `if ($status)`. Validates ADR-0017.
+tags: [status, null, request, direction, adr-0017]
+requires: [FR-001-11, FR-001-03]
+
+spec:
+  id: status-aware
+  version: "1.0.0"
+  transform:
+    lang: jslt
+    expr: |
+      {
+        "data": .data,
+        "statusKnown": $status != null,
+        "httpStatus": if ($status) $status else "N/A"
+      }
+
+# Bound to request direction → $status is null
+profile_direction: request
+
+input:
+  data: "hello"
+
+expected_output:
+  data: "hello"
+  statusKnown: false
+  httpStatus: "N/A"
+```
+
+---
+
+### S-001-62: Sensitive Field Path Syntax Validation
+
+Validates that invalid JSON path syntax in the `sensitive` block is rejected at
+load time (ADR-0019).
+
+```yaml
+scenario: S-001-62
+name: sensitive-path-invalid-syntax-rejected
+description: >
+  A spec declares a `sensitive` list with an invalid JSON path expression (missing
+  `$` prefix). The engine MUST reject at load time with a descriptive error.
+  Validates ADR-0019 / NFR-001-06.
+tags: [sensitive, validation, error, adr-0019, nfr-001-06]
+requires: [FR-001-01]
+
+spec:
+  id: bad-sensitive-spec
+  version: "1.0.0"
+  sensitive:
+    - "$.authId"                        # valid
+    - "callbacks[*].input"              # INVALID — missing $ prefix
+
+  transform:
+    lang: jslt
+    expr: '{ "id": .id }'
+
+expected_error:
+  phase: load
+  type: SensitivePathSyntaxError
+  message_contains: "callbacks[*].input"
+```
+
+---
+
 ## Scenario Index
 
 | ID | Name | Category | Tags |
@@ -2632,6 +2760,9 @@ expected_log:
 | S-001-57 | transform-context-headers-in-body | Pipeline Chaining & Message Semantics | transform-context, headers, body, do-001-07 |
 | S-001-58 | copy-on-wrap-abort-rollback | Pipeline Chaining & Message Semantics | copy-on-wrap, abort, rollback, adr-0013 |
 | S-001-59 | apply-directive-missing-expr-rejected | Reusable Mappers | mappers, apply, validation, error, fr-001-08, adr-0014 |
+| S-001-60 | direction-agnostic-both-bindings | Direction Semantics | direction, agnostic, profile, adr-0016 |
+| S-001-61 | status-null-in-request-transform | Status Code | status, null, request, direction, adr-0017 |
+| S-001-62 | sensitive-path-invalid-syntax-rejected | Sensitive Fields | sensitive, validation, error, adr-0019, nfr-001-06 |
 
 ## Coverage Matrix
 
@@ -2639,7 +2770,7 @@ expected_log:
 |------------------|-----------|
 | FR-001-01 (Spec Format) | S-001-01 through S-001-17, S-001-49 |
 | FR-001-02 (Expression Engine SPI) | S-001-25, S-001-26, S-001-27, S-001-28, S-001-39, S-001-40, S-001-57 |
-| FR-001-03 (Bidirectional) | S-001-02, S-001-29, S-001-30 |
+| FR-001-03 (Bidirectional) | S-001-02, S-001-29, S-001-30, S-001-60 |
 | FR-001-04 (Message Envelope) | S-001-19, S-001-58 |
 | FR-001-05 (Transform Profiles) | S-001-41, S-001-42, S-001-43, S-001-44, S-001-45, S-001-46, S-001-49, S-001-56 |
 | FR-001-06 (Passthrough) | S-001-18, S-001-19 |
@@ -2647,14 +2778,14 @@ expected_log:
 | FR-001-08 (Reusable Mappers) | S-001-50, S-001-51, S-001-52, S-001-59 |
 | FR-001-09 (Schema Validation) | S-001-53, S-001-54, S-001-55 |
 | FR-001-10 (Header Transforms) | S-001-33, S-001-34, S-001-35, S-001-57 |
-| FR-001-11 (Status Code Transforms) | S-001-36, S-001-37, S-001-38 |
+| FR-001-11 (Status Code Transforms) | S-001-36, S-001-37, S-001-38, S-001-61 |
 | NFR-001-01 (Stateless) | All — implicit in test harness design |
 | NFR-001-03 (Latency <5ms) | S-001-23 |
 | NFR-001-04 (Open-world) | S-001-07, S-001-20 |
 | NFR-001-07 (Eval budget) | S-001-24 |
 | NFR-001-02 (Zero gateway deps) | *Verified by dependency analysis, not scenario-testable* |
 | NFR-001-05 (Hot reload) | *Integration test — add when adapter is implemented* |
-| NFR-001-06 (Sensitive fields) | *Static analysis + code review — add when engine is implemented* |
+| NFR-001-06 (Sensitive fields) | S-001-62; *static analysis + code review — add more when engine is implemented* |
 | NFR-001-08 (Match logging) | S-001-44, S-001-46 (matched profile logged) |
 | NFR-001-09 (Telemetry SPI) | S-001-47 |
 | NFR-001-10 (Trace correlation) | S-001-48 |

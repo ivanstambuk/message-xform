@@ -1,67 +1,45 @@
-# Current Session
+# Current Session State
 
-Last updated: 2026-02-07T20:31:00+01:00
+**Updated:** 2026-02-07T21:52:00+01:00
+**Session:** Resolving Open Questions (Q-014 through Q-019)
+**Status:** ✅ Complete — all open questions resolved
 
-## Active Work
+## What Was Done
 
-Feature 001 — Message Transformation Engine (core specification refinement)
+Resolved all 6 remaining open questions (Q-014 through Q-019) for Feature 001:
 
-## Session Progress
+| Question | Decision | ADR |
+|----------|----------|-----|
+| Q-014 – Mapper invocation model | Transform-level `apply` directive | ADR-0014 |
+| Q-015 – Spec vs profile `match` | Spec `match` = prerequisite filter | ADR-0015 |
+| Q-016 – Unidirectional direction | Profile determines direction | ADR-0016 |
+| Q-017 – `$status` in requests | `$status` is `null` | ADR-0017 |
+| Q-018 – Body buffering | Not our concern (gateway NFR) | ADR-0018 |
+| Q-019 – Sensitive field marking | Top-level `sensitive` list | ADR-0019 |
 
-### Open Questions Resolved This Session (5)
-- Q-008: Chained/pipeline transforms → ADR-0008 (single expr per direction)
-- Q-009: Retroactive ADRs → ADR-0009, ADR-0010, ADR-0011
-- Q-010: SPI context for $headers/$status → TransformContext (ADR-0010 updated)
-- Q-011: Pipeline chaining execution semantics → ADR-0012
-- Q-012: Message copy-vs-wrapper → ADR-0013
-- Q-013: Hot reload scope → resolved by narrowing NFR-001-05 (adapter concern)
+Also:
+- Updated Decision Card format to mandate concrete examples and comparison matrices.
+- Retro: added 3 missing scenarios (S-001-60/61/62) and 4 terminology entries.
 
-### Spec Review Performed
-- 4 high-severity issues identified and resolved (Q-010 to Q-013)
-- 6 medium-severity issues registered (Q-014 to Q-019)
-- 3 low-severity polish fixes applied directly
+## Open Questions
 
-### Process Improvements
-- AGENTS.md Rule 8: added Resolution Checklist (7-step mandatory checklist)
-- AGENTS.md Rule 10: added Spec Review Protocol
+**None.** `open-questions.md` is empty. All questions resolved from Q-010 through Q-019.
 
-### Governance Updates
-- Created ADR-0008 through ADR-0013 (6 new ADRs)
-- Updated knowledge-map.md with all new ADRs
-- Updated llms.txt with all new ADRs
-- Updated terminology.md with 5 new terms
-- Added 3 new scenarios (S-001-56 to S-001-58)
+## Next Steps
 
-## Remaining Open Questions (6 — all medium severity)
+1. **Implementation planning** — Feature 001 spec is now fully resolved and ready
+   for implementation task breakdown.
+2. **Scenario hardening** — continue adding edge-case scenarios if new ones emerge.
+3. **Prototype** — begin core engine implementation (Java module structure, JSLT
+   integration, TransformSpec loader).
 
-- Q-014: mapperRef invocation model
-- Q-015: match block spec-vs-profile overlap
-- Q-016: Unidirectional direction semantics
-- Q-017: $status availability for requests
-- Q-018: Large/streaming body handling
-- Q-019: sensitive field YAML syntax
+## Key Files Modified
 
-## Blocking Issues
-
-None.
-
-## Key Decisions This Session
-
-| Decision | Option Chosen | ADR |
-|----------|---------------|-----|
-| Single expression per direction | A: One expression per direction, profile chaining for composition | ADR-0008 |
-| JSLT as default engine (retroactive) | Accepted | ADR-0009 |
-| Pluggable SPI (retroactive) | Accepted | ADR-0010 |
-| Jackson JsonNode body (retroactive) | Accepted | ADR-0011 |
-| TransformContext SPI parameter | A: Typed TransformContext interface | ADR-0010 (updated) |
-| Pipeline chaining semantics | A: Sequential pipeline with abort-on-failure | ADR-0012 |
-| Message adapter semantics | A: Copy-on-wrap | ADR-0013 |
-| Hot reload scope | Narrowed: core = atomic swap, trigger = adapter | — |
-
-## Stats
-
-- ADRs: 13 (ADR-0001 through ADR-0013)
-- Scenarios: 58 (S-001-01 through S-001-58)
-- FRs: 11 (FR-001-01 through FR-001-11)
-- NFRs: 10 (NFR-001-01 through NFR-001-10)
-- Open questions remaining: 6 (all medium severity)
+- `docs/architecture/features/001/spec.md` — FR-001-01, FR-001-03, FR-001-05, FR-001-08, FR-001-11, NFR-001-06
+- `docs/architecture/features/001/scenarios.md` — S-001-50/51/59/60/61/62
+- `docs/decisions/ADR-0014` through `ADR-0019` — all created
+- `docs/architecture/knowledge-map.md` — all 6 ADRs added
+- `docs/architecture/terminology.md` — 4 new terms
+- `docs/architecture/open-questions.md` — emptied
+- `llms.txt` — all 6 ADRs added
+- `docs/architecture/spec-guidelines/open-questions-format.md` — Decision Card format updated

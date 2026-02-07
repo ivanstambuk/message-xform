@@ -151,6 +151,27 @@ terminology agreements must be captured here immediately.
   - `request` or `response` — indicates whether the transform applies to the
     incoming request or the outgoing response. Specified in the profile.
 
+- **Direction-agnostic** (spec property)
+  - A unidirectional spec (only `transform`, no `forward`/`reverse`) that is
+    bound to a direction by the profile rather than declaring one itself. The same
+    direction-agnostic spec MAY be bound to both directions in different profile
+    entries. See ADR-0016.
+
+- **Prerequisite filter** (spec `match`)
+  - The spec-level `match` block declares what the spec can process (a capability
+    declaration), not where it is routed. Distinct from the profile-level `match`
+    block which handles routing. See ADR-0015.
+
+- **Apply directive** (`apply`)
+  - An ordered list of steps in the `transform` block that sequences named mappers
+    with the main `expr`. Steps are either `mapperRef: <name>` or `expr` (the main
+    expression). `expr` must appear exactly once. See ADR-0014.
+
+- **Sensitive list** (`sensitive`)
+  - A top-level optional block in the spec YAML listing JSON path expressions
+    (RFC 9535) for fields that MUST be redacted from logs, caches, and telemetry.
+    See ADR-0019, NFR-001-06.
+
 ## Observability
 
 - **TelemetryListener** (SPI interface)
