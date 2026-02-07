@@ -2140,16 +2140,17 @@ expected_output:
 
 Mapper definitions and `mapperRef` resolution within transform specs.
 
-### S-001-50: mapperRef Resolves to Named Expression
+### S-001-50: Apply Directive — Mapper + Expr + Mapper Pipeline
 
 ```yaml
 scenario: S-001-50
-name: mapper-ref-resolves
+name: apply-directive-mapper-pipeline
 description: >
-  A transform spec defines named mappers under the `mappers` block. The main
-  expression references a mapper via mapperRef, and the engine resolves it to
-  the corresponding compiled expression. Validates FR-001-08 happy path.
-tags: [mappers, mapperRef, resolution, fr-001-08]
+  A transform spec defines named mappers under the `mappers` block and uses the
+  `apply` directive to sequence them with the main `expr`. The engine executes
+  steps in declaration order: strip-internal → expr → add-metadata.
+  Validates FR-001-08 happy path and ADR-0014.
+tags: [mappers, mapperRef, apply, resolution, fr-001-08, adr-0014]
 requires: [FR-001-08]
 
 spec:
@@ -2173,8 +2174,16 @@ spec:
         }
   transform:
     lang: jslt
-    # Conceptual: mapperRef invocations are applied in sequence
-    mapperRef: [strip-internal, add-metadata]
+    expr: |
+      {
+        "orderId": .orderId,
+        "amount": .amount,
+        "currency": .currency
+      }
+    apply:
+      - mapperRef: strip-internal       # step 1: strip internal fields
+      - expr                            # step 2: restructure body
+      - mapperRef: add-metadata         # step 3: add gateway metadata
 
 input:
   orderId: "ord-123"
@@ -2192,16 +2201,16 @@ expected_output:
     specVersion: "1.0.0"
 ```
 
-### S-001-51: Missing mapperRef Rejected at Load Time
+### S-001-51: Missing mapperRef in Apply Directive Rejected at Load Time
 
 ```yaml
 scenario: S-001-51
 name: mapper-ref-missing-rejected
 description: >
-  A transform spec references a mapper id that does not exist in the `mappers`
-  block. The engine MUST reject the spec at load time with a descriptive error.
-  Validates FR-001-08 validation path.
-tags: [mappers, mapperRef, validation, error, fr-001-08]
+  A transform spec's `apply` directive references a mapper id that does not exist
+  in the `mappers` block. The engine MUST reject the spec at load time with a
+  descriptive error. Validates FR-001-08 validation path and ADR-0014.
+tags: [mappers, mapperRef, apply, validation, error, fr-001-08, adr-0014]
 requires: [FR-001-08]
 
 spec:
@@ -2213,7 +2222,11 @@ spec:
       expr: '{ * : . } - "_debug"'
   transform:
     lang: jslt
-    mapperRef: [strip-internal, does-not-exist]  # <- unknown mapper id
+    expr: '{ "id": .id }'
+    apply:
+      - mapperRef: strip-internal
+      - expr
+      - mapperRef: does-not-exist       # <- unknown mapper id
 
 expected_error:
   phase: load
@@ -2254,6 +2267,41 @@ expected_error:
   phase: load
   type: CircularMapperReferenceError
   message_contains: "circular"
+```
+
+### S-001-59: Apply Directive Without `expr` Rejected at Load Time
+
+```yaml
+scenario: S-001-59
+name: apply-directive-missing-expr-rejected
+description: >
+  A transform spec defines an `apply` directive that lists only mapperRef steps
+  but omits `expr`. The engine MUST reject at load time because `expr` must
+  appear exactly once in the apply list. Validates FR-001-08 / ADR-0014.
+tags: [mappers, apply, validation, error, fr-001-08, adr-0014]
+requires: [FR-001-08]
+
+spec:
+  id: no-expr-spec
+  version: "1.0.0"
+  mappers:
+    strip-internal:
+      lang: jslt
+      expr: '{ * : . } - "_debug"'
+    add-meta:
+      lang: jslt
+      expr: '. + { "_meta": { "ok": true } }'
+  transform:
+    lang: jslt
+    expr: '{ "id": .id }'
+    apply:
+      - mapperRef: strip-internal
+      - mapperRef: add-meta             # no `expr` step!
+
+expected_error:
+  phase: load
+  type: ApplyDirectiveError
+  message_contains: "expr"
 ```
 
 ---
@@ -2574,8 +2622,8 @@ expected_log:
 | S-001-47 | telemetry-listener-lifecycle | Observability | observability, telemetry, spi, adr-0007 |
 | S-001-48 | trace-context-propagation | Observability | observability, tracing, correlation, adr-0007 |
 | S-001-49 | profile-chain-jolt-then-jslt | Profile Chaining | profile-chaining, mixed-engine, jolt, jslt, adr-0008 |
-| S-001-50 | mapper-ref-resolves | Reusable Mappers | mappers, mapperRef, resolution, fr-001-08 |
-| S-001-51 | mapper-ref-missing-rejected | Reusable Mappers | mappers, mapperRef, validation, error, fr-001-08 |
+| S-001-50 | apply-directive-mapper-pipeline | Reusable Mappers | mappers, mapperRef, apply, resolution, fr-001-08, adr-0014 |
+| S-001-51 | mapper-ref-missing-rejected | Reusable Mappers | mappers, mapperRef, apply, validation, error, fr-001-08, adr-0014 |
 | S-001-52 | mapper-ref-circular-rejected | Reusable Mappers | mappers, mapperRef, circular, validation, error, fr-001-08 |
 | S-001-53 | schema-valid-load-time | Schema Validation | schema, validation, load-time, fr-001-09, adr-0001 |
 | S-001-54 | schema-invalid-rejected | Schema Validation | schema, validation, error, load-time, fr-001-09, adr-0001 |
@@ -2583,6 +2631,7 @@ expected_log:
 | S-001-56 | pipeline-chain-abort-on-failure | Pipeline Chaining & Message Semantics | profile-chaining, abort, error, adr-0012, adr-0013 |
 | S-001-57 | transform-context-headers-in-body | Pipeline Chaining & Message Semantics | transform-context, headers, body, do-001-07 |
 | S-001-58 | copy-on-wrap-abort-rollback | Pipeline Chaining & Message Semantics | copy-on-wrap, abort, rollback, adr-0013 |
+| S-001-59 | apply-directive-missing-expr-rejected | Reusable Mappers | mappers, apply, validation, error, fr-001-08, adr-0014 |
 
 ## Coverage Matrix
 
@@ -2595,7 +2644,7 @@ expected_log:
 | FR-001-05 (Transform Profiles) | S-001-41, S-001-42, S-001-43, S-001-44, S-001-45, S-001-46, S-001-49, S-001-56 |
 | FR-001-06 (Passthrough) | S-001-18, S-001-19 |
 | FR-001-07 (Error Handling) | S-001-24, S-001-28, S-001-56, S-001-58 |
-| FR-001-08 (Reusable Mappers) | S-001-50, S-001-51, S-001-52 |
+| FR-001-08 (Reusable Mappers) | S-001-50, S-001-51, S-001-52, S-001-59 |
 | FR-001-09 (Schema Validation) | S-001-53, S-001-54, S-001-55 |
 | FR-001-10 (Header Transforms) | S-001-33, S-001-34, S-001-35, S-001-57 |
 | FR-001-11 (Status Code Transforms) | S-001-36, S-001-37, S-001-38 |

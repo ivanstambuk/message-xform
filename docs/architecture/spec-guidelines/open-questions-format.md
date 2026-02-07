@@ -25,7 +25,7 @@ High/medium-level context that makes the decision self-contained. Include enough
 - **Decision scope:** What this decision covers (and, optionally, what it explicitly does not cover).
 - **Stakeholders / impact:** Who/what is affected (security, UX, compatibility, ops).
 - **Key references:** Bullet list of the most relevant authoritative docs (DSL sections, ADRs, feature specs, OpenAPI).
-- **Example (optional but recommended):** A tiny snippet or scenario illustrating the issue (avoid long code unless necessary).
+- **Example (optional):** A tiny snippet or scenario illustrating the *problem* (avoid long code unless necessary).
 
 **Question**  
 Short, human-readable question text (one or a few sentences).
@@ -43,6 +43,13 @@ Short, human-readable question text (one or a few sentences).
   - ❌ Bullet point 1  
   - ❌ Bullet point 2  
   - ❌ Bullet point 3 (optional)
+- **Concrete example:**
+  A short code/YAML/config snippet showing exactly what the system would look
+  like if this option is adopted. Must be specific enough that the reader can
+  visualise the user-facing artefact (spec YAML, API call, config file, etc.).
+  ```yaml
+  # Example YAML or code showing this option in practice
+  ```
 
 ---
 
@@ -55,6 +62,10 @@ Short, human-readable question text (one or a few sentences).
 - **Cons:**  
   - ❌ Bullet point 1  
   - ❌ Bullet point 2  
+- **Concrete example:**
+  ```yaml
+  # Example YAML or code showing this option in practice
+  ```
 
 ---
 
@@ -67,11 +78,29 @@ Short, human-readable question text (one or a few sentences).
 - **Cons:**  
   - ❌ Bullet point 1  
   - ❌ Bullet point 2  
+- **Concrete example:**
+  ```yaml
+  # Example YAML or code showing this option in practice
+  ```
 
 ---
 
-**Next action**  
-Who needs to decide what, and where/when (for example:  
+**Comparison Matrix**
+
+A table comparing all options across the most decision-relevant dimensions
+(e.g., complexity, portability, performance, alignment with existing ADRs).
+Choose 3–6 dimensions that highlight the trade-offs.
+
+| Aspect | 🅰️ Option A | 🅱️ Option B | 🅲 Option C |
+|--------|-------------|-------------|-------------|
+| Dimension 1 | ... | ... | ... |
+| Dimension 2 | ... | ... | ... |
+| Dimension 3 | ... | ... | ... |
+
+---
+
+**Next action**
+Who needs to decide what, and where/when (for example:
 “IAM WG to choose between 🅰️ and 🅱️ in WG-003 on 2025-12-10; update ADR-00XX accordingly.”)
 ```
 
@@ -83,6 +112,8 @@ Who needs to decide what, and where/when (for example:
 - The Decision Card MUST include the **Context** section and it MUST be sufficient for an informed decision without follow-ups.
 - Do **not** add extra meta sections (no TL;DR, summary, criticism, etc.) beyond what is defined in the template.
 - **Workspace-first grounding:** the “Current behaviour / contract today” and “Key references” bullets MUST be based on the repository’s current authoritative documents (DSL reference, ADRs, feature specs, OpenAPI) and MUST cite concrete file paths/sections. Do not rely on chat memory as the primary source for these facts.
+- **Concrete examples are mandatory:** Every option MUST include a `Concrete example` block showing what the system would look like (spec YAML, API, config) if that option is adopted. The reader must be able to visualise the impact without follow-up questions.
+- **Comparison Matrix is mandatory:** After all options, include a comparison table with 3–6 decision-relevant dimensions. This is the reader’s primary decision aid — make it count.
 
 ## 2. Relationship to `open-questions.md`
 

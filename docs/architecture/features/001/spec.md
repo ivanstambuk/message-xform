@@ -462,11 +462,15 @@ missing field, output size exceeded), the engine MUST:
 ### FR-001-08: Reusable Mappers
 
 **Requirement:** Transform specs MAY define reusable named expressions under a
-`mappers` block, referenced inline via `mapperRef`. This avoids duplicating common
-mapping logic.
+`mappers` block. Mappers are invoked via a declarative `apply` list that sequences
+named mappers with the main `expr` in declaration order (ADR-0014).
+
+**Invocation model:** Transform-level sequential directive only. Mappers are NOT
+callable as inline functions within JSLT expressions. This preserves engine-agnosticism
+— the `apply` directive works identically for JSLT, JOLT, jq, and any future engine.
 
 ```yaml
-id: common-transforms
+id: order-transform
 version: "1.0.0"
 
 mappers:
@@ -486,14 +490,47 @@ mappers:
           "specVersion": "1.0.0"
         }
       }
+
+transform:
+  lang: jslt
+  expr: |
+    {
+      "orderId": .orderId,
+      "amount": .amount,
+      "currency": .currency
+    }
+
+  # Declarative pipeline: run these steps in order
+  apply:
+    - mapperRef: strip-internal         # step 1: strip internal fields from input
+    - expr                              # step 2: run the main transform expression
+    - mapperRef: add-gateway-metadata   # step 3: add metadata to output
 ```
+
+**Evaluation flow:**
+1. Engine takes input body → feeds to `strip-internal` mapper → cleaned body.
+2. Cleaned body → feeds to main `expr` → restructured output.
+3. Restructured output → feeds to `add-gateway-metadata` → final output.
+
+**Rules:**
+- Each step in `apply` receives the previous step's output as its input.
+- `expr` refers to the main `transform.expr` expression. It MUST appear exactly once.
+- When `apply` is **absent**, the transform behaves as before: only `expr` is evaluated
+  (backwards-compatible).
+- The `apply` list is **spec-internal** — it does NOT interact with profile-level
+  chaining (ADR-0012). Profile chaining composes across specs; `apply` composes
+  within a single spec.
+- Each mapper compiles to a `CompiledExpression` at load time. Unknown mapper ids or
+  circular references are rejected at load time.
 
 | Aspect | Detail |
 |--------|--------|
-| Success path | `mapperRef: strip-internal` resolves to compiled expression |
+| Success path | `apply` steps executed in order; each step's output feeds the next |
 | Validation path | Missing mapper id → reject at load time |
+| Validation path | `expr` missing from `apply` list → reject at load time |
+| Validation path | `expr` appears more than once in `apply` → reject at load time |
 | Failure path | Circular mapperRef → reject at load time |
-| Source | JourneyForge `spec.mappers` + `mapperRef` pattern |
+| Source | JourneyForge `spec.mappers` + `mapperRef` pattern, ADR-0014 |
 
 ### FR-001-09: Input/Output Schema Validation
 
