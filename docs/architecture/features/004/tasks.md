@@ -1,7 +1,7 @@
 # Feature 004 — Standalone HTTP Proxy Mode — Tasks
 
 _Status:_ In Progress (Phase 2 — I3)
-_Last updated:_ 2026-02-08T22:24+01:00
+_Last updated:_ 2026-02-08T22:34+01:00
 
 **Governing spec:** `docs/architecture/features/004/spec.md`
 **Implementation plan:** `docs/architecture/features/004/plan.md`
@@ -137,7 +137,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `./gradlew spotlessApply check`
   _Verification log:_ ✅ 8/8 tests PASSED (minimal/full/TLS loading, CLI parsing, error paths). `spotlessApply check` GREEN. Commit `7c79a61`.
 
-- [ ] **T-004-07** — Environment variable overlay (FR-004-11)
+- [x] **T-004-07** — Environment variable overlay (FR-004-11)
   _Intent:_ Every config key overridable via environment variable. Env vars
   take precedence over YAML values. Whitespace-only env vars treated as unset.
   _Test first:_ Write `EnvVarOverlayTest`:
@@ -151,6 +151,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   _Verification commands:_
   - `./gradlew :adapter-standalone:test --tests "*EnvVarOverlayTest*"`
   - `./gradlew spotlessApply check`
+  _Verification log:_ ✅ 47/47 tests PASSED (string/int/bool overrides, TLS/pool overrides, empty/whitespace-only treated as unset, precedence over full YAML, no-env-var identity). `spotlessApply check` GREEN.
 
 - [ ] **T-004-08** — Config validation (FR-004-12)
   _Intent:_ Validate mandatory fields and value constraints at startup.
