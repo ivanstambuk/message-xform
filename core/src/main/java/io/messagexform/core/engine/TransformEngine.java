@@ -311,7 +311,8 @@ public final class TransformEngine {
                     message.statusCode(),
                     message.contentType(),
                     message.requestPath(),
-                    message.requestMethod());
+                    message.requestMethod(),
+                    message.queryString());
 
             // T-001-38a: Apply declarative URL rewrite (FR-001-12, ADR-0027)
             // Processing order: body transform → URL rewrite (original body) → headers →
@@ -341,7 +342,8 @@ public final class TransformEngine {
                             newStatus,
                             transformedMessage.contentType(),
                             transformedMessage.requestPath(),
-                            transformedMessage.requestMethod());
+                            transformedMessage.requestMethod(),
+                            transformedMessage.queryString());
                 }
             }
 

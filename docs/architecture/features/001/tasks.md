@@ -638,7 +638,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   New files: UrlSpec.java, UrlTransformer.java, UrlPathRewriteTest.java. Modified: TransformSpec,
   SpecParser (parseUrlSpec), TransformEngine (URL rewrite step). All 220 tests pass.
 
-- [ ] **T-001-38b** — URL query parameter add/remove (FR-001-12, S-001-38b)
+- [x] **T-001-38b** — URL query parameter add/remove (FR-001-12, S-001-38b) ✅ 2026-02-08
   _Intent:_ Implement `url.query.add` (static + dynamic) and `url.query.remove`
   (glob patterns) for modifying query parameters.
   _Test first:_ Write `UrlQueryParamTest`:
@@ -648,11 +648,17 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `query.remove: ["_debug", "_internal"]` → matching params removed.
   - `query.remove: ["_*"]` → glob pattern removes all underscore-prefixed params.
   - Query parameter values percent-encoded per RFC 3986 §3.4.
-  _Implement:_ Extend `UrlTransformer` with query parameter operations.
+  _Implement:_ Extend `UrlTransformer` with query parameter operations. Add
+  `queryString` field to `Message` (with backward-compat convenience constructor).
+  Extend `SpecParser.parseUrlSpec()` with query.add/query.remove parsing.
   _Verify:_ `UrlQueryParamTest` passes.
   _Verification commands:_
   - `./gradlew :core:test --tests "*UrlQueryParamTest*"`
   - `./gradlew spotlessApply check`
+  _Status:_ ✅ Complete (2026-02-08). 10 tests pass: static add, dynamic add (headers +
+  original body), exact remove, glob remove (_*), remove-all, combined operations
+  (S-001-38b), percent-encoding, null query string. Added queryString field to Message
+  with backward-compat constructor. All 230 tests pass.
 
 - [ ] **T-001-38c** — HTTP method override (FR-001-12, ADR-0027, S-001-38c)
   _Intent:_ Implement `url.method.set` with optional `when` predicate, using the

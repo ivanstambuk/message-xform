@@ -8,12 +8,14 @@ import io.messagexform.core.model.UrlSpec;
 import io.messagexform.core.spi.CompiledExpression;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Applies declarative URL rewrite operations to a {@link Message}
- * (FR-001-12, ADR-0027, T-001-38a).
+ * (FR-001-12, ADR-0027, T-001-38a/38b).
  *
  * <p>
  * All URL expressions evaluate against the <strong>original</strong>
@@ -57,20 +59,24 @@ public final class UrlTransformer {
 
         String newPath = message.requestPath();
         String newMethod = message.requestMethod();
+        String newQueryString = message.queryString();
 
         // 1. Path rewrite
         if (urlSpec.hasPathRewrite()) {
             newPath = evaluatePathExpr(urlSpec.pathExpr(), originalBody, context, message.requestPath());
         }
 
-        // 2-4. Query parameter operations (T-001-38b — stub, will be implemented
-        // separately)
+        // 2-4. Query parameter operations (T-001-38b)
+        if (urlSpec.hasQueryOperations()) {
+            newQueryString = applyQueryOperations(urlSpec, originalBody, context, message.queryString());
+        }
 
         // 5. Method override (T-001-38c — stub, will be implemented separately)
 
         // Build the updated message if anything changed
         if (!java.util.Objects.equals(newPath, message.requestPath())
-                || !java.util.Objects.equals(newMethod, message.requestMethod())) {
+                || !java.util.Objects.equals(newMethod, message.requestMethod())
+                || !java.util.Objects.equals(newQueryString, message.queryString())) {
             return new Message(
                     message.body(),
                     message.headers(),
@@ -78,7 +84,8 @@ public final class UrlTransformer {
                     message.statusCode(),
                     message.contentType(),
                     newPath,
-                    newMethod);
+                    newMethod,
+                    newQueryString);
         }
 
         return message;
@@ -119,6 +126,112 @@ public final class UrlTransformer {
         return encodedPath;
     }
 
+    // --- Query parameter operations (T-001-38b) ---
+
+    /**
+     * Applies query parameter remove/add operations and returns the new query
+     * string.
+     *
+     * <p>
+     * Processing order per FR-001-12:
+     * <ol>
+     * <li>{@code query.remove} — strip matching parameters (glob patterns)</li>
+     * <li>{@code query.add} (static) — set parameters with literal values</li>
+     * <li>{@code query.add} (dynamic) — evaluate expr against original body</li>
+     * </ol>
+     */
+    private static String applyQueryOperations(
+            UrlSpec urlSpec, JsonNode originalBody, TransformContext context, String currentQueryString) {
+        // Parse existing query string into mutable map (preserves insertion order)
+        Map<String, String> params = parseQueryString(currentQueryString);
+
+        // 2. Remove — glob pattern matching (same utility as header remove)
+        for (String pattern : urlSpec.queryRemove()) {
+            params.entrySet().removeIf(entry -> globMatches(pattern, entry.getKey()));
+        }
+
+        // 3. Add (static) — literal values, percent-encoded on output
+        for (Map.Entry<String, String> entry : urlSpec.queryStaticAdd().entrySet()) {
+            params.put(entry.getKey(), entry.getValue());
+        }
+
+        // 4. Add (dynamic) — evaluate expr against ORIGINAL body
+        for (Map.Entry<String, CompiledExpression> entry :
+                urlSpec.queryDynamicAdd().entrySet()) {
+            String paramName = entry.getKey();
+            CompiledExpression expr = entry.getValue();
+            try {
+                JsonNode result = expr.evaluate(originalBody, context);
+                if (result != null && !result.isNull() && !result.isMissingNode()) {
+                    params.put(paramName, result.asText());
+                }
+            } catch (Exception e) {
+                LOG.warn("url.query.add.{}.expr evaluation failed: {}, skipping", paramName, e.getMessage());
+            }
+        }
+
+        return buildQueryString(params);
+    }
+
+    /**
+     * Parses a query string (without leading '?') into a map.
+     * Returns an empty mutable map if the query string is null or empty.
+     */
+    static Map<String, String> parseQueryString(String queryString) {
+        Map<String, String> params = new LinkedHashMap<>();
+        if (queryString == null || queryString.isEmpty()) {
+            return params;
+        }
+        for (String pair : queryString.split("&")) {
+            int eq = pair.indexOf('=');
+            if (eq >= 0) {
+                String key = pair.substring(0, eq);
+                String value = pair.substring(eq + 1);
+                params.put(key, value);
+            } else {
+                params.put(pair, "");
+            }
+        }
+        return params;
+    }
+
+    /**
+     * Builds a query string from a map. Returns null if the map is empty.
+     * Values are percent-encoded per RFC 3986 §3.4.
+     */
+    static String buildQueryString(Map<String, String> params) {
+        if (params.isEmpty()) {
+            return null;
+        }
+        StringBuilder sb = new StringBuilder();
+        boolean first = true;
+        for (Map.Entry<String, String> entry : params.entrySet()) {
+            if (!first) {
+                sb.append('&');
+            }
+            sb.append(encodeQueryComponent(entry.getKey()));
+            if (!entry.getValue().isEmpty()) {
+                sb.append('=');
+                sb.append(encodeQueryComponent(entry.getValue()));
+            }
+            first = false;
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Matches a glob pattern against a parameter name.
+     * Supports '*' as wildcard for zero or more characters.
+     * Uses the same approach as {@link HeaderTransformer}.
+     */
+    static boolean globMatches(String pattern, String text) {
+        // Convert glob to regex: escape special chars, replace * with .*
+        String regex = pattern.replace(".", "\\.").replace("*", ".*");
+        return text.matches(regex);
+    }
+
+    // --- Encoding helpers ---
+
     /**
      * Percent-encodes a URL path per RFC 3986 §3.3, preserving '/' separators.
      * Each segment between '/' is individually encoded.
@@ -150,13 +263,23 @@ public final class UrlTransformer {
             return segment;
         }
         // URLEncoder encodes for form data (space→+); we need path encoding (space→%20)
-        // Also need to un-encode characters that are safe in path segments
         String encoded = URLEncoder.encode(segment, StandardCharsets.UTF_8);
         // URLEncoder encodes spaces as '+', but RFC 3986 requires '%20'
         encoded = encoded.replace("+", "%20");
-        // URLEncoder encodes some characters that are safe in path segments
-        // Un-encode: - . _ ~ (these are unreserved and should not be encoded)
-        // URLEncoder already leaves these unencoded, so no action needed
+        return encoded;
+    }
+
+    /**
+     * Encodes a query component (key or value) per RFC 3986 §3.4.
+     * Spaces → %20, other reserved characters percent-encoded.
+     */
+    private static String encodeQueryComponent(String component) {
+        if (component == null || component.isEmpty()) {
+            return component;
+        }
+        String encoded = URLEncoder.encode(component, StandardCharsets.UTF_8);
+        // URLEncoder uses + for spaces, RFC 3986 prefers %20 for consistency
+        encoded = encoded.replace("+", "%20");
         return encoded;
     }
 }

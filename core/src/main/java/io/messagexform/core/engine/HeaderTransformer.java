@@ -87,7 +87,8 @@ public final class HeaderTransformer {
                 message.statusCode(),
                 message.contentType(),
                 message.requestPath(),
-                message.requestMethod());
+                message.requestMethod(),
+                message.queryString());
     }
 
     // --- Private helpers ---

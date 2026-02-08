@@ -248,12 +248,16 @@ public final class SpecParser {
      * Returns {@code null} if no url block is present.
      *
      * <p>
-     * Currently parses:
+     * Parses:
      * <ul>
      * <li>{@code url.path.expr} — compiled JSLT path rewrite expression
      * (T-001-38a)</li>
+     * <li>{@code url.query.add} — static and dynamic query param additions
+     * (T-001-38b)</li>
+     * <li>{@code url.query.remove} — glob patterns for query param removal
+     * (T-001-38b)</li>
      * </ul>
-     * Query and method parsing added in T-001-38b/38c.
+     * Method parsing added in T-001-38c.
      */
     private UrlSpec parseUrlSpec(JsonNode root, ExpressionEngine engine, String specId, String source) {
         JsonNode urlNode = root.get("url");
@@ -273,13 +277,50 @@ public final class SpecParser {
             }
         }
 
-        // Query and method parsing stubs — implemented in T-001-38b/38c
-        if (pathExpr == null) {
-            // No url operations parsed yet — return null to indicate no url block
+        // Parse query block (T-001-38b)
+        List<String> queryRemove = new ArrayList<>();
+        Map<String, String> queryStaticAdd = new LinkedHashMap<>();
+        Map<String, CompiledExpression> queryDynamicAdd = new LinkedHashMap<>();
+        JsonNode queryNode = urlNode.get("query");
+        if (queryNode != null) {
+            // Parse query.remove — list of glob patterns
+            JsonNode qRemoveNode = queryNode.get("remove");
+            if (qRemoveNode != null && qRemoveNode.isArray()) {
+                for (JsonNode pattern : qRemoveNode) {
+                    if (pattern.isTextual()) {
+                        queryRemove.add(pattern.asText());
+                    }
+                }
+            }
+
+            // Parse query.add — static values and dynamic expr (same pattern as
+            // headers.add)
+            JsonNode qAddNode = queryNode.get("add");
+            if (qAddNode != null && qAddNode.isObject()) {
+                Iterator<Map.Entry<String, JsonNode>> fields = qAddNode.fields();
+                while (fields.hasNext()) {
+                    Map.Entry<String, JsonNode> field = fields.next();
+                    String paramName = field.getKey(); // NOT lowercased — query params are case-sensitive
+                    JsonNode value = field.getValue();
+                    if (value.isTextual()) {
+                        queryStaticAdd.put(paramName, value.asText());
+                    } else if (value.isObject() && value.has("expr")) {
+                        String expr = value.get("expr").asText();
+                        CompiledExpression compiled = compileExpression(engine, expr, specId, source);
+                        queryDynamicAdd.put(paramName, compiled);
+                    }
+                }
+            }
+        }
+
+        // Check if any URL operations exist
+        boolean hasAnyOps =
+                pathExpr != null || !queryRemove.isEmpty() || !queryStaticAdd.isEmpty() || !queryDynamicAdd.isEmpty();
+        if (!hasAnyOps) {
             return null;
         }
 
-        return new UrlSpec(pathExpr, null, null, null, null, null);
+        return new UrlSpec(pathExpr, queryRemove, queryStaticAdd, queryDynamicAdd, null, null);
     }
 
     // --- Private helpers ---
