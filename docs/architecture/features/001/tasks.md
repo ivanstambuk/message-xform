@@ -282,7 +282,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `./gradlew :core:test --tests "*BidirectionalSpecTest*"`
   - `./gradlew spotlessApply check`
 
-- [ ] **T-001-18** — JSON Schema load-time validation (FR-001-09)
+- [x] **T-001-18** — JSON Schema load-time validation (FR-001-09) ✅ 2026-02-08
   _Intent:_ Every spec MUST declare `input.schema` and `output.schema`.
   The engine validates they are valid JSON Schema 2020-12 at load time.
   _Test first:_ Write `SchemaValidationTest`:
@@ -916,6 +916,7 @@ Track long-running or shared commands with timestamps to avoid duplicate work.
 - 2026-02-08 10:05 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — 72 tests passed after T-001-13..14
 - 2026-02-08 10:40 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — 81 tests passed after T-001-15
 - 2026-02-08 10:45 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — 89 tests passed after T-001-16..17
+- 2026-02-08 10:50 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — 93 tests passed after T-001-18
 
 ## Completion Criteria
 
