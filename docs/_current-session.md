@@ -3,7 +3,7 @@
 ## Active Work
 
 **Feature 004 — Standalone HTTP Proxy Mode** (Spec Phase)
-Status: ✅ Spec Ready — Specification written, SDD audit passed, ready for planning.
+Status: 📝 Full specification written — ready for review.
 
 ## Session Progress
 
@@ -17,11 +17,12 @@ Status: ✅ Spec Ready — Specification written, SDD audit passed, ready for pl
 4. ✅ Additional config requirements captured: connection pool, TLS truststore, env vars
 5. ✅ Docker/K8s deployment formally in scope (roadmap + spec)
 6. ✅ Full Feature 004 specification written — `docs/architecture/features/004/spec.md`
-7. ✅ Full SDD audit via `/retro` — all gaps resolved:
-   - Created `docs/architecture/features/004/scenarios.md` (51 scenarios)
-   - Updated `terminology.md` (Standalone Proxy, Sidecar, Shadow JAR, etc.)
-   - Updated `knowledge-map.md` (adapter-standalone, Feature 004 trace)
-   - Updated `ADR-0029` (validating scenarios)
+   - 32 functional requirements (FR-004-01 through FR-004-32)
+   - 7 non-functional requirements (NFR-004-01 through NFR-004-07)
+   - 51 scenarios across 11 categories (S-004-01 through S-004-51)
+   - 38 configuration keys with env var mapping
+   - Test strategy, architecture diagram, K8s/Docker deployment examples
+7. 🔲 Owner review of Feature 004 spec
 8. 🔲 Create Feature 004 plan (phases & tasks)
 
 ## Key Decisions (All Resolved)
