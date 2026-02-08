@@ -435,7 +435,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
 
 #### I8 — Profile parser + matching
 
-- [ ] **T-001-27** — Create profile test fixture YAML
+- [x] **T-001-27** — Create profile test fixture YAML
   _Intent:_ Create test profile YAML for the PingAM callback use case.
   _Implement:_ Create `core/src/test/resources/test-profiles/pingam-callback-prettify.yaml`
   with path/method matching and spec references.
@@ -443,7 +443,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   _Verification commands:_
   - N/A — file creation only.
 
-- [ ] **T-001-28** — Parse profile YAML → TransformProfile (FR-001-05, DO-001-04/08)
+- [x] **T-001-28** — Parse profile YAML → TransformProfile (FR-001-05, DO-001-04/08)
   _Intent:_ Parse profile YAML into a `TransformProfile` with resolved spec
   references.
   _Test first:_ Write `ProfileParserTest`:
@@ -457,7 +457,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `./gradlew :core:test --tests "*ProfileParserTest*"`
   - `./gradlew spotlessApply check`
 
-- [ ] **T-001-29** — Profile matching: path, method, content-type (FR-001-05, ADR-0006)
+- [x] **T-001-29** — Profile matching: path, method, content-type (FR-001-05, ADR-0006)
   _Intent:_ Implement the matching logic that selects which profile entry
   applies to a given request.
   _Test first:_ Write `ProfileMatcherTest`:
@@ -473,7 +473,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `./gradlew :core:test --tests "*ProfileMatcherTest*"`
   - `./gradlew spotlessApply check`
 
-- [ ] **T-001-30** — Integrate profiles into TransformEngine (API-001-01/02)
+- [x] **T-001-30** — Integrate profiles into TransformEngine (API-001-01/02)
   _Intent:_ Wire profile loading and matching into the engine so
   `transform(message, direction)` resolves the profile internally.
   _Test first:_ Write `ProfileIntegrationTest`:
@@ -489,7 +489,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
 
 #### I9 — Profile chaining + bidirectional transform via profiles
 
-- [ ] **T-001-31** — Profile-level chaining (FR-001-05, ADR-0012, S-001-49)
+- [x] **T-001-31** — Profile-level chaining (FR-001-05, ADR-0012, S-001-49)
   _Intent:_ When a profile has multiple matching entries for the same
   direction, they execute in declaration order as a pipeline.
   _Test first:_ Write `ChainingTest`:
@@ -503,7 +503,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `./gradlew :core:test --tests "*ChainingTest*"`
   - `./gradlew spotlessApply check`
 
-- [ ] **T-001-32** — Bidirectional transform via profiles (FR-001-03, S-001-02)
+- [x] **T-001-32** — Bidirectional transform via profiles (FR-001-03, S-001-02)
   _Intent:_ Profile entries with `direction: response` use `forward.expr`;
   entries with `direction: request` use `reverse.expr`.
   _Test first:_ Write `BidirectionalProfileTest`:
@@ -518,7 +518,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `./gradlew :core:test --tests "*BidirectionalProfileTest*"`
   - `./gradlew spotlessApply check`
 
-- [ ] **T-001-33** — Chain step logging (NFR-001-08)
+- [x] **T-001-33** — Chain step logging (NFR-001-08)
   _Intent:_ Each chain step MUST be logged with the step index
   (`chain_step: 2/3`) alongside the spec id.
   _Test first:_ Write `ChainStepLoggingTest`:
