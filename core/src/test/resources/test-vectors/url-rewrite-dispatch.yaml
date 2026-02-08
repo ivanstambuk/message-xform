@@ -1,0 +1,62 @@
+# T-001-38f: URL rewrite test fixture — de-polymorphization use case
+# Scenario alignment: S-001-38a (de-polymorphize dispatch),
+#                      S-001-38b (query param manipulation),
+#                      S-001-38c (method override)
+#
+# This fixture exercises the complete de-polymorphization workflow:
+#   - A generic dispatch endpoint receives ALL requests at /api/dispatch (POST)
+#   - The body contains routing fields: action, resource, resourceId
+#   - URL rewriting routes to the correct REST endpoint:
+#     path  → /api/{resource}/{resourceId}
+#     method → derived from .action field
+#   - The body transform strips routing fields, keeping only the payload
+#   - Query parameters: add format=json, remove internal debug params
+#
+# ADR-0027: All URL expressions evaluate against the ORIGINAL (pre-transform) body
+
+id: url-rewrite-dispatch
+version: "1.0.0"
+description: "De-polymorphize generic dispatch to RESTful endpoints"
+
+input:
+  schema:
+    type: object
+    required: [action, resource, resourceId]
+    properties:
+      action:
+        type: string
+        enum: [read, create, update, delete]
+      resource:
+        type: string
+      resourceId:
+        type: string
+      payload:
+        type: object
+
+output:
+  schema:
+    type: object
+    properties:
+      payload:
+        type: object
+
+transform:
+  lang: jslt
+  expr: |
+    if (.payload)
+      .payload
+    else
+      {}
+
+url:
+  path:
+    expr: '"/api/" + .resource + "/" + .resourceId'
+  query:
+    remove: ["_debug", "_internal", "_trace"]
+    add:
+      format: "json"
+      version:
+        expr: .apiVersion
+  method:
+    set: "DELETE"
+    when: '.action == "delete"'

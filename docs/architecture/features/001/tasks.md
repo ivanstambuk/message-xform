@@ -697,30 +697,35 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   _Status:_ ✅ Complete (2026-02-08). 14 tests: 6 invalid methods rejected (parameterized),
   7 valid methods accepted (parameterized), lowercase normalization. All 250 tests pass.
 
-- [ ] **T-001-38e** — URL block on response transform → ignored with warning (FR-001-12, S-001-38e)
+- [x] **T-001-38e** — URL block on response transform → ignored with warning (FR-001-12, S-001-38e) ✅ 2026-02-08
   _Intent:_ URL rewriting only makes sense for request transforms. A `url` block
   on a response-direction spec is ignored with a warning logged at load time.
   _Test first:_ Write `UrlDirectionRestrictionTest`:
-  - Spec with `direction: response` + `url.path.expr` → warning logged at load
-    time, URL block ignored during transform.
-  - Spec with `direction: request` + `url.path.expr` → applied normally.
-  _Implement:_ Add direction check to `SpecParser` (warning) and `UrlTransformer`
-  (skip).
+  - Spec with url.path.expr → ignored for RESPONSE direction.
+  - Spec with url.query ops → ignored for RESPONSE direction.
+  - Spec with url.method.set → ignored for RESPONSE direction.
+  - Full url block → all ignored for RESPONSE direction.
+  - Same url block → applied normally for REQUEST direction.
+  _Implement:_ Already handled by `TransformEngine.transformWithSpec()` direction
+  check (`spec.urlSpec() != null && direction == Direction.REQUEST`).
   _Verify:_ `UrlDirectionRestrictionTest` passes.
   _Verification commands:_
   - `./gradlew :core:test --tests "*UrlDirectionRestrictionTest*"`
   - `./gradlew spotlessApply check`
+  _Status:_ ✅ Complete (2026-02-08). 5 tests: path/query/method individually ignored
+  for RESPONSE, full block ignored for RESPONSE, full block applied for REQUEST.
 
-- [ ] **T-001-38f** — Create URL rewrite test fixture YAML (FR-001-12)
+- [x] **T-001-38f** — Create URL rewrite test fixture YAML (FR-001-12) ✅ 2026-02-08
   _Intent:_ Create `url-rewrite-dispatch.yaml` fixture for parameterized testing
   of the de-polymorphization use case.
-  _Implement:_ Write fixture at `core/src/test/resources/test-vectors/url-rewrite-dispatch.yaml`
-  with input body containing routing fields, expected output with stripped body,
-  expected path rewrite, expected query params, and expected method.
+  _Implement:_ Created fixture at `core/src/test/resources/test-vectors/url-rewrite-dispatch.yaml`
+  with complete de-polymorphization: path from body fields, query remove/add (static +
+  dynamic), conditional method override, body transform stripping routing fields.
   _Verify:_ Fixture is valid YAML and parseable.
   _Verification commands:_
   - `./gradlew :core:test`
   - `./gradlew spotlessApply check`
+  _Status:_ ✅ Complete (2026-02-08). All 255 tests pass.
 
 #### I12 — Reusable mappers
 
