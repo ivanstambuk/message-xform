@@ -1,30 +1,22 @@
 # Pending Task
 
-**Focus**: Phase 6 — Headers, Status, URL, Mappers (I10–I11)
-**Status**: Not started — Phase 5 fully complete and committed
-**Next Step**: Begin T-001-34 — Header add/remove/rename operations
+**Focus**: Phase 6 I11 — Status Code Transformations (T-001-37, T-001-38)
+**Status**: Not started — I10 (Header transformations) fully complete
+**Next Step**: Begin T-001-37 (status code override with `set` + `when` predicate)
 
 ## Context Notes
-- 181 tests passing, build clean (`./gradlew spotlessApply check`)
-- TransformEngine now supports profiles, chaining, bidirectional, logging
-- Per-task commit discipline codified: one task = one commit (AGENTS.md §5)
-- Logback-classic is `testImplementation` (not `testRuntimeOnly`) for ListAppender access
+- I10 completed cleanly: HeaderSpec, HeaderTransformer, SpecParser extensions, 18 new tests (199 total)
+- TransformSpec now has a `headerSpec` field (nullable, backward-compatible via convenience constructor)
+- The same pattern (model record + transformer class + SpecParser extension + TransformEngine integration) should apply to status code transforms
+- Dynamic expr compilation pattern is established — reuse for `status.when` predicate
+- S-001-34 scenario was fixed during retro (dynamic expr must reference transformed body, not input body)
 
-## Phase 6 Task Sequence
-1. **T-001-34** — Header add/remove/rename operations (HeaderTransformer)
-2. **T-001-35** — Dynamic header expressions using JSLT
-3. **T-001-36** — Header name normalization to lowercase (RFC 9110)
-4. **T-001-37** — Status code override with `when` predicate
-5. **T-001-38** — `$status` binding in JSLT
-6. **T-001-38a** — URL path rewrite with JSLT expression
-7. **T-001-38b** — URL query parameter add/remove
+## Key Files for Next Session
+- `TransformEngine.transformWithSpec()` — integration point for status transforms
+- `SpecParser.parse()` — will need `parseStatusSpec()` similar to `parseHeaderSpec()`
+- `docs/architecture/features/001/tasks.md` lines 578-600 — T-001-37/38 task definitions
+- `docs/architecture/features/001/spec.md` lines 846-880 — FR-001-11 spec
+- ADR-0003 (Status Code Transforms) and ADR-0017 ($status null for requests)
 
-## SDD Gaps
-- None identified. Retro completed with all fixes applied.
-- S-001-74 (chain step logging scenario) was added during retro.
-
-## Key Files
-- Tasks: `docs/architecture/features/001/tasks.md` (lines ~535+ for Phase 6)
-- Spec: `docs/architecture/features/001/spec.md` (FR-001-10, FR-001-11, FR-001-12)
-- Engine: `core/src/main/java/io/messagexform/core/engine/TransformEngine.java`
-- Scenarios: `docs/architecture/features/001/scenarios.md` (S-001-33..38g for headers/status/URL)
+## SDD Gaps (if any)
+- None identified. Retro was clean except for the S-001-34 fix (already applied).
