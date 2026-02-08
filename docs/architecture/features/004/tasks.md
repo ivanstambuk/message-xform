@@ -235,7 +235,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `./gradlew spotlessApply check`
   _Verification log:_ ✅ 4/4 tests PASSED (request hop-by-hop stripped, request non-hop-by-hop preserved, response hop-by-hop stripped, response non-hop-by-hop preserved). All 8 RFC 7230 §6.1 headers filtered in both directions. `spotlessApply check` GREEN.
 
-- [ ] **T-004-13** — UpstreamClient: backend error handling (FR-004-24/25, S-004-18/19/20)
+- [x] **T-004-13** — UpstreamClient: backend error handling (FR-004-24/25, S-004-18/19/20)
   _Intent:_ Handle backend connection failures and timeouts.
   _Test first:_ Write `UpstreamErrorTest`:
   - Backend unreachable (host does not resolve) → appropriate exception thrown.
@@ -247,6 +247,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   _Verification commands:_
   - `./gradlew :adapter-standalone:test --tests "*UpstreamErrorTest*"`
   - `./gradlew spotlessApply check`
+  _Verification log:_ ✅ 4/4 tests PASSED (connection refused → UpstreamConnectException, unreachable host → UpstreamConnectException, read timeout → UpstreamTimeoutException, exception hierarchy verified). Domain exceptions: UpstreamException (base) → UpstreamConnectException, UpstreamTimeoutException. `spotlessApply check` GREEN.
 
 - [ ] **T-004-14** — UpstreamClient: connection pool configuration (FR-004-18)
   _Intent:_ Configure connection pool via JVM system properties.

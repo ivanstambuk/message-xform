@@ -1,7 +1,6 @@
 package io.messagexform.standalone.proxy;
 
 import io.messagexform.standalone.config.ProxyConfig;
-import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -75,11 +74,14 @@ public final class UpstreamClient {
      * @param body    the request body (null or empty for bodyless requests)
      * @param headers request headers to forward (lowercase keys); may be null
      * @return the upstream response with status code, headers, and body
-     * @throws IOException          if a network error occurs
-     * @throws InterruptedException if the thread is interrupted while waiting
+     * @throws UpstreamConnectException if the backend is unreachable or refuses
+     *                                  the connection
+     * @throws UpstreamTimeoutException if the backend does not respond within
+     *                                  the configured read timeout
+     * @throws InterruptedException     if the thread is interrupted while waiting
      */
     public UpstreamResponse forward(String method, String path, String body, Map<String, String> headers)
-            throws IOException, InterruptedException {
+            throws UpstreamException, InterruptedException {
 
         URI targetUri = URI.create(backendBaseUrl + path);
 
@@ -108,7 +110,18 @@ public final class UpstreamClient {
 
         LOG.debug("Forwarding {} {} to {}", method, path, targetUri);
 
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> response;
+        try {
+            response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        } catch (java.net.http.HttpConnectTimeoutException e) {
+            throw new UpstreamConnectException("Connect timeout to " + targetUri, e);
+        } catch (java.net.http.HttpTimeoutException e) {
+            throw new UpstreamTimeoutException("Read timeout from " + targetUri, e);
+        } catch (java.net.ConnectException e) {
+            throw new UpstreamConnectException("Connection refused by " + targetUri, e);
+        } catch (java.io.IOException e) {
+            throw new UpstreamConnectException("Failed to connect to " + targetUri, e);
+        }
 
         // Normalize response headers to lowercase, first-value semantics,
         // stripping hop-by-hop headers (FR-004-04)
