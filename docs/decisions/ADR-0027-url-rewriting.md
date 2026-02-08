@@ -160,6 +160,15 @@ Follow-ups:
 - llms.txt: add ADR-0027.
 - open-questions.md: remove Q-028, Q-029.
 
+Validating scenarios:
+- S-001-38a: URL path rewrite — de-polymorphize dispatch (original-body context)
+- S-001-38b: URL query parameter add/remove
+- S-001-38c: HTTP method override with conditional predicate
+- S-001-38d: path.expr returns null → error
+- S-001-38e: invalid HTTP method → rejected at load time
+- S-001-38f: url block on response transform → ignored with warning
+- S-001-38g: URL-to-body extraction — reverse direction
+
 References:
 - Feature 001 spec: `docs/architecture/features/001/spec.md` (FR-001-04, FR-001-10, FR-001-11)
 - PingAccess URL Rewrite Rules: `docs.pingidentity.com/pingaccess/9.0/.../pa_adding_rewrite_url_rules.html`
