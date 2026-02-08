@@ -577,7 +577,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
 
 #### I11 — Status code transformations
 
-- [ ] **T-001-37** — Status code override with `when` predicate (FR-001-11, S-001-36/37/38)
+- [x] **T-001-37** — Status code override with `when` predicate (FR-001-11, S-001-36/37/38)
   _Intent:_ Implement the `status` block: `set` + optional `when` predicate.
   _Test first:_ Write `StatusTransformTest`:
   - Unconditional `set: 202` → status changed (S-001-38 pattern).
@@ -592,8 +592,10 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   _Verification commands:_
   - `./gradlew :core:test --tests "*StatusTransformTest*"`
   - `./gradlew spotlessApply check`
+  _Status:_ ✅ Complete (2026-02-08). 9 tests pass. StatusSpec model, StatusTransformer,
+  SpecParser.parseStatusSpec(), TransformEngine integration. All 212 tests pass.
 
-- [ ] **T-001-38** — $status binding in JSLT (FR-001-11, ADR-0017)
+- [x] **T-001-38** — $status binding in JSLT (FR-001-11, ADR-0017)
   _Intent:_ JSLT body expressions can use `$status` to reference the
   current HTTP status code. Null for request transforms.
   _Test first:_ Write `StatusBindingTest`:
@@ -604,6 +606,9 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   _Verification commands:_
   - `./gradlew :core:test --tests "*StatusBindingTest*"`
   - `./gradlew spotlessApply check`
+  _Status:_ ✅ Complete (2026-02-08). 4 tests pass. $status binding already
+  implemented by T-001-21; dedicated StatusBindingTest covers S-001-37, S-001-61
+  (null for requests, ADR-0017), S-001-63 (nullable Integer, ADR-0020).
 
 #### I11a — URL rewriting
 
