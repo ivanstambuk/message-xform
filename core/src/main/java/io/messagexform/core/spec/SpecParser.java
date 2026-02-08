@@ -12,6 +12,7 @@ import io.messagexform.core.error.ExpressionCompileException;
 import io.messagexform.core.error.SchemaValidationException;
 import io.messagexform.core.error.SpecParseException;
 import io.messagexform.core.model.HeaderSpec;
+import io.messagexform.core.model.StatusSpec;
 import io.messagexform.core.model.TransformSpec;
 import io.messagexform.core.spi.CompiledExpression;
 import io.messagexform.core.spi.ExpressionEngine;
@@ -40,8 +41,8 @@ public final class SpecParser {
 
     private static final String DEFAULT_LANG = "jslt";
     private static final ObjectMapper YAML_MAPPER = new ObjectMapper(new YAMLFactory());
-    private static final JsonSchemaFactory SCHEMA_FACTORY =
-            JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012);
+    private static final JsonSchemaFactory SCHEMA_FACTORY = JsonSchemaFactory
+            .getInstance(SpecVersion.VersionFlag.V202012);
 
     private final EngineRegistry engineRegistry;
 
@@ -119,8 +120,12 @@ public final class SpecParser {
         // Parse optional headers block (FR-001-10, T-001-34)
         HeaderSpec headerSpec = parseHeaderSpec(root, engine, id, source);
 
+        // Parse optional status block (FR-001-11, T-001-37)
+        StatusSpec statusSpec = parseStatusSpec(root, engine, id, source);
+
         return new TransformSpec(
-                id, version, description, lang, inputSchema, outputSchema, compiledExpr, forward, reverse, headerSpec);
+                id, version, description, lang, inputSchema, outputSchema, compiledExpr, forward, reverse,
+                headerSpec, statusSpec);
     }
 
     /**
@@ -181,6 +186,48 @@ public final class SpecParser {
         return spec.isEmpty() ? null : spec;
     }
 
+    /**
+     * Parses the optional {@code status} block from the spec YAML (FR-001-11,
+     * ADR-0003).
+     * Returns {@code null} if no status block is present.
+     *
+     * <p>
+     * Validates that:
+     * <ul>
+     * <li>{@code set} is required and must be an integer in range 100–599</li>
+     * <li>{@code when} is optional; if present, it is compiled as a JSLT
+     * expression</li>
+     * </ul>
+     */
+    private StatusSpec parseStatusSpec(JsonNode root, ExpressionEngine engine, String specId, String source) {
+        JsonNode statusNode = root.get("status");
+        if (statusNode == null || statusNode.isNull()) {
+            return null;
+        }
+
+        // Require 'set' field
+        JsonNode setNode = statusNode.get("set");
+        if (setNode == null || setNode.isNull()) {
+            throw new SpecParseException(
+                    "status block requires a 'set' field with the target HTTP status code", specId, source);
+        }
+        int statusCode = setNode.asInt();
+        if (statusCode < 100 || statusCode > 599) {
+            throw new SpecParseException(
+                    "Invalid status code " + statusCode + " — must be in range 100–599", specId, source);
+        }
+
+        // Optional 'when' predicate — compiled at load time
+        CompiledExpression whenExpr = null;
+        JsonNode whenNode = statusNode.get("when");
+        if (whenNode != null && whenNode.isTextual()) {
+            String whenStr = whenNode.asText();
+            whenExpr = compileExpression(engine, whenStr, specId, source);
+        }
+
+        return new StatusSpec(statusCode, whenExpr);
+    }
+
     // --- Private helpers ---
 
     private JsonNode readYaml(Path path, String source) {
@@ -211,8 +258,8 @@ public final class SpecParser {
     private ExpressionEngine resolveEngine(String lang, String specId, String source) {
         return engineRegistry
                 .getEngine(lang)
-                .orElseThrow(() ->
-                        new ExpressionCompileException("Unknown expression engine: '" + lang + "'", specId, source));
+                .orElseThrow(() -> new ExpressionCompileException("Unknown expression engine: '" + lang + "'", specId,
+                        source));
     }
 
     private JsonNode extractSchema(JsonNode root, String block, String specId, String source) {

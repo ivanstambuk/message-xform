@@ -50,8 +50,8 @@ public final class TransformEngine {
 
     private static final Logger LOG = LoggerFactory.getLogger(TransformEngine.class);
     private static final ObjectMapper SIZE_MAPPER = new ObjectMapper();
-    private static final JsonSchemaFactory SCHEMA_FACTORY =
-            JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012);
+    private static final JsonSchemaFactory SCHEMA_FACTORY = JsonSchemaFactory
+            .getInstance(SpecVersion.VersionFlag.V202012);
 
     private final SpecParser specParser;
     private final ErrorResponseBuilder errorResponseBuilder;
@@ -109,11 +109,11 @@ public final class TransformEngine {
             EvalBudget budget,
             SchemaValidationMode schemaValidationMode) {
         this.specParser = Objects.requireNonNull(specParser, "specParser must not be null");
-        this.errorResponseBuilder =
-                Objects.requireNonNull(errorResponseBuilder, "errorResponseBuilder must not be null");
+        this.errorResponseBuilder = Objects.requireNonNull(errorResponseBuilder,
+                "errorResponseBuilder must not be null");
         this.budget = Objects.requireNonNull(budget, "budget must not be null");
-        this.schemaValidationMode =
-                Objects.requireNonNull(schemaValidationMode, "schemaValidationMode must not be null");
+        this.schemaValidationMode = Objects.requireNonNull(schemaValidationMode,
+                "schemaValidationMode must not be null");
     }
 
     /**
@@ -313,6 +313,24 @@ public final class TransformEngine {
             // T-001-34/35: Apply declarative header operations (FR-001-10)
             if (spec.headerSpec() != null) {
                 transformedMessage = HeaderTransformer.apply(transformedMessage, spec.headerSpec(), transformedBody);
+            }
+
+            // T-001-37: Apply declarative status code transformation (FR-001-11, ADR-0003)
+            // Processing order: bind $status → JSLT body → headers → when predicate → set
+            // status
+            if (spec.statusSpec() != null) {
+                Integer newStatus = StatusTransformer.apply(
+                        transformedMessage.statusCode(), spec.statusSpec(), transformedBody);
+                if (!java.util.Objects.equals(newStatus, transformedMessage.statusCode())) {
+                    transformedMessage = new Message(
+                            transformedMessage.body(),
+                            transformedMessage.headers(),
+                            transformedMessage.headersAll(),
+                            newStatus,
+                            transformedMessage.contentType(),
+                            transformedMessage.requestPath(),
+                            transformedMessage.requestMethod());
+                }
             }
 
             return TransformResult.success(transformedMessage);
