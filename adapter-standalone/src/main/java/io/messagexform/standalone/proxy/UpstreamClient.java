@@ -9,6 +9,7 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,6 +28,20 @@ import org.slf4j.LoggerFactory;
 public final class UpstreamClient {
 
     private static final Logger LOG = LoggerFactory.getLogger(UpstreamClient.class);
+
+    /**
+     * Hop-by-hop headers per RFC 7230 §6.1 — stripped in both request and
+     * response directions (FR-004-04, T-004-12).
+     */
+    private static final Set<String> HOP_BY_HOP_HEADERS = Set.of(
+            "connection",
+            "transfer-encoding",
+            "keep-alive",
+            "proxy-authenticate",
+            "proxy-authorization",
+            "te",
+            "trailer",
+            "upgrade");
 
     private final HttpClient httpClient;
     private final String backendBaseUrl;
@@ -81,8 +96,8 @@ public final class UpstreamClient {
         if (headers != null) {
             for (Map.Entry<String, String> entry : headers.entrySet()) {
                 String name = entry.getKey();
-                // Skip restricted headers that JDK HttpClient manages internally
-                if (isRestrictedHeader(name)) {
+                // Skip restricted and hop-by-hop headers
+                if (isRestrictedHeader(name) || isHopByHop(name)) {
                     continue;
                 }
                 requestBuilder.header(name, entry.getValue());
@@ -95,11 +110,13 @@ public final class UpstreamClient {
 
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
-        // Normalize response headers to lowercase, first-value semantics
+        // Normalize response headers to lowercase, first-value semantics,
+        // stripping hop-by-hop headers (FR-004-04)
         Map<String, String> responseHeaders = new LinkedHashMap<>();
         response.headers().map().forEach((name, values) -> {
-            if (!values.isEmpty()) {
-                responseHeaders.put(name.toLowerCase(), values.getFirst());
+            String lowerName = name.toLowerCase();
+            if (!values.isEmpty() && !isHopByHop(lowerName)) {
+                responseHeaders.put(lowerName, values.getFirst());
             }
         });
 
@@ -124,5 +141,13 @@ public final class UpstreamClient {
      */
     private static boolean isRestrictedHeader(String name) {
         return "host".equalsIgnoreCase(name) || "content-length".equalsIgnoreCase(name);
+    }
+
+    /**
+     * Returns {@code true} for hop-by-hop headers per RFC 7230 §6.1
+     * that must be stripped before forwarding.
+     */
+    private static boolean isHopByHop(String lowerCaseName) {
+        return HOP_BY_HOP_HEADERS.contains(lowerCaseName);
     }
 }

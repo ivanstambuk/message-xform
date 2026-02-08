@@ -219,7 +219,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `./gradlew spotlessApply check`
   _Verification log:_ ✅ 3/3 tests PASSED (transformed body with wrong CL header → recalculated, no CL header → JDK sets correct, empty body → CL 0). Content-Length filtering handled by `isRestrictedHeader()` in UpstreamClient. Response path deferred to ProxyHandler (I5). `spotlessApply check` GREEN.
 
-- [ ] **T-004-12** — UpstreamClient: hop-by-hop header stripping (FR-004-04)
+- [x] **T-004-12** — UpstreamClient: hop-by-hop header stripping (FR-004-04)
   _Intent:_ Strip hop-by-hop headers (`Connection`, `Transfer-Encoding`,
   `Keep-Alive`, `Proxy-Authenticate`, `Proxy-Authorization`, `TE`, `Trailer`,
   `Upgrade`) in both request and response directions per RFC 7230 §6.1.
@@ -233,6 +233,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   _Verification commands:_
   - `./gradlew :adapter-standalone:test --tests "*HopByHopHeaderTest*"`
   - `./gradlew spotlessApply check`
+  _Verification log:_ ✅ 4/4 tests PASSED (request hop-by-hop stripped, request non-hop-by-hop preserved, response hop-by-hop stripped, response non-hop-by-hop preserved). All 8 RFC 7230 §6.1 headers filtered in both directions. `spotlessApply check` GREEN.
 
 - [ ] **T-004-13** — UpstreamClient: backend error handling (FR-004-24/25, S-004-18/19/20)
   _Intent:_ Handle backend connection failures and timeouts.
