@@ -26,7 +26,10 @@ Review the session's activity:
 ### 3. SDD Completeness Audit
 
 Verify that all work from the session is fully captured per the SDD methodology.
-Run through each check and report findings. This is the core of the retrospective.
+Run through each check and collect findings. This is the core of the retrospective.
+
+**CRITICAL**: Every gap found in steps 3a–3e MUST be recorded in the findings
+ledger (step 3f). Do NOT just mention gaps in chat — write them down.
 
 #### 3a. Scenario Coverage Check
 // turbo
@@ -67,6 +70,24 @@ Run through each check and report findings. This is the core of the retrospectiv
   - All requirements have: ID, requirement text, driver, measurement, dependencies, source.
   - Cross-references to ADRs are correct.
 
+#### 3f. Findings Ledger (MANDATORY)
+Before proceeding to step 4, you MUST write a numbered checklist of **every gap**
+found in steps 3a–3e. Use this exact format:
+
+```
+Findings Ledger:
+1. [3a] Missing scenario for valid sensitive path parsing (NFR-001-06)
+2. [3b] Term "foo" not in terminology.md
+3. [3c] ADR-XXXX missing validating scenario reference
+...
+```
+
+- If no gaps were found, write: `Findings Ledger: empty — all checks passed.`
+- **This ledger is the contract for step 6.** Every numbered item MUST be resolved
+  in step 6 before the retro can proceed to step 7.
+- **Non-negotiable**: a gap mentioned only in chat prose is a workflow violation.
+  It must appear as a numbered ledger item.
+
 ### 4. Knowledge Map & References Sync
 // turbo
 - Open `docs/architecture/knowledge-map.md`.
@@ -86,17 +107,31 @@ Per AGENTS.md rule 17, target locations are:
 - **Constitution changes** (new principle or governance rule) →
   propose an update to `docs/decisions/project-constitution.md`.
 
-### 6. Apply Fixes
+### 6. Apply Fixes (Process the Findings Ledger)
 // turbo
-Apply any fixes identified in the SDD audit:
-- Add missing scenarios.
-- Add missing terminology entries.
-- Create missing ADRs.
-- Remove resolved open questions.
+Go through the **findings ledger from step 3f**, item by item.
+For each numbered finding, apply the fix and mark it done:
+
+```
+Findings Ledger (resolved):
+1. [3a] Missing scenario for valid sensitive path parsing → FIXED: added S-001-75
+2. [3b] Term "foo" not in terminology.md → FIXED: added to terminology.md
+...
+```
+
+Fix types:
+- Add missing scenarios to `scenarios.md` (index + coverage matrix).
+- Add missing terminology entries to `terminology.md`.
+- Create missing ADRs in `docs/decisions/`.
+- Remove resolved open questions from `open-questions.md`.
 - Update knowledge map and llms.txt.
 - Update `AGENTS.md` with any new rules or conventions.
 - Update `PLAN.md` if scope, priorities, or technical decisions changed.
 - Commit all fixes.
+
+**Verification gate**: Do NOT proceed to step 7 until every ledger item is
+marked as FIXED or explicitly deferred with a justification. If the ledger
+was "empty", proceed immediately.
 
 ### 7. Update Session State & Handover
 // turbo
