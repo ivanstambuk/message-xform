@@ -3833,3 +3833,96 @@ assertion: each_result_version_is_one_of ["v1", "v2"]
 | NFR-001-09 (Telemetry SPI) | S-001-47 |
 | NFR-001-10 (Trace correlation) | S-001-48 |
 
+## Scenario → Test Class Verification
+
+> Updated 2026-02-08 (T-001-51). Each scenario lists the test class(es) that verify it.
+
+| Scenario | Test Class(es) | Notes |
+|----------|---------------|-------|
+| S-001-01 | `ScenarioSuiteTest`, `TransformEngineTest` | PingAM callback core use case |
+| S-001-02 | `ScenarioSuiteTest`, `BidirectionalSpecTest`, `BidirectionalProfileTest` | Reverse transform |
+| S-001-03 | `ScenarioSuiteTest` | Success response strip |
+| S-001-04 | `ScenarioSuiteTest` | Choice/confirmation callbacks |
+| S-001-05 | `ScenarioSuiteTest` | No-callbacks edge case |
+| S-001-06 | `ScenarioSuiteTest`, `TransformEngineTest` | Strip internal fields |
+| S-001-07 | `JsltExpressionEngineTest` | Open-world `* : .` passthrough (JSLT minus syntax) |
+| S-001-08 | `ScenarioSuiteTest`, `TransformEngineTest`, `JsltExpressionEngineTest` | Field renaming |
+| S-001-09 | `TransformEngineTest` | Defaults (JSLT absent-field behavior) |
+| S-001-10 | — | `now()` dynamic; skipped in suite |
+| S-001-11 | `ScenarioSuiteTest`, `TransformEngineTest` | Flatten nested |
+| S-001-12 | `ScenarioSuiteTest` | Nest flat |
+| S-001-13 | `ScenarioSuiteTest`, `TransformEngineTest`, `JsltExpressionEngineTest` | Array reshape |
+| S-001-14 | `ScenarioSuiteTest` | OAuth normalization |
+| S-001-15 | `ScenarioSuiteTest`, `JsltExpressionEngineTest` | Conditional error vs success |
+| S-001-16 | `ScenarioSuiteTest` | Conditional success path |
+| S-001-17 | `ScenarioSuiteTest` | Enum translation |
+| S-001-18 | `TransformEngineTest` | Passthrough (no match) |
+| S-001-19 | `TransformEngineTest` | Passthrough (invalid JSON) |
+| S-001-20 | `ScenarioSuiteTest` | Open-world extra fields |
+| S-001-21 | `ScenarioSuiteTest` | Empty input |
+| S-001-22 | `ScenarioSuiteTest`, `EvalErrorTest` | Null values |
+| S-001-23 | — | Large array; placeholder data |
+| S-001-24 | `EvalErrorTest` | JSLT eval error → error response |
+| S-001-25 | `ScenarioSuiteTest` | Multi-engine rename (JSLT) |
+| S-001-26 | — | JOLT engine not implemented |
+| S-001-27 | — | jq engine not implemented |
+| S-001-28 | `TransformEngineTest` | Unknown engine rejected |
+| S-001-29 | `BidirectionalSpecTest` | Bidirectional round-trip |
+| S-001-30 | `BidirectionalSpecTest` | Bidirectional flat ↔ nested |
+| S-001-31 | `ScenarioSuiteTest` | RFC 9457 normalization |
+| S-001-32 | `ScenarioSuiteTest` | PingAM error normalization |
+| S-001-33 | `DynamicHeaderTest` | `$headers` in body |
+| S-001-34 | `DynamicHeaderTest` | Body-to-header expr |
+| S-001-35 | `DynamicHeaderTest` | Missing header returns null |
+| S-001-36 | `StatusTransformTest` | Conditional status change |
+| S-001-37 | `StatusTransformTest`, `StatusBindingTest` | `$status` in body |
+| S-001-38 | `StatusTransformTest` | Unconditional status set |
+| S-001-38a | `UrlPathRewriteTest` | URL path rewrite |
+| S-001-38b | `UrlQueryParamTest` | Query param add/remove |
+| S-001-38c | `UrlPathRewriteTest` | HTTP method override |
+| S-001-38d | `UrlPathRewriteTest` | Path expr null → error |
+| S-001-38e | `UrlPathRewriteTest` | Invalid method rejected |
+| S-001-38f | `UrlPathRewriteTest` | URL on response ignored |
+| S-001-38g | `UrlPathRewriteTest` | URL-to-body extraction |
+| S-001-38i | `StatusTransformTest` | Status predicate error → keep |
+| S-001-39 | — | JOLT not implemented |
+| S-001-40 | — | JOLT not implemented |
+| S-001-41 | `TransformEngineTest` | Concurrent spec versions |
+| S-001-42 | `TransformEngineTest` | Missing spec version |
+| S-001-43 | `TransformEngineTest` | Bare spec → latest |
+| S-001-44 | `TransformEngineTest` | Specific path beats wildcard |
+| S-001-45 | `TransformEngineTest` | Ambiguous tie rejected |
+| S-001-46 | `TransformEngineTest` | Constraint count tie-break |
+| S-001-47 | `TelemetryListenerTest` | Telemetry lifecycle events |
+| S-001-48 | `TraceContextTest` | Trace context propagation |
+| S-001-49 | `ChainingTest` | Profile chain (JOLT not impl) |
+| S-001-50 | `MapperPipelineTest` | Mapper + expr pipeline |
+| S-001-51 | `MapperPipelineTest` | Missing mapperRef rejected |
+| S-001-52 | `MapperPipelineTest` | Duplicate mapperRef rejected |
+| S-001-53 | `SchemaValidationTest` | Valid schemas accepted |
+| S-001-54 | `SchemaValidationTest` | Invalid schema rejected |
+| S-001-55 | `SchemaValidationTest` | Strict-mode runtime failure |
+| S-001-56 | `ChainingTest` | Pipeline abort on failure |
+| S-001-57 | `DynamicHeaderTest` | `$headers` context binding |
+| S-001-58 | `TestAdapterTest` | Copy-on-wrap error path |
+| S-001-59 | `MapperPipelineTest` | Apply without expr rejected |
+| S-001-60 | `BidirectionalProfileTest` | Direction-agnostic spec |
+| S-001-61 | `StatusBindingTest` | `$status` null in request |
+| S-001-62 | `SensitiveFieldTest` | Sensitive path validation |
+| S-001-63 | `StatusBindingTest` | Nullable status integer |
+| S-001-64 | `TransformEngineTest` | Query params in body |
+| S-001-65 | `TransformEngineTest` | Cookies in body |
+| S-001-66 | `TransformEngineTest` | Load-time error types |
+| S-001-67 | `EvalErrorTest` | Eval budget exceeded |
+| S-001-68 | `TransformEngineTest` | YAML parse → SpecParseException |
+| S-001-69 | `DynamicHeaderTest` | Multi-value Set-Cookie |
+| S-001-70 | `DynamicHeaderTest` | `$headers_all` missing → null |
+| S-001-71 | `DynamicHeaderTest` | X-Forwarded-For chain |
+| S-001-72 | `HeaderNormalizationTest` | Header name case normalization |
+| S-001-74 | `ChainingTest` | Chain step logging |
+| S-001-75 | `SensitiveFieldTest` | Valid sensitive paths parsed |
+| S-001-76 | `HotReloadTest` | Reload swaps registry |
+| S-001-77 | `HotReloadTest` | Fail-safe reload preserves old |
+| S-001-78 | `HotReloadTest` | Concurrent reads see snapshot |
+
+
