@@ -206,6 +206,47 @@ Adopt the SDD methodology used in sibling projects. SDD mandates that every feat
 - [ ] Define the spec → plan → tasks → code pipeline in `AGENTS.md`
 - [ ] Optionally: create an SDD bundle for this project using `sdd-sample-bundle` as reference
 
+### Governance Parity: Deferred Items (gap analysis 2026-02-08)
+
+Items identified from a systematic gap analysis against `openauth-sim` and
+`journeyforge` sibling projects. Each item has a **trigger** — the point at
+which it should be picked up.
+
+**Trigger: When Gradle project is initialized (Feature 001 implementation start)**
+
+- [ ] **`githooks/` directory** — Create managed `pre-commit` and `commit-msg` hooks.
+  Pre-commit: run `spotlessCheck` + `check`. Commit-msg: enforce conventional commit
+  format via gitlint. Model on `openauth-sim/githooks/`.
+- [ ] **`.gitlint` config** — Enforce conventional commit message format. Rules:
+  `title-max-length=72`, `body-max-line-length=120`, custom `contrib=contrib-title-conventional-commits`.
+- [ ] **Hook Guard in AGENTS.md** — Once `githooks/` exists, activate the prerequisite
+  check: "Verify `git config core.hooksPath githooks` before staging changes."
+- [ ] **Fill Build & Test Commands section** — Replace the stub in `AGENTS.md` with real
+  `./gradlew` targets: full gate, focused module tests, E2E targets.
+- [ ] **`JAVA_HOME` prerequisite check** — Add to session init: "Ensure `JAVA_HOME` points
+  to Java 21 JDK before invoking Gradle or Git hooks."
+- [ ] **Formatter policy** — Choose and document code formatter (e.g., Spotless +
+  Palantir Java Format or google-java-format) with line length. Add to AGENTS.md.
+
+**Trigger: After first passing quality gate (Feature 001 implementation midpoint)**
+
+- [ ] **Quality Gate documentation** — Create `docs/operations/quality-gate.md` explaining
+  the Gradle quality gate pipeline, which tasks it runs, and how to interpret failures.
+- [ ] **CI workflow** — Create `.github/workflows/ci.yml` with: spotlessCheck, check,
+  gitlint, gitleaks (for secrets scanning). Model on `journeyforge/.github/workflows/ci.yml`.
+
+**Trigger: Nice-to-have (low priority, pick up when convenient)**
+
+- [ ] **Session Reset Runbook** — Create `docs/operations/runbook-session-reset.md`. Our
+  `/init` workflow already covers most of this, but a standalone runbook adds resilience.
+- [ ] **Session Quick Reference** — Create `docs/operations/session-quick-reference.md`
+  with session kickoff checklist and handoff prompt template.
+- [ ] **`ReadMe.LLM`** — Create an LLM-oriented project overview (distinct from `llms.txt`
+  which is a file manifest). Covers: what the project does, key entry points, module layout,
+  and how to navigate the docs. Model on `openauth-sim/ReadMe.LLM`.
+- [ ] **`CONTRIBUTING.md`** — External contributor guide. Low priority for solo project,
+  but good practice if the project becomes multi-contributor.
+
 ### Research: Kong Transformer Plugins
 
 Study how Kong implements request/response transformation to inform a generalized, gateway-agnostic design.
