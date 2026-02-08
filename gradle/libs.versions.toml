@@ -1,0 +1,32 @@
+[versions]
+jackson = "2.18.4"
+jslt = "0.1.14"
+jsonSchemaValidator = "1.5.7"
+palantirJavaFormat = "2.78.0"
+slf4j = "2.0.16"
+
+# Test
+assertj = "3.27.6"
+junit = "5.11.4"
+junitPlatform = "1.11.4"
+mockito = "5.15.2"
+logback = "1.5.16"
+
+[libraries]
+jackson-databind = { group = "com.fasterxml.jackson.core", name = "jackson-databind", version.ref = "jackson" }
+jackson-dataformat-yaml = { group = "com.fasterxml.jackson.dataformat", name = "jackson-dataformat-yaml", version.ref = "jackson" }
+jslt = { group = "com.schibsted.spt.data", name = "jslt", version.ref = "jslt" }
+json-schema-validator = { group = "com.networknt", name = "json-schema-validator", version.ref = "jsonSchemaValidator" }
+slf4j-api = { group = "org.slf4j", name = "slf4j-api", version.ref = "slf4j" }
+
+# Test
+assertj-core = { group = "org.assertj", name = "assertj-core", version.ref = "assertj" }
+junit-bom = { group = "org.junit", name = "junit-bom", version.ref = "junit" }
+junit-jupiter = { group = "org.junit.jupiter", name = "junit-jupiter" }
+junit-jupiter-params = { group = "org.junit.jupiter", name = "junit-jupiter-params" }
+mockito-core = { group = "org.mockito", name = "mockito-core", version.ref = "mockito" }
+mockito-junit-jupiter = { group = "org.mockito", name = "mockito-junit-jupiter", version.ref = "mockito" }
+logback-classic = { group = "ch.qos.logback", name = "logback-classic", version.ref = "logback" }
+
+[plugins]
+spotless = { id = "com.diffplug.spotless", version = "8.1.0" }
