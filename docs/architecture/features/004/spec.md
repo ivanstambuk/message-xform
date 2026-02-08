@@ -161,6 +161,13 @@ no changes).
 | FR-004-31 | The Docker image MUST expose volume mount points for spec and profile directories (`/specs`, `/profiles`). | `docker run -v ./my-specs:/specs -e BACKEND_HOST=api message-xform-proxy` → loads specs from mounted volume. | n/a | Empty `/specs` directory → engine loads with zero specs, all requests passthrough. | K8s deployment. |
 | FR-004-32 | The Docker image MUST support Kubernetes ConfigMap mounting for spec and profile delivery. | K8s ConfigMap mounted at `/specs` → proxy loads specs from ConfigMap data. | n/a | n/a | K8s deployment. |
 
+### Upstream Protocol & Headers
+
+| ID | Requirement | Success path | Validation path | Failure path | Source |
+|----|-------------|--------------|-----------------|--------------|--------|
+| FR-004-33 | The proxy MUST force HTTP/1.1 for upstream connections (via `HttpClient.Version.HTTP_1_1`). | Proxy sends `GET /` via HTTP/1.1. | n/a | n/a | Non-Goal: HTTP/2 upstream. |
+| FR-004-34 | The proxy MUST recalculate the `Content-Length` header for the upstream request based on the *transformed* body size. It MUST NOT blindly copy the `Content-Length` from the original request. | Client sends 100 bytes → spec adds 50 bytes → Upstream receives `Content-Length: 150`. | n/a | n/a | HTTP framing correctness. |
+
 ---
 
 ## Non-Functional Requirements
@@ -333,7 +340,7 @@ no changes).
 |----|-------|-------------|
 | IMPL-004-01 | `StandaloneAdapter implements GatewayAdapter<Context>` | Javalin Context → Message bridge |
 | IMPL-004-02 | `ProxyHandler` | HTTP handler: intercept → transform → forward → transform → return |
-| IMPL-004-03 | `UpstreamClient` | JDK `HttpClient` wrapper for backend forwarding |
+| IMPL-004-03 | `UpstreamClient` | JDK `HttpClient` wrapper. **Must enforce HTTP/1.1** (FR-004-33) and recalculate `Content-Length` (FR-004-34). |
 | IMPL-004-04 | `FileWatcher` | `WatchService`-based hot reload trigger |
 | IMPL-004-05 | `StandaloneMain` | Entry point: CLI parsing, config loading, bootstrap |
 
@@ -386,7 +393,12 @@ no changes).
 |---------|------------|
 | `PROXY_HOST` | `proxy.host` |
 | `PROXY_PORT` | `proxy.port` |
-| `PROXY_TLS_ENABLED` | `proxy.tls.enabled` |
+| `PROXY_TLS_KEYSTORE` | `proxy.tls.keystore` |
+| `PROXY_TLS_KEYSTORE_PASSWORD` | `proxy.tls.keystore-password` |
+| `PROXY_TLS_KEYSTORE_TYPE` | `proxy.tls.keystore-type` |
+| `PROXY_TLS_CLIENT_AUTH` | `proxy.tls.client-auth` |
+| `PROXY_TLS_TRUSTSTORE` | `proxy.tls.truststore` |
+| `PROXY_TLS_TRUSTSTORE_PASSWORD` | `proxy.tls.truststore-password` |
 | `BACKEND_SCHEME` | `backend.scheme` |
 | `BACKEND_HOST` | `backend.host` |
 | `BACKEND_PORT` | `backend.port` |
@@ -395,10 +407,17 @@ no changes).
 | `BACKEND_MAX_BODY_BYTES` | `backend.max-body-bytes` |
 | `BACKEND_POOL_MAX_CONNECTIONS` | `backend.pool.max-connections` |
 | `BACKEND_POOL_IDLE_TIMEOUT_MS` | `backend.pool.idle-timeout-ms` |
+| `BACKEND_TLS_TRUSTSTORE` | `backend.tls.truststore` |
+| `BACKEND_TLS_TRUSTSTORE_PASSWORD` | `backend.tls.truststore-password` |
+| `BACKEND_TLS_VERIFY_HOSTNAME` | `backend.tls.verify-hostname` |
+| `BACKEND_TLS_KEYSTORE` | `backend.tls.keystore` |
+| `BACKEND_TLS_KEYSTORE_PASSWORD` | `backend.tls.keystore-password` |
 | `SPECS_DIR` | `engine.specs-dir` |
 | `PROFILES_DIR` | `engine.profiles-dir` |
+| `ENGINE_PROFILE` | `engine.profile` |
 | `SCHEMA_VALIDATION` | `engine.schema-validation` |
 | `RELOAD_ENABLED` | `reload.enabled` |
+| `RELOAD_WATCH_DIRS` | `reload.watch-dirs` (comma-separated list) |
 | `RELOAD_DEBOUNCE_MS` | `reload.debounce-ms` |
 | `HEALTH_ENABLED` | `health.enabled` |
 | `LOG_FORMAT` | `logging.format` |
