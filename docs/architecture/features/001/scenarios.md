@@ -287,7 +287,7 @@ expected_output:
       fieldId: "IDToken2"
       value: "0"
       type: "confirm"
-      options: null
+      # Note: JSLT omits keys whose value is null — no `options` key here
 ```
 
 ### S-001-05: PingAM — No Callbacks (Simple Login Success)
@@ -319,7 +319,7 @@ input:
 
 expected_output:
   type: "success"
-  authId: null
+  # Note: JSLT omits keys whose value is null — no `authId` key here
   sessionToken: "AQIC5wM…TU3OQ*"
   realm: "/alpha"
 ```
@@ -976,6 +976,7 @@ input:
 expected_output:
   userId: "usr-42"
   name: "Bob Jensen"
+  id: "usr-42"  # * : . also passes through 'id'
   email: "bjensen@example.com"
   custom_field: "should survive"
   _new_field_from_v2: true
@@ -1005,7 +1006,7 @@ transform:
 input: {}
 
 expected_output:
-  id: null
+  # Note: JSLT omits keys whose value is null — no `id` key here
   name: "Anonymous"
   status: "unknown"
 ```
@@ -1040,7 +1041,7 @@ input:
 expected_output:
   id: "usr-42"
   name: "Bob Jensen"
-  email: null
+  # Note: JSLT omits keys whose value is null — no `email` key here
   hasEmail: false
 ```
 
