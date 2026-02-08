@@ -81,7 +81,9 @@ Update both `docs/architecture/roadmap.md` and the Roadmap table above when stat
   - `docs/architecture/spec-guidelines/` — Docs style, open questions format.
   - `docs/decisions/` — Architecture Decision Records (ADRs).
   - `docs/decisions/project-constitution.md` — Project constitution.
-  - `docs/operations/` — Gate checklists and operational runbooks.
+  - `docs/operations/` — Gate checklists, operational runbooks, and cross-cutting
+    NFR tasks (performance benchmarks, CI gates). **Rule**: tasks that are not
+    specific to a single feature belong here, not in feature task lists.
   - `docs/research/` — Research notes (API analysis, gateway evaluations, etc.).
   - `docs/templates/` — Spec, plan, tasks, and ADR templates.
   - `docs/_current-session.md` — Session state for agent handoffs.

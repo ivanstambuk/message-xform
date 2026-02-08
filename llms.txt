@@ -55,5 +55,11 @@ docs/research/t-001-12-jslt-context-variables.md
 docs/architecture/features/001/tasks.md
 docs/architecture/features/001/plan.md
 
+# Operations
+docs/operations/performance-testing.md
+
+# SPI interfaces
+core/src/main/java/io/messagexform/core/spi/TelemetryListener.java
+
 # Plan
 PLAN.md
