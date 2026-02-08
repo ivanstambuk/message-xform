@@ -859,7 +859,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   fresh registry from spec paths + optional profile, then set()s atomically.
   Concurrent reads tested with 10 threads × 50 iterations.
 
-- [ ] **T-001-47** — Fail-safe reload (NFR-001-05)
+- [x] **T-001-47** — Fail-safe reload (NFR-001-05) ✅ 2026-02-08
   _Intent:_ If reload() encounters a broken spec, the old registry must be
   preserved — the engine must NOT end up in a broken state.
   _Test first:_ Write `FailSafeReloadTest`:
@@ -872,6 +872,10 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   _Verification commands:_
   - `./gradlew :core:test --tests "*FailSafeReloadTest*"`
   - `./gradlew spotlessApply check`
+  _Verification log:_ ✅ 5/5 tests pass. Fail-safe is inherent: reload()
+  builds new registry before swapping — if parse/compile throws, set() is
+  never reached. Tested: missing id, bad JSLT, mixed good+broken, broken
+  profile, spec count preservation.
 
 ---
 
@@ -963,6 +967,7 @@ Track long-running or shared commands with timestamps to avoid duplicate work.
 - 2026-02-08 14:40 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — 271 tests passed after T-001-39..40 (Phase 6 complete)
 - 2026-02-08 15:32 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL — 300 tests passed after T-001-45
 - 2026-02-08 15:40 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL — 306 tests passed after T-001-46
+- 2026-02-08 15:45 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL — 311 tests passed after T-001-47
 
 ## Completion Criteria
 
