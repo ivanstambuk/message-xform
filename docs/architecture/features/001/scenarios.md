@@ -3593,6 +3593,128 @@ expected_log_entries:
 
 ---
 
+## Category 16: Hot Reload & Atomic Registry Swap (NFR-001-05)
+
+Scenarios validating the immutable `TransformRegistry` snapshot, atomic swap via
+`TransformEngine.reload()`, and fail-safe behaviour when reload encounters errors.
+
+### S-001-76: Reload Swaps Registry Atomically
+
+```yaml
+scenario: S-001-76
+name: reload-swaps-registry-atomically
+description: >
+  After loading spec v1, the engine transforms using v1. After calling reload()
+  with spec v2, the engine transforms using v2 — v1 is no longer available.
+  The old registry is entirely replaced, not merged.
+  Validates NFR-001-05 (atomic registry swap).
+tags: [hot-reload, atomic-swap, registry, nfr-001-05]
+requires: [NFR-001-05]
+
+phase_1:
+  specs:
+    - id: swap-test
+      version: "1.0.0"
+      transform:
+        lang: jslt
+        expr: '{ "old_name": .name }'
+
+  input: { name: "alice" }
+  expected_output: { old_name: "alice" }
+
+phase_2_reload_with:
+  specs:
+    - id: swap-test
+      version: "2.0.0"
+      transform:
+        lang: jslt
+        expr: '{ "new_name": .name }'
+
+  input: { name: "alice" }
+  expected_output: { new_name: "alice" }
+  not_present: ["old_name"]
+```
+
+### S-001-77: Fail-Safe Reload Preserves Old Registry on Error
+
+```yaml
+scenario: S-001-77
+name: fail-safe-reload-preserves-old
+description: >
+  A working engine with a valid spec receives a reload() call with a broken spec
+  (missing required 'id' field). The reload fails with an exception. The engine
+  continues serving with the OLD registry — no data loss or broken state.
+  Validates NFR-001-05 (fail-safe reload).
+tags: [hot-reload, fail-safe, error, registry, nfr-001-05]
+requires: [NFR-001-05]
+
+phase_1:
+  specs:
+    - id: good-spec
+      version: "1.0.0"
+      transform:
+        lang: jslt
+        expr: '{ "result": .name }'
+
+  input: { name: "alice" }
+  expected_output: { result: "alice" }
+
+phase_2_reload_with:
+  specs:
+    - broken: true  # missing 'id' field → SpecParseException
+      version: "1.0.0"
+      transform:
+        lang: jslt
+        expr: '{ "result": .name }'
+
+  expected_error:
+    phase: reload
+    type: SpecParseException
+
+  # After failed reload, engine still serves with old registry
+  post_reload_input: { name: "alice" }
+  post_reload_expected_output: { result: "alice" }
+```
+
+### S-001-78: Concurrent Reads During Swap See Consistent Snapshot
+
+```yaml
+scenario: S-001-78
+name: concurrent-reads-consistent-snapshot
+description: >
+  Multiple threads read from the engine while reload() is called mid-flight.
+  Each thread must observe either the old OR the new registry — never a mix
+  of old specs and new specs within a single transform call.
+  Validates NFR-001-05 (thread-safe atomic swap).
+tags: [hot-reload, concurrent, thread-safety, atomic-swap, nfr-001-05]
+requires: [NFR-001-05]
+
+phase_1:
+  specs:
+    - id: concurrent-test
+      version: "1.0.0"
+      transform:
+        lang: jslt
+        expr: '{ "version": "v1" }'
+
+concurrent_readers: 10
+iterations_per_reader: 50
+
+phase_2_reload_with:
+  specs:
+    - id: concurrent-test
+      version: "2.0.0"
+      transform:
+        lang: jslt
+        expr: '{ "version": "v2" }'
+
+# Each reader must see EITHER { "version": "v1" } OR { "version": "v2" }
+# in each iteration — never a mix or inconsistent state.
+assertion: each_result_version_is_one_of ["v1", "v2"]
+```
+
+---
+
 ## Scenario Index
 
 | ID | Name | Category | Tags |
@@ -3679,6 +3801,9 @@ expected_log_entries:
 | S-001-72 | header-case-normalization | Header Transforms | headers, case-insensitive, normalization, rfc9110 |
 | S-001-73 | chain-direction-conflict-rejected | Transform Profiles | profile, chain, direction, validation, error, load-time |
 | S-001-74 | chain-step-structured-logging | Chain Step Logging | chain-step-logging, structured-logging, nfr-001-08, profile-chaining |
+| S-001-76 | reload-swaps-registry-atomically | Hot Reload | hot-reload, atomic-swap, registry, nfr-001-05 |
+| S-001-77 | fail-safe-reload-preserves-old | Hot Reload | hot-reload, fail-safe, error, registry, nfr-001-05 |
+| S-001-78 | concurrent-reads-consistent-snapshot | Hot Reload | hot-reload, concurrent, thread-safety, atomic-swap, nfr-001-05 |
 
 ## Coverage Matrix
 
@@ -3701,7 +3826,7 @@ expected_log_entries:
 | NFR-001-04 (Open-world) | S-001-07, S-001-20 |
 | NFR-001-07 (Eval budget) | S-001-24 |
 | NFR-001-02 (Zero gateway deps) | *Verified by dependency analysis, not scenario-testable* |
-| NFR-001-05 (Hot reload) | *Integration test — add when adapter is implemented* |
+| NFR-001-05 (Hot reload) | S-001-76, S-001-77, S-001-78 |
 | NFR-001-06 (Sensitive fields) | S-001-62, S-001-75; *static analysis + code review — add more when engine is implemented* |
 | NFR-001-08 (Match logging) | S-001-44, S-001-46 (matched profile logged), S-001-74 (chain step logging) |
 | NFR-001-09 (Telemetry SPI) | S-001-47 |

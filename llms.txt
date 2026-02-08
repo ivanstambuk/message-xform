@@ -61,5 +61,9 @@ docs/operations/performance-testing.md
 # SPI interfaces
 core/src/main/java/io/messagexform/core/spi/TelemetryListener.java
 
+# Core engine classes
+core/src/main/java/io/messagexform/core/engine/TransformEngine.java
+core/src/main/java/io/messagexform/core/engine/TransformRegistry.java
+
 # Plan
 PLAN.md

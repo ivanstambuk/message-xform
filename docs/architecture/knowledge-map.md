@@ -12,7 +12,7 @@ contributors to understand how components connect.
 message-xform/
 ├── core/                          # Transform engine (zero gateway deps)
 │   ├── model/                     # TransformSpec, TransformProfile, Message, HeaderSpec, StatusSpec
-│   ├── engine/                    # Expression evaluation, profile matching, header + status transforms
+│   ├── engine/                    # TransformEngine, TransformRegistry, profile matching, header + status transforms
 │   ├── spec/                      # SpecParser — YAML to TransformSpec loading
 │   ├── spi/                       # ExpressionEngine, TelemetryListener
 │   ├── schema/                    # JSON Schema validation
@@ -56,6 +56,15 @@ TelemetryListener SPI (ADR-0007) ──── receives ──── Transform Ev
   ├── onTransformStarted/Completed/Failed              ├── specId, version, direction
   ├── onProfileMatched                                 ├── duration, outcome
   └── onSpecLoaded/Rejected                            └── trace context (NFR-001-10)
+
+TransformRegistry (DO-001-10) ──── snapshot ──── Engine State
+  │                                                    │
+  ├── Map<id|id@version → TransformSpec>               ├── immutable (defensive copy)
+  ├── optional TransformProfile                        ├── AtomicReference in engine
+  └── Builder + empty() factory                        └── reload() builds new → set()
+                                                            │
+                                                            ├── fail-safe: exception prevents swap
+                                                            └── NFR-001-05 validated
 ```
 
 ## ADR Dependency Graph
@@ -108,6 +117,7 @@ ADR-0027 (URL Rewriting)     governs ── FR-001-12, references ADR-0002, ADR-
 | Gateway Adapter SPI | ADR-0025 | — |
 | FR-001-09 (Schema Validation) | ADR-0001, ADR-0022 | — |
 | FR-001-12 (URL Rewriting) | ADR-0027 | — |
+| Hot Reload | — | NFR-001-05 |
 
 ## Research Documents
 

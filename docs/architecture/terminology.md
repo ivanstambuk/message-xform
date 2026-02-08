@@ -197,6 +197,13 @@ terminology agreements must be captured here immediately.
     requests pick up the new one. Reload *trigger* mechanisms (file watching, polling)
     are adapter concerns.
 
+- **TransformRegistry** (`TransformRegistry`, DO-001-10)
+  - An immutable snapshot holding all loaded `TransformSpec` instances (keyed by both
+    `id` and `id@version`) and an optional active `TransformProfile`. Created via
+    `TransformRegistry.builder()` or `TransformRegistry.empty()`. The unit of atomic
+    swap — `TransformEngine` holds an `AtomicReference<TransformRegistry>` and replaces
+    it wholesale on `reload()`. Defensive copy on construction guarantees thread safety.
+
 ## Bidirectional transforms
 
 - **Forward transform**
