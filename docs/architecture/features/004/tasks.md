@@ -190,7 +190,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `./gradlew spotlessApply check`
   _Verification log:_ ✅ 6/6 tests PASSED (GET forwarding with body+headers, POST with body echo, query string preservation, custom headers forwarding, 204 no-content). Mock backend strategy: JDK `com.sun.net.httpserver.HttpServer` (zero deps, sufficient for UpstreamClient tests). `spotlessApply check` GREEN.
 
-- [ ] **T-004-10** — UpstreamClient: HTTP/1.1 enforcement (FR-004-33, S-004-52)
+- [x] **T-004-10** — UpstreamClient: HTTP/1.1 enforcement (FR-004-33, S-004-52)
   _Intent:_ Force HTTP/1.1 for all upstream connections.
   _Test first:_ Write additional `UpstreamClientTest` case:
   - Verify `HttpClient` configured with `HttpClient.Version.HTTP_1_1`.
@@ -200,6 +200,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   _Verification commands:_
   - `./gradlew :adapter-standalone:test --tests "*UpstreamClientTest*"`
   - `./gradlew spotlessApply check`
+  _Verification log:_ ✅ 7/7 tests PASSED (includes `httpClient_configuredWithHttp11` verifying `HttpClient.Version.HTTP_1_1`). HTTP/1.1 was already configured in T-004-09 constructor; this task adds the explicit test. `spotlessApply check` GREEN.
 
 - [ ] **T-004-11** — UpstreamClient: Content-Length recalculation (FR-004-34, S-004-53/54)
   _Intent:_ After body transformation changes the body size, recalculate

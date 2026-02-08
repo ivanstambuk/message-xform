@@ -111,6 +111,14 @@ public final class UpstreamClient {
     }
 
     /**
+     * Returns the underlying {@link HttpClient} — package-private for testing
+     * (e.g. verifying HTTP/1.1 enforcement in T-004-10).
+     */
+    HttpClient httpClient() {
+        return httpClient;
+    }
+
+    /**
      * Returns {@code true} for headers that JDK HttpClient manages internally
      * and must not be set manually.
      */

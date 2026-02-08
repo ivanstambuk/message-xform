@@ -7,6 +7,7 @@ import io.messagexform.standalone.config.ProxyConfig;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -142,5 +143,13 @@ class UpstreamClientTest {
 
         assertThat(response.statusCode()).isEqualTo(204);
         assertThat(response.body()).isEmpty();
+    }
+
+    // --- T-004-10: HTTP/1.1 enforcement (FR-004-33, S-004-52) ---
+
+    @Test
+    @DisplayName("HttpClient configured with HTTP/1.1 version (FR-004-33)")
+    void httpClient_configuredWithHttp11() {
+        assertThat(client.httpClient().version()).isEqualTo(HttpClient.Version.HTTP_1_1);
     }
 }
