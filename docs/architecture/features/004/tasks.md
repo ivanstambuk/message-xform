@@ -284,7 +284,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `./gradlew spotlessApply check`
   _Verification log:_ ✅ 10/10 tests PASSED (POST body, header lowercase normalization, headersAll multi-value, path/method extraction, queryString, NullNode for empty/absent body, contentType, statusCode null for request, deep copy semantics). Full suite GREEN. Commit `c662cdc`.
 
-- [ ] **T-004-16** — StandaloneAdapter: cookie extraction into TransformContext (FR-004-37, S-004-67/68/69)
+- [x] **T-004-16** — StandaloneAdapter: cookie extraction into TransformContext (FR-004-37, S-004-67/68/69)
   _Intent:_ Parse cookies from the `Cookie` header via `ctx.cookieMap()` and
   build a `TransformContext` with cookies populated. This enables `$cookies`
   binding in JSLT.
@@ -299,6 +299,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   _Verification commands:_
   - `./gradlew :adapter-standalone:test --tests "*CookieExtractionTest*"`
   - `./gradlew spotlessApply check`
+  _Verification log:_ ✅ 3/3 tests PASSED (populated cookies S-004-67, empty map S-004-68, URL-decoded S-004-69). Commit `c969332`.
 
 - [ ] **T-004-17** — StandaloneAdapter: query param extraction into TransformContext (FR-004-39, S-004-74/75/76/77)
   _Intent:_ Parse query parameters from the URL via `ctx.queryParamMap()` and

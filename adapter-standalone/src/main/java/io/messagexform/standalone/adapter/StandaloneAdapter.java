@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.NullNode;
 import io.javalin.http.Context;
 import io.messagexform.core.model.Message;
+import io.messagexform.core.model.TransformContext;
 import io.messagexform.core.spi.GatewayAdapter;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -69,6 +70,25 @@ public final class StandaloneAdapter implements GatewayAdapter<Context> {
     public void applyChanges(Message transformedMessage, Context ctx) {
         // Placeholder — implemented in T-004-19
         throw new UnsupportedOperationException("applyChanges not yet implemented (T-004-19)");
+    }
+
+    /**
+     * Builds a {@link TransformContext} from the Javalin {@link Context},
+     * extracting cookies, query parameters, headers, and status for
+     * injection into the core engine's 3-arg transform call (FR-004-37,
+     * FR-004-39).
+     *
+     * @param ctx the Javalin request context
+     * @return a populated {@link TransformContext}
+     */
+    public TransformContext buildTransformContext(Context ctx) {
+        Map<String, String> headers = normalizeHeaders(ctx.headerMap());
+        Map<String, List<String>> headersAll = extractHeadersAll(ctx);
+
+        // Cookies from Javalin (already URL-decoded)
+        Map<String, String> cookies = new LinkedHashMap<>(ctx.cookieMap());
+
+        return new TransformContext(headers, headersAll, null, Map.of(), cookies);
     }
 
     /**
