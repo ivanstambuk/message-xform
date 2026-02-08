@@ -1,7 +1,7 @@
 # Current Session State
 
 **Date:** 2026-02-08
-**Status:** Phase 6 I11 complete — status code transformations done, 212 tests passing
+**Status:** Phase 6 I11a complete — URL rewriting done, 255 tests passing
 
 ## Active Work
 
@@ -9,7 +9,8 @@ Feature 001 — Message Transformation Engine (core). Implementing from
 `docs/architecture/features/001/tasks.md`. Phases 1–5 complete (T-001-01..33).
 Phase 6 I10 (Header transformations) complete (T-001-34..36).
 Phase 6 I11 (Status code transformations) complete (T-001-37..38).
-Ready to begin Phase 6 I11a (URL rewriting).
+Phase 6 I11a (URL rewriting) complete (T-001-38a..38f).
+Ready to begin Phase 6 I12 (Reusable mappers).
 
 ## Session Progress
 
@@ -26,32 +27,27 @@ Ready to begin Phase 6 I11a (URL rewriting).
 | Phase 5 — I8 | T-001-27..30 | Profile fixture, ProfileParser, ProfileMatcher (specificity scoring), TransformEngine profile integration |
 | Phase 5 — I9 | T-001-31..33 | Profile-level chaining (pipeline), bidirectional profiles, chain step structured logging |
 | Phase 6 — I10 | T-001-34..36 | Header add/remove/rename, dynamic expr, name normalization |
-| **Phase 6 — I11** | **T-001-37..38** | **Status code transforms (set + when predicate), $status binding** |
+| Phase 6 — I11 | T-001-37..38 | Status code transforms (set + when predicate), $status binding |
+| **Phase 6 — I11a** | **T-001-38a..38f** | **URL rewriting: path, query, method, validation, direction, fixture** |
 
 ### Work Done This Session
 | Commit | Description |
 |--------|-------------|
-| `a9410b1` | T-001-37/38 — StatusSpec, StatusTransformer, SpecParser.parseStatusSpec(), StatusTransformTest (9 tests), StatusBindingTest (4 tests) |
-| `53cf760` | Strengthen auto-commit protocol — NEVER ask, just commit |
-| `c05e0de` | Mark T-001-37/38 complete + add Agent Autonomy & Escalation rule |
-| `34bf41c` | SDD audit fixes — S-001-38i scenario, knowledge map update, JSLT quirk |
+| `3684b9c` | T-001-38b: URL query parameter add/remove (10 tests) |
+| `b8ad4bb` | T-001-38c/38d: HTTP method override + load-time validation (6+14 tests) |
+| `2a87f4f` | T-001-38e/38f: Direction restriction tests + test fixture YAML (5 tests) |
 
 ### Key Decisions
 | Decision | Outcome | Location |
 |----------|---------|----------|
-| when predicate eval error is non-fatal | Keep original status, log warning, don't abort body transform | StatusTransformer, S-001-38i |
-| when predicate evaluates against transformed body | Consistent with ADR-0003 processing order | StatusTransformer.apply() |
-| Agent Autonomy & Escalation Threshold | Act autonomously on low-impact/obvious actions; only escalate medium/high-impact with multiple options | AGENTS.md Rule 5 |
+| queryString field via backward-compat constructor | Added 8th field to Message record with convenience 7-arg constructor to avoid breaking 50+ call sites | Message.java |
+| Query params are case-sensitive | Unlike headers (which are lowercased), query param names preserved as-is per RFC 3986 | SpecParser.parseUrlSpec() |
+| Method normalized to uppercase | `method.set: "delete"` → "DELETE" for consistency | SpecParser.parseUrlSpec() |
 
 ### Build Status
-- 212 tests passing (13 new: 9 StatusTransformTest + 4 StatusBindingTest)
-- `./gradlew :core:test --rerun-tasks --no-build-cache` → BUILD SUCCESSFUL
+- 255 tests passing (35 new: 10 query, 6 method, 14 validation, 5 direction)
+- `./gradlew spotlessApply check` → BUILD SUCCESSFUL
 - Java 21, Gradle 9.2.0, JSLT 0.1.14
-
-### SDD Audit Fixes Applied
-- S-001-38i scenario added for when predicate evaluation error (was tested but not documented)
-- knowledge-map.md: added StatusSpec to model/, status transforms to engine/
-- JSLT research doc: added contains() on null quirk
 
 ## Remaining Open Questions
 None — all resolved.
@@ -60,11 +56,8 @@ None — all resolved.
 None.
 
 ## Next Steps
-1. **Phase 6 — I11a: URL Rewriting** (T-001-38a..38f)
-   - T-001-38a: URL path rewrite with JSLT expression
-   - T-001-38b: URL query parameter add/remove
-   - T-001-38c: HTTP method override
-   - T-001-38d: Path expr returns null → error
-   - T-001-38e: Invalid HTTP method → rejected at load time
-   - T-001-38f: URL block on response transform → ignored with warning
-2. Through Phases 6-7: Mappers, gateway adapter API, hot reload
+1. **Phase 6 — I12: Reusable mappers** (T-001-39..40)
+   - T-001-39: Mapper block + apply pipeline
+   - T-001-40: Mapper validation rules
+2. **Phase 7 — I13: Observability** (T-001-41..44)
+3. Through Phases 7+: Gateway adapter API, hot reload

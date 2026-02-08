@@ -1,15 +1,15 @@
 # Pending Task
 
-**Focus**: Phase 6 I11a — URL Rewriting (T-001-38a..38f)
-**Status**: Not started — I11 (Status Code Transforms) just completed
-**Next Step**: Begin T-001-38a — URL path rewrite with JSLT expression
+**Focus**: Phase 6 I12 — Reusable mappers (T-001-39, T-001-40)
+**Status**: Not yet started. I11a (URL rewriting) fully complete.
+**Next Step**: Write `MapperPipelineTest` (T-001-39, test-first)
 
 ## Context Notes
-- Phase 6 I11 complete: StatusSpec, StatusTransformer, 13 new tests (212 total)
-- Processing order confirmed: bind $status → JSLT body → headers → when predicate → set status
-- Agent Autonomy rule (Rule 5) added to AGENTS.md — act autonomously on obvious/low-impact actions
-- Auto-commit protocol strengthened with NON-NEGOTIABLE marker
-- JSLT quirk: `contains()` on null/missing fields throws (not false)
+- All URL rewriting tasks (T-001-38a..38f) are complete and committed
+- 255 tests passing, all quality gates green
+- I12 introduces `mappers` block and `apply` pipeline (FR-001-08, ADR-0014)
+- S-001-50 scenario defines the expected pipeline behavior
+- Message record now has 8 fields including `queryString` (backward-compat constructor)
 
 ## SDD Gaps (if any)
-- None identified — SDD audit clean for I11
+- None identified. Full SDD audit passed clean.
