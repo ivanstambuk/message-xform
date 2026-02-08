@@ -244,7 +244,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `./gradlew :core:test --tests "*SpecParserTest*"`
   - `./gradlew spotlessApply check`
 
-- [ ] **T-001-15** — Spec parse error handling (FR-001-01, FR-001-07)
+- [x] **T-001-15** — Spec parse error handling (FR-001-01, FR-001-07) ✅ 2026-02-08
   _Intent:_ Verify that invalid specs produce the correct typed exceptions.
   _Test first:_ Write additional `SpecParserTest` cases:
   - Invalid YAML syntax → `SpecParseException`.
@@ -914,6 +914,7 @@ Track long-running or shared commands with timestamps to avoid duplicate work.
 - 2026-02-08 03:27 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — 37 tests passed after T-001-03..08
 - 2026-02-08 03:50 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — 61 tests passed after T-001-09..12
 - 2026-02-08 10:05 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — 72 tests passed after T-001-13..14
+- 2026-02-08 10:40 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — 81 tests passed after T-001-15
 
 ## Completion Criteria
 
