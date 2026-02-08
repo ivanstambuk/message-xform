@@ -513,7 +513,7 @@ engine working) and Phase 8 completion (all scenarios pass).
 ## Exit Criteria
 
 - [x] All 16 increments (Phase 1–8) completed and checked off
-- [ ] Phase 9 (T-001-53 — performance benchmark) completed
+- [x] Phase 9 (T-001-53 — performance benchmark) completed
 - [x] Quality gate passes (`./gradlew spotlessApply check`)
 - [x] All 84 scenarios verified — 20 in parameterized suite, 58 in dedicated test classes, 4 skipped (JOLT/jq not implemented), 2 no-test (dynamic/placeholder)
 - [x] Coverage matrix in `scenarios.md` has no uncovered FRs/NFRs

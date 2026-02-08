@@ -1,6 +1,6 @@
 # Feature 001 — Message Transformation Engine — Tasks
 
-_Status:_ In Progress (Phase 9 — T-001-53 pending)
+_Status:_ Complete
 _Last updated:_ 2026-02-08
 
 **Governing spec:** `docs/architecture/features/001/spec.md`
@@ -974,7 +974,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
 
 ### T-001-53 — TransformEngineBenchmark (NFR-001-03)
 
-- [ ] **T-001-53** — Lightweight opt-in benchmark verifying NFR-001-03
+- [x] **T-001-53** — Lightweight opt-in benchmark verifying NFR-001-03
   _Intent:_ Prove that core transform latency is < 5ms for typical payloads (< 50KB).
   Uses the openauth-sim pattern: plain JUnit 5 + `assumeTrue` + `System.nanoTime()`.
   No JMH required.
@@ -1028,11 +1028,13 @@ Track long-running or shared commands with timestamps to avoid duplicate work.
 - 2026-02-08 15:45 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL — 311 tests passed after T-001-47
 - 2026-02-08 16:20 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL — 317 tests passed after T-001-48
 - 2026-02-08 16:24 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL — 339 tests passed after T-001-49
+- 2026-02-08 17:05 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL — all tests passed after T-001-53
+- 2026-02-08 17:06 — `IO_MESSAGEXFORM_BENCHMARK=true ./gradlew :core:test --tests "*TransformEngineBenchmark*"` → BUILD SUCCESSFUL — 3 benchmarks passed: identity-1KB p95=0.001ms (424K ops/s), field-mapping-10KB p95=0.003ms (102K ops/s), complex-50KB p95=0.134ms (4.3K ops/s) — all well below 5ms NFR-001-03 target. Env: Linux amd64, Java 21.0.4+7-LTS, 16 CPUs.
 
 ## Completion Criteria
 
 - [x] All 52 Phase 1–8 tasks checked off
-- [ ] T-001-53 (Phase 9 — performance benchmark) checked off
+- [x] T-001-53 (Phase 9 — performance benchmark) checked off
 - [x] Quality gate passes (`./gradlew spotlessApply check`)
 - [x] All 84 scenarios verified — 20 in parameterized suite, 58 in dedicated test classes, 4 skipped (JOLT/jq stubs), 2 no-test (dynamic/placeholder)
 - [x] Coverage matrix in `scenarios.md` has no uncovered FRs/NFRs

@@ -1,0 +1,18 @@
+# Benchmark fixture: identity transform (JSLT pass-through)
+# Used by TransformEngineBenchmark for NFR-001-03 baseline measurement.
+
+id: bench-identity
+version: "1.0.0"
+description: "Identity transform — JSLT pass-through expression"
+
+input:
+  schema:
+    type: object
+
+output:
+  schema:
+    type: object
+
+transform:
+  lang: jslt
+  expr: "."

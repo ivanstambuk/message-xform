@@ -1,0 +1,47 @@
+# Benchmark fixture: 5-field mapping transform
+# Used by TransformEngineBenchmark for NFR-001-03 — representative field mapping.
+
+id: bench-field-mapping
+version: "1.0.0"
+description: "5-field mapping — rename and restructure fields"
+
+input:
+  schema:
+    type: object
+    properties:
+      user_id:
+        type: string
+      first_name:
+        type: string
+      last_name:
+        type: string
+      email_address:
+        type: string
+      is_active:
+        type: boolean
+
+output:
+  schema:
+    type: object
+    properties:
+      userId:
+        type: string
+      firstName:
+        type: string
+      lastName:
+        type: string
+      emailAddress:
+        type: string
+      isActive:
+        type: boolean
+
+transform:
+  lang: jslt
+  expr: |
+    {
+      "userId": .user_id,
+      "firstName": .first_name,
+      "lastName": .last_name,
+      "emailAddress": .email_address,
+      "isActive": .is_active
+    }
