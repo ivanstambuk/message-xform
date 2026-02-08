@@ -1,63 +1,66 @@
 # Current Session State
 
-**Date:** 2026-02-08
-**Status:** Phase 6 complete — I12 mappers done, 271 tests passing
+**Date**: 2026-02-08 (Session 3 — I13 Structured Logging + TelemetryListener SPI)
+**Status**: Phase 7 I13 complete, infrastructure work done
 
-## Active Work
+## What Was Done
 
-Feature 001 — Message Transformation Engine (core). Implementing from
-`docs/architecture/features/001/tasks.md`. Phases 1–6 complete (T-001-01..40).
-Ready to begin Phase 7 (Observability + Hot Reload).
+### Phase 7 I13 — Structured Logging + TelemetryListener SPI (4 tasks, 18 new tests)
 
-## Session Progress
+| Task | Description | Tests | Status |
+|------|-------------|-------|--------|
+| T-001-41 | Structured log entries (NFR-001-08) | 3 (`StructuredLoggingTest`) | ✅ |
+| T-001-42 | TelemetryListener SPI (NFR-001-09) | 5 (`TelemetryListenerTest`) | ✅ |
+| T-001-43 | Sensitive field redaction (NFR-001-06) | 6 (`SensitiveFieldRedactionTest`) | ✅ |
+| T-001-44 | Trace context propagation (NFR-001-10) | 4 (`TraceContextTest`) | ✅ |
 
-### Implementation Completed
-| Phase | Tasks | Description |
-|-------|-------|-------------|
-| Phase 1 — I1 | T-001-01, T-001-02 | Gradle 9.2.0 init, core module, Spotless, dependencies |
-| Phase 1 — I2 | T-001-03..08 | Domain model (Message, TransformContext, TransformResult, Direction), exception hierarchy (11 classes) |
-| Phase 2 — I3 | T-001-09..12 | ExpressionEngine + CompiledExpression SPI, JSLT engine, EngineRegistry, context variable research |
-| Phase 3 — I4 | T-001-13, T-001-14 | Test fixtures (3 YAML files) + TransformSpec record + SpecParser |
-| Phase 3 — I5 | T-001-15..18 | Error handling (9 negative tests), bidirectional parsing, JSON Schema validation |
-| Phase 4 — I6 | T-001-19..21 | TransformEngine with loadSpec/transform, 6 scenarios, passthrough, context binding |
-| Phase 4 — I7 | T-001-22..26 | ErrorResponseBuilder (RFC 9457), custom templates, eval error handling, budgets, strict-mode |
-| Phase 5 — I8 | T-001-27..30 | Profile fixture, ProfileParser, ProfileMatcher (specificity scoring), TransformEngine profile integration |
-| Phase 5 — I9 | T-001-31..33 | Profile-level chaining (pipeline), bidirectional profiles, chain step structured logging |
-| Phase 6 — I10 | T-001-34..36 | Header add/remove/rename, dynamic expr, name normalization |
-| Phase 6 — I11 | T-001-37..38 | Status code transforms (set + when predicate), $status binding |
-| Phase 6 — I11a | T-001-38a..38f | URL rewriting: path, query, method, validation, direction, fixture |
-| **Phase 6 — I12** | **T-001-39..40** | **Mapper block + apply pipeline, mapper validation rules** |
+### Infrastructure Work
 
-### Work Done This Session
-| Commit | Description |
-|--------|-------------|
-| `0f4cd54` | T-001-39: Mapper block + apply pipeline (7 tests) |
-| `f5a176f` | T-001-40: Mapper validation rules (9 tests) |
-| `cc0f367` | docs: mark T-001-39 and T-001-40 complete |
-| `6ceb0f8` | retro: SDD audit fixes — Mapper term, knowledge map, JSLT pitfall |
+- **CLOC report**: Added `scripts/cloc-report.sh` and step 3.5 in `/init` workflow
+- **Performance testing backlog**: Created `docs/operations/performance-testing.md` (PERF-01 through PERF-04)
+  - Originally put in Feature 001 tasks.md but corrected to operations doc (cross-cutting concern)
+- **AGENTS.md rule**: Codified that cross-cutting NFR tasks go in `docs/operations/`, not feature task lists
 
-### Key Decisions
-| Decision | Outcome | Location |
-|----------|---------|----------|
-| Mapper invocation model | Sequential `apply` directive, not inline JSLT functions (engine-agnostic) | ADR-0014 (pre-existing) |
-| JSLT `uppercase()` unavailable in 0.1.14 | Replaced with string concatenation in tests | AGENTS.md Known Pitfalls |
+### Codebase Stats
 
-### Build Status
-- 271 tests passing (16 new: 7 pipeline, 9 validation)
-- `./gradlew spotlessApply check` → BUILD SUCCESSFUL
-- Java 21, Gradle 9.2.0, JSLT 0.1.14
+```
+Component               Files     Code  Comment    Blank
+Production (src)           37     2213     1205      423
+Tests                      42     7130      735     1368
+Total                      79     9343     1940
+Test-to-total ratio: 76.3%
+```
 
-## Remaining Open Questions
-None — all resolved.
+289 tests passing, 0 failures.
 
-## Blocking Issues
-None.
+## Key Decisions
 
-## Next Steps
-1. **Phase 7 — I13: Structured logging + TelemetryListener SPI** (T-001-41..44)
-   - T-001-41: Structured log entries for matched transforms
-   - T-001-42: TelemetryListener SPI
-   - T-001-43: Sensitive field redaction
-   - T-001-44: Trace context propagation
-2. **Phase 7 — I14: Hot reload + atomic registry swap** (T-001-45..47)
-3. **Phase 8: Gateway Adapter SPI + scenario sweep** (T-001-48..52)
+- **TelemetryListener SPI**: Pure Java interface with 6 lifecycle event records. Listener exceptions caught and logged — never disrupt engine.
+- **MDC for trace propagation**: try-finally pattern ensures no leakage between requests.
+- **Sensitive paths**: Validated at load time (RFC 9535 JSONPath syntax). Actual redaction in logs/telemetry is for a future refinement.
+- **Perf tasks location**: Cross-cutting NFR benchmarks belong in `docs/operations/`, not feature-specific task lists.
+
+## What's Next
+
+### Immediate (Phase 7 I14 — Hot reload + atomic registry swap)
+
+- **T-001-45** — `TransformRegistry` immutable snapshot (NFR-001-05)
+- **T-001-46** — Atomic registry swap via `reload()` (NFR-001-05, API-001-04)
+- **T-001-47** — `TelemetryListener` notifications for reload events
+- **T-001-48** — `GatewayAdapter` interface (API-001-05)
+
+### Follow-up
+
+- **I15** — Gateway adapter + test adapter (T-001-48, T-001-49)
+- **I16** — Full scenario sweep (T-001-50 through T-001-52)
+- **PERF-01..04** — Synthetic performance testing (JMH harness, 10K req/s target)
+
+## SDD Audit Results
+
+- **Scenarios**: ✅ All NFRs have validating scenarios
+- **Terminology**: ✅ All terms defined
+- **ADRs**: ✅ All decisions documented (ADR-0007, ADR-0019)
+- **Open Questions**: ✅ Table empty
+- **Spec Consistency**: ✅ NFR IDs match
+- **Knowledge Map**: Fixed — added sensitive list to TransformSpec
+- **llms.txt**: Fixed — added operations doc and TelemetryListener SPI

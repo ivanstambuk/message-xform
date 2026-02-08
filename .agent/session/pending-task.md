@@ -1,18 +1,20 @@
 # Pending Task
 
-**Focus**: Phase 7 — Observability + Hot Reload (I13/I14)
-**Status**: Not started — Phase 6 fully complete, ready to begin Phase 7
-**Next Step**: Start T-001-41 — Structured log entries for matched transforms (NFR-001-08)
+**Focus**: Phase 7 I14 — Hot reload + atomic registry swap
+**Status**: Not started — ready to begin
+**Next Step**: Implement T-001-45 (TransformRegistry immutable snapshot)
 
 ## Context Notes
-- Phase 6 (I10–I12) is complete: headers, status, URL rewriting, mappers all done
-- 271 tests passing, quality gate clean
-- The mapper pipeline uses a flat sequential model (ADR-0014) — no circular refs possible
-- JSLT 0.1.14 has limited built-in functions — see AGENTS.md Known Pitfalls
-- Phase 7 shifts from functional features to operational concerns (logging, telemetry, hot reload)
+- Phase 7 I13 is complete (T-001-41 through T-001-44) — all 4 observability tasks done
+- 289 tests passing, clean build
+- Engine now has: structured logging, TelemetryListener SPI, sensitive path parsing, MDC trace propagation
+- PERF-01..04 backlog lives in `docs/operations/performance-testing.md` (not in feature tasks)
 
-## SDD Gaps (if any)
-- S-001-52 (circular mapper reference) — not testable in ADR-0014's flat model.
-  Duplicate mapper refs are validated instead. Consider updating the scenario
-  description to reflect this architectural reality.
-- No other gaps identified.
+## Next Steps (in order)
+1. T-001-45 — Create `TransformRegistry` as immutable data class
+2. T-001-46 — Implement `TransformEngine.reload()` with atomic registry swap
+3. T-001-47 — Add TelemetryListener notifications for reload events
+4. T-001-48 — Define `GatewayAdapter` SPI interface
+
+## SDD Gaps
+- None identified. All scenarios, terminology, ADRs, and specs are consistent.
