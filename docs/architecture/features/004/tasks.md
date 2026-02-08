@@ -249,7 +249,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `./gradlew spotlessApply check`
   _Verification log:_ ✅ 4/4 tests PASSED (connection refused → UpstreamConnectException, unreachable host → UpstreamConnectException, read timeout → UpstreamTimeoutException, exception hierarchy verified). Domain exceptions: UpstreamException (base) → UpstreamConnectException, UpstreamTimeoutException. `spotlessApply check` GREEN.
 
-- [ ] **T-004-14** — UpstreamClient: connection pool configuration (FR-004-18)
+- [x] **T-004-14** — UpstreamClient: connection pool configuration (FR-004-18)
   _Intent:_ Configure connection pool via JVM system properties.
   _Test first:_ Write `ConnectionPoolConfigTest`:
   - Verify system properties set: `jdk.httpclient.connectionPoolSize`,
@@ -261,6 +261,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   _Verification commands:_
   - `./gradlew :adapter-standalone:test --tests "*ConnectionPoolConfigTest*"`
   - `./gradlew spotlessApply check`
+  _Verification log:_ ✅ 3/3 tests PASSED (default PoolConfig → props set, custom PoolConfig → custom values, keepAlive=false → timeout=0). System properties set before HttpClient construction. `spotlessApply check` GREEN. I4 complete.
 
 #### I5 — StandaloneAdapter + ProxyHandler
 

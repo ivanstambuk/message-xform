@@ -2,8 +2,8 @@
 
 _Linked specification:_ `docs/architecture/features/004/spec.md`
 _Linked tasks:_ `docs/architecture/features/004/tasks.md`
-_Status:_ In Progress (Phase 3 — I4)
-_Last updated:_ 2026-02-08T22:40+01:00
+_Status:_ In Progress (Phase 3 — I5)
+_Last updated:_ 2026-02-08T23:20+01:00
 
 > Guardrail: Keep this plan traceable back to the governing spec. Reference
 > FR/NFR/Scenario IDs from `spec.md` where relevant, log any new high- or
@@ -181,6 +181,7 @@ _To be completed after implementation._
    - _Requirements covered:_ FR-004-04, FR-004-18, FR-004-33, FR-004-34, IMPL-004-03.
    - _Commands:_ `./gradlew :adapter-standalone:test`, `./gradlew spotlessApply check`
    - _Exit:_ UpstreamClient forwards requests, strips hop-by-hop, enforces HTTP/1.1.
+   - _Result:_ T-004-09 (basic forwarding, 6 tests), T-004-10 (HTTP/1.1 enforcement, 1 test), T-004-11 (Content-Length recalculation, 3 tests), T-004-12 (hop-by-hop stripping, 4 tests), T-004-13 (backend error handling, 4 tests), T-004-14 (connection pool config, 3 tests) done. I4 complete.
 
 5. **I5 — StandaloneAdapter + ProxyHandler** (≤90 min)
    - _Goal:_ Implement `StandaloneAdapter` (GatewayAdapter for Javalin Context)

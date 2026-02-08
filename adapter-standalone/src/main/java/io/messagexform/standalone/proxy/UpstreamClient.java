@@ -1,5 +1,6 @@
 package io.messagexform.standalone.proxy;
 
+import io.messagexform.standalone.config.PoolConfig;
 import io.messagexform.standalone.config.ProxyConfig;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -55,6 +56,9 @@ public final class UpstreamClient {
     public UpstreamClient(ProxyConfig config) {
         this.backendBaseUrl = config.backendScheme() + "://" + config.backendHost() + ":" + config.backendPort();
         this.readTimeout = Duration.ofMillis(config.backendReadTimeoutMs());
+
+        // Configure connection pool via JVM system properties (T-004-14, FR-004-18)
+        configurePoolProperties(config.pool());
 
         this.httpClient = HttpClient.newBuilder()
                 .version(HttpClient.Version.HTTP_1_1)
@@ -162,5 +166,25 @@ public final class UpstreamClient {
      */
     private static boolean isHopByHop(String lowerCaseName) {
         return HOP_BY_HOP_HEADERS.contains(lowerCaseName);
+    }
+
+    /**
+     * Sets JVM system properties that control connection pooling for the
+     * JDK {@link HttpClient} (T-004-14, FR-004-18, CFG-004-17..19).
+     *
+     * <p>
+     * When {@code keepAlive} is disabled, the idle timeout is set to 0
+     * to close connections immediately after use.
+     */
+    private static void configurePoolProperties(PoolConfig pool) {
+        System.setProperty("jdk.httpclient.connectionPoolSize", String.valueOf(pool.maxConnections()));
+        int keepAliveSeconds = pool.keepAlive() ? pool.idleTimeoutMs() / 1000 : 0;
+        System.setProperty("jdk.httpclient.keepalive.timeout", String.valueOf(keepAliveSeconds));
+
+        LOG.debug(
+                "Pool configured: maxConnections={}, keepAlive={}, idleTimeout={}s",
+                pool.maxConnections(),
+                pool.keepAlive(),
+                keepAliveSeconds);
     }
 }
