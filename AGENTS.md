@@ -134,6 +134,9 @@ Update both `docs/architecture/roadmap.md` and the Roadmap table above when stat
      3. ☐ `plan.md`: Update the parent increment status (e.g., ✅ DONE or 🔧 IN PROGRESS) and add a `_Result:_` line if the increment is newly completed.
      4. ☐ `plan.md`: Update `_Status:_` and `_Last updated:_` header if not already current.
      All four items go into the **same** commit as the implementation code.
+     **Anti-pattern (FORBIDDEN)**: committing Java code/tests first, then `tasks.md`
+     as a separate `docs:` commit. This pollutes git history with 2N commits instead
+     of N. Complete ALL checklist items, THEN commit once.
    - **User override**: If the user requests "no commits" / "commit in bulk later", follow their instruction.
    - **Format**: `<type>(<scope>): T-xxx-yy — <short description>` — types: `fix`, `feat`, `docs`, `refactor`, `retro`, `session`, `backlog`, `terminology`.
 7. **Autonomous Operations**: If you can run a command to verify or fix something, do it — don't instruct the user to do it.
