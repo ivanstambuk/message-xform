@@ -144,7 +144,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
 
 #### I3 — Expression Engine SPI + JSLT engine
 
-- [ ] **T-001-09** — ExpressionEngine + CompiledExpression interfaces (DO-001-06, DO-001-03, FR-001-02)
+- [x] **T-001-09** — ExpressionEngine + CompiledExpression interfaces (DO-001-06, DO-001-03, FR-001-02) ✅ 2026-02-08
   _Intent:_ Define the pluggable SPI that allows different transformation
   engines (JSLT, JOLT, jq) to be registered. This is the extension point
   for the entire engine.
@@ -159,7 +159,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `./gradlew :core:test --tests "*ExpressionEngineSpiTest*"`
   - `./gradlew spotlessApply check`
 
-- [ ] **T-001-10** — JSLT engine implementation (FR-001-02, SPI-001-01/02/03)
+- [x] **T-001-10** — JSLT engine implementation (FR-001-02, SPI-001-01/02/03) ✅ 2026-02-08
   _Intent:_ Implement the default expression engine using the JSLT library.
   This is the workhorse — most scenarios use JSLT.
   _Test first:_ Write `JsltExpressionEngineTest` with parameterized cases:
@@ -175,7 +175,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `./gradlew :core:test --tests "*JsltExpressionEngineTest*"`
   - `./gradlew spotlessApply check`
 
-- [ ] **T-001-11** — Engine registry (FR-001-02, API-001-05)
+- [x] **T-001-11** — Engine registry (FR-001-02, API-001-05) ✅ 2026-02-08
   _Intent:_ Manage expression engine registration so the spec parser can
   resolve `lang: jslt` to the correct engine at load time.
   _Test first:_ Write `EngineRegistryTest`:
@@ -188,7 +188,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `./gradlew :core:test --tests "*EngineRegistryTest*"`
   - `./gradlew spotlessApply check`
 
-- [ ] **T-001-12** — Research: JSLT context variable binding
+- [x] **T-001-12** — Research: JSLT context variable binding ✅ 2026-02-08
   _Intent:_ Determine how to pass `$headers`, `$status`, `$queryParams`,
   `$cookies` to JSLT expressions. The JSLT library may support external
   variables via its API, or we may need to inject them into the input JSON.
@@ -806,6 +806,7 @@ Track long-running or shared commands with timestamps to avoid duplicate work.
 
 - 2026-02-08 03:20 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — after T-001-01/02
 - 2026-02-08 03:27 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — 37 tests passed after T-001-03..08
+- 2026-02-08 03:50 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — 61 tests passed after T-001-09..12
 
 ## Completion Criteria
 
