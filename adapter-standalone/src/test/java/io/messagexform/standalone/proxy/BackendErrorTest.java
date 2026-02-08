@@ -55,8 +55,7 @@ class BackendErrorTest {
         int proxyPort = app.port();
 
         try {
-            HttpClient client =
-                    HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
+            HttpClient client = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create("http://127.0.0.1:" + proxyPort + "/api/test"))
@@ -107,8 +106,7 @@ class BackendErrorTest {
         int proxyPort = app.port();
 
         try {
-            HttpClient client =
-                    HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
+            HttpClient client = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create("http://127.0.0.1:" + proxyPort + "/api/slow"))
@@ -151,8 +149,7 @@ class BackendErrorTest {
         int proxyPort = app.port();
 
         try {
-            HttpClient client =
-                    HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
+            HttpClient client = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create("http://127.0.0.1:" + proxyPort + "/api/unreachable"))
@@ -199,7 +196,7 @@ class BackendErrorTest {
 
         StandaloneAdapter adapter = new StandaloneAdapter();
         UpstreamClient upstreamClient = new UpstreamClient(config);
-        ProxyHandler proxyHandler = new ProxyHandler(engine, adapter, upstreamClient);
+        ProxyHandler proxyHandler = new ProxyHandler(engine, adapter, upstreamClient, -1);
 
         return Javalin.create()
                 .addHttpHandler(HandlerType.GET, "/<path>", proxyHandler)

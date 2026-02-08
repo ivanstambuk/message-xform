@@ -48,7 +48,8 @@ abstract class ProxyTestHarness {
     /** Records the last request received by the mock backend for each key. */
     protected final Map<String, ReceivedRequest> receivedRequests = new ConcurrentHashMap<>();
 
-    record ReceivedRequest(String method, String path, String query, Map<String, List<String>> headers, String body) {}
+    record ReceivedRequest(String method, String path, String query, Map<String, List<String>> headers, String body) {
+    }
 
     /**
      * Starts mock backend + Javalin proxy with the given specs and profile.
@@ -58,15 +59,33 @@ abstract class ProxyTestHarness {
      *                            file (null for no profile)
      */
     protected void startWithSpecs(String[] specResourcePaths, String profileResourcePath) throws IOException {
+        startWithSpecs(specResourcePaths, profileResourcePath, -1);
+    }
+
+    /**
+     * Starts mock backend + Javalin proxy with the given specs, profile, and max
+     * body bytes.
+     *
+     * @param specResourcePaths   classpath resource paths to spec YAML files
+     * @param profileResourcePath classpath resource path to the profile YAML
+     *                            file (null for no profile)
+     * @param maxBodyBytes        max request body size in bytes (-1 for default/no
+     *                            limit)
+     */
+    protected void startWithSpecs(String[] specResourcePaths, String profileResourcePath, int maxBodyBytes)
+            throws IOException {
         startMockBackend();
 
-        ProxyConfig config = ProxyConfig.builder()
+        ProxyConfig.Builder configBuilder = ProxyConfig.builder()
                 .backendScheme("http")
                 .backendHost("127.0.0.1")
                 .backendPort(backendPort)
                 .backendConnectTimeoutMs(5000)
-                .backendReadTimeoutMs(5000)
-                .build();
+                .backendReadTimeoutMs(5000);
+        if (maxBodyBytes > 0) {
+            configBuilder.maxBodyBytes(maxBodyBytes);
+        }
+        ProxyConfig config = configBuilder.build();
 
         EngineRegistry registry = new EngineRegistry();
         registry.register(new JsltExpressionEngine());
@@ -89,7 +108,7 @@ abstract class ProxyTestHarness {
 
         StandaloneAdapter adapter = new StandaloneAdapter();
         UpstreamClient upstreamClient = new UpstreamClient(config);
-        ProxyHandler proxyHandler = new ProxyHandler(engine, adapter, upstreamClient);
+        ProxyHandler proxyHandler = new ProxyHandler(engine, adapter, upstreamClient, config.maxBodyBytes());
 
         app = Javalin.create()
                 .addHttpHandler(HandlerType.GET, "/<path>", proxyHandler)
@@ -103,13 +122,17 @@ abstract class ProxyTestHarness {
 
         proxyPort = app.port();
 
-        testClient =
-                HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
+        testClient = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
     }
 
     /** Starts infrastructure with no specs/profile (passthrough mode). */
     protected void startPassthrough() throws IOException {
         startWithSpecs(new String[0], null);
+    }
+
+    /** Starts infrastructure in passthrough mode with a max body size limit. */
+    protected void startPassthroughWithMaxBodyBytes(int maxBodyBytes) throws IOException {
+        startWithSpecs(new String[0], null, maxBodyBytes);
     }
 
     private void startMockBackend() throws IOException {
@@ -210,13 +233,16 @@ abstract class ProxyTestHarness {
     }
 
     private static String capitalize(String s) {
-        if (s == null || s.isEmpty()) return s;
+        if (s == null || s.isEmpty())
+            return s;
         // Capitalize each segment after '-'
         StringBuilder sb = new StringBuilder();
         for (String part : s.split("-")) {
-            if (!sb.isEmpty()) sb.append("-");
+            if (!sb.isEmpty())
+                sb.append("-");
             sb.append(Character.toUpperCase(part.charAt(0)));
-            if (part.length() > 1) sb.append(part.substring(1));
+            if (part.length() > 1)
+                sb.append(part.substring(1));
         }
         return sb.toString();
     }

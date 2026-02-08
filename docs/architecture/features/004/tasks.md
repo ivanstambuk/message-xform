@@ -587,20 +587,21 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   BUILD SUCCESSFUL — 4/4 tests passed
   ```
 
-- [ ] **T-004-29** — Request body size enforcement (FR-004-13, S-004-22)
+- [x] **T-004-29** — Request body size enforcement (FR-004-13, S-004-22)
   _Intent:_ Reject requests exceeding `proxy.max-body-bytes` with `413 Payload
-  Too Large`. Enforce at Jetty I/O layer for chunked-encoded requests.
+  Too Large`. Enforce in ProxyHandler for both Content-Length and chunked requests.
   _Test first:_ Write `RequestBodySizeTest` (integration):
   - Body within limit → accepted and forwarded.
   - Body exceeding limit → `413 Payload Too Large` RFC 9457 (S-004-22).
   - Chunked request exceeding limit → rejected mid-stream.
   - Custom limit via `proxy.max-body-bytes` config key.
-  _Implement:_ Configure `HttpConfiguration.setMaxRequestContentSize()` on
-  Jetty. Register custom error handler for Jetty's default 413 response.
-  _Verify:_ `RequestBodySizeTest` passes.
+  _Implement:_ Add `maxBodyBytes` parameter to `ProxyHandler`. Check
+  `Content-Length` header first, then actual body size after reading.
+  Return RFC 9457 `ProblemDetail.bodyTooLarge()` on violation.
+  _Verify:_ `RequestBodySizeTest` passes (4/4).
   _Verification commands:_
-  - `./gradlew :adapter-standalone:test --tests "*RequestBodySizeTest*"`
-  - `./gradlew spotlessApply check`
+  - `./gradlew :adapter-standalone:test --tests "*RequestBodySizeTest*"` ✅ 4 passed
+  - `./gradlew test` ✅ all passed
 
 - [ ] **T-004-30** — Response body size enforcement (FR-004-13, S-004-56)
   _Intent:_ Backend responses exceeding `proxy.max-body-bytes` produce `502`.

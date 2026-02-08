@@ -61,6 +61,7 @@ public final class ProxyHandler implements Handler {
     private final TransformEngine engine;
     private final StandaloneAdapter adapter;
     private final UpstreamClient upstreamClient;
+    private final int maxBodyBytes;
 
     /**
      * Creates a new handler wiring up the engine, adapter, and upstream client.
@@ -68,11 +69,14 @@ public final class ProxyHandler implements Handler {
      * @param engine         the transform engine (no profile loaded → PASSTHROUGH)
      * @param adapter        the Javalin-to-Message adapter
      * @param upstreamClient the upstream HTTP client
+     * @param maxBodyBytes   max request body size in bytes (≤ 0 for no limit)
      */
-    public ProxyHandler(TransformEngine engine, StandaloneAdapter adapter, UpstreamClient upstreamClient) {
+    public ProxyHandler(TransformEngine engine, StandaloneAdapter adapter, UpstreamClient upstreamClient,
+            int maxBodyBytes) {
         this.engine = engine;
         this.adapter = adapter;
         this.upstreamClient = upstreamClient;
+        this.maxBodyBytes = maxBodyBytes;
     }
 
     private static final String REQUEST_ID_HEADER = "x-request-id";
@@ -85,6 +89,29 @@ public final class ProxyHandler implements Handler {
             requestId = UUID.randomUUID().toString();
         }
         ctx.header(REQUEST_ID_HEADER, requestId);
+
+        // --- Step 0a: Request body size enforcement (FR-004-13, T-004-29) ---
+        if (maxBodyBytes > 0) {
+            long contentLength = ctx.contentLength();
+            if (contentLength > maxBodyBytes) {
+                LOG.warn("Request body too large: {} bytes (limit {})", contentLength, maxBodyBytes);
+                writeProblemResponse(ctx, 413,
+                        ProblemDetail.bodyTooLarge(
+                                "Request body exceeds " + maxBodyBytes + " bytes",
+                                413, ctx.path()));
+                return;
+            }
+            // For chunked requests without Content-Length, check after reading
+            String body = ctx.body();
+            if (body.length() > maxBodyBytes) {
+                LOG.warn("Request body too large: {} bytes (limit {})", body.length(), maxBodyBytes);
+                writeProblemResponse(ctx, 413,
+                        ProblemDetail.bodyTooLarge(
+                                "Request body exceeds " + maxBodyBytes + " bytes",
+                                413, ctx.path()));
+                return;
+            }
+        }
 
         // --- Step 1: Build TransformContext from request (cookies, query params) ---
         TransformContext transformContext = adapter.buildTransformContext(ctx);
