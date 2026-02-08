@@ -13,6 +13,8 @@ docs/architecture/features/001/scenarios.md
 
 # Feature 004 — Standalone HTTP Proxy Mode
 docs/architecture/features/004/spec.md
+docs/architecture/features/004/plan.md
+docs/architecture/features/004/tasks.md
 
 # Architecture decisions (newest first)
 docs/decisions/ADR-0021-query-params-and-cookies-in-context.md

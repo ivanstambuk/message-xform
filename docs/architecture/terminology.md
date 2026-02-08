@@ -1,6 +1,6 @@
 # message-xform – Terminology
 
-Status: Draft | Last updated: 2026-02-07
+Status: Draft | Last updated: 2026-02-08
 
 This document defines common terms used across the message-xform docs and specs so we
 can use consistent vocabulary. It is the golden source for terminology — any new
@@ -274,6 +274,30 @@ terminology agreements must be captured here immediately.
     virtual threads (ADR-0029).
   - Serves as the **reference adapter** — the first concrete `GatewayAdapter`
     implementation and the pattern for all subsequent gateway adapters.
+
+- **Standalone adapter** (`StandaloneAdapter`)
+  - The `GatewayAdapter<Context>` implementation for the standalone proxy. Wraps
+    Javalin's `Context` into `Message` objects (`wrapRequest`, `wrapResponse`) and
+    writes transformed results back via `applyChanges`. Parses cookies and query
+    parameters into `TransformContext` for `$cookies` / `$queryParams` binding.
+
+- **Proxy handler** (`ProxyHandler`)
+  - The central HTTP handler that orchestrates the full proxy cycle: receive request
+    → wrap → request-transform → forward to backend → wrap response → response-
+    transform → return to client. Implements the `TransformResult` dispatch table
+    (FR-004-35) and generates/echoes `X-Request-ID` headers (FR-004-38).
+
+- **Proxy config** (`ProxyConfig`, `BackendConfig`, `TlsConfig`, `PoolConfig`)
+  - Immutable record hierarchy defining all proxy configuration. Loaded from YAML
+    (`message-xform-proxy.yaml`) with environment variable overlay (FR-004-11).
+    `ProxyConfig` is the root; nested records hold backend, TLS, and connection pool
+    settings. 41 config keys (CFG-004-01 through CFG-004-41) with corresponding
+    environment variable mappings.
+
+- **File watcher** (`FileWatcher`)
+  - A `WatchService`-based component that monitors the specs directory for changes
+    and triggers `TransformEngine.reload()` with configurable debounce. Provides
+    zero-downtime hot reload (NFR-004-05). Can be disabled via `reload.enabled: false`.
 
 - **Sidecar pattern**
   - A Kubernetes deployment model where the standalone proxy runs as a container
