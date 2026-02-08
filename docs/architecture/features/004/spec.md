@@ -85,7 +85,7 @@ no changes).
 | FR-004-01 | The proxy MUST receive HTTP requests on a configurable host and port, forward them to the configured backend, and return the backend's response to the client. | Client sends `GET /api/users` → proxy forwards to `backend:8080/api/users` → backend returns 200 → proxy returns 200 to client. | Startup fails if `proxy.port` is already in use or `backend.host` is missing. | Backend unreachable → proxy returns `502 Bad Gateway` with RFC 9457 error body. | Core proxy behaviour. |
 | FR-004-02 | The proxy MUST apply **request transformation** via `TransformEngine.transform(message, REQUEST)` before forwarding to the backend. | Profile matches `POST /api/orders` → JSLT transforms request body → transformed body sent to backend. | Non-matching request → `PASSTHROUGH` → original request forwarded unmodified. | Transform error → proxy returns error response to client (FR-004-23), request is NOT forwarded. | GatewayAdapter SPI, Feature 001. |
 | FR-004-03 | The proxy MUST apply **response transformation** via `TransformEngine.transform(message, RESPONSE)` before returning the backend's response to the client. | Profile matches response → JSLT transforms response body → transformed body returned to client. | Non-matching response → `PASSTHROUGH` → original response returned unmodified. | Transform error → proxy returns error response to client (FR-004-23). | GatewayAdapter SPI, Feature 001. |
-| FR-004-04 | The proxy MUST forward the HTTP method, path, query string, and headers from the (potentially transformed) request to the backend. | `PUT /api/users/123?fields=name` with `Authorization: Bearer xxx` → all forwarded to backend. | Hop-by-hop headers (`Connection`, `Transfer-Encoding`, etc.) MUST be stripped per RFC 7230 §6.1. | n/a | HTTP proxy semantics. |
+| FR-004-04 | The proxy MUST forward the HTTP method, path, query string, and headers from the (potentially transformed) request to the backend. | `PUT /api/users/123?fields=name` with `Authorization: Bearer xxx` → all forwarded to backend. | Hop-by-hop headers (`Connection`, `Transfer-Encoding`, etc.) MUST be stripped per RFC 7230 §6.1 in both request and response directions. | n/a | HTTP proxy semantics. |
 | FR-004-05 | The proxy MUST support `GET`, `POST`, `PUT`, `DELETE`, `PATCH`, `HEAD`, and `OPTIONS` HTTP methods. | All seven methods are proxied without modification (unless a URL rewrite transform changes the method). | Unknown method → proxy returns `405 Method Not Allowed`. | n/a | HTTP/1.1a standard. |
 
 ### GatewayAdapter Implementation
@@ -94,6 +94,7 @@ no changes).
 |----|-------------|--------------|-----------------|--------------|--------|
 | FR-004-06 | The proxy MUST implement `GatewayAdapter<Context>` where `Context` is Javalin's request context, providing `wrapRequest`, `wrapResponse`, and `applyChanges`. | `wrapRequest(ctx)` extracts body → `JsonNode`, headers, status, path, method, query string and returns a `Message`. | Request with no body → `Message.body()` is `NullNode` (per `Message` contract — body is never null). | JSON parse error on request body → proxy returns `400 Bad Request` with RFC 9457 error. | SPI-001-04/05/06, ADR-0013. |
 | FR-004-06a | Before calling `wrapResponse(ctx)`, `ProxyHandler` MUST populate the Javalin `Context` with the upstream backend's response data: body (`ctx.result()`), headers (`ctx.header()`), and status code (`ctx.status()`). This ensures `wrapResponse` reads from `Context` uniformly, mirroring how real gateway adapters (PingAccess, PingGateway) naturally have the response in their native object. | `UpstreamClient.forward()` returns `HttpResponse` → ProxyHandler writes body, headers, status into `ctx` → `wrapResponse(ctx)` reads from `ctx`. | n/a | n/a | Q-034 resolution. |
+| FR-004-06b | `wrapResponse` MUST include the original request's path (`ctx.path()`) and method (`ctx.method()`) in the returned `Message`, since profile matching for response transforms operates on request criteria (Feature 001 API-001-01). | `wrapResponse(ctx)` → `Message` with `requestPath = ctx.path()`, `requestMethod = ctx.method()`. | n/a | n/a | Feature 001 API-001-01. |
 | FR-004-07 | `wrapRequest` and `wrapResponse` MUST create **deep copies** of the native message data, consistent with copy-on-wrap semantics (ADR-0013). | Mutations to the `Message` returned by `wrapRequest` do not affect the original Javalin context until `applyChanges` is called. | n/a | n/a | ADR-0013. |
 | FR-004-08 | `applyChanges` MUST write the transformed `Message` fields (body, headers, status code) back to the Javalin response context. | Transformed body, headers, and status code are written to `ctx.result()`, `ctx.header()`, `ctx.status()`. | If the transformed `Message.body()` is null, `applyChanges` MUST set an empty response body. | n/a | SPI-001-06. |
 | FR-004-09 | Header names MUST be normalized to lowercase in `wrapRequest` and `wrapResponse`, consistent with core engine conventions. | `Content-Type: application/json` → `content-type: application/json` in `Message.headers()`. | n/a | n/a | Feature 001 spec. |
@@ -110,7 +111,7 @@ no changes).
 
 | ID | Requirement | Success path | Validation path | Failure path | Source |
 |----|-------------|--------------|-----------------|--------------|--------|
-| FR-004-13 | The proxy MUST enforce a configurable maximum request body size (`backend.max-body-bytes`, default 10 MB). Requests exceeding this limit MUST receive a `413 Payload Too Large` response without forwarding to the backend. | `POST /api/data` with 5 MB body → accepted and forwarded. | `backend.max-body-bytes: 1048576` → 1 MB limit applied. | `POST /api/data` with 15 MB body → `413 Payload Too Large` returned immediately. | Q-031, ADR-0018. |
+| FR-004-13 | The proxy MUST enforce a configurable maximum body size (`backend.max-body-bytes`, default 10 MB) in **both directions**. Requests exceeding this limit MUST receive `413 Payload Too Large` without forwarding to the backend. Backend responses exceeding this limit MUST result in `502 Bad Gateway` returned to the client (the response is too large to buffer and transform safely). | `POST /api/data` with 5 MB body → accepted and forwarded. Backend response 3 MB → accepted and returned. | `backend.max-body-bytes: 1048576` → 1 MB limit applied to both directions. | Request 15 MB → `413 Payload Too Large`. Response 15 MB → `502 Bad Gateway`. | Q-031, Q-037 resolution, ADR-0018. |
 
 ### TLS
 
@@ -127,12 +128,19 @@ no changes).
 |----|-------------|--------------|-----------------|--------------|--------|
 | FR-004-18 | The proxy MUST support configurable upstream connection pool settings: `backend.pool.max-connections`, `backend.pool.keep-alive`, `backend.pool.idle-timeout-ms`. | Pool reuses connections for successive requests to the same backend. | Default: `max-connections: 100`, `keep-alive: true`, `idle-timeout-ms: 60000`. | Pool exhausted → request queued or rejected depending on JDK HttpClient behaviour; logged as warning. | Research §5, Connection Pool Notes. |
 
+> **JDK HttpClient pool limitation:** The JDK `HttpClient` exposes pool tuning
+> via JVM-global system properties (`jdk.httpclient.connectionPoolSize`,
+> `jdk.httpclient.keepalive.timeout`), not per-instance configuration. The
+> `backend.pool.*` config values map to these system properties at startup.
+> If finer-grained per-instance pool control is needed, `UpstreamClient` can
+> be backed by Apache HttpClient 5 without changing the config schema.
+
 ### Hot Reload
 
 | ID | Requirement | Success path | Validation path | Failure path | Source |
 |----|-------------|--------------|-----------------|--------------|--------|
 | FR-004-19 | The proxy MUST watch `engine.specs-dir` and `engine.profiles-dir` for file changes using `java.nio.file.WatchService` (when `reload.enabled: true`) and trigger `TransformEngine.reload(specPaths, profilePath)`. On each reload, the proxy scans `engine.specs-dir` for all `*.yaml`/`*.yml` files and resolves the active profile from `engine.profile` (or `engine.profiles-dir`). | Save a new spec YAML → watcher detects → `reload()` → new spec available for subsequent requests. | Debounce (default 500ms) prevents rapid successive reloads during editing. | Reload fails (invalid YAML, schema error) → previous registry stays active, error logged. | NFR-001-05, Research §6. |
-| FR-004-20 | The proxy MUST expose `POST /admin/reload` to trigger `TransformEngine.reload()` programmatically. | `POST /admin/reload` → engine reloads → `200 OK` with reload summary. | n/a | Reload fails → `500 Internal Server Error` with error details. Admin endpoints are NOT subject to transform matching. | Research §6. |
+| FR-004-20 | The proxy MUST expose `POST /admin/reload` to trigger a reload. The handler scans `engine.specs-dir` for `*.yaml`/`*.yml` files and resolves the active profile (same logic as `FileWatcher`), then calls `TransformEngine.reload(specPaths, profilePath)`. | `POST /admin/reload` → engine reloads → `200 OK` with `{"status": "reloaded", "specs": N, "profile": "id"}`. | n/a | Reload fails → `500 Internal Server Error` with RFC 9457 error body (consistent with ADR-0022). Admin endpoints are NOT subject to transform matching. | Research §6. |
 
 ### Health & Readiness
 
@@ -140,6 +148,11 @@ no changes).
 |----|-------------|--------------|-----------------|--------------|--------|
 | FR-004-21 | The proxy MUST expose `GET /health` (liveness probe). | Returns `200 OK` with `{"status": "UP"}` when the JVM and HTTP server are running. | Health endpoint is NOT subject to transform matching. | Server not accepting connections → probe fails (Kubernetes restarts pod). | K8s liveness probe. |
 | FR-004-22 | The proxy MUST expose `GET /ready` (readiness probe). | Returns `200 OK` with `{"status": "READY", "engine": "loaded", "backend": "reachable"}` when engine has loaded specs AND backend is reachable (verified via TCP connect to `backend.host:backend.port` with `backend.connect-timeout-ms` timeout). | During startup (before engine loads) → `503 Service Unavailable`. After failed reload → still `200` (old registry is still active). | Backend unreachable → `503 Service Unavailable` with `{"status": "NOT_READY", "reason": "backend_unreachable"}`. | K8s readiness probe. |
+
+> **Endpoint routing priority:** Admin (`/admin/reload`) and health/readiness
+> (`/health`, `/ready`) endpoints MUST take precedence over profile-matched
+> transform routes. If a profile happens to match the same path, the
+> admin/health handler wins — the request is never subject to transformation.
 
 ### Error Handling
 
@@ -154,14 +167,14 @@ no changes).
 
 | ID | Requirement | Success path | Validation path | Failure path | Source |
 |----|-------------|--------------|-----------------|--------------|--------|
-| FR-004-27 | On startup, the proxy MUST: (1) load config, (2) load and compile all specs, (3) load active profile, (4) initialize the HTTP client, (5) start the HTTP server, (6) start the file watcher. | Proxy starts in <3s (NFR-004-01), logs structured startup summary with port, backend, spec count. | Config validation errors → exit with non-zero status and descriptive message. | Spec load errors → startup fails with `TransformLoadException` (ADR-0024). | ADR-0025. |
-| FR-004-28 | On shutdown (SIGTERM/SIGINT), the proxy MUST: (1) stop accepting new connections, (2) wait for in-flight requests to complete (graceful drain, max 30s), (3) close the HTTP client, (4) stop the file watcher, (5) exit. | Ctrl-C → graceful shutdown within 30s → exit 0. | In-flight requests complete normally during shutdown. | Drain timeout exceeded → force close remaining connections → exit 0. | Production deployment. |
+| FR-004-27 | On startup, the proxy MUST: (1) load config, (2) load and compile all specs, (3) load active profile, (4) initialize the HTTP client, (5) start the HTTP server, (6) start the file watcher. | Proxy starts in <3s (NFR-004-01), logs structured startup summary with port, backend, spec count. | Config validation errors → exit with non-zero status and descriptive message. | Invalid spec YAML → startup fails with `TransformLoadException` (ADR-0024). Zero specs (empty `specs-dir`) is a valid configuration — all requests pass through. | ADR-0025. |
+| FR-004-28 | On shutdown (SIGTERM/SIGINT), the proxy MUST: (1) stop accepting new connections, (2) wait for in-flight requests to complete (graceful drain, configurable via `proxy.shutdown.drain-timeout-ms`, default 30s), (3) close the HTTP client, (4) stop the file watcher, (5) exit. | Ctrl-C → graceful shutdown within drain timeout → exit 0. | In-flight requests complete normally during shutdown. | Drain timeout exceeded → force close remaining connections → exit 0. | Production deployment. |
 
 ### Docker & Kubernetes
 
 | ID | Requirement | Success path | Validation path | Failure path | Source |
 |----|-------------|--------------|-----------------|--------------|--------|
-| FR-004-29 | The project MUST produce a Docker image via multi-stage Dockerfile: JDK build stage + JRE Alpine runtime stage. | `docker build -t message-xform-proxy .` → image <150 MB. | n/a | Build failure → CI fails. | Research §5. |
+| FR-004-29 | The project MUST produce a Docker image via multi-stage Dockerfile: JDK build stage + JRE Alpine runtime stage (base: `eclipse-temurin:21-jre-alpine`). | `docker build -t message-xform-proxy .` → image <150 MB. | n/a | Build failure → CI fails. | Research §5. |
 | FR-004-30 | The Docker image MUST use the shadow JAR (single fat JAR containing `core` + `adapter-standalone` + all dependencies). | `java -jar proxy.jar` starts the proxy with no classpath setup. | n/a | n/a | Packaging. |
 | FR-004-31 | The Docker image MUST expose volume mount points for spec and profile directories (`/specs`, `/profiles`). | `docker run -v ./my-specs:/specs -e BACKEND_HOST=api message-xform-proxy` → loads specs from mounted volume. | n/a | Empty `/specs` directory → engine loads with zero specs, all requests passthrough. | K8s deployment. |
 | FR-004-32 | The Docker image MUST support Kubernetes ConfigMap mounting for spec and profile delivery. | K8s ConfigMap mounted at `/specs` → proxy loads specs from ConfigMap data. | n/a | n/a | K8s deployment. |
@@ -172,6 +185,7 @@ no changes).
 |----|-------------|--------------|-----------------|--------------|--------|
 | FR-004-33 | The proxy MUST force HTTP/1.1 for upstream connections (via `HttpClient.Version.HTTP_1_1`). | Proxy sends `GET /` via HTTP/1.1. | n/a | n/a | Non-Goal: HTTP/2 upstream. |
 | FR-004-34 | The proxy MUST recalculate the `Content-Length` header based on the *transformed* body size for **both** upstream requests and client responses. It MUST NOT blindly copy the `Content-Length` from the original message in either direction. | Request: client sends 100 bytes → spec adds 50 bytes → upstream receives `Content-Length: 150`. Response: backend returns 200 bytes → spec removes 50 bytes → client receives `Content-Length: 150`. | n/a | n/a | HTTP framing correctness. |
+| FR-004-36 | When `proxy.forwarded-headers.enabled` is `true` (default), the proxy MUST add `X-Forwarded-For` (client IP), `X-Forwarded-Proto` (`http` or `https` based on inbound scheme), and `X-Forwarded-Host` (original `Host` header value) to upstream requests. If these headers already exist (e.g., from an upstream proxy), the proxy MUST **append** to `X-Forwarded-For` and preserve existing `X-Forwarded-Proto`/`X-Forwarded-Host` values. When disabled, no forwarded headers are added or modified. | Client `10.0.0.5` via HTTPS → backend receives `X-Forwarded-For: 10.0.0.5`, `X-Forwarded-Proto: https`, `X-Forwarded-Host: api.example.com`. | `proxy.forwarded-headers.enabled: false` → no headers added. | n/a | Q-038 resolution, RFC 7239. |
 
 ### TransformResult Dispatch
 
@@ -188,6 +202,11 @@ no changes).
 | RESPONSE  | `PASSTHROUGH`          | Return the original backend response to the client unmodified. |
 | RESPONSE  | `ERROR`                | Return `result.errorResponse()` with `result.errorStatusCode()` to the client. |
 
+> **`PASSTHROUGH` forwarding:** On `PASSTHROUGH`, `ProxyHandler` forwards the
+> raw data from the Javalin `Context` directly (request body bytes, original
+> headers, original path/query), bypassing `Message` serialization. This avoids
+> a needless parse→serialize round-trip for non-matching requests.
+
 ---
 
 ## Non-Functional Requirements
@@ -200,7 +219,7 @@ no changes).
 | NFR-004-04 | Docker image size MUST be < 150 MB (compressed). | Fast pull times in K8s, efficient layer caching. | `docker images` → check compressed size. | JRE Alpine base image + shadow JAR. | Docker packaging. |
 | NFR-004-05 | Hot reload MUST be zero-downtime: in-flight requests MUST complete with the previous registry while new requests use the updated registry. | No request failures during config changes. | Integration test: send request during reload → verify consistent response. | NFR-001-05, `AtomicReference` swap. | Production operations. |
 | NFR-004-06 | The proxy MUST handle at least 1000 concurrent connections without thread exhaustion, leveraging virtual threads. | Sidecar and standalone deployments may serve high-concurrency workloads. | Load test with 1000 concurrent connections → verify no errors. | Java 21 virtual threads, Javalin `useVirtualThreads`. | Scalability. |
-| NFR-004-07 | All structured log entries MUST include: timestamp, level, thread name, request ID (from `X-Request-ID` header if present), request path, response status, and latency. | Production troubleshooting requires correlated, structured logs. | Log output inspection during integration tests. | SLF4J + Logback, NFR-001-08/10. | Observability. |
+| NFR-004-07 | All structured log entries MUST include: timestamp, level, thread name, request ID (from `X-Request-ID` header if present), HTTP method, request path, response status, total proxy latency (ms), upstream latency (ms), transform result type (`SUCCESS`/`PASSTHROUGH`/`ERROR`), and backend host. | Production troubleshooting requires correlated, structured logs. | Log output inspection during integration tests. | SLF4J + Logback, NFR-001-08/10. | Observability. |
 
 ---
 
@@ -227,7 +246,7 @@ no changes).
 | S-004-07 | **Request body transform:** Profile matches `POST /api/orders` → JSLT transforms request body → backend receives transformed body. |
 | S-004-08 | **Request header transform:** Profile adds/removes/renames request headers before forwarding. |
 | S-004-09 | **Request transform error:** JSLT evaluation fails → client receives `502` RFC 9457 error. Request NOT forwarded. |
-| S-004-10 | **Request with no body:** `GET /api/users` matches a profile with request transform → transform receives null body → passthrough. |
+| S-004-10 | **Request with no body:** `GET /api/users` matches a profile with request transform → transform receives `NullNode` body → expression evaluates on `NullNode` → `SUCCESS` with expression output (not `PASSTHROUGH` — profile matched). |
 
 ### Category 3 — Response Transformation
 
@@ -411,7 +430,7 @@ no changes).
 | CFG-004-26 | `backend.tls.keystore-type` | enum | `PKCS12` | `PKCS12` or `JKS` |
 | CFG-004-27 | `engine.specs-dir` | path | `./specs` | Directory containing transform spec YAML files |
 | CFG-004-28 | `engine.profiles-dir` | path | `./profiles` | Directory containing transform profile YAML files |
-| CFG-004-29 | `engine.profile` | path | — | Explicit single profile path (alternative to profiles-dir). When both `engine.profile` and `engine.profiles-dir` are set, `engine.profile` takes precedence and `profiles-dir` is ignored with a warning. |
+| CFG-004-29 | `engine.profile` | path | — | Explicit single profile path (alternative to profiles-dir). When both `engine.profile` and `engine.profiles-dir` are set, `engine.profile` takes precedence and `profiles-dir` is ignored with a warning. The standalone proxy loads exactly **one** active profile per instance (ADR-0023: cross-profile routing is product-defined). |
 | CFG-004-30 | `engine.schema-validation` | enum | `lenient` | `lenient` or `strict` |
 | CFG-004-31 | `reload.enabled` | boolean | `true` | Enable file-system watching for hot reload |
 | CFG-004-32 | `reload.watch-dirs` | list | `[specs-dir, profiles-dir]` | Directories to watch for changes |
@@ -421,6 +440,8 @@ no changes).
 | CFG-004-36 | `health.ready-path` | string | `/ready` | Readiness probe path |
 | CFG-004-37 | `logging.format` | enum | `json` | `json` or `text` |
 | CFG-004-38 | `logging.level` | enum | `INFO` | Root log level |
+| CFG-004-39 | `proxy.shutdown.drain-timeout-ms` | int | `30000` | Max wait for in-flight requests during graceful shutdown (ms) |
+| CFG-004-40 | `proxy.forwarded-headers.enabled` | boolean | `true` | Add `X-Forwarded-For/Proto/Host` headers to upstream requests (Q-038) |
 
 ### Environment Variable Mapping
 
@@ -464,6 +485,8 @@ no changes).
 | `HEALTH_READY_PATH` | `health.ready-path` |
 | `LOG_FORMAT` | `logging.format` |
 | `LOG_LEVEL` | `logging.level` |
+| `PROXY_SHUTDOWN_DRAIN_TIMEOUT_MS` | `proxy.shutdown.drain-timeout-ms` |
+| `PROXY_FORWARDED_HEADERS_ENABLED` | `proxy.forwarded-headers.enabled` |
 
 ### Fixtures & Sample Data
 
