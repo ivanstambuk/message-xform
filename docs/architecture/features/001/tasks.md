@@ -370,7 +370,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `./gradlew :core:test --tests "*ErrorResponseBuilderTest*"`
   - `./gradlew spotlessApply check`
 
-- [ ] **T-001-23** — Custom error template (FR-001-07, CFG-001-05)
+- [x] **T-001-23** — Custom error template (FR-001-07, CFG-001-05)
   _Intent:_ Support operator-defined error templates with `{{error.*}}`
   placeholder substitution.
   _Test first:_ Write `CustomErrorTemplateTest`:
@@ -922,6 +922,7 @@ Track long-running or shared commands with timestamps to avoid duplicate work.
 - 2026-02-08 11:20 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — 109 tests passed after T-001-21
 - 2026-02-08 11:30 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — 119 tests passed after T-001-22
 - 2026-02-08 11:35 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — 124 tests passed after T-001-24
+- 2026-02-08 11:40 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — 130 tests passed after T-001-23
 
 ## Completion Criteria
 
