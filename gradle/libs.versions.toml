@@ -1,9 +1,11 @@
 [versions]
 jackson = "2.18.4"
+javalin = "6.7.0"
 jslt = "0.1.14"
 jsonSchemaValidator = "1.5.7"
 palantirJavaFormat = "2.78.0"
 slf4j = "2.0.16"
+snakeyaml = "2.3"
 
 # Test
 assertj = "3.27.6"
@@ -15,9 +17,11 @@ logback = "1.5.16"
 [libraries]
 jackson-databind = { group = "com.fasterxml.jackson.core", name = "jackson-databind", version.ref = "jackson" }
 jackson-dataformat-yaml = { group = "com.fasterxml.jackson.dataformat", name = "jackson-dataformat-yaml", version.ref = "jackson" }
+javalin = { group = "io.javalin", name = "javalin", version.ref = "javalin" }
 jslt = { group = "com.schibsted.spt.data", name = "jslt", version.ref = "jslt" }
 json-schema-validator = { group = "com.networknt", name = "json-schema-validator", version.ref = "jsonSchemaValidator" }
 slf4j-api = { group = "org.slf4j", name = "slf4j-api", version.ref = "slf4j" }
+snakeyaml = { group = "org.yaml", name = "snakeyaml", version.ref = "snakeyaml" }
 
 # Test
 assertj-core = { group = "org.assertj", name = "assertj-core", version.ref = "assertj" }
@@ -29,4 +33,5 @@ mockito-junit-jupiter = { group = "org.mockito", name = "mockito-junit-jupiter",
 logback-classic = { group = "ch.qos.logback", name = "logback-classic", version.ref = "logback" }
 
 [plugins]
+shadow = { id = "com.gradleup.shadow", version = "9.3.1" }
 spotless = { id = "com.diffplug.spotless", version = "8.1.0" }

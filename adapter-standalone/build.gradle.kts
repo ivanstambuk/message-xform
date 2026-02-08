@@ -1,0 +1,28 @@
+plugins {
+    `java-library`
+    alias(libs.plugins.shadow)
+}
+
+val catalog = rootProject.extensions.getByType<VersionCatalogsExtension>().named("libs")
+
+dependencies {
+    // Core engine (project dependency)
+    implementation(project(":core"))
+
+    // HTTP server — Javalin 6 (Jetty 12 transitive) (ADR-0029)
+    implementation(catalog.findLibrary("javalin").get())
+
+    // Configuration parsing
+    implementation(catalog.findLibrary("jackson-databind").get())
+    implementation(catalog.findLibrary("jackson-dataformat-yaml").get())
+    implementation(catalog.findLibrary("snakeyaml").get())
+
+    // Logging — SLF4J binding for production
+    implementation(catalog.findLibrary("slf4j-api").get())
+    runtimeOnly(catalog.findLibrary("logback-classic").get())
+
+    // Test
+    testImplementation(catalog.findLibrary("mockito-core").get())
+    testImplementation(catalog.findLibrary("mockito-junit-jupiter").get())
+    testImplementation(catalog.findLibrary("logback-classic").get())
+}
