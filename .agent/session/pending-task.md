@@ -1,25 +1,24 @@
 # Pending Task
 
-**Focus**: Feature 001 — Phase 3: Spec Parsing + Loading (T-001-13..20)
-**Status**: Phase 1–2 fully complete and committed. Phase 3 not started.
-**Next Step**: Begin T-001-13 — Create YAML test fixture files in `core/src/test/resources/test-vectors/`.
+**Focus**: Phase 3 — Spec Parsing + Loading
+**Status**: Ready to start (Phases 1–2 complete, all design work done)
+**Next Step**: T-001-13 — Create test fixture YAML files
 
 ## Context Notes
-- Build is green: 61 tests passing, `./gradlew spotlessApply check` → BUILD SUCCESSFUL.
-- Tasks file: `docs/architecture/features/001/tasks.md` — T-001-01..12 checked off.
-- The task list has detailed instructions for each task including verification commands.
-- JSLT engine is fully functional with context variable injection.
-- EngineRegistry supports thread-safe registration and lookup.
+- This session was entirely spec/design work: FR-001-12 (URL Rewriting),
+  ADR-0027, Rule 18, 7 scenarios, 6 tasks, terminology updates.
+- No implementation changes — build is green at 61 tests.
+- Phase 3 starts with creating YAML test fixtures (T-001-13), then parsing
+  them into TransformSpec (T-001-14). TDD cadence: tests first.
+- The `url` block in TransformSpec needs to be parsed by SpecParser (Phase 6,
+  T-001-38a), but the domain model + spec are ready for it when we get there.
 
-## Phase 3 Task Summary (T-001-13..20)
-- T-001-13: Create YAML test fixture files (3 golden vectors)
-- T-001-14: TransformSpec record (immutable Java record)
-- T-001-15: SpecParser (YAML → TransformSpec)
-- T-001-16: Spec validation (id, version, lang)
-- T-001-17: Transform profile record
-- T-001-18: Profile-spec resolution
-- T-001-19: SpecLoader (file → parsed + validated spec)
-- T-001-20: SpecLoader error handling
+## Key Files for Phase 3
+- `docs/architecture/features/001/tasks.md` — T-001-13 through T-001-18
+- `docs/architecture/features/001/spec.md` — FR-001-01 (spec format), DO-001-02
+- `core/src/test/resources/test-vectors/` — where fixtures go
+- `core/src/main/java/.../core/spec/` — where SpecParser will live
 
-## SDD Gaps (if any)
-- None identified. All retro checks passed ✅.
+## SDD Gaps
+- None identified. Retro audit passed all checks.
+- ADR-0027 validating scenarios added during retro.
