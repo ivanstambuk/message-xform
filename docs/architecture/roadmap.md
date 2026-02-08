@@ -7,7 +7,7 @@
 | 001 | Message Transformation Engine (core) | ✅ Complete | `features/001/spec.md` | Research complete | Java 21 |
 | 002 | PingAccess Adapter | 🔲 Not Started | `features/002/spec.md` | Feature 001 | Java (SDK) |
 | 003 | PingGateway Adapter | 🔲 Not Started | `features/003/spec.md` | Feature 001 | Java / Groovy |
-| 004 | Standalone HTTP Proxy Mode | 🔲 Not Started | `features/004/spec.md` | Feature 001 | Java |
+| 004 | Standalone HTTP Proxy Mode | 🔬 Research | `features/004/spec.md` | Feature 001 | Java |
 | 005 | WSO2 API Manager Adapter | 🔲 Not Started | `features/005/spec.md` | Feature 001 | Java |
 | 006 | Apache APISIX Adapter | 🔲 Not Started | `features/006/spec.md` | Feature 001 | Java (Plugin Runner) |
 | 007 | Kong Gateway Adapter | 🔲 Not Started | `features/007/spec.md` | Feature 001 | Lua or sidecar |
@@ -38,6 +38,20 @@ Research pending: reference docs at `docs/reference/pinggateway-2025.11.txt`.
 The engine running as an independent HTTP reverse proxy (no gateway needed).
 Receives requests, applies transforms, forwards to upstream, transforms response.
 Useful for development, testing, and deployments without a gateway.
+
+**Key deliverables:**
+- Javalin 6 (Jetty 12) embedded HTTP server with Java 21 virtual threads (ADR-0029)
+- JDK `HttpClient` for upstream forwarding (zero additional deps)
+- Full YAML configuration: TLS (inbound + outbound), connection pool, timeouts, body limits
+- Environment variable overrides for all config knobs (no rebuild for tuning)
+- Hot reload via `WatchService` + admin endpoint
+- Health/readiness endpoints for liveness/readiness probes
+- **Docker image** — multi-stage build, shadow JAR, JRE 21 Alpine (~100 MB)
+- **Kubernetes deployment patterns** — sidecar proxy, standalone service,
+  ConfigMap-based spec/profile mounting
+
+Research: `docs/research/standalone-proxy-http-server.md` (all questions resolved).
+Decisions: ADR-0029 (Javalin).
 
 ### Feature 005 — WSO2 API Manager Adapter
 
@@ -88,6 +102,7 @@ updated 2026-02-08 to promote Feature 004 as the E2E test harness:
 ## Status Key
 
 - 🔲 Not Started — No spec exists yet.
+- 🔬 Research — Research phase in progress, decisions being made.
 - 📝 Spec Draft — Spec is being written.
 - ✅ Spec Ready — Spec approved, ready for implementation.
 - 🔨 In Progress — Implementation underway.
