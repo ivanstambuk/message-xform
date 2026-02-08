@@ -2,29 +2,37 @@
 
 ## Active Work
 
-**Feature 001 — Message Transformation Engine**
-Status: ✅ **Complete** — all 53 tasks, all exit criteria, all 87 scenarios verified.
+**Feature 004 — Standalone HTTP Proxy Mode** (Research Phase)
+Status: 🔬 Research in progress — HTTP server selection, architecture design.
 
 ## Session Progress
 
-1. ✅ Feature 001 exit criteria marked as complete (roadmap, spec, plan, tasks)
-2. ✅ Performance testing research — studied openauth-sim patterns
-3. ✅ ADR-0028 — hybrid performance testing strategy (feature-scoped + shared infra)
-4. ✅ T-001-53 — TransformEngineBenchmark (NFR-001-03 verification)
-   - identity-1KB: p95=0.001ms, 424K ops/s
-   - field-mapping-10KB: p95=0.003ms, 102K ops/s
-   - complex-50KB: p95=0.134ms, 4.3K ops/s
-   - All well below 5ms NFR target
-5. ✅ NFR-001-03 spec expanded with percentile targets, payload tiers, throughput, env
-6. ✅ SDD retro audit — found + fixed scenario ID conflict (S-001-53a/b/c → S-001-79/80/81)
-7. ✅ Scenarios.md updated: Category 17 added, index, coverage, test class table
+1. ✅ `/init` — loaded project context, assessed state, proposed next steps
+2. ✅ Feature 004 research started — HTTP server evaluation
+3. ✅ Research document written: `docs/research/standalone-proxy-http-server.md`
+   - Evaluated 5 candidates: Javalin, Undertow, Vert.x, Netty, JDK HttpServer
+   - Recommendation: Javalin 6 (highest API/effort ratio) or JDK HttpServer (zero deps)
+   - Architecture sketch, proxy config model, request flow designed
+   - HTTP client decision: JDK `HttpClient` (zero deps)
+   - Hot reload: WatchService + admin endpoint
+4. ✅ Open questions logged: Q-029 through Q-032
+   - Q-029: HTTP server choice (HIGH impact)
+   - Q-030: Upstream routing model (MEDIUM)
+   - Q-031: Body size limits (MEDIUM)
+   - Q-032: TLS termination (LOW)
+5. 🔲 Resolve open questions with Ivan
+6. 🔲 Write Feature 004 spec
 
-## Key Decisions
+## Key Decisions (Pending)
 
-- ADR-0028: Hybrid performance testing (Layer 1: feature-scoped, Layer 2: Feature 009)
-- NFR-001-03: p95 percentile is the primary latency target (not avg or max)
-- Soft assertion: benchmarks log warnings, don't fail builds
+- Q-029: HTTP server — Javalin 6 recommended, awaiting owner decision
+- Q-030: Upstream routing — single upstream per instance recommended
+- Q-031: Body limit — 10 MB default recommended
+- Q-032: TLS — plaintext only for v1 recommended
 
-## Next Session Focus
+## Carry-Forward Context
 
-Feature 004 (Standalone HTTP Proxy) — first adapter feature, validates the core API.
+- Feature 001 is ✅ Complete (53 tasks, 87 scenarios, all exit criteria met)
+- Feature 004 depends on Feature 001 (core engine)
+- ADR-0025 defines adapter lifecycle as adapter-scoped (no lifecycle methods in SPI)
+- GatewayAdapter SPI has 3 methods: wrapRequest, wrapResponse, applyChanges
