@@ -1,6 +1,6 @@
 # message-xform – Terminology
 
-Status: Draft | Last updated: 2026-02-08
+Status: Draft | Last updated: 2026-02-09
 
 This document defines common terms used across the message-xform docs and specs so we
 can use consistent vocabulary. It is the golden source for terminology — any new
@@ -320,6 +320,21 @@ terminology agreements must be captured here immediately.
     `ProxyHandler` filters `Content-Length` and `Transfer-Encoding` from upstream
     responses to prevent body truncation when response transforms change the body
     size.
+
+- **Problem detail** (`ProblemDetail`, RFC 9457)
+  - A standardised JSON error response format (`application/problem+json`) used
+    for all proxy-level errors: backend failures (502/504), body size violations
+    (413), non-JSON body on matched route (400), and method rejection (405).
+    Transform errors use the core `ErrorResponseBuilder` (ADR-0022) which produces
+    the same RFC 9457 structure. Every problem detail includes `type` (URN),
+    `title`, `status`, `detail`, and `instance` (request path) fields.
+
+- **Upstream exception** (`UpstreamException` hierarchy)
+  - Domain-specific exception classes for backend communication failures.
+    `UpstreamConnectException` covers connection refused and host unreachable
+    (→ 502 Bad Gateway). `UpstreamTimeoutException` covers read timeouts
+    (→ 504 Gateway Timeout). `ProxyHandler` catches these and converts them
+    to RFC 9457 problem details via `ProblemDetail`.
 
 - **Shadow JAR**
   - A single fat JAR containing the `core`, `adapter-standalone`, and all
