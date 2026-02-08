@@ -1,6 +1,6 @@
 # Knowledge Map
 
-Status: Draft | Last updated: 2026-02-07
+Status: Draft | Last updated: 2026-02-08
 
 This document maps the architectural relationships between modules, specs, ADRs,
 and key concepts in message-xform. It serves as a navigational aid for agents and
@@ -78,6 +78,11 @@ ADR-0018 (Body Buffer)   ──── governs ── FR-001-04, references ADR-0
 ADR-0019 (Sensitive)     ──── governs ── FR-001-01, NFR-001-06, references ADR-0015
 ADR-0020 (Nullable Status) ── governs ── FR-001-02, FR-001-11, references ADR-0017
 ADR-0021 (Query+Cookies) ─── governs ── FR-001-02, references ADR-0020, ADR-0004
+ADR-0022 (Error Response) ── governs ── FR-001-07, FR-001-06, references ADR-0001, ADR-0012, ADR-0013
+ADR-0023 (Cross-Profile)  ── governs ── FR-001-05, references ADR-0006
+ADR-0024 (Error Catalogue) ─ governs ── FR-001-07, FR-001-02, references ADR-0022, ADR-0001, ADR-0012, ADR-0019
+ADR-0025 (Adapter Lifecycle) governs ── Gateway Adapter SPI, references ADR-0023, ADR-0024
+ADR-0026 (Multi-Value Hdrs)  governs ── FR-001-10, references ADR-0002, ADR-0021
 ```
 
 ## Feature → ADR → NFR Traceability
