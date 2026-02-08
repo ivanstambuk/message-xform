@@ -823,7 +823,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
 
 #### I14 — Hot reload + atomic registry swap
 
-- [ ] **T-001-45** — TransformRegistry immutable snapshot (NFR-001-05)
+- [x] **T-001-45** — TransformRegistry immutable snapshot (NFR-001-05) ✅ 2026-02-08
   _Intent:_ Create the immutable registry object that holds all loaded
   specs and profiles. Used for atomic swap.
   _Test first:_ Write `TransformRegistryTest`:
@@ -835,6 +835,8 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   _Verification commands:_
   - `./gradlew :core:test --tests "*TransformRegistryTest*"`
   - `./gradlew spotlessApply check`
+  _Verification log:_ ✅ 9/9 tests pass. BUILD SUCCESSFUL. Immutable snapshot
+  with defensive copy, Builder pattern, empty() factory, allSpecs() unmodifiable view.
 
 - [ ] **T-001-46** — Atomic registry swap via reload() (NFR-001-05, API-001-04)
   _Intent:_ `TransformEngine.reload()` must atomically swap the registry
@@ -955,6 +957,7 @@ Track long-running or shared commands with timestamps to avoid duplicate work.
 - 2026-02-08 11:45 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — 133 tests passed after T-001-25
 - 2026-02-08 11:50 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — 138 tests passed after T-001-26
 - 2026-02-08 14:40 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — 271 tests passed after T-001-39..40 (Phase 6 complete)
+- 2026-02-08 15:32 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL — 300 tests passed after T-001-45
 
 ## Completion Criteria
 
