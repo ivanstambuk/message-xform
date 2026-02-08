@@ -1,33 +1,30 @@
-# Current Session
+# Current Session State
 
-**Feature**: 004 — Standalone HTTP Proxy Mode
-**Phase**: Phase 3 — Core Proxy: Handler + Upstream Client
-**Increment**: I5 — StandaloneAdapter + ProxyHandler
-**Status**: I4 complete, I5 not started
+**Feature:** 004 — Standalone HTTP Proxy Mode
+**Phase:** 3 — Core Proxy: Handler + Upstream Client
+**Increment:** I5 — StandaloneAdapter + ProxyHandler
+**Status:** I5 partially complete (StandaloneAdapter done, ProxyHandler next)
+**Last updated:** 2026-02-08T23:34+01:00
 
 ## Completed This Session
 
-- T-004-09 — UpstreamClient: basic forwarding (6 tests)
-- T-004-10 — UpstreamClient: HTTP/1.1 enforcement (1 test)
-- T-004-11 — UpstreamClient: Content-Length recalculation (3 tests)
-- T-004-12 — UpstreamClient: hop-by-hop header stripping (4 tests)
-- T-004-13 — UpstreamClient: backend error handling (4 tests)
-- T-004-14 — UpstreamClient: connection pool configuration (3 tests)
-
-**Total**: 6 tasks, 21 tests, 6 commits (d54c624..ccdca69)
+- T-004-15 — StandaloneAdapter.wrapRequest (10 tests, commit `c662cdc`)
+- T-004-16 — Cookie extraction into TransformContext (3 tests, commit `c969332`)
+- T-004-17 — Query param extraction into TransformContext (4 tests, commit `cd68bb5`)
+- T-004-18 — StandaloneAdapter.wrapResponse (6 tests, commit `61bb040`)
+- T-004-19 — StandaloneAdapter.applyChanges (4 tests, commit `2bbf08d`)
 
 ## Key Decisions
 
-- Mock backend strategy: JDK `com.sun.net.httpserver.HttpServer` (zero deps)
-- Domain exception hierarchy: UpstreamException → UpstreamConnectException, UpstreamTimeoutException
-- Content-Length and Host are restricted headers (JDK-managed)
-- All 8 RFC 7230 §6.1 hop-by-hop headers filtered in both directions
+- `buildTransformContext()` is a public method on StandaloneAdapter (not part of
+  the GatewayAdapter SPI) — ProxyHandler will call it separately to build the
+  TransformContext with cookies and query params.
+- Response headers are read from `ctx.res()` (servlet response), not `ctx.headerMap()`
+  (which is request headers).
+- `wrapResponse` content type is derived from response headers map, not `ctx.contentType()`.
 
-## Next
+## Next Up
 
-I5 — StandaloneAdapter + ProxyHandler (T-004-15..T-004-19):
-- T-004-15: StandaloneAdapter (GatewayAdapter for Javalin Context)
-- T-004-16: ProxyHandler: happy path
-- T-004-17: ProxyHandler: error responses (RFC 9457)
-- T-004-18: ProxyHandler: Javalin integration
-- T-004-19: ProxyHandler: body size limit enforcement
+- T-004-20 — ProxyHandler: passthrough cycle (integration test with mock backend)
+- T-004-21 — ProxyHandler: request transformation
+- T-004-22 — ProxyHandler: response transformation

@@ -77,5 +77,6 @@ core/src/main/java/io/messagexform/core/engine/TransformRegistry.java
 PLAN.md
 
 # Standalone proxy classes
+adapter-standalone/src/main/java/io/messagexform/standalone/adapter/StandaloneAdapter.java
 adapter-standalone/src/main/java/io/messagexform/standalone/proxy/UpstreamClient.java
 adapter-standalone/src/main/java/io/messagexform/standalone/proxy/UpstreamException.java
