@@ -1,0 +1,32 @@
+# Bidirectional transform profile for T-004-23
+# Both request and response transforms on the same path
+profile: bidirectional-profile
+description: "Profile for bidirectional transformation tests"
+version: "1.0.0"
+
+transforms:
+  - spec: request-body-transform@1.0.0
+    direction: request
+    match:
+      path: "/api/bidi"
+      method: POST
+
+  - spec: response-body-transform@1.0.0
+    direction: response
+    match:
+      path: "/api/bidi"
+      method: POST
+
+  # Request-only path (S-004-16: request transformed + response passthrough)
+  - spec: request-body-transform@1.0.0
+    direction: request
+    match:
+      path: "/api/req-only"
+      method: POST
+
+  # Response-only path (S-004-17: request passthrough + response transformed)
+  - spec: response-body-transform@1.0.0
+    direction: response
+    match:
+      path: "/api/resp-only"
+      method: POST

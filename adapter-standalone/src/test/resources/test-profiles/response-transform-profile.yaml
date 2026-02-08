@@ -1,0 +1,17 @@
+# Response transform profile for T-004-22
+profile: response-transform-profile
+description: "Profile for response transformation tests"
+version: "1.0.0"
+
+transforms:
+  - spec: response-body-transform@1.0.0
+    direction: response
+    match:
+      path: "/api/items"
+      method: GET
+
+  - spec: response-header-transform@1.0.0
+    direction: response
+    match:
+      path: "/api/headers"
+      method: GET

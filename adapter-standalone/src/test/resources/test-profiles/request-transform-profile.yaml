@@ -1,0 +1,24 @@
+# Request transform profile for T-004-21
+# Routes POST /api/orders to the request body transform spec
+profile: request-transform-profile
+description: "Profile for request transformation tests"
+version: "1.0.0"
+
+transforms:
+  - spec: request-body-transform@1.0.0
+    direction: request
+    match:
+      path: "/api/orders"
+      method: POST
+
+  - spec: request-header-transform@1.0.0
+    direction: request
+    match:
+      path: "/api/headers"
+      method: POST
+
+  - spec: request-body-transform@1.0.0
+    direction: request
+    match:
+      path: "/api/nullbody"
+      method: GET

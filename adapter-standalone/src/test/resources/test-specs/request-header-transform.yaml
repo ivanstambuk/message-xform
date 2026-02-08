@@ -1,0 +1,24 @@
+# Request header transform spec for T-004-21 (S-004-08)
+# Adds, removes, and renames headers.
+id: request-header-transform
+version: "1.0.0"
+description: "Transform request headers: add, remove, rename"
+
+input:
+  schema:
+    type: object
+output:
+  schema:
+    type: object
+
+transform:
+  lang: jslt
+  expr: |
+    .
+
+headers:
+  add:
+    x-transformed: "true"
+    x-correlation-id: "auto-generated"
+  remove:
+    - "x-internal-*"

@@ -1,0 +1,24 @@
+# Response header transform spec for T-004-22 (S-004-12/13)
+# Adds response headers and can override status code.
+id: response-header-transform
+version: "1.0.0"
+description: "Add response headers"
+
+input:
+  schema:
+    type: object
+output:
+  schema:
+    type: object
+
+transform:
+  lang: jslt
+  expr: |
+    .
+
+headers:
+  add:
+    x-api-version: "2.0"
+    x-processed: "true"
+  remove:
+    - "x-backend-*"

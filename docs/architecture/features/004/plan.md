@@ -216,6 +216,7 @@ _To be completed after implementation._
      FR-004-38, FR-004-39, IMPL-004-01, IMPL-004-02, S-004-01 through S-004-10.
    - _Commands:_ `./gradlew :adapter-standalone:test`, `./gradlew spotlessApply check`
    - _Exit:_ Full proxy cycle works. Passthrough and transform paths verified.
+   - _Result:_ T-004-15 through T-004-25 done (56 tests total). ProxyHandler passthrough, request/response/bidirectional transforms, dispatch table, X-Request-ID all verified. Content-length header filtering fix applied. I5 complete.
 
 ### Phase 4 — Error Handling + Body Size + Forwarded Headers (≤90 min)
 

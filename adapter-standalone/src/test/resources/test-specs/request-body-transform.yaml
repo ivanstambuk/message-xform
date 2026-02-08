@@ -1,0 +1,21 @@
+# Request body transform spec for T-004-21 (S-004-07)
+# Renames fields and restructures the body.
+id: request-body-transform
+version: "1.0.0"
+description: "Transform order request: external schema → internal schema"
+
+input:
+  schema:
+    type: object
+output:
+  schema:
+    type: object
+
+transform:
+  lang: jslt
+  expr: |
+    {
+      "orderId": .order_id,
+      "customerName": .customer_name,
+      "totalAmount": .total
+    }

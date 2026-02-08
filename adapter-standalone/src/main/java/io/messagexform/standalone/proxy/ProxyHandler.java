@@ -9,6 +9,7 @@ import io.messagexform.core.model.TransformContext;
 import io.messagexform.core.model.TransformResult;
 import io.messagexform.standalone.adapter.StandaloneAdapter;
 import java.util.Map;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -73,8 +74,17 @@ public final class ProxyHandler implements Handler {
         this.upstreamClient = upstreamClient;
     }
 
+    private static final String REQUEST_ID_HEADER = "x-request-id";
+
     @Override
     public void handle(Context ctx) throws Exception {
+        // --- Step 0: X-Request-ID extraction/generation (FR-004-38) ---
+        String requestId = ctx.header("X-Request-ID");
+        if (requestId == null || requestId.isEmpty()) {
+            requestId = UUID.randomUUID().toString();
+        }
+        ctx.header(REQUEST_ID_HEADER, requestId);
+
         // --- Step 1: Build TransformContext from request (cookies, query params) ---
         TransformContext transformContext = adapter.buildTransformContext(ctx);
 
@@ -125,7 +135,15 @@ public final class ProxyHandler implements Handler {
         // --- Step 6: Populate Javalin context with upstream response (FR-004-06a) ---
         ctx.result(upstreamResponse.body());
         ctx.status(upstreamResponse.statusCode());
-        upstreamResponse.headers().forEach(ctx::header);
+        // Forward response headers, but skip framing headers (content-length,
+        // transfer-encoding) — Javalin/Jetty manages these based on the actual
+        // body written to ctx.result(). If we forwarded them, a response
+        // transformation that changes the body size would cause truncation.
+        upstreamResponse.headers().forEach((name, value) -> {
+            if (!"content-length".equalsIgnoreCase(name) && !"transfer-encoding".equalsIgnoreCase(name)) {
+                ctx.header(name, value);
+            }
+        });
 
         // --- Step 7: Wrap the response → Message ---
         Message responseMessage = adapter.wrapResponse(ctx);

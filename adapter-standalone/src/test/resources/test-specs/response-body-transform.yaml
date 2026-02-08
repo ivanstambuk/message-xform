@@ -1,0 +1,23 @@
+# Response body transform spec for T-004-22 (S-004-11)
+# Normalizes backend response into a standard envelope.
+id: response-body-transform
+version: "1.0.0"
+description: "Wrap backend response in standard envelope"
+
+input:
+  schema:
+    type: object
+output:
+  schema:
+    type: object
+
+transform:
+  lang: jslt
+  expr: |
+    {
+      "success": true,
+      "data": {
+        "name": .name,
+        "value": .value
+      }
+    }

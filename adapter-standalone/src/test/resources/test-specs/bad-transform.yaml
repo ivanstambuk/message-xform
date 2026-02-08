@@ -1,0 +1,17 @@
+# Spec that compiles successfully but always fails at runtime (S-004-09, S-004-14)
+# Uses JSLT error() function to force a runtime TransformEvalException
+id: bad-transform
+version: "1.0.0"
+description: "Always-failing transform for error handling tests"
+
+input:
+  schema:
+    type: object
+output:
+  schema:
+    type: object
+
+transform:
+  lang: jslt
+  expr: |
+    error("forced-test-error")

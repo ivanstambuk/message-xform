@@ -1,0 +1,11 @@
+# Profile for RequestIdTest error scenario (S-004-73)
+profile: request-id-error-profile
+description: "Profile that triggers a request transform error for request-id tests"
+version: "1.0.0"
+
+transforms:
+  - spec: bad-transform@1.0.0
+    direction: request
+    match:
+      path: "/api/rid-error"
+      method: POST

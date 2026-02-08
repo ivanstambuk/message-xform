@@ -1,0 +1,33 @@
+# Error transform profiles for DispatchTableTest (T-004-24)
+profile: dispatch-table-profile
+description: "Profile for dispatch table verification tests"
+version: "1.0.0"
+
+transforms:
+  # SUCCESS path: request body transform
+  - spec: request-body-transform@1.0.0
+    direction: request
+    match:
+      path: "/api/dispatch-success"
+      method: POST
+
+  # Response SUCCESS: response body transform
+  - spec: response-body-transform@1.0.0
+    direction: response
+    match:
+      path: "/api/dispatch-resp-success"
+      method: GET
+
+  # REQUEST ERROR: bad transform on request
+  - spec: bad-transform@1.0.0
+    direction: request
+    match:
+      path: "/api/dispatch-req-error"
+      method: POST
+
+  # RESPONSE ERROR: bad transform on response
+  - spec: bad-transform@1.0.0
+    direction: response
+    match:
+      path: "/api/dispatch-resp-error"
+      method: GET

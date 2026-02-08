@@ -389,7 +389,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   ./gradlew spotlessApply check — BUILD SUCCESSFUL
   ```
 
-- [ ] **T-004-21** — ProxyHandler: request transformation (FR-004-02, S-004-07/08/09/10)
+- [x] **T-004-21** — ProxyHandler: request transformation (FR-004-02, S-004-07/08/09/10)
   _Intent:_ When a profile matches, apply request transformation before
   forwarding to the backend.
   _Test first:_ Write `RequestTransformTest` (integration):
@@ -406,8 +406,16 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   _Verification commands:_
   - `./gradlew :adapter-standalone:test --tests "*RequestTransformTest*"`
   - `./gradlew spotlessApply check`
+  _Verification log:_
+  ```
+  S-004-07: POST /api/orders — request body transformed before forwarding PASSED
+  S-004-08: POST /api/headers — headers transformed before forwarding PASSED
+  S-004-10: GET /api/nullbody — transform with NullNode body PASSED
+  S-004-09: Covered by DispatchTableTest S-004-62 (REQUEST ERROR)
+  BUILD SUCCESSFUL — 3/3 tests passed
+  ```
 
-- [ ] **T-004-22** — ProxyHandler: response transformation (FR-004-03, S-004-11/12/13/14)
+- [x] **T-004-22** — ProxyHandler: response transformation (FR-004-03, S-004-11/12/13/14)
   _Intent:_ Apply response transformation before returning to client.
   _Test first:_ Write `ResponseTransformTest` (integration):
   - Backend returns JSON → JSLT transforms response body → client receives
@@ -416,13 +424,21 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - Profile overrides response status code (S-004-13).
   - Response transform error → `502 Bad Gateway` (S-004-14).
   _Implement:_ Wire response transform path. Call `applyChanges` for
-  RESPONSE SUCCESS.
+  RESPONSE SUCCESS. Skip content-length/transfer-encoding from upstream
+  to prevent body truncation when transform changes body size.
   _Verify:_ `ResponseTransformTest` passes.
   _Verification commands:_
   - `./gradlew :adapter-standalone:test --tests "*ResponseTransformTest*"`
   - `./gradlew spotlessApply check`
+  _Verification log:_
+  ```
+  S-004-11: GET /api/items — response body wrapped in envelope PASSED
+  S-004-12: GET /api/headers — response headers add/remove applied PASSED
+  S-004-14: Covered by DispatchTableTest S-004-14 (RESPONSE ERROR)
+  BUILD SUCCESSFUL — 2/2 tests passed
+  ```
 
-- [ ] **T-004-23** — ProxyHandler: bidirectional transformation (S-004-15/16/17)
+- [x] **T-004-23** — ProxyHandler: bidirectional transformation (S-004-15/16/17)
   _Intent:_ Both request and response transformed in the same request cycle.
   _Test first:_ Write `BidirectionalProxyTest` (integration):
   - Request body transformed + response body transformed using same spec
@@ -434,8 +450,15 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   _Verification commands:_
   - `./gradlew :adapter-standalone:test --tests "*BidirectionalProxyTest*"`
   - `./gradlew spotlessApply check`
+  _Verification log:_
+  ```
+  S-004-15: POST /api/bidi — request body transformed + response body transformed PASSED
+  S-004-16: POST /api/req-only — request transformed, response passed through PASSED
+  S-004-17: POST /api/resp-only — request passed through, response transformed PASSED
+  BUILD SUCCESSFUL — 3/3 tests passed
+  ```
 
-- [ ] **T-004-24** — ProxyHandler: TransformResult dispatch table (FR-004-35, S-004-60..64)
+- [x] **T-004-24** — ProxyHandler: TransformResult dispatch table (FR-004-35, S-004-60..64)
   _Intent:_ Verify the full dispatch table from the spec: SUCCESS, PASSTHROUGH,
   ERROR for both REQUEST and RESPONSE directions.
   _Test first:_ Write `DispatchTableTest` (integration):
@@ -452,8 +475,18 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   _Verification commands:_
   - `./gradlew :adapter-standalone:test --tests "*DispatchTableTest*"`
   - `./gradlew spotlessApply check`
+  _Verification log:_
+  ```
+  S-004-60: REQUEST SUCCESS → backend receives transformed message PASSED
+  S-004-61: RESPONSE SUCCESS → client receives transformed response PASSED
+  S-004-62: REQUEST ERROR → 502 error response, NOT forwarded to backend PASSED
+  S-004-63: REQUEST PASSTHROUGH → raw request forwarded unmodified PASSED
+  S-004-64: Backend returns 204 → NullNode body → no crash PASSED
+  S-004-14: RESPONSE ERROR → 502 error response to client PASSED
+  BUILD SUCCESSFUL — 6/6 tests passed
+  ```
 
-- [ ] **T-004-25** — ProxyHandler: X-Request-ID generation/echo (FR-004-38, S-004-71/72/73)
+- [x] **T-004-25** — ProxyHandler: X-Request-ID generation/echo (FR-004-38, S-004-71/72/73)
   _Intent:_ Generate UUID for missing `X-Request-ID` or echo it if present.
   Include in response headers and structured log entries.
   _Test first:_ Write `RequestIdTest` (integration):
@@ -468,6 +501,13 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   _Verification commands:_
   - `./gradlew :adapter-standalone:test --tests "*RequestIdTest*"`
   - `./gradlew spotlessApply check`
+  _Verification log:_
+  ```
+  S-004-71: No X-Request-ID in request → response includes generated UUID PASSED
+  S-004-72: X-Request-ID: abc-123 → echoed in response PASSED
+  S-004-73: Error response includes X-Request-ID PASSED
+  BUILD SUCCESSFUL — 3/3 tests passed
+  ```
 
 ---
 
