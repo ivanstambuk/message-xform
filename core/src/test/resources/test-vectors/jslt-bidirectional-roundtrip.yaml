@@ -1,0 +1,78 @@
+# FX-001-04: Bidirectional JSLT — forward + reverse with round-trip
+# Scenario alignment: S-001-02 (bidirectional transform: forward applied to
+#                      response, reverse applied to request)
+#
+# This fixture exercises:
+#   - Bidirectional spec format (forward.expr + reverse.expr)
+#   - Round-trip property: reverse(forward(input)) ≈ input
+#   - Field renaming in both directions
+#   - Structural nesting (forward) / flattening (reverse)
+#
+# Use case: Internal DB record (snake_case, flat) ↔ API response
+#           (camelCase, nested contact block).
+#
+# Limitations: String concatenation in forward (displayName) is lossy —
+# the reverse direction cannot perfectly reconstruct first_name/last_name
+# from a single displayName. The round-trip test uses a scenario where
+# first_name alone is sufficient (last_name empty), or we accept that
+# round-trip on the full envelope (minus derived fields) holds.
+
+id: bidirectional-roundtrip
+version: "1.0.0"
+description: "Bidirectional user profile: DB record ↔ API response"
+
+input:
+  schema:
+    type: object
+    required: [user_id, email_address]
+    properties:
+      user_id:
+        type: string
+      email_address:
+        type: string
+        format: email
+      phone_number:
+        type: string
+      is_active:
+        type: boolean
+
+output:
+  schema:
+    type: object
+    required: [userId, contact]
+    properties:
+      userId:
+        type: string
+      contact:
+        type: object
+        required: [email]
+        properties:
+          email:
+            type: string
+            format: email
+          phone:
+            type: string
+      active:
+        type: boolean
+
+forward:
+  lang: jslt
+  expr: |
+    {
+      "userId": .user_id,
+      "contact": {
+        "email": .email_address,
+        "phone": .phone_number
+      },
+      "active": .is_active
+    }
+
+reverse:
+  lang: jslt
+  expr: |
+    {
+      "user_id": .userId,
+      "email_address": .contact.email,
+      "phone_number": .contact.phone,
+      "is_active": .active
+    }
