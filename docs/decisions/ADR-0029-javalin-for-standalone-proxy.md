@@ -97,7 +97,12 @@ Follow-ups:
 
 References:
 - Research: `docs/research/standalone-proxy-http-server.md`
-- Feature 004 stub: `docs/architecture/features/004/spec.md`
+- Feature 004 spec: `docs/architecture/features/004/spec.md`
 - ADR-0025 – Adapter Lifecycle is Adapter-Scoped
 - ADR-0013 – Copy-on-Wrap Message Adapter
 - NFR-001-02 – Zero gateway-specific dependencies in core
+
+Validating scenarios:
+- S-004-01 through S-004-06 — basic proxy operation validates Javalin serves traffic
+- S-004-44 — clean startup validates Javalin + Jetty lifecycle
+- S-004-52 — HTTP/1.1 enforced validates JDK `HttpClient` upstream config

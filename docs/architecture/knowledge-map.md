@@ -98,6 +98,7 @@ ADR-0025 (Adapter Lifecycle) governs ── Gateway Adapter SPI, references ADR-
 ADR-0026 (Multi-Value Hdrs)  governs ── FR-001-10, references ADR-0002, ADR-0021
 ADR-0027 (URL Rewriting)     governs ── FR-001-12, references ADR-0002, ADR-0003, ADR-0013
 ADR-0028 (Perf Strategy)     governs ── NFR-001-03, references Feature 009
+ADR-0029 (Javalin Proxy)     governs ── FR-004-01, references ADR-0025, ADR-0013
 ```
 
 ## Feature → ADR → NFR Traceability
@@ -120,6 +121,8 @@ ADR-0028 (Perf Strategy)     governs ── NFR-001-03, references Feature 009
 | FR-001-12 (URL Rewriting) | ADR-0027 | — |
 | NFR-001-03 (Latency) | ADR-0028 | NFR-001-03 |
 | Hot Reload | — | NFR-001-05 |
+| FR-004-01 (Standalone Proxy) | ADR-0029 | NFR-004-01 through NFR-004-07 |
+| Feature 004 Docker/K8s | — | NFR-004-04 |
 
 ## Research Documents
 
@@ -128,3 +131,4 @@ ADR-0028 (Perf Strategy)     governs ── NFR-001-03, references Feature 009
 | `docs/research/pingam-callback-api.md` | PingAM callback API analysis | Feature 001 scenarios |
 | `docs/research/gateway-extension-models.md` | Gateway adapter comparison | Features 002–008 |
 | `docs/research/t-001-12-jslt-context-variables.md` | JSLT context variable binding approach | T-001-10 (JsltExpressionEngine), ADR-0021 |
+| `docs/research/standalone-proxy-http-server.md` | HTTP server evaluation for standalone proxy | Feature 004, ADR-0029 |

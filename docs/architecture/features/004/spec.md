@@ -79,8 +79,8 @@ no changes).
 | ID | Requirement | Success path | Validation path | Failure path | Source |
 |----|-------------|--------------|-----------------|--------------|--------|
 | FR-004-01 | The proxy MUST receive HTTP requests on a configurable host and port, forward them to the configured backend, and return the backend's response to the client. | Client sends `GET /api/users` → proxy forwards to `backend:8080/api/users` → backend returns 200 → proxy returns 200 to client. | Startup fails if `proxy.port` is already in use or `backend.host` is missing. | Backend unreachable → proxy returns `502 Bad Gateway` with RFC 9457 error body. | Core proxy behaviour. |
-| FR-004-02 | The proxy MUST apply **request transformation** via `TransformEngine.transform(message, REQUEST)` before forwarding to the backend. | Profile matches `POST /api/orders` → JSLT transforms request body → transformed body sent to backend. | Non-matching request → `PASSTHROUGH` → original request forwarded unmodified. | Transform error → proxy returns error response to client (FR-004-12), request is NOT forwarded. | GatewayAdapter SPI, Feature 001. |
-| FR-004-03 | The proxy MUST apply **response transformation** via `TransformEngine.transform(message, RESPONSE)` before returning the backend's response to the client. | Profile matches response → JSLT transforms response body → transformed body returned to client. | Non-matching response → `PASSTHROUGH` → original response returned unmodified. | Transform error → proxy returns error response to client (FR-004-12). | GatewayAdapter SPI, Feature 001. |
+| FR-004-02 | The proxy MUST apply **request transformation** via `TransformEngine.transform(message, REQUEST)` before forwarding to the backend. | Profile matches `POST /api/orders` → JSLT transforms request body → transformed body sent to backend. | Non-matching request → `PASSTHROUGH` → original request forwarded unmodified. | Transform error → proxy returns error response to client (FR-004-23), request is NOT forwarded. | GatewayAdapter SPI, Feature 001. |
+| FR-004-03 | The proxy MUST apply **response transformation** via `TransformEngine.transform(message, RESPONSE)` before returning the backend's response to the client. | Profile matches response → JSLT transforms response body → transformed body returned to client. | Non-matching response → `PASSTHROUGH` → original response returned unmodified. | Transform error → proxy returns error response to client (FR-004-23). | GatewayAdapter SPI, Feature 001. |
 | FR-004-04 | The proxy MUST forward the HTTP method, path, query string, and headers from the (potentially transformed) request to the backend. | `PUT /api/users/123?fields=name` with `Authorization: Bearer xxx` → all forwarded to backend. | Hop-by-hop headers (`Connection`, `Transfer-Encoding`, etc.) MUST be stripped per RFC 7230 §6.1. | n/a | HTTP proxy semantics. |
 | FR-004-05 | The proxy MUST support `GET`, `POST`, `PUT`, `DELETE`, `PATCH`, `HEAD`, and `OPTIONS` HTTP methods. | All seven methods are proxied without modification (unless a URL rewrite transform changes the method). | Unknown method → proxy returns `405 Method Not Allowed`. | n/a | HTTP/1.1a standard. |
 
@@ -149,7 +149,7 @@ no changes).
 
 | ID | Requirement | Success path | Validation path | Failure path | Source |
 |----|-------------|--------------|-----------------|--------------|--------|
-| FR-004-27 | On startup, the proxy MUST: (1) load config, (2) load and compile all specs, (3) load active profile, (4) initialize the HTTP client, (5) start the HTTP server, (6) start the file watcher. | Proxy starts in <2s, logs structured startup summary with port, backend, spec count. | Config validation errors → exit with non-zero status and descriptive message. | Spec load errors → startup fails with `TransformLoadException` (ADR-0024). | ADR-0025. |
+| FR-004-27 | On startup, the proxy MUST: (1) load config, (2) load and compile all specs, (3) load active profile, (4) initialize the HTTP client, (5) start the HTTP server, (6) start the file watcher. | Proxy starts in <3s (NFR-004-01), logs structured startup summary with port, backend, spec count. | Config validation errors → exit with non-zero status and descriptive message. | Spec load errors → startup fails with `TransformLoadException` (ADR-0024). | ADR-0025. |
 | FR-004-28 | On shutdown (SIGTERM/SIGINT), the proxy MUST: (1) stop accepting new connections, (2) wait for in-flight requests to complete (graceful drain, max 30s), (3) close the HTTP client, (4) stop the file watcher, (5) exit. | Ctrl-C → graceful shutdown within 30s → exit 0. | In-flight requests complete normally during shutdown. | Drain timeout exceeded → force close remaining connections → exit 0. | Production deployment. |
 
 ### Docker & Kubernetes
@@ -294,6 +294,13 @@ no changes).
 | S-004-49 | **Docker run:** `docker run -e BACKEND_HOST=httpbin.org -e BACKEND_PORT=80 message-xform-proxy` starts and serves traffic. |
 | S-004-50 | **Volume mount:** `docker run -v ./specs:/specs` → specs loaded from mounted volume. |
 | S-004-51 | **Shadow JAR:** `java -jar proxy.jar` starts the proxy with no classpath issues. |
+
+### Category 12 — Upstream Protocol
+
+| Scenario ID | Description / Expected outcome |
+|-------------|--------------------------------|
+| S-004-52 | **HTTP/1.1 enforced:** Upstream request uses HTTP/1.1 regardless of client protocol version (FR-004-33). |
+| S-004-53 | **Content-Length recalculated:** After request body transform changes size, upstream receives correct `Content-Length` (FR-004-34). |
 
 ---
 
@@ -462,7 +469,7 @@ no changes).
                     │                                                  │
                     │  ┌──────────┐  ┌──────────┐  ┌──────────┐       │
                     │  │ /health  │  │ /ready   │  │ /admin/  │       │
-                    │  │ liveness │  │ readness │  │  reload  │       │
+                    │  │ liveness │  │ readiness│  │  reload  │       │
                     │  └──────────┘  └──────────┘  └──────────┘       │
                     │                                                  │
                     │  ┌──────────────────────────────────────┐       │

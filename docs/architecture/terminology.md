@@ -263,6 +263,34 @@ terminology agreements must be captured here immediately.
     all log entries and telemetry events (NFR-001-10). The engine participates in the
     caller's trace — it does not create new traces.
 
+## Standalone proxy (Feature 004)
+
+- **Standalone proxy** (`adapter-standalone`)
+  - The message-xform engine running as an independent HTTP reverse proxy without
+    any gateway product. Receives HTTP requests, applies transform profiles via the
+    `TransformEngine`, forwards to a configured backend, transforms the response,
+    and returns to the client. Deployed as a shadow JAR or Docker image.
+  - Implements `GatewayAdapter<Context>` using Javalin 6 (Jetty 12) with Java 21
+    virtual threads (ADR-0029).
+  - Serves as the **reference adapter** — the first concrete `GatewayAdapter`
+    implementation and the pattern for all subsequent gateway adapters.
+
+- **Sidecar pattern**
+  - A Kubernetes deployment model where the standalone proxy runs as a container
+    alongside the backend application in the same pod. Traffic flows through the
+    proxy for transformation before reaching the backend. The proxy uses
+    `localhost` as the backend host.
+
+- **Upstream client** (`UpstreamClient`)
+  - The component that forwards (potentially transformed) HTTP requests to the
+    configured backend. Uses JDK `HttpClient` with HTTP/1.1. Recalculates
+    `Content-Length` after body transformation.
+
+- **Shadow JAR**
+  - A single fat JAR containing the `core`, `adapter-standalone`, and all
+    transitive dependencies. Produced by the Gradle Shadow plugin. The Docker
+    image runs `java -jar proxy.jar` with no classpath setup required.
+
 ## Wording conventions
 
 - Use **"transform spec"** for the transformation definition YAML.

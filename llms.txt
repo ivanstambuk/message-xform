@@ -11,6 +11,9 @@ docs/architecture/terminology.md
 docs/architecture/features/001/spec.md
 docs/architecture/features/001/scenarios.md
 
+# Feature 004 — Standalone HTTP Proxy Mode
+docs/architecture/features/004/spec.md
+
 # Architecture decisions (newest first)
 docs/decisions/ADR-0021-query-params-and-cookies-in-context.md
 docs/decisions/ADR-0020-nullable-status-code.md
@@ -33,6 +36,7 @@ docs/decisions/ADR-0025-adapter-lifecycle-is-adapter-scoped.md
 docs/decisions/ADR-0026-multi-value-header-access.md
 docs/decisions/ADR-0027-url-rewriting.md
 docs/decisions/ADR-0028-performance-testing-strategy.md
+docs/decisions/ADR-0029-javalin-for-standalone-proxy.md
 docs/decisions/ADR-0022-error-response-on-transform-failure.md
 docs/decisions/ADR-0006-profile-match-resolution.md
 docs/decisions/ADR-0005-profile-spec-version-pinning.md
@@ -51,6 +55,7 @@ docs/research/pingaccess-docker-and-sdk.md
 docs/research/gateway-candidates.md
 docs/research/pingam-callback-api.md
 docs/research/t-001-12-jslt-context-variables.md
+docs/research/standalone-proxy-http-server.md
 
 # Implementation tracking
 docs/architecture/features/001/tasks.md
