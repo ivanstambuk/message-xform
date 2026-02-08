@@ -778,7 +778,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `./gradlew :core:test --tests "*StructuredLoggingTest*"`
   - `./gradlew spotlessApply check`
 
-- [ ] **T-001-42** — TelemetryListener SPI (NFR-001-09)
+- [x] **T-001-42** — TelemetryListener SPI (NFR-001-09) ✅ 2026-02-08
   _Intent:_ Define the telemetry SPI so adapters can hook into OTel or
   Micrometer without adding those dependencies to core.
   _Test first:_ Write `TelemetryListenerTest`:

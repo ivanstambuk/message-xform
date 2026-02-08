@@ -10,6 +10,7 @@ import com.networknt.schema.ValidationMessage;
 import io.messagexform.core.engine.EngineRegistry;
 import io.messagexform.core.error.ExpressionCompileException;
 import io.messagexform.core.error.SchemaValidationException;
+import io.messagexform.core.error.SensitivePathSyntaxError;
 import io.messagexform.core.error.SpecParseException;
 import io.messagexform.core.model.ApplyStep;
 import io.messagexform.core.model.HeaderSpec;
@@ -137,6 +138,9 @@ public final class SpecParser {
         Map<String, CompiledExpression> compiledMappers = parseMappers(root, engine, id, source);
         List<ApplyStep> applySteps = parseApplyDirective(transformBlock, compiledMappers, id, source);
 
+        // Parse optional sensitive paths (NFR-001-06, ADR-0019, T-001-43)
+        List<String> sensitivePaths = parseSensitivePaths(root, id, source);
+
         return new TransformSpec(
                 id,
                 version,
@@ -150,7 +154,8 @@ public final class SpecParser {
                 headerSpec,
                 statusSpec,
                 urlSpec,
-                applySteps);
+                applySteps,
+                sensitivePaths);
     }
 
     /**
@@ -480,6 +485,64 @@ public final class SpecParser {
     }
 
     // --- Private helpers ---
+
+    /**
+     * Parses the optional {@code sensitive} block from the spec YAML
+     * (NFR-001-06, ADR-0019, T-001-43).
+     *
+     * <p>
+     * Each entry must be a valid RFC 9535 JSONPath expression starting
+     * with {@code $}. Invalid syntax triggers {@link SensitivePathSyntaxError}
+     * at load time.
+     *
+     * @return immutable list of validated paths, or null if no sensitive block
+     */
+    private List<String> parseSensitivePaths(JsonNode root, String specId, String source) {
+        JsonNode sensitiveNode = root.get("sensitive");
+        if (sensitiveNode == null || sensitiveNode.isNull()) {
+            return null;
+        }
+        if (!sensitiveNode.isArray()) {
+            throw new SpecParseException("'sensitive' must be a YAML list of JSON path expressions", specId, source);
+        }
+
+        List<String> paths = new ArrayList<>();
+        for (JsonNode pathNode : sensitiveNode) {
+            if (!pathNode.isTextual()) {
+                throw new SensitivePathSyntaxError(
+                        "Sensitive path entry must be a string, got: " + pathNode.getNodeType(), specId, source);
+            }
+            String path = pathNode.asText();
+            validateSensitivePath(path, specId, source);
+            paths.add(path);
+        }
+        return Collections.unmodifiableList(paths);
+    }
+
+    /**
+     * Validates that a sensitive path conforms to RFC 9535 JSONPath syntax.
+     * Minimum requirements: must start with '$', must contain only valid
+     * segment characters (dot-notation with optional [*] wildcards).
+     */
+    private void validateSensitivePath(String path, String specId, String source) {
+        if (path == null || path.isBlank()) {
+            throw new SensitivePathSyntaxError("Sensitive path must not be blank", specId, source);
+        }
+        if (!path.startsWith("$")) {
+            throw new SensitivePathSyntaxError(
+                    "Invalid sensitive path '" + path + "' — must start with '$' (RFC 9535)", specId, source);
+        }
+        // Validate path segments: after '$', expect dot-separated identifiers
+        // with optional [*] or [n] array accessors
+        String afterRoot = path.substring(1);
+        if (!afterRoot.isEmpty() && !afterRoot.matches("(\\.[a-zA-Z_][a-zA-Z0-9_]*(\\[\\*?\\d*\\])*)*")) {
+            throw new SensitivePathSyntaxError(
+                    "Invalid sensitive path syntax '" + path
+                            + "' — expected RFC 9535 dot-notation with optional [*] wildcards",
+                    specId,
+                    source);
+        }
+    }
 
     private JsonNode readYaml(Path path, String source) {
         try {
