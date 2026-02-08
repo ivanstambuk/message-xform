@@ -1,0 +1,12 @@
+# Has transform block but no 'expr' key inside it
+id: "missing-expr"
+version: "1.0.0"
+input:
+  schema:
+    type: object
+output:
+  schema:
+    type: object
+transform:
+  lang: "jslt"
+  # 'expr' key is intentionally missing

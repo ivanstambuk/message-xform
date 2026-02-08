@@ -1,0 +1,11 @@
+id: "bad-jslt"
+version: "1.0.0"
+lang: "jslt"
+input:
+  schema:
+    type: object
+output:
+  schema:
+    type: object
+transform:
+  expr: "{ this is not valid JSLT %%% }"

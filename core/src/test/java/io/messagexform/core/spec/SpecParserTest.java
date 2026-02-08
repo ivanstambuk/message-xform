@@ -1,23 +1,27 @@
 package io.messagexform.core.spec;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.messagexform.core.engine.EngineRegistry;
 import io.messagexform.core.engine.jslt.JsltExpressionEngine;
+import io.messagexform.core.error.ExpressionCompileException;
+import io.messagexform.core.error.SpecParseException;
 import io.messagexform.core.model.TransformContext;
 import io.messagexform.core.model.TransformSpec;
 import java.nio.file.Path;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 /**
- * Tests for {@link SpecParser} (T-001-14, FR-001-01, DO-001-02). Verifies that
- * valid spec YAML
- * files are parsed into correct {@link TransformSpec} instances and that
- * compiled expressions
- * produce correct output.
+ * Tests for {@link SpecParser} (T-001-14 + T-001-15, FR-001-01, FR-001-07,
+ * DO-001-02). Verifies that valid spec YAML files are parsed into correct
+ * {@link TransformSpec} instances, that compiled expressions produce correct
+ * output, and that invalid specs produce the correct typed exceptions.
  */
 class SpecParserTest {
 
@@ -71,15 +75,15 @@ class SpecParserTest {
         TransformSpec spec = parser.parse(fixturePath("jslt-simple-rename.yaml"));
 
         JsonNode input = MAPPER.readTree("""
-                        {
-                          "user_id": "usr-42",
-                          "first_name": "Bob",
-                          "last_name": "Jensen",
-                          "email_address": "bjensen@example.com",
-                          "phone_number": "+31-6-12345678",
-                          "is_active": true
-                        }
-                        """);
+        {
+          "user_id": "usr-42",
+          "first_name": "Bob",
+          "last_name": "Jensen",
+          "email_address": "bjensen@example.com",
+          "phone_number": "+31-6-12345678",
+          "is_active": true
+        }
+        """);
 
         JsonNode output = spec.compiledExpr().evaluate(input, TransformContext.empty());
 
@@ -107,11 +111,11 @@ class SpecParserTest {
         TransformSpec spec = parser.parse(fixturePath("jslt-conditional.yaml"));
 
         JsonNode input = MAPPER.readTree("""
-                        {
-                          "error": "invalid_grant",
-                          "error_description": "The provided grant is invalid"
-                        }
-                        """);
+        {
+          "error": "invalid_grant",
+          "error_description": "The provided grant is invalid"
+        }
+        """);
 
         JsonNode output = spec.compiledExpr().evaluate(input, TransformContext.empty());
 
@@ -125,11 +129,11 @@ class SpecParserTest {
         TransformSpec spec = parser.parse(fixturePath("jslt-conditional.yaml"));
 
         JsonNode input = MAPPER.readTree("""
-                        {
-                          "id": "usr-42",
-                          "name": "Bob Jensen"
-                        }
-                        """);
+        {
+          "id": "usr-42",
+          "name": "Bob Jensen"
+        }
+        """);
 
         JsonNode output = spec.compiledExpr().evaluate(input, TransformContext.empty());
 
@@ -156,28 +160,28 @@ class SpecParserTest {
         TransformSpec spec = parser.parse(fixturePath("jslt-array-reshape.yaml"));
 
         JsonNode input = MAPPER.readTree("""
-                        {
-                          "totalResults": 2,
-                          "startIndex": 1,
-                          "itemsPerPage": 10,
-                          "Resources": [
-                            {
-                              "id": "u-1",
-                              "userName": "bjensen",
-                              "displayName": "Bob Jensen",
-                              "emails": [{"value": "bjensen@example.com", "type": "work", "primary": true}],
-                              "active": true
-                            },
-                            {
-                              "id": "u-2",
-                              "userName": "jsmith",
-                              "displayName": "Jane Smith",
-                              "emails": [{"value": "jsmith@example.com", "type": "work"}],
-                              "active": false
-                            }
-                          ]
-                        }
-                        """);
+        {
+          "totalResults": 2,
+          "startIndex": 1,
+          "itemsPerPage": 10,
+          "Resources": [
+            {
+              "id": "u-1",
+              "userName": "bjensen",
+              "displayName": "Bob Jensen",
+              "emails": [{"value": "bjensen@example.com", "type": "work", "primary": true}],
+              "active": true
+            },
+            {
+              "id": "u-2",
+              "userName": "jsmith",
+              "displayName": "Jane Smith",
+              "emails": [{"value": "jsmith@example.com", "type": "work"}],
+              "active": false
+            }
+          ]
+        }
+        """);
 
         JsonNode output = spec.compiledExpr().evaluate(input, TransformContext.empty());
 
@@ -217,9 +221,166 @@ class SpecParserTest {
         assertThat(spec.lang()).isEqualTo("jslt");
     }
 
+    // --- T-001-15: Error handling (FR-001-01, FR-001-07) ---
+
+    @Nested
+    @DisplayName("T-001-15: Spec parse error handling")
+    class ErrorHandlingTest {
+
+        @Test
+        @DisplayName("Invalid YAML syntax → SpecParseException")
+        void invalidYaml_throwsSpecParseException() {
+            Path path = invalidFixturePath("invalid-yaml-syntax.yaml");
+
+            assertThatThrownBy(() -> parser.parse(path))
+                    .isInstanceOf(SpecParseException.class)
+                    .hasMessageContaining("Failed to read or parse YAML")
+                    .satisfies(ex -> {
+                        SpecParseException spe = (SpecParseException) ex;
+                        assertThat(spe.specId()).isNull();
+                        assertThat(spe.source()).isEqualTo(path.toString());
+                    });
+        }
+
+        @Test
+        @DisplayName("Unknown engine id (lang: nonexistent) → ExpressionCompileException")
+        void unknownEngine_throwsExpressionCompileException() {
+            Path path = invalidFixturePath("unknown-engine.yaml");
+
+            assertThatThrownBy(() -> parser.parse(path))
+                    .isInstanceOf(ExpressionCompileException.class)
+                    .hasMessageContaining("Unknown expression engine")
+                    .hasMessageContaining("nonexistent")
+                    .satisfies(ex -> {
+                        ExpressionCompileException ece = (ExpressionCompileException) ex;
+                        assertThat(ece.specId()).isEqualTo("unknown-engine-spec");
+                        assertThat(ece.source()).isEqualTo(path.toString());
+                    });
+        }
+
+        @Test
+        @DisplayName("Invalid JSLT syntax → ExpressionCompileException")
+        void badJsltSyntax_throwsExpressionCompileException() {
+            Path path = invalidFixturePath("bad-jslt-syntax.yaml");
+
+            assertThatThrownBy(() -> parser.parse(path))
+                    .isInstanceOf(ExpressionCompileException.class)
+                    .hasMessageContaining("Failed to compile expression")
+                    .hasMessageContaining("bad-jslt")
+                    .satisfies(ex -> {
+                        ExpressionCompileException ece = (ExpressionCompileException) ex;
+                        assertThat(ece.specId()).isEqualTo("bad-jslt");
+                        assertThat(ece.source()).isEqualTo(path.toString());
+                    });
+        }
+
+        @Test
+        @DisplayName("Missing required field: id → SpecParseException")
+        void missingId_throwsSpecParseException() {
+            Path path = invalidFixturePath("missing-id.yaml");
+
+            assertThatThrownBy(() -> parser.parse(path))
+                    .isInstanceOf(SpecParseException.class)
+                    .hasMessageContaining("Missing or invalid required field")
+                    .hasMessageContaining("'id'")
+                    .satisfies(ex -> {
+                        SpecParseException spe = (SpecParseException) ex;
+                        // specId is null since we couldn't extract it
+                        assertThat(spe.specId()).isNull();
+                        assertThat(spe.source()).isEqualTo(path.toString());
+                    });
+        }
+
+        @Test
+        @DisplayName("Missing required field: version → SpecParseException")
+        void missingVersion_throwsSpecParseException() {
+            Path path = invalidFixturePath("missing-version.yaml");
+
+            assertThatThrownBy(() -> parser.parse(path))
+                    .isInstanceOf(SpecParseException.class)
+                    .hasMessageContaining("Missing or invalid required field")
+                    .hasMessageContaining("'version'")
+                    .satisfies(ex -> {
+                        SpecParseException spe = (SpecParseException) ex;
+                        // id WAS available, so specId should be populated
+                        assertThat(spe.specId()).isEqualTo("missing-version");
+                        assertThat(spe.source()).isEqualTo(path.toString());
+                    });
+        }
+
+        @Test
+        @DisplayName("Missing transform/forward/reverse blocks → SpecParseException")
+        void missingTransformBlock_throwsSpecParseException() {
+            Path path = invalidFixturePath("missing-transform.yaml");
+
+            assertThatThrownBy(() -> parser.parse(path))
+                    .isInstanceOf(SpecParseException.class)
+                    .hasMessageContaining("'transform' block")
+                    .hasMessageContaining("'forward'")
+                    .hasMessageContaining("'reverse'")
+                    .satisfies(ex -> {
+                        SpecParseException spe = (SpecParseException) ex;
+                        assertThat(spe.specId()).isEqualTo("missing-transform");
+                        assertThat(spe.source()).isEqualTo(path.toString());
+                    });
+        }
+
+        @Test
+        @DisplayName("Transform block without 'expr' key → SpecParseException")
+        void missingExpr_throwsSpecParseException() {
+            Path path = invalidFixturePath("missing-expr.yaml");
+
+            assertThatThrownBy(() -> parser.parse(path))
+                    .isInstanceOf(SpecParseException.class)
+                    .hasMessageContaining("Missing or invalid 'expr'")
+                    .hasMessageContaining("'transform'")
+                    .satisfies(ex -> {
+                        SpecParseException spe = (SpecParseException) ex;
+                        assertThat(spe.specId()).isEqualTo("missing-expr");
+                        assertThat(spe.source()).isEqualTo(path.toString());
+                    });
+        }
+
+        @Test
+        @DisplayName("Forward block without reverse → SpecParseException (incomplete bidirectional)")
+        void forwardOnly_throwsSpecParseException() {
+            Path path = invalidFixturePath("forward-only.yaml");
+
+            assertThatThrownBy(() -> parser.parse(path))
+                    .isInstanceOf(SpecParseException.class)
+                    .hasMessageContaining("'transform' block")
+                    .hasMessageContaining("'forward'")
+                    .hasMessageContaining("'reverse'")
+                    .satisfies(ex -> {
+                        SpecParseException spe = (SpecParseException) ex;
+                        assertThat(spe.specId()).isEqualTo("forward-only");
+                        assertThat(spe.source()).isEqualTo(path.toString());
+                    });
+        }
+
+        @Test
+        @DisplayName("Non-existent file → SpecParseException")
+        void nonExistentFile_throwsSpecParseException() {
+            Path path = fixturePath("does-not-exist.yaml");
+
+            assertThatThrownBy(() -> parser.parse(path))
+                    .isInstanceOf(SpecParseException.class)
+                    .hasMessageContaining("Failed to read or parse YAML")
+                    .satisfies(ex -> {
+                        SpecParseException spe = (SpecParseException) ex;
+                        assertThat(spe.specId()).isNull();
+                        assertThat(spe.source()).isEqualTo(path.toString());
+                    });
+        }
+    }
+
     // --- Helpers ---
 
     private static Path fixturePath(String filename) {
         return Path.of("src/test/resources/test-vectors/" + filename);
+    }
+
+    private static Path invalidFixturePath(String filename) {
+        return Path.of("src/test/resources/test-vectors/invalid/" + filename);
     }
 }

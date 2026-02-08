@@ -1,0 +1,11 @@
+id: "unknown-engine-spec"
+version: "1.0.0"
+lang: "nonexistent"
+input:
+  schema:
+    type: object
+output:
+  schema:
+    type: object
+transform:
+  expr: ".value"

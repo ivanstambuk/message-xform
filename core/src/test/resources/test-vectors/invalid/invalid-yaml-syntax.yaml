@@ -1,0 +1,7 @@
+# Invalid YAML — unmatched brace causes parser to fail
+id: "broken-yaml"
+version: "1.0.0"
+transform:
+  expr: |
+    { "result": .value
+  unclosed: [this is not valid YAML: {{}

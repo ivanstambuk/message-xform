@@ -1,0 +1,12 @@
+# Has forward block but no reverse — bidirectional specs require both
+id: "forward-only"
+version: "1.0.0"
+input:
+  schema:
+    type: object
+output:
+  schema:
+    type: object
+forward:
+  expr: '{ "result": .value }'
+# 'reverse' block is intentionally missing

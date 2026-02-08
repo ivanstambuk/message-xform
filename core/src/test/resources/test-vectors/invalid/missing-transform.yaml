@@ -1,0 +1,9 @@
+# Missing transform/forward/reverse blocks entirely
+id: "missing-transform"
+version: "1.0.0"
+input:
+  schema:
+    type: object
+output:
+  schema:
+    type: object

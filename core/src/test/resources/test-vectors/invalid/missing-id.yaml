@@ -1,0 +1,10 @@
+# Missing required 'id' field
+version: "1.0.0"
+input:
+  schema:
+    type: object
+output:
+  schema:
+    type: object
+transform:
+  expr: '{ "result": .value }'
