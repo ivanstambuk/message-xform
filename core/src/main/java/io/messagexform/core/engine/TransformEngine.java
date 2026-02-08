@@ -9,6 +9,7 @@ import com.networknt.schema.ValidationMessage;
 import io.messagexform.core.error.EvalBudgetExceededException;
 import io.messagexform.core.error.InputSchemaViolation;
 import io.messagexform.core.error.TransformEvalException;
+import io.messagexform.core.model.ApplyStep;
 import io.messagexform.core.model.Direction;
 import io.messagexform.core.model.Message;
 import io.messagexform.core.model.ProfileEntry;
@@ -287,7 +288,28 @@ public final class TransformEngine {
             }
 
             long startNanos = System.nanoTime();
-            JsonNode transformedBody = expr.evaluate(message.body(), context);
+
+            // T-001-39: Apply pipeline or single expression evaluation (FR-001-08,
+            // ADR-0014)
+            JsonNode transformedBody;
+            if (spec.hasApplyPipeline()) {
+                // Execute apply steps in declaration order — each step's output feeds the next
+                JsonNode pipelineInput = message.body();
+                for (ApplyStep step : spec.applySteps()) {
+                    if (step.isExpr()) {
+                        // Main transform expression
+                        pipelineInput = expr.evaluate(pipelineInput, context);
+                    } else {
+                        // Named mapper expression
+                        pipelineInput = step.compiledMapper().evaluate(pipelineInput, context);
+                    }
+                }
+                transformedBody = pipelineInput;
+            } else {
+                // No apply directive — backwards-compatible single expression evaluation
+                transformedBody = expr.evaluate(message.body(), context);
+            }
+
             long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
 
             // T-001-25: Enforce time budget

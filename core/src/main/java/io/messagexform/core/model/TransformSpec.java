@@ -2,6 +2,7 @@ package io.messagexform.core.model;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import io.messagexform.core.spi.CompiledExpression;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -26,8 +27,8 @@ import java.util.Objects;
  * compiledExpr, forward, reverse. Fields populated in Phase 6 I10/I11:
  * headerSpec, statusSpec.
  * Fields populated in Phase 6 I11a: urlSpec (FR-001-12/ADR-0027).
- * Fields populated in later phases (null until then): sensitive, match,
- * mappers.
+ * Fields populated in Phase 6 I12: applySteps (FR-001-08/ADR-0014).
+ * Fields populated in later phases (null until then): sensitive, match.
  */
 public record TransformSpec(
         String id,
@@ -41,7 +42,8 @@ public record TransformSpec(
         CompiledExpression reverse,
         HeaderSpec headerSpec,
         StatusSpec statusSpec,
-        UrlSpec urlSpec) {
+        UrlSpec urlSpec,
+        List<ApplyStep> applySteps) {
 
     /**
      * Canonical constructor — validates required fields.
@@ -52,6 +54,7 @@ public record TransformSpec(
         Objects.requireNonNull(id, "id must not be null");
         Objects.requireNonNull(version, "version must not be null");
         Objects.requireNonNull(lang, "lang must not be null");
+        // applySteps may be null (no apply directive) or an immutable list
     }
 
     /**
@@ -78,6 +81,7 @@ public record TransformSpec(
                 compiledExpr,
                 forward,
                 reverse,
+                null,
                 null,
                 null,
                 null);
@@ -109,6 +113,7 @@ public record TransformSpec(
                 reverse,
                 headerSpec,
                 null,
+                null,
                 null);
     }
 
@@ -139,6 +144,40 @@ public record TransformSpec(
                 reverse,
                 headerSpec,
                 statusSpec,
+                null,
+                null);
+    }
+
+    /**
+     * Convenience constructor for specs with header + status + URL but no apply
+     * pipeline.
+     */
+    public TransformSpec(
+            String id,
+            String version,
+            String description,
+            String lang,
+            JsonNode inputSchema,
+            JsonNode outputSchema,
+            CompiledExpression compiledExpr,
+            CompiledExpression forward,
+            CompiledExpression reverse,
+            HeaderSpec headerSpec,
+            StatusSpec statusSpec,
+            UrlSpec urlSpec) {
+        this(
+                id,
+                version,
+                description,
+                lang,
+                inputSchema,
+                outputSchema,
+                compiledExpr,
+                forward,
+                reverse,
+                headerSpec,
+                statusSpec,
+                urlSpec,
                 null);
     }
 
@@ -148,5 +187,13 @@ public record TransformSpec(
      */
     public boolean isBidirectional() {
         return forward != null && reverse != null;
+    }
+
+    /**
+     * Returns {@code true} if this spec defines an {@code apply} pipeline
+     * (FR-001-08, ADR-0014).
+     */
+    public boolean hasApplyPipeline() {
+        return applySteps != null && !applySteps.isEmpty();
     }
 }

@@ -11,6 +11,7 @@ import io.messagexform.core.engine.EngineRegistry;
 import io.messagexform.core.error.ExpressionCompileException;
 import io.messagexform.core.error.SchemaValidationException;
 import io.messagexform.core.error.SpecParseException;
+import io.messagexform.core.model.ApplyStep;
 import io.messagexform.core.model.HeaderSpec;
 import io.messagexform.core.model.StatusSpec;
 import io.messagexform.core.model.TransformSpec;
@@ -20,6 +21,7 @@ import io.messagexform.core.spi.ExpressionEngine;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -131,6 +133,10 @@ public final class SpecParser {
         // Parse optional url block (FR-001-12, ADR-0027, T-001-38a)
         UrlSpec urlSpec = parseUrlSpec(root, engine, id, source);
 
+        // Parse optional mappers block + apply pipeline (FR-001-08, ADR-0014, T-001-39)
+        Map<String, CompiledExpression> compiledMappers = parseMappers(root, engine, id, source);
+        List<ApplyStep> applySteps = parseApplyDirective(transformBlock, compiledMappers, id, source);
+
         return new TransformSpec(
                 id,
                 version,
@@ -143,7 +149,8 @@ public final class SpecParser {
                 reverse,
                 headerSpec,
                 statusSpec,
-                urlSpec);
+                urlSpec,
+                applySteps);
     }
 
     /**
@@ -352,6 +359,99 @@ public final class SpecParser {
         }
 
         return new UrlSpec(pathExpr, queryRemove, queryStaticAdd, queryDynamicAdd, methodSet, methodWhen);
+    }
+
+    /**
+     * Parses the optional {@code mappers} block from the spec YAML (FR-001-08,
+     * ADR-0014, T-001-39).
+     * Each mapper is a named expression compiled at load time.
+     *
+     * @return map of mapper id → compiled expression, empty if no mappers block
+     */
+    private Map<String, CompiledExpression> parseMappers(
+            JsonNode root, ExpressionEngine engine, String specId, String source) {
+        JsonNode mappersNode = root.get("mappers");
+        if (mappersNode == null || mappersNode.isNull() || !mappersNode.isObject()) {
+            return Map.of();
+        }
+
+        Map<String, CompiledExpression> mappers = new LinkedHashMap<>();
+        Iterator<Map.Entry<String, JsonNode>> fields = mappersNode.fields();
+        while (fields.hasNext()) {
+            Map.Entry<String, JsonNode> entry = fields.next();
+            String mapperId = entry.getKey();
+            JsonNode mapperBlock = entry.getValue();
+
+            // Each mapper must have an 'expr' field
+            String expr = requireExpr(mapperBlock, "mappers." + mapperId, specId, source);
+
+            // Resolve mapper-specific lang if present, otherwise use the spec-level engine
+            ExpressionEngine mapperEngine = engine;
+            if (mapperBlock.has("lang")) {
+                String mapperLang = mapperBlock.get("lang").asText();
+                mapperEngine = resolveEngine(mapperLang, specId, source);
+            }
+
+            CompiledExpression compiled = compileExpression(mapperEngine, expr, specId, source);
+            mappers.put(mapperId, compiled);
+        }
+
+        return mappers;
+    }
+
+    /**
+     * Parses the optional {@code apply} directive from the transform block
+     * (FR-001-08, ADR-0014, T-001-39).
+     *
+     * <p>
+     * Returns {@code null} if no apply directive is present (backwards compatible
+     * — only main expr is evaluated).
+     *
+     * @param transformBlock  the transform YAML block (may be null for
+     *                        bidirectional specs)
+     * @param compiledMappers map of mapper id → compiled expression
+     * @param specId          spec identifier for error messages
+     * @param source          source file path for error messages
+     * @return ordered list of apply steps, or null if no apply directive
+     */
+    private List<ApplyStep> parseApplyDirective(
+            JsonNode transformBlock, Map<String, CompiledExpression> compiledMappers, String specId, String source) {
+        if (transformBlock == null || !transformBlock.has("apply")) {
+            return null;
+        }
+
+        JsonNode applyNode = transformBlock.get("apply");
+        if (!applyNode.isArray()) {
+            throw new SpecParseException("'apply' directive must be a YAML list", specId, source);
+        }
+
+        List<ApplyStep> steps = new ArrayList<>();
+        for (JsonNode stepNode : applyNode) {
+            if (stepNode.isTextual() && "expr".equals(stepNode.asText())) {
+                // Reference to the main transform expression
+                steps.add(ApplyStep.expr());
+            } else if (stepNode.isObject() && stepNode.has("mapperRef")) {
+                // Reference to a named mapper
+                String mapperRef = stepNode.get("mapperRef").asText();
+                CompiledExpression compiled = compiledMappers.get(mapperRef);
+                if (compiled == null) {
+                    throw new SpecParseException(
+                            "Unknown mapper id '" + mapperRef
+                                    + "' in apply directive — available mappers: "
+                                    + compiledMappers.keySet(),
+                            specId,
+                            source);
+                }
+                steps.add(ApplyStep.mapper(mapperRef, compiled));
+            } else {
+                throw new SpecParseException(
+                        "Invalid apply step: expected 'expr' or '{ mapperRef: <id> }', got: " + stepNode,
+                        specId,
+                        source);
+            }
+        }
+
+        return Collections.unmodifiableList(steps);
     }
 
     // --- Private helpers ---
