@@ -89,6 +89,7 @@ no changes).
 | ID | Requirement | Success path | Validation path | Failure path | Source |
 |----|-------------|--------------|-----------------|--------------|--------|
 | FR-004-06 | The proxy MUST implement `GatewayAdapter<Context>` where `Context` is Javalin's request context, providing `wrapRequest`, `wrapResponse`, and `applyChanges`. | `wrapRequest(ctx)` extracts body → `JsonNode`, headers, status, path, method, query string and returns a `Message`. | Request with no body → `Message.body()` is `NullNode` (per `Message` contract — body is never null). | JSON parse error on request body → proxy returns `400 Bad Request` with RFC 9457 error. | SPI-001-04/05/06, ADR-0013. |
+| FR-004-06a | Before calling `wrapResponse(ctx)`, `ProxyHandler` MUST populate the Javalin `Context` with the upstream backend's response data: body (`ctx.result()`), headers (`ctx.header()`), and status code (`ctx.status()`). This ensures `wrapResponse` reads from `Context` uniformly, mirroring how real gateway adapters (PingAccess, PingGateway) naturally have the response in their native object. | `UpstreamClient.forward()` returns `HttpResponse` → ProxyHandler writes body, headers, status into `ctx` → `wrapResponse(ctx)` reads from `ctx`. | n/a | n/a | Q-034 resolution. |
 | FR-004-07 | `wrapRequest` and `wrapResponse` MUST create **deep copies** of the native message data, consistent with copy-on-wrap semantics (ADR-0013). | Mutations to the `Message` returned by `wrapRequest` do not affect the original Javalin context until `applyChanges` is called. | n/a | n/a | ADR-0013. |
 | FR-004-08 | `applyChanges` MUST write the transformed `Message` fields (body, headers, status code) back to the Javalin response context. | Transformed body, headers, and status code are written to `ctx.result()`, `ctx.header()`, `ctx.status()`. | If the transformed `Message.body()` is null, `applyChanges` MUST set an empty response body. | n/a | SPI-001-06. |
 | FR-004-09 | Header names MUST be normalized to lowercase in `wrapRequest` and `wrapResponse`, consistent with core engine conventions. | `Content-Type: application/json` → `content-type: application/json` in `Message.headers()`. | n/a | n/a | Feature 001 spec. |
@@ -475,6 +476,7 @@ no changes).
                     │    │  1. StandaloneAdapter.wrapRequest(ctx)      │
                     │    │  2. TransformEngine.transform(msg, REQUEST) │
                     │    │  3. UpstreamClient.forward(request)  ──HTTP──▶  Backend
+                    │    │  3a. Populate ctx with upstream response     │
                     │    │  4. StandaloneAdapter.wrapResponse(ctx)     │
                     │    │  5. TransformEngine.transform(msg, RESPONSE)│
                     │    │  6. StandaloneAdapter.applyChanges(msg,ctx) │
