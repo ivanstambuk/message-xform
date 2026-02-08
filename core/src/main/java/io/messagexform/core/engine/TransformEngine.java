@@ -2,7 +2,12 @@ package io.messagexform.core.engine;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.networknt.schema.JsonSchema;
+import com.networknt.schema.JsonSchemaFactory;
+import com.networknt.schema.SpecVersion;
+import com.networknt.schema.ValidationMessage;
 import io.messagexform.core.error.EvalBudgetExceededException;
+import io.messagexform.core.error.InputSchemaViolation;
 import io.messagexform.core.error.TransformEvalException;
 import io.messagexform.core.model.Direction;
 import io.messagexform.core.model.Message;
@@ -14,7 +19,9 @@ import io.messagexform.core.spi.CompiledExpression;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 /**
  * Core transformation engine (API-001-01/03, FR-001-01, FR-001-02, FR-001-04).
@@ -31,10 +38,13 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class TransformEngine {
 
     private static final ObjectMapper SIZE_MAPPER = new ObjectMapper();
+    private static final JsonSchemaFactory SCHEMA_FACTORY =
+            JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012);
 
     private final SpecParser specParser;
     private final ErrorResponseBuilder errorResponseBuilder;
     private final EvalBudget budget;
+    private final SchemaValidationMode schemaValidationMode;
     private final Map<String, TransformSpec> specs = new ConcurrentHashMap<>();
 
     /**
@@ -44,7 +54,7 @@ public final class TransformEngine {
      * @param specParser the parser used to load and compile spec YAML files
      */
     public TransformEngine(SpecParser specParser) {
-        this(specParser, new ErrorResponseBuilder(), EvalBudget.DEFAULT);
+        this(specParser, new ErrorResponseBuilder(), EvalBudget.DEFAULT, SchemaValidationMode.LENIENT);
     }
 
     /**
@@ -55,7 +65,7 @@ public final class TransformEngine {
      * @param errorResponseBuilder the builder for RFC 9457 error responses
      */
     public TransformEngine(SpecParser specParser, ErrorResponseBuilder errorResponseBuilder) {
-        this(specParser, errorResponseBuilder, EvalBudget.DEFAULT);
+        this(specParser, errorResponseBuilder, EvalBudget.DEFAULT, SchemaValidationMode.LENIENT);
     }
 
     /**
@@ -68,10 +78,29 @@ public final class TransformEngine {
      * @param budget               evaluation budget (max-eval-ms, max-output-bytes)
      */
     public TransformEngine(SpecParser specParser, ErrorResponseBuilder errorResponseBuilder, EvalBudget budget) {
+        this(specParser, errorResponseBuilder, budget, SchemaValidationMode.LENIENT);
+    }
+
+    /**
+     * Creates a new engine with all configuration options.
+     *
+     * @param specParser           the parser used to load and compile spec YAML
+     *                             files
+     * @param errorResponseBuilder the builder for RFC 9457 error responses
+     * @param budget               evaluation budget (max-eval-ms, max-output-bytes)
+     * @param schemaValidationMode STRICT or LENIENT (FR-001-09, CFG-001-09)
+     */
+    public TransformEngine(
+            SpecParser specParser,
+            ErrorResponseBuilder errorResponseBuilder,
+            EvalBudget budget,
+            SchemaValidationMode schemaValidationMode) {
         this.specParser = Objects.requireNonNull(specParser, "specParser must not be null");
         this.errorResponseBuilder =
                 Objects.requireNonNull(errorResponseBuilder, "errorResponseBuilder must not be null");
         this.budget = Objects.requireNonNull(budget, "budget must not be null");
+        this.schemaValidationMode =
+                Objects.requireNonNull(schemaValidationMode, "schemaValidationMode must not be null");
     }
 
     /**
@@ -131,6 +160,11 @@ public final class TransformEngine {
         TransformContext context = new TransformContext(message.headers(), message.headersAll(), status, null, null);
         // Evaluate the expression — catch eval exceptions per ADR-0022
         try {
+            // T-001-26: Strict-mode input schema validation
+            if (schemaValidationMode == SchemaValidationMode.STRICT && spec.inputSchema() != null) {
+                validateInputSchema(message.body(), spec);
+            }
+
             long startNanos = System.nanoTime();
             JsonNode transformedBody = expr.evaluate(message.body(), context);
             long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
@@ -198,6 +232,16 @@ public final class TransformEngine {
             // Should never happen for a valid JsonNode; treat as eval error
             throw new io.messagexform.core.error.ExpressionEvalException(
                     "Failed to measure output size: " + e.getMessage(), e, specId, null);
+        }
+    }
+
+    private void validateInputSchema(JsonNode input, TransformSpec spec) {
+        JsonSchema schema = SCHEMA_FACTORY.getSchema(spec.inputSchema());
+        Set<ValidationMessage> errors = schema.validate(input);
+        if (!errors.isEmpty()) {
+            String detail = errors.stream().map(ValidationMessage::getMessage).collect(Collectors.joining("; "));
+            throw new InputSchemaViolation(
+                    String.format("Input schema violation in spec '%s': %s", spec.id(), detail), spec.id(), null);
         }
     }
 }
