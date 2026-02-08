@@ -196,7 +196,10 @@ public final class TransformEngine {
             }
             // Single match → direct transform (common fast path)
             if (matches.size() == 1) {
-                return transformWithSpec(matches.get(0).spec(), message, direction);
+                ProfileEntry entry = matches.get(0);
+                LogContext logCtx =
+                        new LogContext(profile.id(), entry.specificityScore(), message.requestPath(), direction, null);
+                return transformWithSpec(entry.spec(), message, direction, logCtx);
             }
             // Multiple matches → pipeline chain (T-001-31, ADR-0012, S-001-49)
             return transformChain(matches, message, direction);
@@ -209,7 +212,7 @@ public final class TransformEngine {
 
         // Use the first loaded spec (for backward compatibility with Phase 4 tests)
         TransformSpec spec = specs.values().iterator().next();
-        return transformWithSpec(spec, message, direction);
+        return transformWithSpec(spec, message, direction, null);
     }
 
     /**
@@ -239,7 +242,9 @@ public final class TransformEngine {
                     entry.spec().id(),
                     profileId);
 
-            TransformResult stepResult = transformWithSpec(entry.spec(), current, direction);
+            LogContext logCtx =
+                    new LogContext(profileId, entry.specificityScore(), message.requestPath(), direction, stepLabel);
+            TransformResult stepResult = transformWithSpec(entry.spec(), current, direction, logCtx);
 
             if (stepResult.isError()) {
                 LOG.warn(
@@ -267,8 +272,13 @@ public final class TransformEngine {
     /**
      * Applies a single spec to the message. Shared between profile-routed and
      * single-spec (Phase 4 fallback) paths.
+     *
+     * @param logCtx optional logging context for structured log emission (T-001-41,
+     *               NFR-001-08);
+     *               null when no profile is loaded (Phase 4 fallback)
      */
-    private TransformResult transformWithSpec(TransformSpec spec, Message message, Direction direction) {
+    private TransformResult transformWithSpec(
+            TransformSpec spec, Message message, Direction direction, LogContext logCtx) {
         // Resolve the expression based on directionality
         CompiledExpression expr = resolveExpression(spec, direction);
 
@@ -324,6 +334,9 @@ public final class TransformEngine {
 
             // T-001-25: Enforce output size budget
             checkOutputSize(transformedBody, spec.id());
+
+            // T-001-41: Emit structured log entry for matched transform (NFR-001-08)
+            emitTransformMatchedLog(spec, elapsedMs, logCtx);
 
             // Build the transformed message, preserving envelope metadata
             Message transformedMessage = new Message(
@@ -386,6 +399,44 @@ public final class TransformEngine {
     }
 
     // --- Private helpers ---
+
+    /**
+     * Logging context for structured log entries (T-001-41, NFR-001-08).
+     * Captures profile-level metadata that is not available inside
+     * {@code transformWithSpec}.
+     *
+     * @param profileId        the matched profile id
+     * @param specificityScore the specificity score of the matched entry
+     * @param requestPath      the request path
+     * @param direction        the transform direction
+     * @param chainStep        optional chain step label (e.g. "1/3"), null for
+     *                         single match
+     */
+    private record LogContext(
+            String profileId, int specificityScore, String requestPath, Direction direction, String chainStep) {}
+
+    /**
+     * Emits a structured log entry for a matched transform (T-001-41, NFR-001-08).
+     * Uses SLF4J 2.0 fluent API with key-value pairs for structured logging.
+     */
+    private void emitTransformMatchedLog(TransformSpec spec, long evalDurationMs, LogContext logCtx) {
+        if (logCtx == null) {
+            // Phase 4 fallback — no profile context available
+            return;
+        }
+        var builder = LOG.atInfo()
+                .addKeyValue("profile_id", logCtx.profileId())
+                .addKeyValue("spec_id", spec.id())
+                .addKeyValue("spec_version", spec.version())
+                .addKeyValue("request_path", logCtx.requestPath())
+                .addKeyValue("specificity_score", logCtx.specificityScore())
+                .addKeyValue("eval_duration_ms", evalDurationMs)
+                .addKeyValue("direction", logCtx.direction().name());
+        if (logCtx.chainStep() != null) {
+            builder = builder.addKeyValue("chain_step", logCtx.chainStep());
+        }
+        builder.log("transform.matched");
+    }
 
     private CompiledExpression resolveExpression(TransformSpec spec, Direction direction) {
         if (spec.isBidirectional()) {
