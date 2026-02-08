@@ -1,0 +1,43 @@
+# Scenario: S-001-06 — Strip Internal/Debug Fields
+# Remove fields that should not be exposed to external consumers.
+
+id: s-001-06-strip-internal-fields
+version: "1.0.0"
+description: "Strip internal/debug fields from API response"
+
+input:
+  schema:
+    type: object
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      email:
+        type: string
+      role:
+        type: string
+
+output:
+  schema:
+    type: object
+    required: [id, name, email, role]
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      email:
+        type: string
+      role:
+        type: string
+
+transform:
+  lang: jslt
+  expr: |
+    {
+      "id": .id,
+      "name": .name,
+      "email": .email,
+      "role": .role
+    }

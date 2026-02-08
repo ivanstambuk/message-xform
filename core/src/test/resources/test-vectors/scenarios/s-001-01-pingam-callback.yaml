@@ -1,0 +1,58 @@
+# Scenario: S-001-01 — PingAM Callback — Username + Password Step
+# The core use case: transform PingAM's nested callback JSON into a clean,
+# flat structure suitable for a modern frontend.
+
+id: s-001-01-pingam-callback
+version: "1.0.0"
+description: "PingAM callback prettification — NameCallback + PasswordCallback"
+
+input:
+  schema:
+    type: object
+    properties:
+      authId:
+        type: string
+      template:
+        type: string
+      stage:
+        type: string
+      callbacks:
+        type: array
+        items:
+          type: object
+
+output:
+  schema:
+    type: object
+    properties:
+      type:
+        type: string
+      authId:
+        type: string
+      stage:
+        type: string
+      fields:
+        type: array
+        items:
+          type: object
+
+transform:
+  lang: jslt
+  expr: |
+    {
+      "type": if (.callbacks) "challenge" else "simple",
+      "authId": .authId,
+      "stage": .stage,
+      "fields": [for (.callbacks)
+        {
+          "label": .output[0].value,
+          "fieldId": .input[0].name,
+          "value": .input[0].value,
+          "type":
+            if   (.type == "NameCallback") "text"
+            else if (.type == "PasswordCallback") "password"
+            else "unknown",
+          "sensitive": .type == "PasswordCallback"
+        }
+      ]
+    }

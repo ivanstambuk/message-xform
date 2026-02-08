@@ -1,0 +1,44 @@
+# Scenario: S-001-13 — Array-of-Objects Reshaping
+# Transform SCIM-style user list response into simplified list API format.
+
+id: s-001-13-array-reshape
+version: "1.0.0"
+description: "Array-of-objects reshaping — SCIM to simplified list"
+
+input:
+  schema:
+    type: object
+    properties:
+      totalResults:
+        type: integer
+      Resources:
+        type: array
+        items:
+          type: object
+
+output:
+  schema:
+    type: object
+    properties:
+      total:
+        type: integer
+      users:
+        type: array
+        items:
+          type: object
+
+transform:
+  lang: jslt
+  expr: |
+    {
+      "total": .totalResults,
+      "users": [for (.Resources)
+        {
+          "id": .id,
+          "username": .userName,
+          "displayName": .displayName,
+          "email": .emails[0].value,
+          "active": .active
+        }
+      ]
+    }

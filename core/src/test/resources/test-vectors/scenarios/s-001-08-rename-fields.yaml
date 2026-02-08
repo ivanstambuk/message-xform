@@ -1,0 +1,52 @@
+# Scenario: S-001-08 — Rename Fields (API Versioning)
+# Rename fields for API version migration: snake_case → camelCase.
+
+id: s-001-08-rename-fields
+version: "1.0.0"
+description: "Rename fields for API version migration (snake_case to camelCase)"
+
+input:
+  schema:
+    type: object
+    properties:
+      user_id:
+        type: string
+      first_name:
+        type: string
+      last_name:
+        type: string
+      email_address:
+        type: string
+      is_active:
+        type: boolean
+      created_at:
+        type: string
+
+output:
+  schema:
+    type: object
+    properties:
+      userId:
+        type: string
+      firstName:
+        type: string
+      lastName:
+        type: string
+      emailAddress:
+        type: string
+      isActive:
+        type: boolean
+      createdAt:
+        type: string
+
+transform:
+  lang: jslt
+  expr: |
+    {
+      "userId": .user_id,
+      "firstName": .first_name,
+      "lastName": .last_name,
+      "emailAddress": .email_address,
+      "isActive": .is_active,
+      "createdAt": .created_at
+    }

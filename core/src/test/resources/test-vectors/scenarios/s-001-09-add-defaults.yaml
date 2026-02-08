@@ -1,0 +1,42 @@
+# Scenario: S-001-09 — Add Default Values
+# Enrich response with default values for missing fields.
+
+id: s-001-09-add-defaults
+version: "1.0.0"
+description: "Add default values for missing fields"
+
+input:
+  schema:
+    type: object
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+
+output:
+  schema:
+    type: object
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      status:
+        type: string
+      tier:
+        type: string
+      metadata:
+        type: object
+
+transform:
+  lang: jslt
+  expr: |
+    {
+      "id": .id,
+      "name": .name,
+      "status": if (.status) .status else "unknown",
+      "tier": if (.tier) .tier else "free",
+      "metadata": if (.metadata) .metadata else {},
+      * : .
+    }

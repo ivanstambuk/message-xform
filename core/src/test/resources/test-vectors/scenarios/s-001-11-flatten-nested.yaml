@@ -1,0 +1,50 @@
+# Scenario: S-001-11 — Flatten Nested Object
+# Flatten a deeply nested user profile into a flat structure.
+
+id: s-001-11-flatten-nested
+version: "1.0.0"
+description: "Flatten a deeply nested user profile into a flat structure"
+
+input:
+  schema:
+    type: object
+    properties:
+      id:
+        type: string
+      profile:
+        type: object
+
+output:
+  schema:
+    type: object
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      firstName:
+        type: string
+      lastName:
+        type: string
+      email:
+        type: string
+      phone:
+        type: string
+      city:
+        type: string
+      country:
+        type: string
+
+transform:
+  lang: jslt
+  expr: |
+    {
+      "id": .id,
+      "name": .profile.name.full,
+      "firstName": .profile.name.first,
+      "lastName": .profile.name.last,
+      "email": .profile.contact.email,
+      "phone": .profile.contact.phone,
+      "city": .profile.address.city,
+      "country": .profile.address.country
+    }
