@@ -80,6 +80,10 @@ jq, XPath, and XQuery. Java-native, built on Jackson.
 - ⚠️ No formal spec/standard — it's Schibsted's custom language
 - ⚠️ No built-in bidirectional support
 - ⚠️ Has `for` loops (we don't need them, but they're there — not harmful)
+- ⚠️ **Absent fields produce no node** — when an input field is missing, JSLT *omits*
+  the output key entirely rather than producing a `null` node. Tests must use
+  `assertFalse(result.has("field"))` instead of `assertTrue(result.get("field").isNull())`.
+  Discovered during bidirectional round-trip testing (T-001-16/17).
 
 **Assessment: ⭐⭐⭐⭐⭐ STRONG RECOMMEND**
 
