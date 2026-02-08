@@ -8,7 +8,7 @@
 | Linked plan | `docs/architecture/features/004/plan.md` |
 | Linked tasks | `docs/architecture/features/004/tasks.md` |
 | Roadmap entry | #4 – Standalone HTTP Proxy Mode |
-| Depends on | Feature 001 (core engine) |
+| Depends on | Feature 001 (core engine; minor API addition — Q-042) |
 | Research | `docs/research/standalone-proxy-http-server.md` |
 | Decisions | ADR-0029 (Javalin 6 / Jetty 12) |
 
@@ -34,8 +34,9 @@ The standalone proxy is packaged as a **Java application** (shadow JAR) and a
 3. **Standalone service** — run as an independent Kubernetes Deployment with its
    own Service, fronting any backend.
 
-**Affected modules:** `adapter-standalone` (new Gradle submodule), `core` (dependency,
-no changes).
+**Affected modules:** `adapter-standalone` (new Gradle submodule), `core` (minor
+API addition: `TransformEngine.transform(Message, Direction, TransformContext)`
+overload — Q-042).
 
 ## Goals
 
@@ -225,9 +226,20 @@ no changes).
 > writer, so writing a transformed *request* back to it makes no sense.
 
 > **Cookie binding (Q-041):** `$cookies` context variable IS populated in v1.
-> `wrapRequest` parses the `Cookie` header via `ctx.cookieMap()` and passes
-> it to `TransformContext`. See FR-004-37. `wrapResponse` does not populate
-> cookies (cookies are a request-direction concept).
+> `wrapRequest` parses the `Cookie` header via `ctx.cookieMap()` and builds
+> a `TransformContext` with cookies populated. The adapter passes this context
+> to `TransformEngine.transform(message, direction, context)` (Q-042 resolution).
+> See FR-004-37. `wrapResponse` does not populate cookies (cookies are a
+> request-direction concept).
+
+> **TransformContext injection (Q-042 resolution):** Feature 004 requires a new
+> `TransformEngine.transform(Message, Direction, TransformContext)` overload.
+> The adapter builds a `TransformContext` with adapter-specific data (cookies,
+> query params) and passes it to the engine. The engine uses this context instead
+> of constructing its own. The existing 2-arg `transform(Message, Direction)`
+> remains backward-compatible — it builds an empty context internally. This is a
+> minor, additive core change (~10 lines) that does not break any existing tests
+> or API contracts.
 
 ---
 
