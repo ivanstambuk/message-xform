@@ -78,5 +78,6 @@ PLAN.md
 
 # Standalone proxy classes
 adapter-standalone/src/main/java/io/messagexform/standalone/adapter/StandaloneAdapter.java
+adapter-standalone/src/main/java/io/messagexform/standalone/proxy/ProxyHandler.java
 adapter-standalone/src/main/java/io/messagexform/standalone/proxy/UpstreamClient.java
 adapter-standalone/src/main/java/io/messagexform/standalone/proxy/UpstreamException.java

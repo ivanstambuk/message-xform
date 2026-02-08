@@ -311,6 +311,16 @@ terminology agreements must be captured here immediately.
     configured backend. Uses JDK `HttpClient` with HTTP/1.1. Recalculates
     `Content-Length` after body transformation.
 
+- **Hop-by-hop headers**
+  - HTTP headers that are meaningful only for a single transport-level connection
+    and must not be forwarded by proxies (RFC 9110 §7.6.1). Includes
+    `Connection`, `Keep-Alive`, `Transfer-Encoding`, `TE`, `Trailer`,
+    `Proxy-Authorization`, `Proxy-Authenticate`, and `Upgrade`. In this project,
+    `UpstreamClient` strips hop-by-hop headers from forwarded requests, and
+    `ProxyHandler` filters `Content-Length` and `Transfer-Encoding` from upstream
+    responses to prevent body truncation when response transforms change the body
+    size.
+
 - **Shadow JAR**
   - A single fat JAR containing the `core`, `adapter-standalone`, and all
     transitive dependencies. Produced by the Gradle Shadow plugin. The Docker

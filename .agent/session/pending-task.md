@@ -1,24 +1,19 @@
 # Pending Task
 
-**Focus**: T-004-20 — ProxyHandler: passthrough cycle
-**Status**: Not started — StandaloneAdapter is feature-complete, ProxyHandler is next
-**Next Step**: Write `ProxyHandlerPassthroughTest` integration test with mock backend
+**Focus**: Feature 004 — Phase 4: Error Handling + Body Size + Forwarded Headers (I6)
+**Status**: I5 complete. Ready to begin I6.
+**Next Step**: Start T-004-26 (error handling integration tests)
 
 ## Context Notes
-- StandaloneAdapter has all 3 GatewayAdapter methods + buildTransformContext()
-- `buildTransformContext(ctx)` extracts cookies (cookieMap) and query params (queryParamMap)
-- Response headers read from `ctx.res()` (servlet response), not `ctx.headerMap()`
-- UpstreamClient is fully implemented (T-004-11..14) with hop-by-hop stripping,
-  Content-Length recalc, backend error handling, connection pool config
-- T-004-20 requires integration test: Javalin server + mock backend + HTTP client
-- Spec requires: passthrough GET/POST, all 7 methods, headers, query string, full path
-- Test architecture: Test ← HTTP → Proxy ← HTTP → Mock Upstream
+- ProxyHandler fully implements passthrough, request/response/bidirectional
+  transforms, dispatch table, and X-Request-ID generation/echo
+- Content-length/transfer-encoding headers are now filtered from upstream
+  responses to prevent body truncation when transforms change body size
+- bad-transform.yaml uses JSLT `error()` for runtime errors — do NOT use
+  compile-time-broken JSLT (fails at spec load time, not transform time)
+- ProxyTestHarness provides shared infrastructure for all proxy integration tests
+- All 56 proxy tests pass (passthrough + transform cycles)
 
-## Dependencies for T-004-20
-- ProxyHandler class (IMPL-004-02) — new class to create
-- Wire: StandaloneAdapter + TransformEngine + UpstreamClient
-- For passthrough: no profile matches → forward unmodified → return unmodified
-- FR-004-35 dispatch table: REQUEST PASSTHROUGH → raw bytes forwarded
-
-## SDD Gaps
-- None identified in retro audit
+## SDD Gaps (if any)
+- Feature 004 scenarios.md with coverage matrix deferred until feature nears
+  completion (scenarios are tracked in spec.md inline)

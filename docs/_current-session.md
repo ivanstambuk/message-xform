@@ -1,30 +1,34 @@
-# Current Session State
+# Current Session
 
-**Feature:** 004 — Standalone HTTP Proxy Mode
-**Phase:** 3 — Core Proxy: Handler + Upstream Client
-**Increment:** I5 — StandaloneAdapter + ProxyHandler
-**Status:** I5 partially complete (StandaloneAdapter done, ProxyHandler next)
-**Last updated:** 2026-02-08T23:34+01:00
+**Date**: 2026-02-08
+**Feature**: 004 — Standalone HTTP Proxy Mode
+**Phase**: Phase 3 — Core Proxy: Handler + Upstream Client
+**Increment**: I5 — StandaloneAdapter + ProxyHandler ✅ COMPLETE
 
-## Completed This Session
+## Progress
 
-- T-004-15 — StandaloneAdapter.wrapRequest (10 tests, commit `c662cdc`)
-- T-004-16 — Cookie extraction into TransformContext (3 tests, commit `c969332`)
-- T-004-17 — Query param extraction into TransformContext (4 tests, commit `cd68bb5`)
-- T-004-18 — StandaloneAdapter.wrapResponse (6 tests, commit `61bb040`)
-- T-004-19 — StandaloneAdapter.applyChanges (4 tests, commit `2bbf08d`)
+### Completed This Session
+- T-004-20: ProxyHandler passthrough cycle (13 tests)
+- T-004-21: Request transformation (3 tests)
+- T-004-22: Response transformation (2 tests)
+- T-004-23: Bidirectional transformation (3 tests)
+- T-004-24: TransformResult dispatch table (6 tests)
+- T-004-25: X-Request-ID generation/echo (3 tests)
 
-## Key Decisions
+### Key Implementation Details
+- ProxyHandler: Full request/response transform cycle implemented
+- ProxyHandler: X-Request-ID extraction/generation (FR-004-38)
+- ProxyHandler: Content-length/transfer-encoding filtering from upstream
+  responses to prevent body truncation on response transform
+- ProxyTestHarness: Shared test infrastructure for all proxy integration tests
+- bad-transform.yaml uses JSLT `error()` for runtime errors (not compile-time)
 
-- `buildTransformContext()` is a public method on StandaloneAdapter (not part of
-  the GatewayAdapter SPI) — ProxyHandler will call it separately to build the
-  TransformContext with cookies and query params.
-- Response headers are read from `ctx.res()` (servlet response), not `ctx.headerMap()`
-  (which is request headers).
-- `wrapResponse` content type is derived from response headers map, not `ctx.contentType()`.
+### Increments Complete
+- I1 ✅ (TransformContext 3-arg)
+- I2 ✅ (GatewayAdapter SPI)
+- I3 ✅ (ConfigLoader)
+- I4 ✅ (UpstreamClient)
+- I5 ✅ (StandaloneAdapter + ProxyHandler)
 
-## Next Up
-
-- T-004-20 — ProxyHandler: passthrough cycle (integration test with mock backend)
-- T-004-21 — ProxyHandler: request transformation
-- T-004-22 — ProxyHandler: response transformation
+### Next Increment
+- I6 — Error handling, body size limits, X-Forwarded-* headers (Phase 4)
