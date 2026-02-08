@@ -21,7 +21,6 @@ Hard rules:
 
 | ID | Owner | Question | Options (A preferred) | Status | Asked | Notes |
 |----|-------|----------|------------------------|--------|-------|-------|
-| Q-040 | Ivan | How should `max-body-bytes` be enforced for chunked-encoded requests? Javalin/Jetty assembles the full body before the proxy can inspect it. A 50 MB chunked request would be fully buffered in memory before rejection. | A: Configure Jetty's `maxRequestSize` / `maxFormContentSize` at server init to reject oversized bodies during upload (memory-safe but Jetty-specific). B: Check body size after Javalin assembles the body (`ctx.body().length()`) — simpler but permits transient memory spikes. C: Document as known limitation in v1 — Jetty buffers first, proxy checks after. | Open | 2026-02-08 | Jetty 12 API surface for streaming size limits needs investigation. |
 | Q-041 | Ivan | Should `wrapRequest` parse cookies from the `Cookie` header and bind `$cookies` context variable (Feature 001 DO-001-07)? | A: Defer to v2 — `$cookies` is `null`. Document in spec that cookie binding is not supported in v1. B: Implement in v1 — Javalin has `ctx.cookie(name)` API. Populate `TransformContext.cookies` from parsed `Cookie` header. | Open | 2026-02-08 | Spec currently defers this (note added in FR-004-35 section). |
 
 
