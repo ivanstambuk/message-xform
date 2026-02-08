@@ -280,7 +280,7 @@ _Fill in after each drift gate run._
    - _Commands:_ `./gradlew :core:test`, `./gradlew spotlessApply check`
    - _Exit:_ Chaining works. Bidirectional transforms via profiles work.
 
-### Phase 6 — Headers, Status, Mappers (≤3 × 90 min)
+### Phase 6 — Headers, Status, URL, Mappers (≤4 × 90 min)
 
 10. **I10 — Header transformations** (≤90 min)
     - _Goal:_ Implement declarative header add/remove/rename and header-to-body
@@ -318,6 +318,36 @@ _Fill in after each drift gate run._
     - _Requirements covered:_ FR-001-11 (status transforms).
     - _Commands:_ `./gradlew :core:test`, `./gradlew spotlessApply check`
     - _Exit:_ Status overrides work. `$status` binding correct for both directions.
+
+11a. **I11a — URL rewriting** (≤90 min)
+     - _Goal:_ Implement URL path rewrite, query parameter add/remove, and HTTP
+       method override. Expressions evaluate against the **original** (pre-transform)
+       body (ADR-0027).
+     - _Preconditions:_ I6 complete (context variable binding works), I4 complete
+       (spec parser works).
+     - _Steps:_
+       1. Create test fixture: `url-rewrite-dispatch.yaml` — polymorphic dispatch
+          endpoint de-polymorphized to REST URLs.
+       2. **Test first:** Write failing test: spec with `url.path.expr` →
+          request path rewritten using body fields from the **original** body.
+       3. Implement `UrlTransformer` — path rewrite with RFC 3986 §3.3 encoding.
+       4. **Test first:** Write test: `url.query.add` (static + dynamic) and
+          `url.query.remove` (glob patterns) → query parameters modified.
+       5. Implement query parameter operations in `UrlTransformer`.
+       6. **Test first:** Write test: `url.method.set` with `when` predicate →
+          HTTP method overridden conditionally.
+       7. Implement method override (reuse `set`/`when` pattern from status).
+       8. **Test first:** Write test: `url.path.expr` returns null → `ExpressionEvalException`.
+       9. **Test first:** Write test: `url.method.set` with invalid HTTP method
+          (e.g., `"YOLO"`) → `SpecParseException` at load time.
+       10. **Test first:** Write test: `url` block on `direction: response` →
+           warning logged, URL block ignored.
+       11. Extend `SpecParser` to parse `url` block. Add `url` field to
+           `TransformSpec`. Add `setRequestPath`, `setRequestMethod` to `Message`.
+     - _Requirements covered:_ FR-001-12 (URL rewriting), ADR-0027.
+     - _Commands:_ `./gradlew :core:test`, `./gradlew spotlessApply check`
+     - _Exit:_ Path rewrite works. Query params modified. Method override works.
+       URL encoding correct. Response-direction URL block ignored with warning.
 
 12. **I12 — Reusable mappers** (≤90 min)
     - _Goal:_ Implement `mappers` block and declarative `apply` pipeline.
@@ -395,17 +425,17 @@ _Fill in after each drift gate run._
     - _Exit:_ GatewayAdapter SPI defined. Test adapter works. Scenario coverage visible.
 
 16. **I16 — Full scenario sweep + coverage matrix** (≤90 min)
-    - _Goal:_ Ensure all 73 scenarios pass. Update coverage matrix.
+    - _Goal:_ Ensure all scenarios pass. Update coverage matrix.
     - _Preconditions:_ I15 complete.
     - _Steps:_
-      1. Run full parameterized test suite with all 73 scenario YAML files.
+      1. Run full parameterized test suite with all scenario YAML files.
       2. Fix any failing scenarios (implementation gaps or scenario errors).
       3. Update coverage matrix in `scenarios.md`: map each scenario to its
          passing test class and method.
       4. Run drift gate checklist.
     - _Requirements covered:_ All FRs + NFRs verified.
     - _Commands:_ `./gradlew :core:test`, `./gradlew spotlessApply check`
-    - _Exit:_ All 73 scenarios green. Coverage matrix complete. Drift gate clean.
+    - _Exit:_ All scenarios green. Coverage matrix complete. Drift gate clean.
 
 ## Scenario Tracking
 
@@ -419,6 +449,7 @@ _Fill in after each drift gate run._
 | S-001-29 through S-001-32 | I6 (bidirectional via I5) | Bidirectional transforms |
 | S-001-33 through S-001-35 | I10 (headers) | Header operations |
 | S-001-36 through S-001-38 | I11 (status) | Status code transforms |
+| S-001-38a through S-001-38f | I11a (URL rewriting) | Path rewrite, query ops, method override |
 | S-001-39 through S-001-48 | I8, I9 (profiles) | Profile matching + chaining |
 | S-001-49 | I9 (chaining) | Mixed-engine chain (JOLT→JSLT) |
 | S-001-50 through S-001-52 | I12 (mappers) | Reusable mappers |
