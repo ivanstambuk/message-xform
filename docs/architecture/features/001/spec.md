@@ -941,6 +941,15 @@ Processing order:
 | SPI-001-05 | `GatewayAdapter.wrapResponse(native) → Message` | Wrap gateway-native response as Message |
 | SPI-001-06 | `GatewayAdapter.applyChanges(Message, native)` | Write Message changes back to native object |
 
+> **Adapter Lifecycle Guidance (ADR-0025):** The `GatewayAdapter` SPI is intentionally
+> limited to per-request operations. Lifecycle management — engine initialization,
+> shutdown, reload triggering — is the adapter's responsibility. Each adapter calls
+> the `TransformEngine` public API (`loadSpec`, `loadProfile`, `reload`,
+> `registerEngine`) from within its gateway-native lifecycle hooks (e.g., PingAccess
+> `configure()`, PingGateway `init()`, standalone `main()`). Adapters MUST catch
+> `TransformLoadException` (ADR-0024) during initialization and translate it to the
+> gateway's native error mechanism. Reload triggers are adapter concerns (NFR-001-05).
+
 ### Configuration
 
 | ID | Config key | Type | Description |

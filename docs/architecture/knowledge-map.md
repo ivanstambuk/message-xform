@@ -95,6 +95,7 @@ ADR-0021 (Query+Cookies) ─── governs ── FR-001-02, references ADR-0020
 | Observability | ADR-0007 | NFR-001-08, NFR-001-09, NFR-001-10 |
 | FR-001-06 (Passthrough) | ADR-0022 | — |
 | FR-001-07 (Error Handling) | ADR-0022, ADR-0024 | — |
+| Gateway Adapter SPI | ADR-0025 | — |
 | FR-001-09 (Schema Validation) | ADR-0001, ADR-0022 | — |
 
 ## Research Documents
