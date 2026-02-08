@@ -21,7 +21,5 @@ Hard rules:
 
 | ID | Owner | Question | Options (A preferred) | Status | Asked | Notes |
 |----|-------|----------|------------------------|--------|-------|-------|
-
-
-
+| Q-028 | Ivan | **`transform()` API profile matching gap**: `API-001-01 TransformEngine.transform(Message, Direction)` must perform profile matching (FR-001-05), but `Message` now includes `getRequestPath()` and `getRequestMethod()`. Should the engine extract match criteria from `Message`, or should the API signature change? | A) **Engine extracts from Message** — `transform()` reads `Message.getRequestPath()`, `.getRequestMethod()`, `.getContentType()` to resolve the matching profile. No API signature change. Simple, but couples profile matching to Message. B) **Add explicit match input** — `transform(Message, Direction, MatchCriteria)` where `MatchCriteria` bundles path/method/content-type. Decouples matching from Message, but adds a new type. C) **Two-phase API** — `matchProfile(path, method, contentType, direction) → TransformSpec[]`, then `transformWithSpec(Message, TransformSpec)`. Most flexible, but more complex adapter code. | Open | 2026-02-08 | Severity: MEDIUM — `Message` already has path/method after R-3 fix, so Option A may be the obvious choice. But the two-phase pattern (C) enables adapters to cache match results for repeated routes. |
 
