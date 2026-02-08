@@ -51,13 +51,14 @@ public final class StandaloneAdapter implements GatewayAdapter<Context> {
         String requestMethod = ctx.method().name();
         String queryString = ctx.queryString();
 
-        LOG.debug("wrapRequest: {} {} (body={} bytes, headers={})",
-                requestMethod, requestPath,
+        LOG.debug(
+                "wrapRequest: {} {} (body={} bytes, headers={})",
+                requestMethod,
+                requestPath,
                 ctx.body() != null ? ctx.body().length() : 0,
                 headers.size());
 
-        return new Message(body, headers, headersAll, null, contentType,
-                requestPath, requestMethod, queryString);
+        return new Message(body, headers, headersAll, null, contentType, requestPath, requestMethod, queryString);
     }
 
     @Override
@@ -71,7 +72,8 @@ public final class StandaloneAdapter implements GatewayAdapter<Context> {
         for (String name : ctx.res().getHeaderNames()) {
             String lowerName = name.toLowerCase();
             headers.putIfAbsent(lowerName, ctx.res().getHeader(name));
-            headersAll.putIfAbsent(lowerName,
+            headersAll.putIfAbsent(
+                    lowerName,
                     Collections.unmodifiableList(new ArrayList<>(ctx.res().getHeaders(name))));
         }
 
@@ -82,14 +84,16 @@ public final class StandaloneAdapter implements GatewayAdapter<Context> {
         String requestPath = ctx.path();
         String requestMethod = ctx.method().name();
 
-        LOG.debug("wrapResponse: {} {} → {} (body={} bytes, headers={})",
-                requestMethod, requestPath, statusCode,
+        LOG.debug(
+                "wrapResponse: {} {} → {} (body={} bytes, headers={})",
+                requestMethod,
+                requestPath,
+                statusCode,
                 ctx.result() != null ? ctx.result().length() : 0,
                 headers.size());
 
         // queryString is null for responses
-        return new Message(body, headers, headersAll, statusCode, contentType,
-                requestPath, requestMethod, null);
+        return new Message(body, headers, headersAll, statusCode, contentType, requestPath, requestMethod, null);
     }
 
     @Override
@@ -111,7 +115,8 @@ public final class StandaloneAdapter implements GatewayAdapter<Context> {
             ctx.status(transformedMessage.statusCode());
         }
 
-        LOG.debug("applyChanges: status={}, headers={}, body={} bytes",
+        LOG.debug(
+                "applyChanges: status={}, headers={}, body={} bytes",
                 transformedMessage.statusCode(),
                 transformedMessage.headers().size(),
                 bodyStr.length());

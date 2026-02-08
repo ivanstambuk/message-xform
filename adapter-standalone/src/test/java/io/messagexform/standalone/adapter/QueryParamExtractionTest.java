@@ -57,8 +57,7 @@ class QueryParamExtractionTest {
     @Test
     @DisplayName("multi-value param → first value only (S-004-76)")
     void multiValueParamFirstValueOnly() {
-        Context ctx = mockContext(Map.of(
-                "tag", List.of("a", "b")));
+        Context ctx = mockContext(Map.of("tag", List.of("a", "b")));
 
         TransformContext tc = adapter.buildTransformContext(ctx);
 

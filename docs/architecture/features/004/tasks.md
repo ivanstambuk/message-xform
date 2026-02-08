@@ -352,7 +352,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `./gradlew spotlessApply check`
   _Verification log:_ ✅ 20/20 tests PASSED (10 wrapRequest + 6 wrapResponse + 4 applyChanges: body writeback, header writeback, status writeback, NullNode empty body). Commit `2bbf08d`.
 
-- [ ] **T-004-20** — ProxyHandler: passthrough cycle (FR-004-01, S-004-01/02/03/04/05/06)
+- [x] **T-004-20** — ProxyHandler: passthrough cycle (FR-004-01, S-004-01/02/03/04/05/06)
   _Intent:_ Implement the basic proxy cycle for passthrough requests — no
   matching profile, request forwarded unmodified, response returned unmodified.
   _Test first:_ Write `ProxyHandlerPassthroughTest` (integration test with mock
@@ -370,6 +370,24 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   _Verification commands:_
   - `./gradlew :adapter-standalone:test --tests "*ProxyHandlerPassthroughTest*"`
   - `./gradlew spotlessApply check`
+  _Verification log:_
+  ```
+  ProxyHandler — passthrough cycle > S-004-01: GET /api/users with no matching profile → passthrough PASSED
+  ProxyHandler — passthrough cycle > S-004-02: POST /api/data with JSON body → body forwarded intact PASSED
+  ProxyHandler — passthrough cycle > S-004-03: HEAD method proxied correctly PASSED
+  ProxyHandler — passthrough cycle > S-004-03: HTTP method proxied correctly > GET PASSED
+  ProxyHandler — passthrough cycle > S-004-03: HTTP method proxied correctly > POST PASSED
+  ProxyHandler — passthrough cycle > S-004-03: HTTP method proxied correctly > PUT PASSED
+  ProxyHandler — passthrough cycle > S-004-03: HTTP method proxied correctly > DELETE PASSED
+  ProxyHandler — passthrough cycle > S-004-03: HTTP method proxied correctly > PATCH PASSED
+  ProxyHandler — passthrough cycle > S-004-03: HTTP method proxied correctly > OPTIONS PASSED
+  ProxyHandler — passthrough cycle > S-004-04: Request headers forwarded to backend PASSED
+  ProxyHandler — passthrough cycle > S-004-04: Response headers from backend returned to client PASSED
+  ProxyHandler — passthrough cycle > S-004-05: Query string forwarded intact PASSED
+  ProxyHandler — passthrough cycle > S-004-06: Full nested path forwarded to backend PASSED
+  BUILD SUCCESSFUL — 13/13 tests passed
+  ./gradlew spotlessApply check — BUILD SUCCESSFUL
+  ```
 
 - [ ] **T-004-21** — ProxyHandler: request transformation (FR-004-02, S-004-07/08/09/10)
   _Intent:_ When a profile matches, apply request transformation before
