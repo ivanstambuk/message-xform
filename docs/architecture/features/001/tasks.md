@@ -259,7 +259,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
 
 #### I5 — Bidirectional specs + schema validation
 
-- [ ] **T-001-16** — Create bidirectional test fixture (FX-001-04)
+- [x] **T-001-16** — Create bidirectional test fixture (FX-001-04) ✅ 2026-02-08
   _Intent:_ Create the YAML fixture for bidirectional transform testing.
   _Implement:_ Create `core/src/test/resources/test-vectors/bidirectional-roundtrip.yaml`
   with `forward.expr` and `reverse.expr` blocks.
@@ -267,7 +267,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   _Verification commands:_
   - N/A — file creation only.
 
-- [ ] **T-001-17** — Parse bidirectional specs (FR-001-03)
+- [x] **T-001-17** — Parse bidirectional specs (FR-001-03) ✅ 2026-02-08
   _Intent:_ Extend the spec parser to handle `forward`/`reverse` blocks
   instead of a single `transform` block.
   _Test first:_ Write `BidirectionalSpecTest`:
@@ -915,6 +915,7 @@ Track long-running or shared commands with timestamps to avoid duplicate work.
 - 2026-02-08 03:50 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — 61 tests passed after T-001-09..12
 - 2026-02-08 10:05 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — 72 tests passed after T-001-13..14
 - 2026-02-08 10:40 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — 81 tests passed after T-001-15
+- 2026-02-08 10:45 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — 89 tests passed after T-001-16..17
 
 ## Completion Criteria
 
