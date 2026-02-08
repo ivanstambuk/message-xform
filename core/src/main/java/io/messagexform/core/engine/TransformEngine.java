@@ -276,6 +276,12 @@ public final class TransformEngine {
      * <p>
      * When no profile is loaded, falls back to single-spec mode (Phase 4).
      *
+     * <p>
+     * Builds a {@link TransformContext} from the message's headers and status.
+     * Query params and cookies are empty. Adapters that need to inject richer
+     * context (e.g. parsed cookies, query params) should use the 3-arg overload
+     * {@link #transform(Message, Direction, TransformContext)}.
+     *
      * @param message   the input message to transform
      * @param direction the direction of the transform (REQUEST or RESPONSE)
      * @return a {@link TransformResult} — SUCCESS with the transformed message,
@@ -286,10 +292,42 @@ public final class TransformEngine {
         Objects.requireNonNull(message, "message must not be null");
         Objects.requireNonNull(direction, "direction must not be null");
 
+        // Build context from message metadata (backward-compatible path).
+        // For REQUEST transforms, $status is null (ADR-0017).
+        Integer status = direction == Direction.RESPONSE ? message.statusCode() : null;
+        TransformContext context = new TransformContext(message.headers(), message.headersAll(), status, null, null);
+
+        return transform(message, direction, context);
+    }
+
+    /**
+     * Transforms the given message using an adapter-supplied
+     * {@link TransformContext}
+     * (T-004-01, Q-042, FR-004-39).
+     *
+     * <p>
+     * This overload allows gateway adapters to inject a richer context that
+     * includes parsed cookies ({@code $cookies}), query parameters
+     * ({@code $queryParams}), and any other metadata the adapter has access to.
+     * The injected context is used directly — the engine does <em>not</em>
+     * re-build it from the message.
+     *
+     * @param message   the input message to transform
+     * @param direction the direction of the transform (REQUEST or RESPONSE)
+     * @param context   the adapter-supplied transform context; must not be null
+     * @return a {@link TransformResult} — SUCCESS with the transformed message,
+     *         ERROR with an RFC 9457 body if evaluation fails (ADR-0022),
+     *         or PASSTHROUGH if no spec or profile matches
+     */
+    public TransformResult transform(Message message, Direction direction, TransformContext context) {
+        Objects.requireNonNull(message, "message must not be null");
+        Objects.requireNonNull(direction, "direction must not be null");
+        Objects.requireNonNull(context, "context must not be null");
+
         // T-001-44: Propagate trace context headers to MDC (NFR-001-10)
         setTraceContext(message);
         try {
-            return transformInternal(message, direction);
+            return transformInternal(message, direction, context);
         } finally {
             clearTraceContext();
         }
@@ -297,9 +335,9 @@ public final class TransformEngine {
 
     /**
      * Internal transform logic — separated to allow try-finally MDC cleanup in
-     * {@link #transform(Message, Direction)}.
+     * {@link #transform(Message, Direction, TransformContext)}.
      */
-    private TransformResult transformInternal(Message message, Direction direction) {
+    private TransformResult transformInternal(Message message, Direction direction, TransformContext context) {
         // Capture the registry snapshot — in-flight request uses this snapshot
         // even if reload() swaps in a new registry concurrently (NFR-001-05).
         TransformRegistry snapshot = registryRef.get();
@@ -317,10 +355,10 @@ public final class TransformEngine {
                 ProfileEntry entry = matches.get(0);
                 LogContext logCtx =
                         new LogContext(profile.id(), entry.specificityScore(), message.requestPath(), direction, null);
-                return transformWithSpec(entry.spec(), message, direction, logCtx);
+                return transformWithSpec(entry.spec(), message, direction, logCtx, context);
             }
             // Multiple matches → pipeline chain (T-001-31, ADR-0012, S-001-49)
-            return transformChain(matches, message, direction);
+            return transformChain(matches, message, direction, context);
         }
 
         // Phase 4 fallback: single-spec mode (no profile loaded)
@@ -331,7 +369,7 @@ public final class TransformEngine {
 
         // Use the first loaded spec (for backward compatibility with Phase 4 tests)
         TransformSpec spec = allSpecs.values().iterator().next();
-        return transformWithSpec(spec, message, direction, null);
+        return transformWithSpec(spec, message, direction, null, context);
     }
 
     /**
@@ -339,7 +377,8 @@ public final class TransformEngine {
      * Each step's output message feeds the next step. If any step fails,
      * the entire chain aborts — no partial results reach the caller.
      */
-    private TransformResult transformChain(List<ProfileEntry> chain, Message message, Direction direction) {
+    private TransformResult transformChain(
+            List<ProfileEntry> chain, Message message, Direction direction, TransformContext context) {
         TransformProfile profile = registryRef.get().activeProfile();
         String profileId = profile != null ? profile.id() : "unknown";
         int totalSteps = chain.size();
@@ -363,7 +402,7 @@ public final class TransformEngine {
 
             LogContext logCtx =
                     new LogContext(profileId, entry.specificityScore(), message.requestPath(), direction, stepLabel);
-            TransformResult stepResult = transformWithSpec(entry.spec(), current, direction, logCtx);
+            TransformResult stepResult = transformWithSpec(entry.spec(), current, direction, logCtx, context);
 
             if (stepResult.isError()) {
                 LOG.warn(
@@ -392,19 +431,16 @@ public final class TransformEngine {
      * Applies a single spec to the message. Shared between profile-routed and
      * single-spec (Phase 4 fallback) paths.
      *
-     * @param logCtx optional logging context for structured log emission (T-001-41,
-     *               NFR-001-08);
-     *               null when no profile is loaded (Phase 4 fallback)
+     * @param logCtx  optional logging context for structured log emission
+     *                (T-001-41,
+     *                NFR-001-08);
+     *                null when no profile is loaded (Phase 4 fallback)
+     * @param context the transform context (adapter-injected or engine-built)
      */
     private TransformResult transformWithSpec(
-            TransformSpec spec, Message message, Direction direction, LogContext logCtx) {
+            TransformSpec spec, Message message, Direction direction, LogContext logCtx, TransformContext context) {
         // Resolve the expression based on directionality
         CompiledExpression expr = resolveExpression(spec, direction);
-
-        // Build context from message metadata (T-001-21, FR-001-10/11).
-        // For REQUEST transforms, $status is null (ADR-0017).
-        Integer status = direction == Direction.RESPONSE ? message.statusCode() : null;
-        TransformContext context = new TransformContext(message.headers(), message.headersAll(), status, null, null);
 
         // Save the original body for URL rewriting (ADR-0027: "route the input")
         JsonNode originalBody = message.body();
