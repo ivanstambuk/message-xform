@@ -932,7 +932,7 @@ Processing order:
 ## Test Strategy
 
 - **Core (unit):** JUnit 5 tests for JSLT expression evaluation in isolation.
-  Parameterized tests with input/output JSON pairs from `docs/test-vectors/`.
+  Parameterized tests with input/output JSON pairs from `core/src/test/resources/test-vectors/`.
 - **Core (spec loading):** Tests for YAML spec parsing, JSLT compilation, engine
   resolution, and validation error reporting.
 - **Core (full pipeline):** End-to-end tests: load spec YAML → apply to input JSON →
@@ -1021,13 +1021,13 @@ exchange/request context, since profile matching always operates on request crit
 
 | ID | Path | Purpose |
 |----|------|---------|
-| FX-001-01 | `docs/test-vectors/jslt-simple-rename.yaml` | Simple JSLT: rename and restructure fields |
-| FX-001-02 | `docs/test-vectors/jslt-conditional.yaml` | JSLT with `if/else` logic |
-| FX-001-03 | `docs/test-vectors/jslt-array-reshape.yaml` | JSLT with `[for ...]` array transformation |
-| FX-001-04 | `docs/test-vectors/bidirectional-roundtrip.yaml` | Forward + reverse JSLT with input/output pairs |
-| FX-001-05 | `docs/test-vectors/passthrough.yaml` | Non-matching input → unmodified output |
-| FX-001-06 | `docs/test-vectors/open-world.yaml` | Input with extra fields → preserved via `* : .` |
-| FX-001-07 | `docs/test-vectors/error-strict-mode.yaml` | JSLT error → transformation aborted |
+| FX-001-01 | `core/src/test/resources/test-vectors/jslt-simple-rename.yaml` | Simple JSLT: rename and restructure fields |
+| FX-001-02 | `core/src/test/resources/test-vectors/jslt-conditional.yaml` | JSLT with `if/else` logic |
+| FX-001-03 | `core/src/test/resources/test-vectors/jslt-array-reshape.yaml` | JSLT with `[for ...]` array transformation |
+| FX-001-04 | `core/src/test/resources/test-vectors/bidirectional-roundtrip.yaml` | Forward + reverse JSLT with input/output pairs |
+| FX-001-05 | `core/src/test/resources/test-vectors/passthrough.yaml` | Non-matching input → unmodified output |
+| FX-001-06 | `core/src/test/resources/test-vectors/open-world.yaml` | Input with extra fields → preserved via `* : .` |
+| FX-001-07 | `core/src/test/resources/test-vectors/error-strict-mode.yaml` | JSLT error → transformation aborted |
 
 ## Spec DSL
 

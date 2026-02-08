@@ -223,12 +223,17 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   engine, compile the expression, and produce an immutable `TransformSpec`.
   _Test first:_ Write `SpecParserTest`:
   - Load `jslt-simple-rename.yaml` → TransformSpec with correct id,
-    version, lang="jslt", non-null compiledExpr.
+    version, description (optional), lang="jslt", non-null compiledExpr.
   - Load `jslt-conditional.yaml` → same structure.
   - Evaluate the compiled expression against test input → correct output.
   _Implement:_ Create `SpecParser` class in
   `core/src/main/java/io/messagexform/core/spec/`.
   Use Jackson YAML parser. Resolve engine via `EngineRegistry`.
+  _Design note:_ `TransformSpec` is an immutable record with nullable fields
+  for attributes populated by later phases (sensitive, match, headers, status,
+  mappers). Phase 3 populates: id, version, description, lang, inputSchema,
+  outputSchema, compiledExpr, forward, reverse. Remaining fields are null
+  until Phases 5–6 extend parsing.
   _Verify:_ `SpecParserTest` passes.
   _Verification commands:_
   - `./gradlew :core:test --tests "*SpecParserTest*"`
@@ -279,8 +284,8 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - Spec with valid `input.schema` and `output.schema` → loads without error.
   - Spec with invalid JSON Schema (e.g., `type: not-a-type`) →
     `SchemaValidationException`.
-  - Spec with no schema blocks → decide: error or warning (log open question
-    if undecided).
+  - Spec with no schema blocks → `SpecParseException` (FR-001-09 uses
+    RFC 2119 MUST — missing schemas are a load-time error, not a warning).
   _Implement:_ Integrate `networknt/json-schema-validator` into `SpecParser`.
   Validate schema blocks at load time.
   _Verify:_ `SchemaValidationTest` passes.

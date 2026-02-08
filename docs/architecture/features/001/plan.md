@@ -157,11 +157,16 @@ _Fill in after each drift gate run._
 4. **I4 — YAML spec parser** (≤90 min)
    - _Goal:_ Parse transform spec YAML into `TransformSpec` domain objects.
    - _Preconditions:_ I3 complete (engine SPI + JSLT engine exist).
+   - _Design note:_ `TransformSpec` is an immutable record with nullable fields.
+     Phase 3 populates core fields (id, version, description, lang,
+     inputSchema, outputSchema, compiledExpr, forward, reverse). Fields for
+     later phases (sensitive, match, headers, status, mappers) are null until
+     Phases 5–6 extend parsing.
    - _Steps:_
      1. Create test fixture YAML files: `jslt-simple-rename.yaml`,
         `jslt-conditional.yaml`, `jslt-array-reshape.yaml` (FX-001-01/02/03).
      2. **Test first:** Write failing test: parse valid YAML → `TransformSpec`
-        with correct id, version, lang, compiled expression.
+        with correct id, version, description (optional), lang, compiled expression.
      3. Implement `SpecParser` — YAML → `TransformSpec` using Jackson YAML.
      4. **Test first:** Write failing test: invalid YAML → `SpecParseException`.
      5. **Test first:** Write failing test: unknown engine id → `ExpressionCompileException`.
@@ -182,7 +187,9 @@ _Fill in after each drift gate run._
      4. **Test first:** Write test: spec with `input.schema` and `output.schema` →
         JSON Schema 2020-12 validated at load time.
      5. **Test first:** Write test: invalid JSON Schema → `SchemaValidationException`.
-     6. Implement schema validation (FR-001-09) — load-time validation with
+     6. **Test first:** Write test: missing schema blocks → `SpecParseException`
+        (FR-001-09 MUST — pre-resolved, not an open question).
+     7. Implement schema validation (FR-001-09) — load-time validation with
         `networknt/json-schema-validator`.
    - _Requirements covered:_ FR-001-03 (bidirectional), FR-001-09 (schema validation).
    - _Commands:_ `./gradlew :core:test`, `./gradlew spotlessApply check`
