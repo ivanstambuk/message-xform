@@ -807,7 +807,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `./gradlew :core:test --tests "*SensitiveFieldRedactionTest*"`
   - `./gradlew spotlessApply check`
 
-- [ ] **T-001-44** — Trace context propagation (NFR-001-10)
+- [x] **T-001-44** — Trace context propagation (NFR-001-10) ✅ 2026-02-08
   _Intent:_ Propagate `X-Request-ID` and `traceparent` headers through all
   log entries and telemetry events.
   _Test first:_ Write `TraceContextTest`:
