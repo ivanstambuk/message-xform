@@ -71,7 +71,11 @@ public final class UrlTransformer {
             newQueryString = applyQueryOperations(urlSpec, originalBody, context, message.queryString());
         }
 
-        // 5. Method override (T-001-38c — stub, will be implemented separately)
+        // 5. Method override (T-001-38c)
+        // Evaluates method.when against original body (ADR-0027)
+        if (urlSpec.hasMethodOverride()) {
+            newMethod = applyMethodOverride(urlSpec, originalBody, context, message.requestMethod());
+        }
 
         // Build the updated message if anything changed
         if (!java.util.Objects.equals(newPath, message.requestPath())
@@ -171,6 +175,56 @@ public final class UrlTransformer {
         }
 
         return buildQueryString(params);
+    }
+
+    // --- Method override (T-001-38c) ---
+
+    /**
+     * Applies the method override if the {@code when} predicate is satisfied
+     * (or absent).
+     * The {@code when} predicate evaluates against the <strong>original</strong>
+     * body (ADR-0027).
+     *
+     * @return the new method, or the current method if the predicate is false
+     */
+    private static String applyMethodOverride(
+            UrlSpec urlSpec, JsonNode originalBody, TransformContext context, String currentMethod) {
+        // If method.when is present, evaluate it against the original body
+        if (urlSpec.methodWhen() != null) {
+            try {
+                JsonNode result = urlSpec.methodWhen().evaluate(originalBody, context);
+                if (!isTruthy(result)) {
+                    LOG.debug("url.method.when predicate is false — method unchanged: {}", currentMethod);
+                    return currentMethod;
+                }
+            } catch (Exception e) {
+                LOG.warn("url.method.when evaluation failed: {} — method unchanged", e.getMessage());
+                return currentMethod;
+            }
+        }
+
+        // Apply the override
+        String newMethod = urlSpec.methodSet();
+        LOG.debug("URL method override: {} → {}", currentMethod, newMethod);
+        return newMethod;
+    }
+
+    /**
+     * Checks if a JSLT result is "truthy".
+     * Follows JSLT/JSON semantics: null, false, empty string, missing → falsy.
+     */
+    private static boolean isTruthy(JsonNode result) {
+        if (result == null || result.isNull() || result.isMissingNode()) {
+            return false;
+        }
+        if (result.isBoolean()) {
+            return result.booleanValue();
+        }
+        if (result.isTextual()) {
+            return !result.asText().isEmpty();
+        }
+        // Any other non-null value is truthy
+        return true;
     }
 
     /**

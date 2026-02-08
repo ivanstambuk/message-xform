@@ -45,6 +45,10 @@ public final class SpecParser {
     private static final JsonSchemaFactory SCHEMA_FACTORY =
             JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012);
 
+    /** Valid HTTP methods for url.method.set (T-001-38d, RFC 9110 §9). */
+    private static final Set<String> VALID_HTTP_METHODS =
+            Set.of("GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS");
+
     private final EngineRegistry engineRegistry;
 
     /**
@@ -313,14 +317,41 @@ public final class SpecParser {
             }
         }
 
+        // Parse method block (T-001-38c)
+        String methodSet = null;
+        CompiledExpression methodWhen = null;
+        JsonNode methodNode = urlNode.get("method");
+        if (methodNode != null) {
+            JsonNode setNode = methodNode.get("set");
+            if (setNode != null && setNode.isTextual()) {
+                methodSet = setNode.asText().toUpperCase();
+                // T-001-38d: Validate HTTP method at load time
+                if (!VALID_HTTP_METHODS.contains(methodSet)) {
+                    throw new SpecParseException(
+                            "Invalid HTTP method '" + setNode.asText()
+                                    + "' in url.method.set — must be one of: "
+                                    + VALID_HTTP_METHODS,
+                            specId,
+                            source);
+                }
+            }
+            JsonNode whenNode = methodNode.get("when");
+            if (whenNode != null && whenNode.isTextual()) {
+                methodWhen = compileExpression(engine, whenNode.asText(), specId, source);
+            }
+        }
+
         // Check if any URL operations exist
-        boolean hasAnyOps =
-                pathExpr != null || !queryRemove.isEmpty() || !queryStaticAdd.isEmpty() || !queryDynamicAdd.isEmpty();
+        boolean hasAnyOps = pathExpr != null
+                || !queryRemove.isEmpty()
+                || !queryStaticAdd.isEmpty()
+                || !queryDynamicAdd.isEmpty()
+                || methodSet != null;
         if (!hasAnyOps) {
             return null;
         }
 
-        return new UrlSpec(pathExpr, queryRemove, queryStaticAdd, queryDynamicAdd, null, null);
+        return new UrlSpec(pathExpr, queryRemove, queryStaticAdd, queryDynamicAdd, methodSet, methodWhen);
     }
 
     // --- Private helpers ---

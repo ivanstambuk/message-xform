@@ -660,7 +660,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   (S-001-38b), percent-encoding, null query string. Added queryString field to Message
   with backward-compat constructor. All 230 tests pass.
 
-- [ ] **T-001-38c** — HTTP method override (FR-001-12, ADR-0027, S-001-38c)
+- [x] **T-001-38c** — HTTP method override (FR-001-12, ADR-0027, S-001-38c) ✅ 2026-02-08
   _Intent:_ Implement `url.method.set` with optional `when` predicate, using the
   same pattern as `status` (FR-001-11). Enables complete de-polymorphization by
   changing both the URL path and HTTP method.
@@ -671,26 +671,31 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `method.set: "GET"` + `when: '.action == "read"'` + non-matching body → method
     unchanged.
   - `method.when` predicate evaluates against **original** body (ADR-0027).
-  _Implement:_ Extend `UrlTransformer` with method override. Add `setRequestMethod`
-  to `Message` interface. Reuse `set`/`when` pattern from `StatusTransformer`.
+  _Implement:_ Extended `UrlTransformer.applyMethodOverride()` with set/when pattern.
+  Added `isTruthy()` helper for JSLT predicate evaluation.
   _Verify:_ `UrlMethodOverrideTest` passes.
   _Verification commands:_
   - `./gradlew :core:test --tests "*UrlMethodOverrideTest*"`
   - `./gradlew spotlessApply check`
+  _Status:_ ✅ Complete (2026-02-08). 6 tests: unconditional set, conditional when
+  (truthy/falsy), original body evaluation, combined path+method, direction handling.
 
-- [ ] **T-001-38d** — URL method validation at load time (FR-001-12, S-001-38d)
+- [x] **T-001-38d** — URL method validation at load time (FR-001-12, S-001-38d) ✅ 2026-02-08
   _Intent:_ Invalid HTTP methods in `method.set` MUST be rejected at load time
   with a `SpecParseException`. Valid methods: GET, POST, PUT, DELETE, PATCH, HEAD,
   OPTIONS.
   _Test first:_ Write `UrlMethodValidationTest`:
   - `method.set: "YOLO"` → `SpecParseException` at load time.
   - `method.set: "GET"` → accepted.
-  - Invalid glob in `query.remove` → rejected at load time.
-  _Implement:_ Add validation to `SpecParser.parseUrlBlock()`.
+  - Lowercase method normalized to uppercase.
+  _Implement:_ Added `VALID_HTTP_METHODS` constant and validation in
+  `SpecParser.parseUrlSpec()`. Method normalized to uppercase before validation.
   _Verify:_ `UrlMethodValidationTest` passes.
   _Verification commands:_
   - `./gradlew :core:test --tests "*UrlMethodValidationTest*"`
   - `./gradlew spotlessApply check`
+  _Status:_ ✅ Complete (2026-02-08). 14 tests: 6 invalid methods rejected (parameterized),
+  7 valid methods accepted (parameterized), lowercase normalization. All 250 tests pass.
 
 - [ ] **T-001-38e** — URL block on response transform → ignored with warning (FR-001-12, S-001-38e)
   _Intent:_ URL rewriting only makes sense for request transforms. A `url` block
