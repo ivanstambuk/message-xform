@@ -2,7 +2,7 @@
 
 | Field | Value |
 |-------|-------|
-| Status | Draft |
+| Status | Ready |
 | Last updated | 2026-02-08 |
 | Owners | Ivan |
 | Linked plan | `docs/architecture/features/004/plan.md` |
@@ -92,12 +92,12 @@ no changes).
 
 | ID | Requirement | Success path | Validation path | Failure path | Source |
 |----|-------------|--------------|-----------------|--------------|--------|
-| FR-004-06 | The proxy MUST implement `GatewayAdapter<Context>` where `Context` is Javalin's request context, providing `wrapRequest`, `wrapResponse`, and `applyChanges`. | `wrapRequest(ctx)` extracts body → `JsonNode`, headers, status, path, method, query string and returns a `Message`. | Request with no body → `Message.body()` is `NullNode` (per `Message` contract — body is never null). | JSON parse error on request body → proxy returns `400 Bad Request` with RFC 9457 error. | SPI-001-04/05/06, ADR-0013. |
+| FR-004-06 | The proxy MUST implement `GatewayAdapter<Context>` where `Context` is Javalin's request context, providing `wrapRequest`, `wrapResponse`, and `applyChanges`. | `wrapRequest(ctx)` extracts: body → `JsonNode`, `headers` (single-value, lowercase keys), `headersAll` (multi-value, lowercase keys), `contentType`, `requestPath`, `requestMethod`, `queryString` (raw, without leading `?`), and `statusCode` (null for requests). Returns a fully populated `Message`. | Request with no body → `Message.body()` is `NullNode` (per `Message` contract — body is never null). Response with no body (e.g., `204 No Content`) → `Message.body()` is `NullNode`. | JSON parse error on request body → proxy returns `400 Bad Request` with RFC 9457 error. | SPI-001-04/05/06, ADR-0013. |
 | FR-004-06a | Before calling `wrapResponse(ctx)`, `ProxyHandler` MUST populate the Javalin `Context` with the upstream backend's response data: body (`ctx.result()`), headers (`ctx.header()`), and status code (`ctx.status()`). This ensures `wrapResponse` reads from `Context` uniformly, mirroring how real gateway adapters (PingAccess, PingGateway) naturally have the response in their native object. | `UpstreamClient.forward()` returns `HttpResponse` → ProxyHandler writes body, headers, status into `ctx` → `wrapResponse(ctx)` reads from `ctx`. | n/a | n/a | Q-034 resolution. |
-| FR-004-06b | `wrapResponse` MUST include the original request's path (`ctx.path()`) and method (`ctx.method()`) in the returned `Message`, since profile matching for response transforms operates on request criteria (Feature 001 API-001-01). | `wrapResponse(ctx)` → `Message` with `requestPath = ctx.path()`, `requestMethod = ctx.method()`. | n/a | n/a | Feature 001 API-001-01. |
+| FR-004-06b | `wrapResponse` MUST include the original request's path (`ctx.path()`) and method (`ctx.method()`) in the returned `Message`, since profile matching for response transforms operates on request criteria (Feature 001 API-001-01). `wrapResponse` MUST populate: body → `JsonNode`, `headers` (single-value, lowercase keys), `headersAll` (multi-value, lowercase keys), `contentType`, `statusCode`, `requestPath` (from original request), `requestMethod` (from original request). `queryString` is set to `null` for responses. | `wrapResponse(ctx)` → `Message` with `requestPath = ctx.path()`, `requestMethod = ctx.method()`, upstream body/headers/status. | n/a | n/a | Feature 001 API-001-01. |
 | FR-004-07 | `wrapRequest` and `wrapResponse` MUST create **deep copies** of the native message data, consistent with copy-on-wrap semantics (ADR-0013). | Mutations to the `Message` returned by `wrapRequest` do not affect the original Javalin context until `applyChanges` is called. | n/a | n/a | ADR-0013. |
-| FR-004-08 | `applyChanges` MUST write the transformed `Message` fields (body, headers, status code) back to the Javalin response context. | Transformed body, headers, and status code are written to `ctx.result()`, `ctx.header()`, `ctx.status()`. | If the transformed `Message.body()` is null, `applyChanges` MUST set an empty response body. | n/a | SPI-001-06. |
-| FR-004-09 | Header names MUST be normalized to lowercase in `wrapRequest` and `wrapResponse`, consistent with core engine conventions. | `Content-Type: application/json` → `content-type: application/json` in `Message.headers()`. | n/a | n/a | Feature 001 spec. |
+| FR-004-08 | `applyChanges` MUST write the transformed `Message` fields (body, headers, status code) back to the Javalin response context. **`applyChanges` is called only for RESPONSE SUCCESS** — request transforms flow directly to `UpstreamClient.forward(result.message())` without calling `applyChanges` (see FR-004-35 dispatch table). | Transformed body, headers, and status code are written to `ctx.result()`, `ctx.header()`, `ctx.status()`. | If the transformed `Message.body()` is null, `applyChanges` MUST set an empty response body. | n/a | SPI-001-06. |
+| FR-004-09 | Header names MUST be normalized to lowercase in `wrapRequest` and `wrapResponse`, consistent with core engine conventions. This applies to both `headers` (single-value) and `headersAll` (multi-value) maps. | `Content-Type: application/json` → `content-type: application/json` in `Message.headers()` and `Message.headersAll()`. | n/a | n/a | Feature 001 spec. |
 
 ### Configuration
 
@@ -167,7 +167,7 @@ no changes).
 
 | ID | Requirement | Success path | Validation path | Failure path | Source |
 |----|-------------|--------------|-----------------|--------------|--------|
-| FR-004-27 | On startup, the proxy MUST: (1) load config, (2) load and compile all specs, (3) load active profile, (4) initialize the HTTP client, (5) start the HTTP server, (6) start the file watcher. | Proxy starts in <3s (NFR-004-01), logs structured startup summary with port, backend, spec count. | Config validation errors → exit with non-zero status and descriptive message. | Invalid spec YAML → startup fails with `TransformLoadException` (ADR-0024). Zero specs (empty `specs-dir`) is a valid configuration — all requests pass through. | ADR-0025. |
+| FR-004-27 | On startup, the proxy MUST: (1) load config, (2) register expression engines (JSLT is registered by default; v1 does not support runtime engine registration — additional engines are future scope), (3) load and compile all specs, (4) load active profile, (5) initialize the HTTP client, (6) start the HTTP server, (7) start the file watcher. | Proxy starts in <3s (NFR-004-01), logs structured startup summary with port, backend, spec count, registered engines. | Config validation errors → exit with non-zero status and descriptive message. | Invalid spec YAML → startup fails with `TransformLoadException` (ADR-0024). Zero specs (empty `specs-dir`) is a valid configuration — all requests pass through. | ADR-0025. |
 | FR-004-28 | On shutdown (SIGTERM/SIGINT), the proxy MUST: (1) stop accepting new connections, (2) wait for in-flight requests to complete (graceful drain, configurable via `proxy.shutdown.drain-timeout-ms`, default 30s), (3) close the HTTP client, (4) stop the file watcher, (5) exit. | Ctrl-C → graceful shutdown within drain timeout → exit 0. | In-flight requests complete normally during shutdown. | Drain timeout exceeded → force close remaining connections → exit 0. | Production deployment. |
 
 ### Docker & Kubernetes
@@ -206,6 +206,19 @@ no changes).
 > raw data from the Javalin `Context` directly (request body bytes, original
 > headers, original path/query), bypassing `Message` serialization. This avoids
 > a needless parse→serialize round-trip for non-matching requests.
+
+> **`applyChanges` call site:** `applyChanges(msg, ctx)` is called ONLY for
+> RESPONSE SUCCESS — it writes the transformed body, headers, and status back
+> to the Javalin context, which Javalin then sends to the client. For REQUEST
+> SUCCESS, `ProxyHandler` reads from the transformed `Message` directly and
+> passes it to `UpstreamClient.forward()`. This is an intentional deviation
+> from the symmetric SPI pattern: the Javalin `Context` is the *response*
+> writer, so writing a transformed *request* back to it makes no sense.
+
+> **Cookie binding:** `$cookies` context variable (Feature 001 DO-001-07) is
+> NOT populated in v1. Cookie parsing from the `Cookie` header is deferred
+> to a future version (Q-041). JSLT expressions referencing `$cookies` will
+> evaluate to `null`.
 
 ---
 
@@ -351,6 +364,23 @@ no changes).
 | S-004-57 | **X-Forwarded-* added (default):** `proxy.forwarded-headers.enabled: true` (default) → upstream request includes `X-Forwarded-For` (client IP), `X-Forwarded-Proto`, `X-Forwarded-Host` (FR-004-36). |
 | S-004-58 | **X-Forwarded-* disabled:** `proxy.forwarded-headers.enabled: false` → upstream request does NOT include any `X-Forwarded-*` headers (FR-004-36). |
 | S-004-59 | **X-Forwarded-For appended:** Client behind an existing proxy sends `X-Forwarded-For: 1.1.1.1` → proxy appends client IP → backend receives `X-Forwarded-For: 1.1.1.1, 10.0.0.5` (FR-004-36). |
+
+### Category 14 — Dispatch Table Integration
+
+| Scenario ID | Description / Expected outcome |
+|-------------|--------------------------------|
+| S-004-60 | **Request SUCCESS dispatch:** Profile matches → request body transformed → `UpstreamClient` receives transformed `Message` (body, headers, path, method). `applyChanges` is NOT called for request direction. |
+| S-004-61 | **Response SUCCESS dispatch:** Backend returns response → response body transformed → `applyChanges` writes transformed body/headers/status to Javalin context → client receives transformed response. |
+| S-004-62 | **Request ERROR dispatch:** Profile matches but JSLT expression fails → client receives `502` RFC 9457 error. Request is NOT forwarded to backend. |
+| S-004-63 | **Request PASSTHROUGH dispatch:** No profile matches request → raw request bytes forwarded to backend unmodified (no JSON parse). Response returned unmodified. |
+| S-004-64 | **Response with no body (204):** Backend returns `204 No Content` → `wrapResponse` creates `Message` with `NullNode` body → profile matching proceeds normally → response returned to client. |
+
+### Category 15 — Concurrency
+
+| Scenario ID | Description / Expected outcome |
+|-------------|--------------------------------|
+| S-004-65 | **Concurrent connections:** 100 concurrent requests → all complete without thread exhaustion or error (virtual threads validation). |
+| S-004-66 | **Concurrent reload during traffic:** File watcher triggers reload while 10 concurrent requests are in-flight → in-flight requests complete with old registry, new requests use new registry. No mixed results. |
 
 > **Note on chunked transfer encoding:** When clients or backends use
 > `Transfer-Encoding: chunked`, the proxy relies on Javalin/Jetty to assemble the
