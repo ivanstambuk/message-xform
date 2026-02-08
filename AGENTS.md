@@ -45,7 +45,7 @@ constitution in `docs/decisions/project-constitution.md` before acting.
 | 007 | Kong Gateway Adapter | 🔲 Not Started |
 | 008 | NGINX Adapter | 🔲 Not Started |
 
-**Priority:** Tier 1 (001+002) → Tier 2 (003+004) → Tier 3 (005+006) → Tier 4 (007+008)
+**Priority:** Tier 1 (001+004) → Tier 2 (002+003) → Tier 3 (005+006) → Tier 4 (007+008)
 
 ## Feature Lifecycle
 

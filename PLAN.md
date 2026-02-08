@@ -322,9 +322,9 @@ Build and validate message-xform adapters against real gateway instances, end-to
 
 | Priority | Gateway | Notes |
 |----------|---------|-------|
-| 1st | **PingAccess** | Primary target — Java plugin API. Docker image available via Ping Identity. |
-| 2nd | **PingGateway** | Same Ping ecosystem — Groovy filters, shared Java core. |
-| 3rd | **Standalone proxy** | `message-xform-standalone` as an embedded HTTP proxy — no gateway dependency. |
+| 1st | **Standalone proxy** | `message-xform-standalone` as an embedded HTTP proxy — no gateway dependency. Validates core API and GatewayAdapter SPI with zero external dependencies. |
+| 2nd | **PingAccess** | Primary production target — Java plugin API. Docker image available via Ping Identity. |
+| 3rd | **PingGateway** | Same Ping ecosystem — Groovy filters, shared Java core. |
 | 4th | **WSO2 API Manager** | Java-native, OSS — Docker images on Docker Hub. |
 | 5th | **Apache APISIX** | Java Plugin Runner, hot-reload — Docker Compose ready. |
 | 6th | **Kong** | Lua/Go plugin — requires bridging strategy. |

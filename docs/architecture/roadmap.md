@@ -66,12 +66,13 @@ Similar to Kong — no native Java. Four approaches documented:
 
 ## Priority Order
 
-Based on the gateway candidate research (`docs/research/gateway-candidates.md`):
+Based on the gateway candidate research (`docs/research/gateway-candidates.md`),
+updated 2026-02-08 to promote Feature 004 as the E2E test harness:
 
 | Tier | Features | Rationale |
 |------|----------|-----------|
-| **Tier 1** | 001 (core) + 002 (PingAccess) | MVP: core engine + primary adapter |
-| **Tier 2** | 003 (PingGateway) + 004 (Standalone) | Same vendor ecosystem + dev/test tool |
+| **Tier 1** | 001 (core) + 004 (Standalone) | Core engine + E2E test harness. Standalone proxy validates the core API and GatewayAdapter SPI with zero external dependencies. Also serves as the reference adapter for all subsequent gateway integrations. |
+| **Tier 2** | 002 (PingAccess) + 003 (PingGateway) | Primary production target + same Ping ecosystem |
 | **Tier 3** | 005 (WSO2) + 006 (APISIX) | OSS gateways, Java-native, broader market |
 | **Tier 4** | 007 (Kong) + 008 (NGINX) | Language gap — requires bridging strategy |
 
