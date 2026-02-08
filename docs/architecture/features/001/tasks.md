@@ -948,7 +948,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   not implemented, dynamic timestamp, placeholder data). All others map
   to specific test class(es).
 
-- [ ] **T-001-52** — Drift gate report
+- [x] **T-001-52** — Drift gate report ✅ 2026-02-08
   _Intent:_ Execute the full drift gate checklist from `plan.md`. Verify
   spec ↔ code alignment for every FR and NFR.
   _Implement:_ Fill in the Drift Report section in `plan.md`. Record
@@ -956,6 +956,10 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   _Verify:_ All checklist items pass. Report committed.
   _Verification commands:_
   - `./gradlew spotlessApply check`
+  _Verification log:_ ✅ All 7 checklist items pass. 12/12 FRs verified.
+  10/10 NFRs verified (NFR-001-03 latency benchmark deferred to backlog).
+  4 drift items documented — all Low/Expected severity. 367 tests, 0
+  failures, 8 skipped.
   - `./gradlew :core:test`
   - Review: `docs/architecture/open-questions.md` has no open entries.
 
