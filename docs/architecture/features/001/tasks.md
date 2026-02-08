@@ -222,7 +222,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   _Verification commands:_
   - N/A — file creation only.
 
-- [ ] **T-001-14** — Parse valid spec YAML → TransformSpec (FR-001-01, DO-001-02)
+- [x] **T-001-14** — Parse valid spec YAML → TransformSpec (FR-001-01, DO-001-02)
   _Intent:_ The core spec parser: read a YAML file, resolve the expression
   engine, compile the expression, and produce an immutable `TransformSpec`.
   _Test first:_ Write `SpecParserTest`:
@@ -913,6 +913,7 @@ Track long-running or shared commands with timestamps to avoid duplicate work.
 - 2026-02-08 03:20 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — after T-001-01/02
 - 2026-02-08 03:27 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — 37 tests passed after T-001-03..08
 - 2026-02-08 03:50 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — 61 tests passed after T-001-09..12
+- 2026-02-08 10:05 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — 72 tests passed after T-001-13..14
 
 ## Completion Criteria
 
