@@ -88,6 +88,25 @@ Update both `docs/architecture/roadmap.md` and the Roadmap table above when stat
   - `.agent/session/` — Ephemeral session state (pending tasks).
   - `llms.txt` — High-signal specs manifest for LLM context.
 
+## Build & Test Commands
+
+> **Stub — fill in when the Gradle project is initialized.**
+
+```bash
+# Full formatting + verify (canonical quality gate):
+# ./gradlew --no-daemon spotlessApply check
+
+# Focused core-only tests:
+# ./gradlew --no-daemon :core:test
+
+# E2E integration tests:
+# ./gradlew --no-daemon :standalone:test
+```
+
+**Prerequisites:**
+- Ensure `JAVA_HOME` points to a Java 21 JDK before invoking Gradle or Git hooks.
+- Verify `git config core.hooksPath githooks` before staging changes (once `githooks/` is set up).
+
 ## Rules
 
 1. **Read Before Acting**: At session start, run the `/init` workflow. Read `AGENTS.md` and `PLAN.md` before making changes.
@@ -148,6 +167,10 @@ Update both `docs/architecture/roadmap.md` and the Roadmap table above when stat
     - **Quality gate after every increment**: Run the build quality gate (e.g., `./gradlew spotlessApply check`) after every self-contained increment. A red build must be fixed or the failing test explicitly quarantined with a TODO, a documented reason, and a follow-up captured in the plan.
     - **Tests validate scenarios**: Executable tests MUST map back to the scenarios defined in `scenarios.md`. When a scenario has no corresponding test, that's a gap — fill it before moving on.
     - **No "implement then test" sequences**: Task breakdowns in `tasks.md` MUST order test creation before production code for each increment. A task that reads "implement X, then add tests" is incorrectly structured — restructure it as "write failing tests for X, then implement X."
+13. **No Unapproved Deletions**: Never delete files or directories — especially via recursive commands or when cleaning untracked items — unless the user has explicitly approved the exact paths in the current session. Features may be developed in parallel across sessions, so untracked files can appear without warning; surface them for review instead of removing them.
+14. **No Destructive Commands**: Avoid destructive commands (e.g., `rm -rf`, `git reset --hard`, force-pushes) unless the user explicitly requests them. Stay within the repository sandbox. Prefer reversible operations.
+15. **Dependency Approval Required**: Never add or upgrade libraries, Gradle plugins, BOMs, or other build dependencies without explicit user approval. When approved, document the rationale in the relevant feature plan or ADR. Automated dependency PRs (e.g., Dependabot) still require owner approval before merging.
+16. **No Reflection**: Do not introduce Java reflection in production or test sources. When existing code requires access to collaborators or internals, prefer explicit seams (constructor parameters, package-private collaborators, or dedicated test fixtures) instead of reflection.
 
 ## Pre-Implementation Checklist (Mandatory)
 
