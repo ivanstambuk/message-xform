@@ -169,6 +169,21 @@ no changes).
 | FR-004-33 | The proxy MUST force HTTP/1.1 for upstream connections (via `HttpClient.Version.HTTP_1_1`). | Proxy sends `GET /` via HTTP/1.1. | n/a | n/a | Non-Goal: HTTP/2 upstream. |
 | FR-004-34 | The proxy MUST recalculate the `Content-Length` header based on the *transformed* body size for **both** upstream requests and client responses. It MUST NOT blindly copy the `Content-Length` from the original message in either direction. | Request: client sends 100 bytes → spec adds 50 bytes → upstream receives `Content-Length: 150`. Response: backend returns 200 bytes → spec removes 50 bytes → client receives `Content-Length: 150`. | n/a | n/a | HTTP framing correctness. |
 
+### TransformResult Dispatch
+
+| ID | Requirement | Source |
+|----|-------------|--------|
+| FR-004-35 | `ProxyHandler` MUST dispatch on the `TransformResult` returned by `TransformEngine.transform()` as follows: | Q-033 resolution, FR-004-02/03/23. |
+
+| Direction | `TransformResult` state | Proxy behaviour |
+|-----------|------------------------|-----------------|
+| REQUEST   | `SUCCESS`              | Forward `result.message()` to backend via `UpstreamClient`. |
+| REQUEST   | `PASSTHROUGH`          | Forward the original (unwrapped) request to the backend unmodified. |
+| REQUEST   | `ERROR`                | Return `result.errorResponse()` with `result.errorStatusCode()` to the client immediately. Do **NOT** forward to backend. |
+| RESPONSE  | `SUCCESS`              | Return `result.message()` to client via `applyChanges(msg, ctx)`. |
+| RESPONSE  | `PASSTHROUGH`          | Return the original backend response to the client unmodified. |
+| RESPONSE  | `ERROR`                | Return `result.errorResponse()` with `result.errorStatusCode()` to the client. |
+
 ---
 
 ## Non-Functional Requirements
