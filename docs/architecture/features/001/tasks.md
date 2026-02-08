@@ -338,7 +338,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `./gradlew :core:test --tests "*PassthroughTest*"`
   - `./gradlew spotlessApply check`
 
-- [ ] **T-001-21** — Context variable binding: $headers, $status (FR-001-10, FR-001-11)
+- [x] **T-001-21** — Context variable binding: $headers, $status (FR-001-10, FR-001-11)
   _Intent:_ Wire `TransformContext` into JSLT evaluation so expressions can
   reference `$headers`, `$headers_all`, `$status`. Depends on T-001-12
   research findings.
@@ -918,6 +918,8 @@ Track long-running or shared commands with timestamps to avoid duplicate work.
 - 2026-02-08 10:45 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — 89 tests passed after T-001-16..17
 - 2026-02-08 10:50 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — 93 tests passed after T-001-18
 - 2026-02-08 11:10 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — 99 tests passed after T-001-19 (S-001-09 adjusted for JSLT absent-field behavior)
+- 2026-02-08 11:15 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — 104 tests passed after T-001-20
+- 2026-02-08 11:20 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — 109 tests passed after T-001-21
 
 ## Completion Criteria
 
