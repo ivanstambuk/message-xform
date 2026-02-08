@@ -34,5 +34,8 @@ dependency-reduced-pom.xml
 # Reference docs (local working copies — PDFs + extracted text)
 docs/reference/
 
+# Vendor binaries (product zips, license files, extracted SDKs)
+binaries/
+
 # Docker
 docker-compose.override.yml
