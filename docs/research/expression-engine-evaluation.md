@@ -518,6 +518,28 @@ transform:
 > 4. Its compiled `Expression` objects are immutable and thread-safe — ideal
 >    for gateway-inline use where a single spec serves thousands of requests.
 
+### Known Limitations
+
+#### JSLT Evaluation Budget (T-001-25)
+
+JSLT compiled `Expression.apply()` runs synchronously and **cannot be
+interrupted mid-evaluation**. There is no timeout or cancellation mechanism
+in the JSLT API. Consequences:
+
+- **Time budget** (`max-eval-ms`) is enforced **post-evaluation** by
+  measuring wall-clock time around the `apply()` call. If the expression
+  takes longer than the budget, the result is discarded and an
+  `EvalBudgetExceededException` is thrown — but the thread was still blocked
+  for the full evaluation duration.
+- **Output size budget** (`max-output-bytes`) is the **primary guard**
+  against runaway expressions. After evaluation, the output is serialised
+  and its byte count is compared against the budget.
+- For true preemptive timeout, a separate executor thread with
+  `Future.get(timeout)` would be needed, adding context-switch overhead.
+  This is considered a Phase 7+ optimisation if real-world workloads
+  demonstrate a need.
+
 ---
 
 *Status: COMPLETE — Engine evaluation done. JSLT recommended.*
+
