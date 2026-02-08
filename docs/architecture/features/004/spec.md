@@ -186,6 +186,7 @@ no changes).
 | FR-004-33 | The proxy MUST force HTTP/1.1 for upstream connections (via `HttpClient.Version.HTTP_1_1`). | Proxy sends `GET /` via HTTP/1.1. | n/a | n/a | Non-Goal: HTTP/2 upstream. |
 | FR-004-34 | The proxy MUST recalculate the `Content-Length` header based on the *transformed* body size for **both** upstream requests and client responses. It MUST NOT blindly copy the `Content-Length` from the original message in either direction. | Request: client sends 100 bytes → spec adds 50 bytes → upstream receives `Content-Length: 150`. Response: backend returns 200 bytes → spec removes 50 bytes → client receives `Content-Length: 150`. | n/a | n/a | HTTP framing correctness. |
 | FR-004-36 | When `proxy.forwarded-headers.enabled` is `true` (default), the proxy MUST add `X-Forwarded-For` (client IP), `X-Forwarded-Proto` (`http` or `https` based on inbound scheme), and `X-Forwarded-Host` (original `Host` header value) to upstream requests. If these headers already exist (e.g., from an upstream proxy), the proxy MUST **append** to `X-Forwarded-For` and preserve existing `X-Forwarded-Proto`/`X-Forwarded-Host` values. When disabled, no forwarded headers are added or modified. | Client `10.0.0.5` via HTTPS → backend receives `X-Forwarded-For: 10.0.0.5`, `X-Forwarded-Proto: https`, `X-Forwarded-Host: api.example.com`. | `proxy.forwarded-headers.enabled: false` → no headers added. | n/a | Q-038 resolution, RFC 7239. |
+| FR-004-37 | `wrapRequest` MUST parse cookies from the `Cookie` header (via Javalin’s `ctx.cookieMap()`) and pass them to `TransformContext` as the `cookies` parameter. This enables `$cookies` binding in JSLT expressions (Feature 001 DO-001-07). `wrapResponse` does NOT populate cookies (cookies are a request-direction concept). | Request with `Cookie: session=abc123; lang=en` → `$cookies.session` evaluates to `"abc123"`, `$cookies.lang` evaluates to `"en"`. | Request with no `Cookie` header → `$cookies` is an empty map (not null). | n/a | Q-041 resolution, DO-001-07. |
 
 ### TransformResult Dispatch
 
@@ -215,10 +216,10 @@ no changes).
 > from the symmetric SPI pattern: the Javalin `Context` is the *response*
 > writer, so writing a transformed *request* back to it makes no sense.
 
-> **Cookie binding:** `$cookies` context variable (Feature 001 DO-001-07) is
-> NOT populated in v1. Cookie parsing from the `Cookie` header is deferred
-> to a future version (Q-041). JSLT expressions referencing `$cookies` will
-> evaluate to `null`.
+> **Cookie binding (Q-041):** `$cookies` context variable IS populated in v1.
+> `wrapRequest` parses the `Cookie` header via `ctx.cookieMap()` and passes
+> it to `TransformContext`. See FR-004-37. `wrapResponse` does not populate
+> cookies (cookies are a request-direction concept).
 
 ---
 
@@ -381,6 +382,14 @@ no changes).
 |-------------|--------------------------------|
 | S-004-65 | **Concurrent connections:** 100 concurrent requests → all complete without thread exhaustion or error (virtual threads validation). |
 | S-004-66 | **Concurrent reload during traffic:** File watcher triggers reload while 10 concurrent requests are in-flight → in-flight requests complete with old registry, new requests use new registry. No mixed results. |
+
+### Category 16 — Cookie Binding
+
+| Scenario ID | Description / Expected outcome |
+|-------------|--------------------------------|
+| S-004-67 | **Cookie binding in JSLT:** Request with `Cookie: session=abc123; lang=en` → JSLT expression `$cookies.session` evaluates to `"abc123"` (FR-004-37). |
+| S-004-68 | **No cookies:** Request with no `Cookie` header → `$cookies` is an empty map, `$cookies.session` evaluates to `null`. No error. |
+| S-004-69 | **URL-encoded cookie value:** Request with `Cookie: name=hello%20world` → `$cookies.name` evaluates to `"hello world"` (Javalin decodes). |
 
 > **Note on chunked transfer encoding:** When clients or backends use
 > `Transfer-Encoding: chunked`, the proxy relies on Javalin/Jetty to assemble the
