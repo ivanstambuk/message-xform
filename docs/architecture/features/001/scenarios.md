@@ -2569,39 +2569,41 @@ expected_error:
   message_contains: "does-not-exist"
 ```
 
-### S-001-52: Circular mapperRef Rejected at Load Time
+### S-001-52: Duplicate mapperRef in Apply Directive Rejected at Load Time
 
 ```yaml
 scenario: S-001-52
-name: mapper-ref-circular-rejected
+name: mapper-ref-duplicate-rejected
 description: >
-  Mapper A references mapper B, and mapper B references mapper A, creating a
-  circular dependency. The engine MUST detect the cycle at load time and reject
-  the spec with a descriptive error.
-  Validates FR-001-08 failure path.
-tags: [mappers, mapperRef, circular, validation, error, fr-001-08]
+  The `apply` directive references the same mapper id more than once.
+  Under ADR-0014's flat model, mappers are standalone expressions composed
+  via `apply` — there is no mapper-to-mapper cross-referencing, so true
+  circular dependencies are structurally impossible. However, duplicate
+  mapperRef entries in the apply list are rejected at load time to prevent
+  accidental double-application.
+  Validates FR-001-08 validation path and ADR-0014.
+tags: [mappers, mapperRef, duplicate, validation, error, fr-001-08, adr-0014]
 requires: [FR-001-08]
 
 spec:
-  id: circular-spec
+  id: duplicate-ref-spec
   version: "1.0.0"
   mappers:
-    mapper-a:
+    strip-internal:
       lang: jslt
-      mapperRef: [mapper-b]  # references mapper-b
-      expr: '{ * : . }'
-    mapper-b:
-      lang: jslt
-      mapperRef: [mapper-a]  # references mapper-a -> cycle
-      expr: '. + {"x": 1}'
+      expr: '{ * : . } - "_debug"'
   transform:
     lang: jslt
-    mapperRef: [mapper-a]
+    expr: '{ "id": .id }'
+    apply:
+      - mapperRef: strip-internal
+      - expr
+      - mapperRef: strip-internal       # <- duplicate mapper id
 
 expected_error:
   phase: load
-  type: CircularMapperReferenceError
-  message_contains: "circular"
+  type: SpecParseException
+  message_contains: "appears more than once in apply"
 ```
 
 ### S-001-59: Apply Directive Without `expr` Rejected at Load Time
@@ -3609,7 +3611,7 @@ expected_log_entries:
 | S-001-49 | profile-chain-jolt-then-jslt | Profile Chaining | profile-chaining, mixed-engine, jolt, jslt, adr-0008 |
 | S-001-50 | apply-directive-mapper-pipeline | Reusable Mappers | mappers, mapperRef, apply, resolution, fr-001-08, adr-0014 |
 | S-001-51 | mapper-ref-missing-rejected | Reusable Mappers | mappers, mapperRef, apply, validation, error, fr-001-08, adr-0014 |
-| S-001-52 | mapper-ref-circular-rejected | Reusable Mappers | mappers, mapperRef, circular, validation, error, fr-001-08 |
+| S-001-52 | mapper-ref-duplicate-rejected | Reusable Mappers | mappers, mapperRef, duplicate, validation, error, fr-001-08, adr-0014 |
 | S-001-53 | schema-valid-load-time | Schema Validation | schema, validation, load-time, fr-001-09, adr-0001 |
 | S-001-54 | schema-invalid-rejected | Schema Validation | schema, validation, error, load-time, fr-001-09, adr-0001 |
 | S-001-55 | schema-strict-mode-runtime-failure | Schema Validation | schema, validation, strict-mode, runtime, fr-001-09, adr-0001 |

@@ -696,7 +696,7 @@ transform:
   chaining (ADR-0012). Profile chaining composes across specs; `apply` composes
   within a single spec.
 - Each mapper compiles to a `CompiledExpression` at load time. Unknown mapper ids or
-  circular references are rejected at load time.
+  duplicate mapper references in the `apply` list are rejected at load time.
 
 | Aspect | Detail |
 |--------|--------|
@@ -704,7 +704,7 @@ transform:
 | Validation path | Missing mapper id → reject at load time |
 | Validation path | `expr` missing from `apply` list → reject at load time |
 | Validation path | `expr` appears more than once in `apply` → reject at load time |
-| Failure path | Circular mapperRef → reject at load time |
+| Failure path | Duplicate mapperRef in `apply` list → reject at load time |
 | Source | ADR-0014 |
 
 ### FR-001-09: Input/Output Schema Validation
