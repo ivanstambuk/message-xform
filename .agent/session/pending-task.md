@@ -1,18 +1,20 @@
 # Pending Task
 
-**Focus**: Feature 004 — Standalone HTTP Proxy Mode implementation planning
-**Status**: Spec is Ready (all open questions resolved). No plan or tasks exist yet.
-**Next Step**: Create `docs/architecture/features/004/plan.md` (phased implementation plan) and `docs/architecture/features/004/tasks.md` (granular task breakdown).
+**Focus**: Feature 004 — Standalone HTTP Proxy Mode implementation
+**Status**: Planning complete. Ready to begin coding.
+**Next Step**: Start Phase 1 — Implement I1 (T-004-01: add 3-arg `transform()`
+overload to core engine) followed by I2 (T-004-02: Gradle module scaffold).
 
 ## Context Notes
-- Spec has 37 FRs, 7 NFRs, 69 scenarios — comprehensive and reviewed against actual code
-- Key design choice: `applyChanges` is response-only; request → UpstreamClient directly reads from Message
-- Cookie binding ($cookies) is IN scope for v1 (Q-041 Option B)
-- Body size enforcement uses Jetty `maxRequestContentSize` for chunked safety (Q-040)
-- Config key is `proxy.max-body-bytes` not `backend.max-body-bytes` (Q-039)
-- The core engine already passes null for cookies in TransformContext (line 407 of TransformEngine.java) — this needs to be updated when implementing the adapter
-- No separate scenarios.md — all scenarios are inline in spec.md
-- Knowledge map and roadmap both show Feature 004 as "Spec Ready"
+- Spec is finalized (`docs/architecture/features/004/spec.md`) — 39 FRs, 7 NFRs.
+- Plan created (`plan.md`) — 8 phases, 12 increments, 77 scenarios tracked.
+- Tasks created (`tasks.md`) — 60 tasks with TDD cadence and verification commands.
+- Q-042 resolved: 3-arg `transform(Message, Direction, TransformContext)` overload.
+  The 2-arg method delegates to 3-arg with empty context. ~10 lines of core change.
+- Q-043 resolved: `$queryParams` in-scope for v1 via `TransformContext`.
+- No open questions remain.
+- Phase 1 I1 is the entry point: modify `TransformEngine.java` in `core/` module,
+  then run all Feature 001 tests to verify zero regressions.
 
-## SDD Gaps
-- None identified. All checks passed in retro audit.
+## SDD Gaps (if any)
+- None — all gaps from retro audit resolved and committed.
