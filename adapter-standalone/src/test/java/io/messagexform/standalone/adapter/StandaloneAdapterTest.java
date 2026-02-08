@@ -2,8 +2,10 @@ package io.messagexform.standalone.adapter;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.NullNode;
 import io.javalin.http.Context;
 import io.javalin.http.HandlerType;
@@ -319,6 +321,80 @@ class StandaloneAdapterTest {
 
                         assertThat(msg.body()).isInstanceOf(NullNode.class);
                         assertThat(msg.statusCode()).isEqualTo(204);
+                }
+        }
+
+        @Nested
+        @DisplayName("applyChanges")
+        class ApplyChanges {
+
+                private static final ObjectMapper MAPPER = new ObjectMapper();
+
+                @Test
+                @DisplayName("transformed body written to ctx.result()")
+                void bodyWrittenToResult() throws Exception {
+                        var body = MAPPER.readTree("{\"result\":\"ok\"}");
+                        Message msg = new Message(body, Map.of(), Map.of(), 200,
+                                        "application/json", "/api/data", "GET");
+
+                        Context ctx = mock(Context.class);
+                        when(ctx.result("{\"result\":\"ok\"}")).thenReturn(ctx);
+
+                        adapter.applyChanges(msg, ctx);
+
+                        verify(ctx).result("{\"result\":\"ok\"}");
+                }
+
+                @Test
+                @DisplayName("transformed headers written to ctx.header()")
+                void headersWrittenToContext() throws Exception {
+                        var body = MAPPER.readTree("{}");
+                        Map<String, String> headers = new LinkedHashMap<>();
+                        headers.put("x-custom", "value1");
+                        headers.put("x-correlation-id", "abc-123");
+
+                        Message msg = new Message(body, headers, Map.of(), 200,
+                                        "application/json", "/api/data", "GET");
+
+                        Context ctx = mock(Context.class);
+                        when(ctx.header("x-custom", "value1")).thenReturn(ctx);
+                        when(ctx.header("x-correlation-id", "abc-123")).thenReturn(ctx);
+
+                        adapter.applyChanges(msg, ctx);
+
+                        verify(ctx).header("x-custom", "value1");
+                        verify(ctx).header("x-correlation-id", "abc-123");
+                }
+
+                @Test
+                @DisplayName("transformed status code written to ctx.status()")
+                void statusWrittenToContext() throws Exception {
+                        var body = MAPPER.readTree("{}");
+                        Message msg = new Message(body, Map.of(), Map.of(), 201,
+                                        "application/json", "/api/users", "POST");
+
+                        Context ctx = mock(Context.class);
+                        when(ctx.status(201)).thenReturn(ctx);
+
+                        adapter.applyChanges(msg, ctx);
+
+                        verify(ctx).status(201);
+                }
+
+                @Test
+                @DisplayName("NullNode body → empty response body")
+                void nullNodeBodyWritesEmptyResult() {
+                        Message msg = new Message(NullNode.getInstance(), Map.of(), Map.of(),
+                                        204, null, "/api/data", "DELETE");
+
+                        Context ctx = mock(Context.class);
+                        when(ctx.result("")).thenReturn(ctx);
+                        when(ctx.status(204)).thenReturn(ctx);
+
+                        adapter.applyChanges(msg, ctx);
+
+                        verify(ctx).result("");
+                        verify(ctx).status(204);
                 }
         }
 

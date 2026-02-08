@@ -337,7 +337,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `./gradlew spotlessApply check`
   _Verification log:_ ✅ 16/16 tests PASSED (10 wrapRequest + 6 wrapResponse: body extraction, status preservation, header normalization, requestPath/requestMethod FR-004-06b, null queryString, 204 NullNode). Commit `61bb040`.
 
-- [ ] **T-004-19** — StandaloneAdapter.applyChanges (FR-004-08)
+- [x] **T-004-19** — StandaloneAdapter.applyChanges (FR-004-08)
   _Intent:_ Write the transformed `Message` fields back to Javalin response
   context. Called only for RESPONSE SUCCESS.
   _Test first:_ Write `StandaloneAdapterTest.applyChanges`:
@@ -350,6 +350,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   _Verification commands:_
   - `./gradlew :adapter-standalone:test --tests "*StandaloneAdapterTest*"`
   - `./gradlew spotlessApply check`
+  _Verification log:_ ✅ 20/20 tests PASSED (10 wrapRequest + 6 wrapResponse + 4 applyChanges: body writeback, header writeback, status writeback, NullNode empty body). Commit `2bbf08d`.
 
 - [ ] **T-004-20** — ProxyHandler: passthrough cycle (FR-004-01, S-004-01/02/03/04/05/06)
   _Intent:_ Implement the basic proxy cycle for passthrough requests — no

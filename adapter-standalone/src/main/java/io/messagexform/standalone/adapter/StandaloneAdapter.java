@@ -94,8 +94,27 @@ public final class StandaloneAdapter implements GatewayAdapter<Context> {
 
     @Override
     public void applyChanges(Message transformedMessage, Context ctx) {
-        // Placeholder — implemented in T-004-19
-        throw new UnsupportedOperationException("applyChanges not yet implemented (T-004-19)");
+        // Write body — NullNode → empty body (FR-004-08)
+        String bodyStr;
+        if (transformedMessage.body() == null || transformedMessage.body().isNull()) {
+            bodyStr = "";
+        } else {
+            bodyStr = transformedMessage.body().toString();
+        }
+        ctx.result(bodyStr);
+
+        // Write headers
+        transformedMessage.headers().forEach(ctx::header);
+
+        // Write status code
+        if (transformedMessage.statusCode() != null) {
+            ctx.status(transformedMessage.statusCode());
+        }
+
+        LOG.debug("applyChanges: status={}, headers={}, body={} bytes",
+                transformedMessage.statusCode(),
+                transformedMessage.headers().size(),
+                bodyStr.length());
     }
 
     /**
