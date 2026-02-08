@@ -729,7 +729,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
 
 #### I12 — Reusable mappers
 
-- [ ] **T-001-39** — Mapper block + apply pipeline (FR-001-08, ADR-0014, S-001-50)
+- [x] **T-001-39** — Mapper block + apply pipeline (FR-001-08, ADR-0014, S-001-50)
   _Intent:_ Implement the intra-spec pipeline: named mappers composed via
   a declarative `apply` list.
   _Test first:_ Write `MapperPipelineTest`:
@@ -742,8 +742,9 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   _Verification commands:_
   - `./gradlew :core:test --tests "*MapperPipelineTest*"`
   - `./gradlew spotlessApply check`
+  _Verification log:_ ✅ 7/7 tests pass. BUILD SUCCESSFUL. Committed 0f4cd54.
 
-- [ ] **T-001-40** — Mapper validation rules (FR-001-08)
+- [x] **T-001-40** — Mapper validation rules (FR-001-08)
   _Intent:_ Enforce all load-time validation rules for mapper pipelines.
   _Test first:_ Write `MapperValidationTest`:
   - `expr` missing from `apply` → `SpecParseException`.
@@ -756,6 +757,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   _Verification commands:_
   - `./gradlew :core:test --tests "*MapperValidationTest*"`
   - `./gradlew spotlessApply check`
+  _Verification log:_ ✅ 9/9 tests pass. BUILD SUCCESSFUL. Committed f5a176f.
 
 ---
 
