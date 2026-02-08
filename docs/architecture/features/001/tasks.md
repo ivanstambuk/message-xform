@@ -536,7 +536,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
 
 #### I10 — Header transformations
 
-- [ ] **T-001-34** — Header add/remove/rename (FR-001-10, S-001-33/34/35)
+- [x] **T-001-34** — Header add/remove/rename (FR-001-10, S-001-33/34/35) ✅ 2026-02-09
   _Intent:_ Implement the declarative header operations block.
   _Test first:_ Write `HeaderTransformTest`:
   - `add` static: add `X-Transformed-By: message-xform` → present in output.
@@ -549,7 +549,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `./gradlew :core:test --tests "*HeaderTransformTest*"`
   - `./gradlew spotlessApply check`
 
-- [ ] **T-001-35** — Dynamic header expressions (FR-001-10)
+- [x] **T-001-35** — Dynamic header expressions (FR-001-10) ✅ 2026-02-09
   _Intent:_ Header `add` with `expr` sub-key — evaluate JSLT against the
   transformed body to produce a header value.
   _Test first:_ Write `DynamicHeaderTest`:
@@ -563,7 +563,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `./gradlew :core:test --tests "*DynamicHeaderTest*"`
   - `./gradlew spotlessApply check`
 
-- [ ] **T-001-36** — Header name normalization to lowercase (FR-001-10)
+- [x] **T-001-36** — Header name normalization to lowercase (FR-001-10) ✅ 2026-02-09
   _Intent:_ All header names MUST be normalized to lowercase per RFC 9110 §5.1.
   _Test first:_ Write `HeaderNormalizationTest`:
   - Input headers with mixed case → `$headers` keys are lowercase.
