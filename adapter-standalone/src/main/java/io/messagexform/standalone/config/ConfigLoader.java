@@ -220,7 +220,63 @@ public final class ConfigLoader {
                 yamlPoolKeepAlive,
                 yamlPoolIdleTimeoutMs);
 
-        return builder.build();
+        ProxyConfig config = builder.build();
+        validate(config);
+        return config;
+    }
+
+    /**
+     * Validates the constructed {@link ProxyConfig} and throws
+     * {@link ConfigLoadException} if any constraints are violated.
+     */
+    private static void validate(ProxyConfig config) {
+        // --- Required fields ---
+        if (config.backendHost() == null || config.backendHost().trim().isEmpty()) {
+            throw new ConfigLoadException("Configuration error: 'backend.host' is required and must be non-empty.");
+        }
+
+        // --- Enum constraints ---
+        validateOneOf("backend.scheme", config.backendScheme(), "http", "https");
+        validateOneOf("logging.level", config.loggingLevel(), "TRACE", "DEBUG", "INFO", "WARN", "ERROR");
+        validateOneOf("logging.format", config.loggingFormat(), "json", "text");
+        validateOneOf("proxy.tls.client-auth", config.proxyTls().clientAuth(), "none", "want", "need");
+        validateOneOf("engine.schema-validation", config.schemaValidation(), "lenient", "strict");
+
+        // Keystore types
+        validateOneOf("proxy.tls.keystore-type", config.proxyTls().keystoreType(), "PKCS12", "JKS");
+        validateOneOf("proxy.tls.truststore-type", config.proxyTls().truststoreType(), "PKCS12", "JKS");
+        validateOneOf("backend.tls.keystore-type", config.backendTls().keystoreType(), "PKCS12", "JKS");
+        validateOneOf("backend.tls.truststore-type", config.backendTls().truststoreType(), "PKCS12", "JKS");
+
+        // --- Positive integer constraints ---
+        validatePositive("proxy.port", config.proxyPort());
+        validatePositive("backend.port", config.backendPort());
+        validatePositive("backend.connect-timeout-ms", config.backendConnectTimeoutMs());
+        validatePositive("backend.read-timeout-ms", config.backendReadTimeoutMs());
+        validatePositive("proxy.max-body-bytes", config.maxBodyBytes());
+        validatePositive("proxy.shutdown.drain-timeout-ms", config.shutdownDrainTimeoutMs());
+        validatePositive("reload.debounce-ms", config.reloadDebounceMs());
+        validatePositive("backend.pool.max-connections", config.pool().maxConnections());
+        validatePositive("backend.pool.idle-timeout-ms", config.pool().idleTimeoutMs());
+    }
+
+    /** Validates that a value is one of the allowed values. */
+    private static void validateOneOf(String field, String value, String... allowed) {
+        for (String a : allowed) {
+            if (a.equals(value)) {
+                return;
+            }
+        }
+        throw new ConfigLoadException("Configuration error: '%s' has invalid value '%s'. Allowed: %s."
+                .formatted(field, value, String.join(", ", allowed)));
+    }
+
+    /** Validates that an integer value is strictly positive (> 0). */
+    private static void validatePositive(String field, int value) {
+        if (value <= 0) {
+            throw new ConfigLoadException(
+                    "Configuration error: '%s' must be positive, got %d.".formatted(field, value));
+        }
     }
 
     /**

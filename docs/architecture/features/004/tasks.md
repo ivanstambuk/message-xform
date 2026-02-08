@@ -1,7 +1,7 @@
 # Feature 004 — Standalone HTTP Proxy Mode — Tasks
 
 _Status:_ In Progress (Phase 2 — I3)
-_Last updated:_ 2026-02-08T22:34+01:00
+_Last updated:_ 2026-02-08T22:40+01:00
 
 **Governing spec:** `docs/architecture/features/004/spec.md`
 **Implementation plan:** `docs/architecture/features/004/plan.md`
@@ -151,9 +151,9 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   _Verification commands:_
   - `./gradlew :adapter-standalone:test --tests "*EnvVarOverlayTest*"`
   - `./gradlew spotlessApply check`
-  _Verification log:_ ✅ 47/47 tests PASSED (string/int/bool overrides, TLS/pool overrides, empty/whitespace-only treated as unset, precedence over full YAML, no-env-var identity). `spotlessApply check` GREEN.
+  _Verification log:_ ✅ 47/47 tests PASSED (string/int/bool overrides, TLS/pool overrides, empty/whitespace-only treated as unset, precedence over full YAML, no-env-var identity). `spotlessApply check` GREEN. Commit `4a7ab4e`.
 
-- [ ] **T-004-08** — Config validation (FR-004-12)
+- [x] **T-004-08** — Config validation (FR-004-12)
   _Intent:_ Validate mandatory fields and value constraints at startup.
   _Test first:_ Write `ConfigValidationTest`:
   - Missing `backend.host` → startup fails with descriptive error (S-004-27).
@@ -166,6 +166,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   _Verification commands:_
   - `./gradlew :adapter-standalone:test --tests "*ConfigValidationTest*"`
   - `./gradlew spotlessApply check`
+  _Verification log:_ ✅ 19/19 tests PASSED (missing backend.host, invalid scheme/level/format/client-auth/schema-validation/keystore-type, valid enums, port auto-derivation, negative integers). `spotlessApply check` GREEN. Commit `b6adcaa`.
 
 ---
 

@@ -2,8 +2,8 @@
 
 _Linked specification:_ `docs/architecture/features/004/spec.md`
 _Linked tasks:_ `docs/architecture/features/004/tasks.md`
-_Status:_ In Progress (Phase 2 — I3)
-_Last updated:_ 2026-02-08T22:34+01:00
+_Status:_ In Progress (Phase 3 — I4)
+_Last updated:_ 2026-02-08T22:40+01:00
 
 > Guardrail: Keep this plan traceable back to the governing spec. Reference
 > FR/NFR/Scenario IDs from `spec.md` where relevant, log any new high- or
@@ -135,7 +135,7 @@ _To be completed after implementation._
 
 ### Phase 2 — Configuration & Bootstrap (≤90 min)
 
-3. **I3 — Configuration model + YAML loading** (≤90 min) 🔧 IN PROGRESS
+3. **I3 — Configuration model + YAML loading** (≤90 min) ✅ DONE
    - _Goal:_ Implement `ProxyConfig`, `BackendTlsConfig`, `TlsConfig`, `PoolConfig`
      domain objects and YAML configuration loading with environment variable overlay.
    - _Preconditions:_ I2 complete.
@@ -157,7 +157,7 @@ _To be completed after implementation._
      CFG-004-01 through CFG-004-41, S-004-39 through S-004-44.
    - _Commands:_ `./gradlew :adapter-standalone:test`, `./gradlew spotlessApply check`
    - _Exit:_ Config loads from YAML. Env vars override. Validation works.
-   - _Result (partial):_ T-004-04 (config records, 8 tests), T-004-05 (3 fixtures), T-004-06 (config loader, 8 tests), T-004-07 (env var overlay, 47 tests) done. T-004-08 (validation) remains.
+   - _Result:_ T-004-04 (config records, 8 tests), T-004-05 (3 fixtures), T-004-06 (config loader, 8 tests), T-004-07 (env var overlay, 47 tests), T-004-08 (validation, 19 tests) done. I3 complete.
 
 ### Phase 3 — Core Proxy: Handler + Upstream Client (≤2 × 90 min)
 
