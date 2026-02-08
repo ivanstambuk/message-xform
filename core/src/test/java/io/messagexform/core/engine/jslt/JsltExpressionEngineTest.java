@@ -13,8 +13,10 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /**
- * Tests for {@link JsltExpressionEngine} (FR-001-02, SPI-001-01/02/03). Parameterized cases
- * covering basic transforms, conditionals, arrays, and context variable binding.
+ * Tests for {@link JsltExpressionEngine} (FR-001-02, SPI-001-01/02/03).
+ * Parameterized cases
+ * covering basic transforms, conditionals, arrays, and context variable
+ * binding.
  */
 class JsltExpressionEngineTest {
 
@@ -138,20 +140,19 @@ class JsltExpressionEngineTest {
         // Compile once, evaluate from multiple threads
         CompiledExpression compiled = engine.compile("{\"doubled\": .value * 2}");
 
-        @SuppressWarnings({"unchecked", "rawtypes"})
-        java.util.concurrent.CompletableFuture<JsonNode>[] futures =
-                (java.util.concurrent.CompletableFuture<JsonNode>[]) new java.util.concurrent.CompletableFuture[10];
+        java.util.List<java.util.concurrent.CompletableFuture<JsonNode>> futures = new java.util.ArrayList<>();
         for (int i = 0; i < 10; i++) {
             final int val = i;
-            futures[i] = java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+            futures.add(java.util.concurrent.CompletableFuture.supplyAsync(() -> {
                 JsonNode input = MAPPER.createObjectNode().put("value", val);
                 return compiled.evaluate(input, TransformContext.empty());
-            });
+            }));
         }
-        java.util.concurrent.CompletableFuture.allOf(futures).join();
+        java.util.concurrent.CompletableFuture.allOf(futures.toArray(new java.util.concurrent.CompletableFuture<?>[0]))
+                .join();
 
         for (int i = 0; i < 10; i++) {
-            JsonNode result = futures[i].join();
+            JsonNode result = futures.get(i).join();
             assertThat(result.get("doubled").asInt()).isEqualTo(i * 2);
         }
     }
