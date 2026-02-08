@@ -970,6 +970,14 @@ Processing order:
 | API-001-04 | `TransformEngine.reload()` | Hot-reload: re-parse specs, recompile expressions, atomic swap |
 | API-001-05 | `TransformEngine.registerEngine(ExpressionEngine)` | Register a pluggable expression engine |
 
+**Profile match resolution (Q-028):** `transform(Message, Direction)` resolves the
+matching profile entry by reading `Message.getRequestPath()`,
+`Message.getRequestMethod()`, and `Message.getContentType()` internally. The engine
+fully owns the matching logic — adapters simply wrap the gateway-native request/response
+into a `Message` and call `transform()`. For response transforms, the adapter MUST
+set request metadata (path, method) on the response `Message` from the gateway's
+exchange/request context, since profile matching always operates on request criteria.
+
 ### Expression Engine SPI
 
 | ID | Method | Description |
