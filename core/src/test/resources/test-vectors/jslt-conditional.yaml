@@ -1,0 +1,73 @@
+# FX-001-02: JSLT with if/else conditional logic
+# Scenario alignment: S-001-15 (conditional output: error vs success),
+#                      S-001-09 (default values)
+#
+# This fixture exercises:
+#   - Top-level if/else branching (different output shapes)
+#   - Default values via conditional expressions
+#   - Null coalescing pattern
+#   - JSON Schema 2020-12 input/output declarations (FR-001-09)
+
+id: conditional-response
+version: "1.0.0"
+description: "Normalize upstream response: wrap success data or format error"
+
+input:
+  schema:
+    type: object
+    properties:
+      error:
+        type: string
+      error_description:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      status:
+        type: string
+
+output:
+  schema:
+    type: object
+    required: [success]
+    properties:
+      success:
+        type: boolean
+      data:
+        type: object
+        properties:
+          id:
+            type: string
+          name:
+            type: string
+          status:
+            type: string
+      error:
+        type: object
+        properties:
+          code:
+            type: string
+          message:
+            type: string
+
+transform:
+  lang: jslt
+  expr: |
+    if (.error)
+      {
+        "success": false,
+        "error": {
+          "code": .error,
+          "message": if (.error_description) .error_description else "Unknown error"
+        }
+      }
+    else
+      {
+        "success": true,
+        "data": {
+          "id": .id,
+          "name": .name,
+          "status": if (.status) .status else "active"
+        }
+      }

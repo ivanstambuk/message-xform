@@ -1,0 +1,66 @@
+# FX-001-01: Simple JSLT — rename and restructure fields
+# Scenario alignment: S-001-08 (rename fields, API versioning),
+#                      S-001-12 (nest flat object)
+#
+# This fixture exercises:
+#   - Field renaming (snake_case → camelCase)
+#   - Structural nesting (flat → nested)
+#   - Derived field (string concatenation)
+#   - JSON Schema 2020-12 input/output declarations (FR-001-09)
+
+id: simple-rename
+version: "1.0.0"
+description: "Rename snake_case fields to camelCase and nest contact info"
+
+input:
+  schema:
+    type: object
+    required: [user_id, first_name, last_name, email_address]
+    properties:
+      user_id:
+        type: string
+      first_name:
+        type: string
+      last_name:
+        type: string
+      email_address:
+        type: string
+        format: email
+      phone_number:
+        type: string
+      is_active:
+        type: boolean
+
+output:
+  schema:
+    type: object
+    required: [userId, displayName, contact]
+    properties:
+      userId:
+        type: string
+      displayName:
+        type: string
+      contact:
+        type: object
+        required: [email]
+        properties:
+          email:
+            type: string
+            format: email
+          phone:
+            type: string
+      active:
+        type: boolean
+
+transform:
+  lang: jslt
+  expr: |
+    {
+      "userId": .user_id,
+      "displayName": .first_name + " " + .last_name,
+      "contact": {
+        "email": .email_address,
+        "phone": .phone_number
+      },
+      "active": .is_active
+    }

@@ -1,0 +1,96 @@
+# FX-001-03: JSLT with [for ...] array transformation
+# Scenario alignment: S-001-13 (SCIM user list reshaping)
+#
+# This fixture exercises:
+#   - Array iteration via [for (...) { ... }]
+#   - Array element access (indexed: .emails[0].value)
+#   - Top-level field extraction (.totalResults → .total)
+#   - Dropping unwanted array-level metadata (schemas, startIndex, itemsPerPage)
+#   - JSON Schema 2020-12 input/output declarations (FR-001-09)
+
+id: array-reshape
+version: "1.0.0"
+description: "Reshape SCIM ListResponse into simplified user list"
+
+input:
+  schema:
+    type: object
+    required: [totalResults, Resources]
+    properties:
+      totalResults:
+        type: integer
+      startIndex:
+        type: integer
+      itemsPerPage:
+        type: integer
+      schemas:
+        type: array
+        items:
+          type: string
+      Resources:
+        type: array
+        items:
+          type: object
+          required: [id, userName]
+          properties:
+            id:
+              type: string
+            userName:
+              type: string
+            displayName:
+              type: string
+            emails:
+              type: array
+              items:
+                type: object
+                properties:
+                  value:
+                    type: string
+                    format: email
+                  type:
+                    type: string
+                  primary:
+                    type: boolean
+            active:
+              type: boolean
+
+output:
+  schema:
+    type: object
+    required: [total, users]
+    properties:
+      total:
+        type: integer
+      users:
+        type: array
+        items:
+          type: object
+          required: [id, username]
+          properties:
+            id:
+              type: string
+            username:
+              type: string
+            displayName:
+              type: string
+            email:
+              type: string
+              format: email
+            active:
+              type: boolean
+
+transform:
+  lang: jslt
+  expr: |
+    {
+      "total": .totalResults,
+      "users": [for (.Resources)
+        {
+          "id": .id,
+          "username": .userName,
+          "displayName": .displayName,
+          "email": .emails[0].value,
+          "active": .active
+        }
+      ]
+    }
