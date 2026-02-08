@@ -22,11 +22,12 @@ import io.messagexform.core.spec.SpecParser;
 import io.messagexform.core.spi.CompiledExpression;
 import io.messagexform.core.spi.TelemetryListener;
 import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,7 +48,10 @@ import org.slf4j.MDC;
  * (Phase 4 behaviour).
  *
  * <p>
- * Thread-safe: uses {@link ConcurrentHashMap} for the spec registry.
+ * Thread-safe: uses {@link AtomicReference} to hold an immutable
+ * {@link TransformRegistry} snapshot. {@link #reload} atomically swaps the
+ * entire registry so in-flight requests complete with the old snapshot while
+ * new requests pick up the new one (NFR-001-05).
  */
 public final class TransformEngine {
 
@@ -61,8 +65,7 @@ public final class TransformEngine {
     private final EvalBudget budget;
     private final SchemaValidationMode schemaValidationMode;
     private final TelemetryListener telemetryListener;
-    private final Map<String, TransformSpec> specs = new ConcurrentHashMap<>();
-    private volatile TransformProfile activeProfile;
+    private final AtomicReference<TransformRegistry> registryRef = new AtomicReference<>(TransformRegistry.empty());
 
     /**
      * Creates a new engine backed by the given spec parser, using the default
@@ -158,10 +161,14 @@ public final class TransformEngine {
     public TransformSpec loadSpec(Path path) {
         try {
             TransformSpec spec = specParser.parse(path);
-            // Store by both "id" (for Phase 4 compat) and "id@version" (for profile
-            // resolution)
-            specs.put(spec.id(), spec);
-            specs.put(spec.id() + "@" + spec.version(), spec);
+            // Atomically add the spec to the registry snapshot (by id and
+            // id@version)
+            registryRef.updateAndGet(old -> {
+                Map<String, TransformSpec> updated = new HashMap<>(old.allSpecs());
+                updated.put(spec.id(), spec);
+                updated.put(spec.id() + "@" + spec.version(), spec);
+                return new TransformRegistry(updated, old.activeProfile());
+            });
             // T-001-42: Notify telemetry listener of successful spec load
             notifySpecLoaded(spec, path);
             return spec;
@@ -185,9 +192,10 @@ public final class TransformEngine {
      *                                                            cannot be resolved
      */
     public TransformProfile loadProfile(Path path) {
-        ProfileParser profileParser = new ProfileParser(specs);
+        TransformRegistry current = registryRef.get();
+        ProfileParser profileParser = new ProfileParser(current.allSpecs());
         TransformProfile profile = profileParser.parse(path);
-        this.activeProfile = profile;
+        registryRef.updateAndGet(old -> new TransformRegistry(old.allSpecs(), profile));
         return profile;
     }
 
@@ -196,7 +204,66 @@ public final class TransformEngine {
      * loaded.
      */
     public TransformProfile activeProfile() {
-        return activeProfile;
+        return registryRef.get().activeProfile();
+    }
+
+    /**
+     * Atomically reloads the engine with a fresh set of specs and an optional
+     * profile (T-001-46, NFR-001-05, API-001-04).
+     *
+     * <p>
+     * Builds a new {@link TransformRegistry} from the given spec files and
+     * profile, then atomically swaps it in. In-flight requests that captured
+     * the old registry reference via {@link #transform} will complete with it;
+     * new requests pick up the new registry.
+     *
+     * @param specPaths   paths to spec YAML files to load
+     * @param profilePath optional profile YAML file, or null for no profile
+     * @throws io.messagexform.core.error.SpecParseException         if any spec
+     *                                                               fails to parse
+     * @throws io.messagexform.core.error.ExpressionCompileException if any
+     *                                                               expression
+     *                                                               fails
+     *                                                               to compile
+     * @throws io.messagexform.core.error.ProfileResolveException    if the profile
+     *                                                               cannot be
+     *                                                               resolved
+     */
+    public void reload(List<Path> specPaths, Path profilePath) {
+        // Build new registry from scratch
+        TransformRegistry.Builder builder = TransformRegistry.builder();
+        for (Path specPath : specPaths) {
+            TransformSpec spec = specParser.parse(specPath);
+            builder.addSpec(spec);
+            notifySpecLoaded(spec, specPath);
+        }
+
+        // Resolve profile against the new spec set
+        TransformProfile profile = null;
+        if (profilePath != null) {
+            TransformRegistry tempRegistry = builder.build();
+            ProfileParser profileParser = new ProfileParser(tempRegistry.allSpecs());
+            profile = profileParser.parse(profilePath);
+            builder.activeProfile(profile);
+        }
+
+        // Atomic swap — in-flight requests keep old reference
+        TransformRegistry newRegistry = builder.build();
+        registryRef.set(newRegistry);
+        LOG.info(
+                "Registry reloaded: specs={}, profile={}",
+                newRegistry.specCount(),
+                profile != null ? profile.id() : "none");
+    }
+
+    /**
+     * Returns the current registry snapshot. Primarily for testing and
+     * introspection.
+     *
+     * @return the current immutable registry
+     */
+    public TransformRegistry registry() {
+        return registryRef.get();
     }
 
     /**
@@ -233,8 +300,12 @@ public final class TransformEngine {
      * {@link #transform(Message, Direction)}.
      */
     private TransformResult transformInternal(Message message, Direction direction) {
+        // Capture the registry snapshot — in-flight request uses this snapshot
+        // even if reload() swaps in a new registry concurrently (NFR-001-05).
+        TransformRegistry snapshot = registryRef.get();
+
         // Phase 5: Profile-based routing via ProfileMatcher
-        TransformProfile profile = this.activeProfile;
+        TransformProfile profile = snapshot.activeProfile();
         if (profile != null) {
             List<ProfileEntry> matches = ProfileMatcher.findMatches(
                     profile, message.requestPath(), message.requestMethod(), message.contentType(), direction);
@@ -253,12 +324,13 @@ public final class TransformEngine {
         }
 
         // Phase 4 fallback: single-spec mode (no profile loaded)
-        if (specs.isEmpty()) {
+        Map<String, TransformSpec> allSpecs = snapshot.allSpecs();
+        if (allSpecs.isEmpty()) {
             return TransformResult.passthrough();
         }
 
         // Use the first loaded spec (for backward compatibility with Phase 4 tests)
-        TransformSpec spec = specs.values().iterator().next();
+        TransformSpec spec = allSpecs.values().iterator().next();
         return transformWithSpec(spec, message, direction, null);
     }
 
@@ -268,7 +340,7 @@ public final class TransformEngine {
      * the entire chain aborts — no partial results reach the caller.
      */
     private TransformResult transformChain(List<ProfileEntry> chain, Message message, Direction direction) {
-        TransformProfile profile = this.activeProfile;
+        TransformProfile profile = registryRef.get().activeProfile();
         String profileId = profile != null ? profile.id() : "unknown";
         int totalSteps = chain.size();
 
@@ -453,7 +525,7 @@ public final class TransformEngine {
      * Returns the number of currently loaded specs.
      */
     public int specCount() {
-        return specs.size();
+        return registryRef.get().specCount();
     }
 
     // --- Private helpers ---

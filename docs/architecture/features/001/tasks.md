@@ -838,7 +838,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   _Verification log:_ ✅ 9/9 tests pass. BUILD SUCCESSFUL. Immutable snapshot
   with defensive copy, Builder pattern, empty() factory, allSpecs() unmodifiable view.
 
-- [ ] **T-001-46** — Atomic registry swap via reload() (NFR-001-05, API-001-04)
+- [x] **T-001-46** — Atomic registry swap via reload() (NFR-001-05, API-001-04) ✅ 2026-02-08
   _Intent:_ `TransformEngine.reload()` must atomically swap the registry
   so in-flight requests complete with the old one and new requests get the
   new one.
@@ -854,6 +854,10 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   _Verification commands:_
   - `./gradlew :core:test --tests "*AtomicReloadTest*"`
   - `./gradlew spotlessApply check`
+  _Verification log:_ ✅ 6/6 AtomicReloadTest tests pass.
+  Refactored engine to AtomicReference<TransformRegistry>. reload() builds
+  fresh registry from spec paths + optional profile, then set()s atomically.
+  Concurrent reads tested with 10 threads × 50 iterations.
 
 - [ ] **T-001-47** — Fail-safe reload (NFR-001-05)
   _Intent:_ If reload() encounters a broken spec, the old registry must be
@@ -958,6 +962,7 @@ Track long-running or shared commands with timestamps to avoid duplicate work.
 - 2026-02-08 11:50 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — 138 tests passed after T-001-26
 - 2026-02-08 14:40 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — 271 tests passed after T-001-39..40 (Phase 6 complete)
 - 2026-02-08 15:32 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL — 300 tests passed after T-001-45
+- 2026-02-08 15:40 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL — 306 tests passed after T-001-46
 
 ## Completion Criteria
 
