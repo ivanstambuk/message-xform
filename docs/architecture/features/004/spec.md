@@ -373,7 +373,7 @@ no changes).
 
 | ID | Class | Description |
 |----|-------|-------------|
-| IMPL-004-01 | `StandaloneAdapter implements GatewayAdapter<Context>` | Javalin Context → Message bridge |
+| IMPL-004-01 | `StandaloneAdapter implements GatewayAdapter<Context>` | Javalin Context → Message gateway adapter |
 | IMPL-004-02 | `ProxyHandler` | HTTP handler: intercept → transform → forward → transform → return |
 | IMPL-004-03 | `UpstreamClient` | JDK `HttpClient` wrapper. **Must enforce HTTP/1.1** (FR-004-33) and recalculate `Content-Length` (FR-004-34). |
 | IMPL-004-04 | `FileWatcher` | `WatchService`-based hot reload trigger |
