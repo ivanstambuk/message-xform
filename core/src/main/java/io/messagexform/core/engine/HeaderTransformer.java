@@ -1,7 +1,10 @@
 package io.messagexform.core.engine;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import io.messagexform.core.model.HeaderSpec;
 import io.messagexform.core.model.Message;
+import io.messagexform.core.model.TransformContext;
+import io.messagexform.core.spi.CompiledExpression;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -12,7 +15,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Applies declarative header operations (add/remove/rename) to a
  * {@link Message}
- * (FR-001-10, T-001-34).
+ * (FR-001-10, T-001-34, T-001-35).
  *
  * <p>
  * Processing order (per spec):
@@ -21,7 +24,7 @@ import org.slf4j.LoggerFactory;
  * <li>{@code rename} — rename header keys</li>
  * <li>{@code add} (static) — set headers with literal string values</li>
  * <li>{@code add} (dynamic) — evaluate {@code expr} against the transformed
- * body (T-001-35)</li>
+ * body</li>
  * </ol>
  *
  * <p>
@@ -41,11 +44,13 @@ public final class HeaderTransformer {
      * Applies header operations from the given {@link HeaderSpec} to the message,
      * returning a new {@link Message} with the modified headers.
      *
-     * @param message    the message to transform headers on
-     * @param headerSpec the header operations to apply
+     * @param message         the message to transform headers on
+     * @param headerSpec      the header operations to apply
+     * @param transformedBody the body after JSLT transform (for dynamic expr
+     *                        evaluation)
      * @return a new Message with modified headers (body/status/etc. unchanged)
      */
-    public static Message apply(Message message, HeaderSpec headerSpec) {
+    public static Message apply(Message message, HeaderSpec headerSpec, JsonNode transformedBody) {
         if (headerSpec == null || headerSpec.isEmpty()) {
             return message;
         }
@@ -70,7 +75,10 @@ public final class HeaderTransformer {
             applyStaticAdd(headers, headersAll, headerSpec.staticAdd());
         }
 
-        // 4. Add (dynamic) — T-001-35, not implemented in this task
+        // 4. Add (dynamic) — evaluate expr against transformed body (T-001-35)
+        if (!headerSpec.dynamicAdd().isEmpty()) {
+            applyDynamicAdd(headers, headersAll, headerSpec.dynamicAdd(), transformedBody);
+        }
 
         return new Message(
                 message.body(),
@@ -125,6 +133,33 @@ public final class HeaderTransformer {
             headers.put(name, value);
             headersAll.put(name, List.of(value));
             LOG.debug("Added header: {} = {}", name, value);
+        }
+    }
+
+    /**
+     * Evaluates dynamic header expressions against the transformed body.
+     * Non-string results are coerced to their text representation.
+     * Null results skip the header (it is not set).
+     */
+    private static void applyDynamicAdd(
+            Map<String, String> headers,
+            Map<String, List<String>> headersAll,
+            Map<String, CompiledExpression> dynamicAdd,
+            JsonNode transformedBody) {
+        for (Map.Entry<String, CompiledExpression> entry : dynamicAdd.entrySet()) {
+            String name = entry.getKey().toLowerCase();
+            CompiledExpression expr = entry.getValue();
+            JsonNode result = expr.evaluate(transformedBody, TransformContext.empty());
+            if (result == null || result.isNull()) {
+                LOG.debug("Dynamic header {} evaluated to null — skipping", name);
+                continue;
+            }
+            // Coerce to string: text nodes return asText(), others return JSON
+            // representation
+            String value = result.isTextual() ? result.asText() : result.asText();
+            headers.put(name, value);
+            headersAll.put(name, List.of(value));
+            LOG.debug("Added dynamic header: {} = {}", name, value);
         }
     }
 

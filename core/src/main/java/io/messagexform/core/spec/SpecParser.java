@@ -117,7 +117,7 @@ public final class SpecParser {
         }
 
         // Parse optional headers block (FR-001-10, T-001-34)
-        HeaderSpec headerSpec = parseHeaderSpec(root, id, source);
+        HeaderSpec headerSpec = parseHeaderSpec(root, engine, id, source);
 
         return new TransformSpec(
                 id, version, description, lang, inputSchema, outputSchema, compiledExpr, forward, reverse, headerSpec);
@@ -127,15 +127,15 @@ public final class SpecParser {
      * Parses the optional {@code headers} block from the spec YAML (FR-001-10).
      * Returns {@code null} if no headers block is present.
      */
-    private HeaderSpec parseHeaderSpec(JsonNode root, String specId, String source) {
+    private HeaderSpec parseHeaderSpec(JsonNode root, ExpressionEngine engine, String specId, String source) {
         JsonNode headersNode = root.get("headers");
         if (headersNode == null || headersNode.isNull()) {
             return null;
         }
 
-        // Parse 'add' — static values only (T-001-34); dynamic expr deferred to
-        // T-001-35
+        // Parse 'add' — static values (T-001-34) and dynamic expr (T-001-35)
         Map<String, String> staticAdd = new LinkedHashMap<>();
+        Map<String, CompiledExpression> dynamicAdd = new LinkedHashMap<>();
         JsonNode addNode = headersNode.get("add");
         if (addNode != null && addNode.isObject()) {
             Iterator<Map.Entry<String, JsonNode>> fields = addNode.fields();
@@ -145,8 +145,12 @@ public final class SpecParser {
                 JsonNode value = field.getValue();
                 if (value.isTextual()) {
                     staticAdd.put(headerName, value.asText());
+                } else if (value.isObject() && value.has("expr")) {
+                    // Dynamic header expression — compile at load time (T-001-35)
+                    String expr = value.get("expr").asText();
+                    CompiledExpression compiled = compileExpression(engine, expr, specId, source);
+                    dynamicAdd.put(headerName, compiled);
                 }
-                // Dynamic expr entries (value is object with 'expr' key) — T-001-35
             }
         }
 
@@ -173,7 +177,7 @@ public final class SpecParser {
             }
         }
 
-        HeaderSpec spec = new HeaderSpec(staticAdd, null, remove, rename);
+        HeaderSpec spec = new HeaderSpec(staticAdd, dynamicAdd, remove, rename);
         return spec.isEmpty() ? null : spec;
     }
 

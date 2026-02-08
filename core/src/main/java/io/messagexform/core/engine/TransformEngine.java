@@ -310,9 +310,9 @@ public final class TransformEngine {
                     message.requestPath(),
                     message.requestMethod());
 
-            // T-001-34: Apply declarative header operations (FR-001-10)
+            // T-001-34/35: Apply declarative header operations (FR-001-10)
             if (spec.headerSpec() != null) {
-                transformedMessage = HeaderTransformer.apply(transformedMessage, spec.headerSpec());
+                transformedMessage = HeaderTransformer.apply(transformedMessage, spec.headerSpec(), transformedBody);
             }
 
             return TransformResult.success(transformedMessage);
