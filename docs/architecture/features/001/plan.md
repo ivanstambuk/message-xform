@@ -449,7 +449,7 @@ _Fill in after each drift gate run._
 | S-001-29 through S-001-32 | I6 (bidirectional via I5) | Bidirectional transforms |
 | S-001-33 through S-001-35 | I10 (headers) | Header operations |
 | S-001-36 through S-001-38 | I11 (status) | Status code transforms |
-| S-001-38a through S-001-38f | I11a (URL rewriting) | Path rewrite, query ops, method override |
+| S-001-38a through S-001-38g | I11a (URL rewriting) | Path rewrite, query ops, method override, URL-to-body |
 | S-001-39 through S-001-48 | I8, I9 (profiles) | Profile matching + chaining |
 | S-001-49 | I9 (chaining) | Mixed-engine chain (JOLT→JSLT) |
 | S-001-50 through S-001-52 | I12 (mappers) | Reusable mappers |

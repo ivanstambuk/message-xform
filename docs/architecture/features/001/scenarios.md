@@ -1945,6 +1945,66 @@ expected_path: "/original"    # unchanged — url block ignored
 expected_warning: "url block is ignored for response-direction transforms"
 ```
 
+### S-001-38g: URL-to-Body Extraction — Path Segment and Query Param into Nested Body
+
+Extract fields from the URL (path segment + query parameter) and inject them into
+nested body fields. The URL is then cleaned (path simplified, query param removed).
+This is the reverse of de-polymorphization: instead of body → URL, it's URL → body.
+
+```yaml
+scenario: S-001-38g
+name: url-to-body-extraction
+description: >
+  A multi-tenant API encodes the tenant in the URL path and a tracing ID in a
+  query parameter. The transform extracts both into nested body fields and cleans
+  the URL so the downstream service receives a tenant-agnostic path. Body
+  transform uses $requestPath and $queryParams context variables. URL rewrite
+  constructs a simplified path and removes the extracted query param.
+  Validates FR-001-12 + ADR-0021 ($queryParams) working together.
+tags: [url, body, extraction, path-segment, query-param, adr-0027, adr-0021]
+requires: [FR-001-12]
+
+direction: request
+
+transform:
+  lang: jslt
+  expr: |
+    let parts = split($requestPath, "/")
+    . + {
+      "routing": {
+        "tenant": $parts[2],
+        "traceId": $queryParams.trace
+      }
+    }
+
+url:
+  path:
+    expr: |
+      let parts = split($requestPath, "/")
+      "/api/" + $parts[3]
+  query:
+    remove: ["trace"]
+
+input:
+  name: "Bob Jensen"
+  email: "bjensen@example.com"
+
+request_path: "/api/acme-corp/users"
+request_query: "trace=tid-abc-123&format=json"
+
+expected_output:
+  name: "Bob Jensen"
+  email: "bjensen@example.com"
+  routing:
+    tenant: "acme-corp"
+    traceId: "tid-abc-123"
+
+expected_path: "/api/users"
+expected_query_params:
+  format: "json"
+  # trace removed by url.query.remove
+```
+
 ---
 
 ## Category 11: Engine Capability Validation
@@ -3449,6 +3509,7 @@ error_detail_contains: "conflicting directions"
 | S-001-38d | url-path-expr-returns-null | URL Rewriting | url, error, null, validation |
 | S-001-38e | url-method-invalid-rejected | URL Rewriting | url, method, validation, load-time |
 | S-001-38f | url-block-on-response-ignored | URL Rewriting | url, direction, response, warning |
+| S-001-38g | url-to-body-extraction | URL Rewriting | url, body, extraction, path-segment, query-param, adr-0027, adr-0021 |
 | S-001-39 | jolt-unsupported-predicate-rejected | Engine Capability | engine, capability, jolt, validation, adr-0004 |
 | S-001-40 | jolt-unsupported-headers-rejected | Engine Capability | engine, capability, jolt, validation, adr-0004 |
 | S-001-41 | concurrent-spec-versions | Version Pinning | version, profile, concurrent, adr-0005 |
@@ -3500,7 +3561,7 @@ error_detail_contains: "conflicting directions"
 | FR-001-09 (Schema Validation) | S-001-53, S-001-54, S-001-55 |
 | FR-001-10 (Header Transforms) | S-001-33, S-001-34, S-001-35, S-001-57, S-001-69, S-001-70, S-001-71, S-001-72 |
 | FR-001-11 (Status Code Transforms) | S-001-36, S-001-37, S-001-38, S-001-61, S-001-63 |
-| FR-001-12 (URL Rewriting) | S-001-38a, S-001-38b, S-001-38c, S-001-38d, S-001-38e, S-001-38f |
+| FR-001-12 (URL Rewriting) | S-001-38a, S-001-38b, S-001-38c, S-001-38d, S-001-38e, S-001-38f, S-001-38g |
 | NFR-001-01 (Stateless) | All — implicit in test harness design |
 | NFR-001-03 (Latency <5ms) | S-001-23 |
 | NFR-001-04 (Open-world) | S-001-07, S-001-20 |
