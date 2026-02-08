@@ -55,29 +55,29 @@ class ProfileIntegrationTest {
             // Create a profile that references the loaded spec
             Path profilePath = tempDir.resolve("test-profile.yaml");
             Files.writeString(profilePath, """
-                    profile: test-integration
-                    version: "1.0.0"
-                    transforms:
-                      - spec: simple-rename@1.0.0
-                        direction: response
-                        match:
-                          path: "/api/users"
-                          method: POST
-                    """);
+                                        profile: test-integration
+                                        version: "1.0.0"
+                                        transforms:
+                                          - spec: simple-rename@1.0.0
+                                            direction: response
+                                            match:
+                                              path: "/api/users"
+                                              method: POST
+                                        """);
 
             engine.loadProfile(profilePath);
 
             // Build a matching message
             JsonNode inputBody = JSON.readTree("""
-                    {
-                      "user_id": "u123",
-                      "first_name": "John",
-                      "last_name": "Doe",
-                      "email_address": "john@example.com",
-                      "phone_number": "+1234567890",
-                      "is_active": true
-                    }
-                    """);
+                                        {
+                                          "user_id": "u123",
+                                          "first_name": "John",
+                                          "last_name": "Doe",
+                                          "email_address": "john@example.com",
+                                          "phone_number": "+1234567890",
+                                          "is_active": true
+                                        }
+                                        """);
             Message message = new Message(
                     inputBody,
                     Map.of("content-type", "application/json"),
@@ -103,15 +103,15 @@ class ProfileIntegrationTest {
 
             Path profilePath = tempDir.resolve("test-profile.yaml");
             Files.writeString(profilePath, """
-                    profile: test-passthrough
-                    version: "1.0.0"
-                    transforms:
-                      - spec: simple-rename@1.0.0
-                        direction: response
-                        match:
-                          path: "/api/users"
-                          method: POST
-                    """);
+                                        profile: test-passthrough
+                                        version: "1.0.0"
+                                        transforms:
+                                          - spec: simple-rename@1.0.0
+                                            direction: response
+                                            match:
+                                              path: "/api/users"
+                                              method: POST
+                                        """);
 
             engine.loadProfile(profilePath);
 
@@ -134,15 +134,15 @@ class ProfileIntegrationTest {
 
             Path profilePath = tempDir.resolve("test-profile.yaml");
             Files.writeString(profilePath, """
-                    profile: test-direction
-                    version: "1.0.0"
-                    transforms:
-                      - spec: simple-rename@1.0.0
-                        direction: response
-                        match:
-                          path: "/api/users"
-                          method: POST
-                    """);
+                                        profile: test-direction
+                                        version: "1.0.0"
+                                        transforms:
+                                          - spec: simple-rename@1.0.0
+                                            direction: response
+                                            match:
+                                              path: "/api/users"
+                                              method: POST
+                                        """);
 
             engine.loadProfile(profilePath);
 
@@ -157,41 +157,43 @@ class ProfileIntegrationTest {
         }
 
         @Test
-        @DisplayName("most-specific-wins with multiple entries")
+        @DisplayName("most-specific entry is used when it matches (ADR-0006)")
         void mostSpecificWins() throws IOException {
             engine.loadSpec(Path.of("src/test/resources/test-vectors/jslt-simple-rename.yaml"));
             engine.loadSpec(Path.of("src/test/resources/test-vectors/jslt-conditional.yaml"));
 
-            // Profile with exact and glob entries
+            // Profile: exact entry for "/json/alpha/authenticate", glob for
+            // "/json/*/sessions"
+            // Only the exact entry should match our request to "/json/alpha/authenticate"
             Path profilePath = tempDir.resolve("test-specificity.yaml");
             Files.writeString(profilePath, """
-                    profile: test-specificity
-                    version: "1.0.0"
-                    transforms:
-                      - spec: conditional-response@1.0.0
-                        direction: response
-                        match:
-                          path: "/json/*/authenticate"
-                          method: POST
-                      - spec: simple-rename@1.0.0
-                        direction: response
-                        match:
-                          path: "/json/alpha/authenticate"
-                          method: POST
-                    """);
+                                        profile: test-specificity
+                                        version: "1.0.0"
+                                        transforms:
+                                          - spec: conditional-response@1.0.0
+                                            direction: response
+                                            match:
+                                              path: "/json/*/sessions"
+                                              method: POST
+                                          - spec: simple-rename@1.0.0
+                                            direction: response
+                                            match:
+                                              path: "/json/alpha/authenticate"
+                                              method: POST
+                                        """);
 
             engine.loadProfile(profilePath);
 
-            // Message matching the exact path — should use simple-rename (more specific)
+            // Message matching the exact path — only simple-rename matches
             JsonNode inputBody = JSON.readTree("""
-                    {
-                      "user_id": "u123",
-                      "first_name": "John",
-                      "last_name": "Doe",
-                      "email_address": "john@example.com",
-                      "is_active": true
-                    }
-                    """);
+                                        {
+                                          "user_id": "u123",
+                                          "first_name": "John",
+                                          "last_name": "Doe",
+                                          "email_address": "john@example.com",
+                                          "is_active": true
+                                        }
+                                        """);
             Message message = new Message(
                     inputBody, Map.of(), Map.of(), 200, "application/json", "/json/alpha/authenticate", "POST");
 
@@ -200,7 +202,7 @@ class ProfileIntegrationTest {
             assertThat(result.isSuccess()).isTrue();
             // simple-rename produces userId, displayName, contact
             assertThat(result.message().body().has("userId"))
-                    .as("most-specific match (simple-rename) should be used")
+                    .as("the matching entry (simple-rename) should be used")
                     .isTrue();
         }
     }
@@ -215,14 +217,14 @@ class ProfileIntegrationTest {
             // Do NOT load any specs
             Path profilePath = tempDir.resolve("bad-ref.yaml");
             Files.writeString(profilePath, """
-                    profile: test-bad-ref
-                    version: "1.0.0"
-                    transforms:
-                      - spec: nonexistent@1.0.0
-                        direction: response
-                        match:
-                          path: "/test"
-                    """);
+                                        profile: test-bad-ref
+                                        version: "1.0.0"
+                                        transforms:
+                                          - spec: nonexistent@1.0.0
+                                            direction: response
+                                            match:
+                                              path: "/test"
+                                        """);
 
             assertThatThrownBy(() -> engine.loadProfile(profilePath))
                     .isInstanceOf(ProfileResolveException.class)
@@ -241,14 +243,14 @@ class ProfileIntegrationTest {
 
             // No profile loaded — should use Phase 4 single-spec behaviour
             JsonNode inputBody = JSON.readTree("""
-                    {
-                      "user_id": "u123",
-                      "first_name": "John",
-                      "last_name": "Doe",
-                      "email_address": "john@example.com",
-                      "is_active": true
-                    }
-                    """);
+                                        {
+                                          "user_id": "u123",
+                                          "first_name": "John",
+                                          "last_name": "Doe",
+                                          "email_address": "john@example.com",
+                                          "is_active": true
+                                        }
+                                        """);
             Message message = new Message(inputBody, Map.of(), Map.of(), 200, "application/json", "/any/path", "GET");
 
             TransformResult result = engine.transform(message, Direction.RESPONSE);

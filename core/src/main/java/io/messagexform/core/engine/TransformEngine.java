@@ -20,6 +20,7 @@ import io.messagexform.core.spec.ProfileParser;
 import io.messagexform.core.spec.SpecParser;
 import io.messagexform.core.spi.CompiledExpression;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -163,15 +164,13 @@ public final class TransformEngine {
 
     /**
      * Transforms the given message. When a profile is loaded, the engine uses
-     * {@link ProfileMatcher} to select the appropriate spec entry by matching
-     * the message's path, method, content-type, and direction. When no profile
-     * is loaded, falls back to single-spec mode (Phase 4 behaviour).
+     * {@link ProfileMatcher} to select matching profile entries. If multiple
+     * entries match, they execute as a pipeline in declaration order
+     * (T-001-31, ADR-0012) — the output of step N feeds step N+1. If any step
+     * fails, the entire chain aborts with an error response.
      *
      * <p>
-     * For unidirectional specs, the compiled expression is used regardless of
-     * direction. For bidirectional specs, {@link Direction#RESPONSE} selects
-     * the {@code forward} expression, and {@link Direction#REQUEST} selects
-     * the {@code reverse} expression.
+     * When no profile is loaded, falls back to single-spec mode (Phase 4).
      *
      * @param message   the input message to transform
      * @param direction the direction of the transform (REQUEST or RESPONSE)
@@ -186,12 +185,17 @@ public final class TransformEngine {
         // Phase 5: Profile-based routing via ProfileMatcher
         TransformProfile profile = this.activeProfile;
         if (profile != null) {
-            ProfileEntry bestMatch = ProfileMatcher.findBestMatch(
+            List<ProfileEntry> matches = ProfileMatcher.findMatches(
                     profile, message.requestPath(), message.requestMethod(), message.contentType(), direction);
-            if (bestMatch == null) {
+            if (matches.isEmpty()) {
                 return TransformResult.passthrough();
             }
-            return transformWithSpec(bestMatch.spec(), message, direction);
+            // Single match → direct transform (common fast path)
+            if (matches.size() == 1) {
+                return transformWithSpec(matches.get(0).spec(), message, direction);
+            }
+            // Multiple matches → pipeline chain (T-001-31, ADR-0012, S-001-49)
+            return transformChain(matches, message, direction);
         }
 
         // Phase 4 fallback: single-spec mode (no profile loaded)
@@ -202,6 +206,31 @@ public final class TransformEngine {
         // Use the first loaded spec (for backward compatibility with Phase 4 tests)
         TransformSpec spec = specs.values().iterator().next();
         return transformWithSpec(spec, message, direction);
+    }
+
+    /**
+     * Executes a pipeline chain of transforms (T-001-31, ADR-0012).
+     * Each step's output message feeds the next step. If any step fails,
+     * the entire chain aborts — no partial results reach the caller.
+     */
+    private TransformResult transformChain(List<ProfileEntry> chain, Message message, Direction direction) {
+        Message current = message;
+        for (int i = 0; i < chain.size(); i++) {
+            ProfileEntry entry = chain.get(i);
+            TransformResult stepResult = transformWithSpec(entry.spec(), current, direction);
+
+            if (stepResult.isError()) {
+                // Chain aborted — return the error immediately (no partial results)
+                return stepResult;
+            }
+            if (stepResult.isPassthrough()) {
+                // Passthrough from a chain step — pass the message through to next step
+                continue;
+            }
+            // SUCCESS — feed the output to the next step
+            current = stepResult.message();
+        }
+        return TransformResult.success(current);
     }
 
     /**
