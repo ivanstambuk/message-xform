@@ -114,14 +114,15 @@ Update both `docs/architecture/roadmap.md` and the Roadmap table above when stat
 2. **Persistence**: Update `AGENTS.md` immediately when conventions or preferences change.
 3. **Implement Now, Don't Defer**: When asked for a feature, implement it. Don't suggest "add to backlog."
 4. **Self-Correcting Protocol**: When making a preventable mistake, proactively ask the user to update `AGENTS.md` or a workflow to prevent recurrence.
-5. **Incremental Auto-Commit Protocol**: Commit after **every logical increment** — do not accumulate a mega-commit.
-   - A "logical increment" is a self-contained unit: one ADR + its spec/scenario updates, one open question resolution, one terminology fix, one backlog item.
-   - Commit immediately after each increment, before starting the next.
+5. **Per-Task Auto-Commit Protocol**: Commit after **every completed task** (`T-xxx-yy`) — one task, one commit. Do not accumulate multi-task mega-commits.
+   - A task is the atomic unit. Each commit should correspond to exactly one task from `tasks.md`.
+   - Commit immediately after the task's tests pass and before starting the next task.
    - Use descriptive commit messages that explain *what* and *why* (not just *what*).
    - **Do NOT batch unrelated changes** in one commit.
+   - **Narrow exception**: Two tasks may share a single commit **only** when they are trivially coupled — i.e., they modify the same method/class and neither can compile or pass tests independently. Document both task IDs in the commit message.
    - **Task tracker rule**: If a commit completes one or more tasks (`T-xxx-yy`), update `tasks.md` in the **same** commit — check off the task, update the verification log, and set `_Status:_` if this is the first task being checked off.
    - **User override**: If the user requests "no commits" / "commit in bulk later", follow their instruction.
-   - **Format**: `<type>: <short description>` — types: `fix`, `feat`, `docs`, `refactor`, `retro`, `session`, `backlog`, `terminology`.
+   - **Format**: `<type>(<scope>): T-xxx-yy — <short description>` — types: `fix`, `feat`, `docs`, `refactor`, `retro`, `session`, `backlog`, `terminology`.
 6. **Autonomous Operations**: If you can run a command to verify or fix something, do it — don't instruct the user to do it.
 7. **Research Must Be Persisted**: When tasked with researching something — APIs, tools, design options, vendor comparisons — **always write findings to a file** in `docs/research/` (or `docs/decisions/` for ADRs). Never leave research as chat-only output. Research documents must be:
    - Self-contained and comprehensible without the chat context
