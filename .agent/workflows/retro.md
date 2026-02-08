@@ -66,11 +66,16 @@ Run through each check and report findings. This is the core of the retrospectiv
 - Open `llms.txt` and verify any new high-signal docs are listed.
 
 ### 4. Capture Learnings
-Identify anything that should be persisted:
-- **New conventions**: Patterns or rules that emerged → update `AGENTS.md`.
-- **Pitfalls**: Gotchas or debugging insights → document in a relevant location.
-- **Plan updates**: If vision, features, or priorities shifted → update `PLAN.md`.
-- **Constitution changes**: If a new principle or governance rule emerged →
+Identify anything that should be persisted. **Every learning listed here MUST be
+written to a file before the retro is complete** — chat-only bullets are failures.
+Per AGENTS.md rule 17, target locations are:
+- **Library/API quirks** (unexpected syntax, error behaviors, threading gotchas) →
+  the relevant `docs/research/` document. Create one if none exists.
+- **Tooling/process pitfalls** (build, formatting, CI, editor interactions) →
+  `AGENTS.md` "Known Pitfalls" section.
+- **New conventions** (patterns or rules that emerged) → `AGENTS.md` operational rules.
+- **Plan updates** (vision, features, or priorities shifted) → update `PLAN.md`.
+- **Constitution changes** (new principle or governance rule) →
   propose an update to `docs/decisions/project-constitution.md`.
 
 ### 5. Apply Fixes

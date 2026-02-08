@@ -173,6 +173,14 @@ Update both `docs/architecture/roadmap.md` and the Roadmap table above when stat
 14. **No Destructive Commands**: Avoid destructive commands (e.g., `rm -rf`, `git reset --hard`, force-pushes) unless the user explicitly requests them. Stay within the repository sandbox. Prefer reversible operations.
 15. **Dependency Approval Required**: Never add or upgrade libraries, Gradle plugins, BOMs, or other build dependencies without explicit user approval. When approved, document the rationale in the relevant feature plan or ADR. Automated dependency PRs (e.g., Dependabot) still require owner approval before merging.
 16. **No Reflection**: Do not introduce Java reflection in production or test sources. When existing code requires access to collaborators or internals, prefer explicit seams (constructor parameters, package-private collaborators, or dedicated test fixtures) instead of reflection.
+17. **Learnings Must Be Persisted**: Session learnings (pitfalls, syntax gotchas, tooling workarounds, API surprises) MUST be written to a file — never left as chat-only retro bullets. Target locations:
+    - **Library/API quirks** → the relevant `docs/research/` document.
+    - **Tooling/process pitfalls** → `AGENTS.md` (this file), under "Known Pitfalls" below.
+    - **Conventions** → `AGENTS.md` operational rules.
+
+### Known Pitfalls
+
+- **File edit tool + Spotless concurrency** (2026-02-08): When `./gradlew spotlessApply` runs concurrently with `replace_file_content` or `multi_replace_file_content`, Spotless may overwrite edits silently — the tool reports success but the file on disk is unchanged. **Workaround**: run `spotlessApply` first, *then* edit, *then* `check`. Or use `sed` / Python for edits that must survive.
 
 ## Pre-Implementation Checklist (Mandatory)
 

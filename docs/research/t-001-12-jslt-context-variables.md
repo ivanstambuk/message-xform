@@ -50,6 +50,10 @@ Context variables are bound as **top-level JSLT external variables** using
 4. **Object key access works naturally** — `$headers."content-type"` or
    `$headers.host` works as expected for accessing individual header values.
 
+5. **Field exclusion syntax** — to copy all fields except specific ones, use
+   `{ * - secret : . }` (the minus in the matcher), **not** `{ * : . } - "secret"`
+   (which is an invalid subtraction expression).
+
 ## Implications
 
 - No wrapper or adapter layer needed — the JSLT library's native variable
