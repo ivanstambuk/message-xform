@@ -1717,6 +1717,236 @@ expected_status: 202
 
 ---
 
+## Category 10a: URL Rewriting
+
+Scenarios validating URL rewriting — path rewrite, query parameter operations,
+and HTTP method override (ADR-0027, FR-001-12).
+
+### S-001-38a: URL Path Rewrite — De-polymorphize Dispatch Endpoint
+
+The primary use case: extract routing fields from the request body and construct
+a specific REST-style URL.
+
+```yaml
+scenario: S-001-38a
+name: url-path-rewrite-dispatch
+description: >
+  A polymorphic POST /dispatch endpoint is de-polymorphized by extracting
+  .action and .resourceId from the body to construct a REST URL like
+  /api/users/123. The body transform strips the routing fields. URL
+  path.expr evaluates against the ORIGINAL (pre-transform) body, so routing
+  fields are available even though the body transform erases them.
+  Validates ADR-0027 original-body evaluation context.
+tags: [url, path-rewrite, de-polymorphize, adr-0027]
+requires: [FR-001-12]
+
+direction: request
+
+transform:
+  lang: jslt
+  expr: |
+    {* - action, - resourceId : .}
+
+url:
+  path:
+    expr: '"/api/" + .action + "/" + .resourceId'
+
+input:
+  action: "users"
+  resourceId: "123"
+  name: "Bob Jensen"
+  email: "bjensen@example.com"
+
+request_path: "/dispatch"
+
+expected_output:
+  name: "Bob Jensen"
+  email: "bjensen@example.com"
+
+expected_path: "/api/users/123"
+```
+
+### S-001-38b: URL Query Parameter Add/Remove
+
+```yaml
+scenario: S-001-38b
+name: url-query-param-operations
+description: >
+  Add static and dynamic query parameters. Remove matching parameters by
+  glob pattern. Dynamic query expr evaluates against the original body.
+  Validates FR-001-12 url.query operations.
+tags: [url, query, add, remove, glob, adr-0027]
+requires: [FR-001-12]
+
+direction: request
+
+transform:
+  lang: jslt
+  expr: .
+
+url:
+  query:
+    add:
+      format: "json"
+      tenant:
+        expr: .tenantId
+    remove: ["_debug", "_internal"]
+
+request_headers:
+  X-Correlation-ID: "corr-abc-123"
+
+input:
+  tenantId: "acme-corp"
+  data: "payload"
+
+request_path: "/api/resource"
+request_query: "_debug=true&_internal=metric&existing=keep"
+
+expected_output:
+  tenantId: "acme-corp"
+  data: "payload"
+
+expected_path: "/api/resource"
+expected_query_params:
+  format: "json"
+  tenant: "acme-corp"
+  existing: "keep"
+  # _debug and _internal removed by glob
+```
+
+### S-001-38c: HTTP Method Override with Conditional Predicate
+
+```yaml
+scenario: S-001-38c
+name: url-method-override-conditional
+description: >
+  Override the HTTP method based on a body field. POST /dispatch with
+  action "delete" becomes DELETE /api/users/123. Validates ADR-0027
+  method override with when predicate against original body.
+tags: [url, method, override, conditional, adr-0027]
+requires: [FR-001-12]
+
+direction: request
+
+transform:
+  lang: jslt
+  expr: |
+    {* - action, - resourceId : .}
+
+url:
+  path:
+    expr: '"/api/users/" + .resourceId'
+  method:
+    set: "DELETE"
+    when: '.action == "delete"'
+
+input:
+  action: "delete"
+  resourceId: "456"
+
+request_path: "/dispatch"
+request_method: "POST"
+
+expected_output: {}
+
+expected_path: "/api/users/456"
+expected_method: "DELETE"
+```
+
+### S-001-38d: URL Path Expr Returns Null — Error
+
+```yaml
+scenario: S-001-38d
+name: url-path-expr-returns-null
+description: >
+  When url.path.expr evaluates to null (e.g., missing body field), the
+  engine throws ExpressionEvalException. URL rewrite must produce a
+  valid string.
+tags: [url, error, null, validation]
+requires: [FR-001-12]
+
+direction: request
+
+transform:
+  lang: jslt
+  expr: .
+
+url:
+  path:
+    expr: .missingField
+
+input:
+  data: "payload"
+
+request_path: "/original"
+
+expected_error:
+  type: "expression-eval"
+  message: "url.path.expr must return a string, got null"
+```
+
+### S-001-38e: Invalid HTTP Method — Rejected at Load Time
+
+```yaml
+scenario: S-001-38e
+name: url-method-invalid-rejected
+description: >
+  A spec declares url.method.set with an invalid HTTP method. The engine
+  must reject this at load time with SpecParseException.
+tags: [url, method, validation, load-time]
+requires: [FR-001-12]
+
+url:
+  method:
+    set: "YOLO"
+
+transform:
+  lang: jslt
+  expr: .
+
+expected_error:
+  type: "spec-parse"
+  message: "invalid HTTP method 'YOLO' — must be one of: GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS"
+```
+
+### S-001-38f: URL Block on Response Transform — Ignored with Warning
+
+```yaml
+scenario: S-001-38f
+name: url-block-on-response-ignored
+description: >
+  A response-direction transform includes a url block. Since URL rewriting
+  is only meaningful for request transforms, the url block is ignored and
+  a warning is logged at load time.
+tags: [url, direction, response, warning]
+requires: [FR-001-12]
+
+direction: response
+
+transform:
+  lang: jslt
+  expr: |
+    { "data": .data }
+
+url:
+  path:
+    expr: '"/should-be-ignored"'
+
+input:
+  data: "payload"
+
+request_path: "/original"
+request_status: 200
+
+expected_output:
+  data: "payload"
+
+expected_path: "/original"    # unchanged — url block ignored
+expected_warning: "url block is ignored for response-direction transforms"
+```
+
+---
+
 ## Category 11: Engine Capability Validation
 
 Scenarios validating engine support matrix enforcement (ADR-0004, FR-001-02).
@@ -3213,6 +3443,12 @@ error_detail_contains: "conflicting directions"
 | S-001-36 | conditional-status-error-body | Status Code | status, conditional, error, adr-0003 |
 | S-001-37 | status-in-body-expression | Status Code | status, body, variable, adr-0003 |
 | S-001-38 | unconditional-status-set | Status Code | status, unconditional, adr-0003 |
+| S-001-38a | url-path-rewrite-dispatch | URL Rewriting | url, path-rewrite, de-polymorphize, adr-0027 |
+| S-001-38b | url-query-param-operations | URL Rewriting | url, query, add, remove, glob, adr-0027 |
+| S-001-38c | url-method-override-conditional | URL Rewriting | url, method, override, conditional, adr-0027 |
+| S-001-38d | url-path-expr-returns-null | URL Rewriting | url, error, null, validation |
+| S-001-38e | url-method-invalid-rejected | URL Rewriting | url, method, validation, load-time |
+| S-001-38f | url-block-on-response-ignored | URL Rewriting | url, direction, response, warning |
 | S-001-39 | jolt-unsupported-predicate-rejected | Engine Capability | engine, capability, jolt, validation, adr-0004 |
 | S-001-40 | jolt-unsupported-headers-rejected | Engine Capability | engine, capability, jolt, validation, adr-0004 |
 | S-001-41 | concurrent-spec-versions | Version Pinning | version, profile, concurrent, adr-0005 |
@@ -3264,6 +3500,7 @@ error_detail_contains: "conflicting directions"
 | FR-001-09 (Schema Validation) | S-001-53, S-001-54, S-001-55 |
 | FR-001-10 (Header Transforms) | S-001-33, S-001-34, S-001-35, S-001-57, S-001-69, S-001-70, S-001-71, S-001-72 |
 | FR-001-11 (Status Code Transforms) | S-001-36, S-001-37, S-001-38, S-001-61, S-001-63 |
+| FR-001-12 (URL Rewriting) | S-001-38a, S-001-38b, S-001-38c, S-001-38d, S-001-38e, S-001-38f |
 | NFR-001-01 (Stateless) | All — implicit in test harness design |
 | NFR-001-03 (Latency <5ms) | S-001-23 |
 | NFR-001-04 (Open-world) | S-001-07, S-001-20 |
