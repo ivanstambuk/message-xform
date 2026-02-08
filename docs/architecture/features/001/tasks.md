@@ -1,6 +1,6 @@
 # Feature 001 — Message Transformation Engine — Tasks
 
-_Status:_ Draft
+_Status:_ In Progress
 _Last updated:_ 2026-02-08
 
 **Governing spec:** `docs/architecture/features/001/spec.md`
@@ -29,7 +29,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
 
 #### I1 — Gradle project init + core module
 
-- [ ] **T-001-01** — Initialize Gradle wrapper with Java 21 (NFR-001-02)
+- [x] **T-001-01** — Initialize Gradle wrapper with Java 21 (NFR-001-02) ✅ 2026-02-08
   _Intent:_ Establish the build foundation. All subsequent tasks depend on a
   working Gradle build. Co-created with Feature 009.
   _Implement:_ Run `gradle init` or create `settings.gradle.kts` +
@@ -40,7 +40,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `./gradlew --version`
   - `./gradlew projects`
 
-- [ ] **T-001-02** — Add core dependencies and configure Spotless (NFR-001-02)
+- [x] **T-001-02** — Add core dependencies and configure Spotless (NFR-001-02) ✅ 2026-02-08
   _Intent:_ Lock down the dependency set for the core module and establish
   code formatting from day one.
   _Implement:_ Add to `core/build.gradle.kts`: Jackson Databind,
@@ -52,7 +52,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `./gradlew :core:dependencies --configuration compileClasspath`
   - `./gradlew spotlessApply check`
 
-- [ ] **T-001-03** — Verify zero gateway-specific dependencies (NFR-001-02)
+- [x] **T-001-03** — Verify zero gateway-specific dependencies (NFR-001-02) ✅ 2026-02-08
   _Intent:_ Establish the NFR-001-02 gate from the start. The core module
   MUST NOT depend on any gateway SDK (PingAccess, PingGateway, Kong, etc.).
   _Test first:_ Create `CoreDependencyTest` — parse Gradle dependency tree
@@ -65,7 +65,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
 
 #### I2 — Domain model + Exception hierarchy
 
-- [ ] **T-001-04** — Message interface (DO-001-01, FR-001-04)
+- [x] **T-001-04** — Message record (DO-001-01, FR-001-04) ✅ 2026-02-08
   _Intent:_ Define the generic HTTP message envelope that all gateway
   adapters will produce. This is the engine's universal input/output type.
   _Test first:_ Write `MessageTest` — construct a Message with body
@@ -78,7 +78,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `./gradlew :core:test --tests "*MessageTest*"`
   - `./gradlew spotlessApply check`
 
-- [ ] **T-001-05** — TransformContext interface (DO-001-07)
+- [x] **T-001-05** — TransformContext record (DO-001-07) ✅ 2026-02-08
   _Intent:_ Define the read-only context passed to expression engines during
   evaluation. This carries `$headers`, `$headers_all`, `$status`,
   `$queryParams`, `$cookies`.
@@ -93,7 +93,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `./gradlew :core:test --tests "*TransformContextTest*"`
   - `./gradlew spotlessApply check`
 
-- [ ] **T-001-06** — TransformResult (DO-001-05)
+- [x] **T-001-06** — TransformResult (DO-001-05) ✅ 2026-02-08
   _Intent:_ Define the outcome type returned by the engine. Must represent
   three states: SUCCESS (with transformed message), ERROR (with error
   response body + status), PASSTHROUGH (no changes).
@@ -107,7 +107,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `./gradlew :core:test --tests "*TransformResultTest*"`
   - `./gradlew spotlessApply check`
 
-- [ ] **T-001-07** — Direction enum
+- [x] **T-001-07** — Direction enum ✅ 2026-02-08
   _Intent:_ Simple enum for REQUEST/RESPONSE direction. Used throughout
   the engine for bidirectional transform selection.
   _Test first:_ Minimal — assert `Direction.REQUEST` and `Direction.RESPONSE`
@@ -118,7 +118,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `./gradlew :core:test`
   - `./gradlew spotlessApply check`
 
-- [ ] **T-001-08** — Exception hierarchy (FR-001-07, ADR-0024)
+- [x] **T-001-08** — Exception hierarchy (FR-001-07, ADR-0024) ✅ 2026-02-08
   _Intent:_ Implement the two-tier exception hierarchy from the Error
   Catalogue. All engine error handling depends on these types.
   _Test first:_ Write `ExceptionHierarchyTest` — verify:
@@ -804,7 +804,8 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
 
 Track long-running or shared commands with timestamps to avoid duplicate work.
 
-- _YYYY-MM-DD — `./gradlew spotlessApply check` (result, duration)_
+- 2026-02-08 03:20 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — after T-001-01/02
+- 2026-02-08 03:27 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — 37 tests passed after T-001-03..08
 
 ## Completion Criteria
 
