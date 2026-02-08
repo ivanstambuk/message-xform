@@ -1,0 +1,19 @@
+# Profile for RFC 9457 error response tests (T-004-26)
+profile: rfc9457-error-profile
+description: "Routes for RFC 9457 error body structure validation"
+version: "1.0.0"
+
+transforms:
+  # REQUEST ERROR: bad-transform on request direction
+  - spec: bad-transform@1.0.0
+    direction: request
+    match:
+      path: "/api/rfc9457/req-error"
+      method: POST
+
+  # RESPONSE ERROR: bad-transform on response direction
+  - spec: bad-transform@1.0.0
+    direction: response
+    match:
+      path: "/api/rfc9457/resp-error"
+      method: GET

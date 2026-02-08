@@ -1,5 +1,6 @@
 package io.messagexform.standalone.proxy;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import io.javalin.http.Context;
 import io.javalin.http.Handler;
 import io.messagexform.core.engine.TransformEngine;
@@ -89,10 +90,30 @@ public final class ProxyHandler implements Handler {
         TransformContext transformContext = adapter.buildTransformContext(ctx);
 
         // --- Step 2: Wrap the inbound request → Message ---
-        Message requestMessage = adapter.wrapRequest(ctx);
+        // JSON parse may fail if the body is non-JSON or malformed.
+        // FR-004-26: profile-matched routes reject non-JSON; unmatched
+        // routes pass through without body parsing.
+        Message requestMessage;
+        boolean parseError = false;
+        try {
+            requestMessage = adapter.wrapRequest(ctx);
+        } catch (IllegalArgumentException e) {
+            // Build a minimal Message (NullNode body) for profile matching only.
+            // If the engine returns PASSTHROUGH, forward raw.
+            // If a profile would match (SUCCESS/ERROR), return 400.
+            parseError = true;
+            requestMessage = adapter.wrapRequestRaw(ctx);
+        }
 
         // --- Step 3: Transform the request ---
         TransformResult requestResult = engine.transform(requestMessage, Direction.REQUEST, transformContext);
+
+        // If parse failed, check if a profile matched → 400 Bad Request (FR-004-26)
+        if (parseError && !requestResult.isPassthrough()) {
+            LOG.warn("Non-JSON body on profile-matched route: {}", ctx.path());
+            writeProblemResponse(ctx, 400, ProblemDetail.badRequest("Request body is not valid JSON", ctx.path()));
+            return;
+        }
 
         // --- Step 4: Dispatch on request TransformResult (FR-004-35) ---
         String forwardMethod;
@@ -116,9 +137,8 @@ public final class ProxyHandler implements Handler {
                 forwardMethod = ctx.method().name();
                 forwardPath = buildForwardPath(ctx.path(), ctx.queryString());
                 forwardBody = ctx.body();
-                forwardHeaders = null; // UpstreamClient will forward without custom headers
-                // Pass raw header map so backend receives original headers
-                forwardHeaders = adapter.wrapRequest(ctx).headers();
+                // Use already-constructed requestMessage headers (avoids re-parsing body)
+                forwardHeaders = requestMessage.headers();
             }
             case ERROR -> {
                 // Return error to client immediately — do NOT forward to backend
@@ -129,8 +149,18 @@ public final class ProxyHandler implements Handler {
         }
 
         // --- Step 5: Forward to backend ---
-        UpstreamResponse upstreamResponse =
-                upstreamClient.forward(forwardMethod, forwardPath, forwardBody, forwardHeaders);
+        UpstreamResponse upstreamResponse;
+        try {
+            upstreamResponse = upstreamClient.forward(forwardMethod, forwardPath, forwardBody, forwardHeaders);
+        } catch (UpstreamTimeoutException e) {
+            LOG.warn("Backend timeout: {}", e.getMessage(), e);
+            writeProblemResponse(ctx, 504, ProblemDetail.gatewayTimeout(e.getMessage(), ctx.path()));
+            return;
+        } catch (UpstreamConnectException e) {
+            LOG.warn("Backend unreachable: {}", e.getMessage(), e);
+            writeProblemResponse(ctx, 502, ProblemDetail.backendUnreachable(e.getMessage(), ctx.path()));
+            return;
+        }
 
         // --- Step 6: Populate Javalin context with upstream response (FR-004-06a) ---
         ctx.result(upstreamResponse.body());
@@ -146,10 +176,28 @@ public final class ProxyHandler implements Handler {
         });
 
         // --- Step 7: Wrap the response → Message ---
-        Message responseMessage = adapter.wrapResponse(ctx);
+        // Response body may not be JSON (e.g., passthrough text/plain backend).
+        // Same pattern as request: if parse fails and no profile matches
+        // (PASSTHROUGH), the response is already written in step 6.
+        Message responseMessage;
+        boolean responseParseError = false;
+        try {
+            responseMessage = adapter.wrapResponse(ctx);
+        } catch (IllegalArgumentException e) {
+            responseParseError = true;
+            responseMessage = adapter.wrapResponseRaw(ctx);
+        }
 
         // --- Step 8: Transform the response ---
         TransformResult responseResult = engine.transform(responseMessage, Direction.RESPONSE, transformContext);
+
+        // If response parse failed and a profile matched → 502 (can't transform)
+        if (responseParseError && !responseResult.isPassthrough()) {
+            LOG.warn("Non-JSON response body on profile-matched route: {}", ctx.path());
+            writeProblemResponse(
+                    ctx, 502, ProblemDetail.backendUnreachable("Backend returned non-JSON response body", ctx.path()));
+            return;
+        }
 
         // --- Step 9: Dispatch on response TransformResult (FR-004-35) ---
         switch (responseResult.type()) {
@@ -198,5 +246,19 @@ public final class ProxyHandler implements Handler {
         ctx.result(result.errorResponse().toString());
 
         LOG.warn("Transform error: status={}, body={}", result.errorStatusCode(), result.errorResponse());
+    }
+
+    /**
+     * Writes an RFC 9457 Problem Details response for proxy-level errors
+     * (backend failures, body size violations, bad requests).
+     *
+     * @param ctx        the Javalin context
+     * @param statusCode the HTTP status code
+     * @param problem    the RFC 9457 JSON body
+     */
+    private static void writeProblemResponse(Context ctx, int statusCode, JsonNode problem) {
+        ctx.status(statusCode);
+        ctx.contentType("application/problem+json");
+        ctx.result(problem.toString());
     }
 }

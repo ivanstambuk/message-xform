@@ -1,0 +1,11 @@
+# Profile for non-JSON body rejection tests (T-004-28)
+profile: non-json-body-profile
+description: "Routes POST /api/orders to request-body-transform for JSON validation tests"
+version: "1.0.0"
+
+transforms:
+  - spec: request-body-transform@1.0.0
+    direction: request
+    match:
+      path: "/api/orders"
+      method: POST

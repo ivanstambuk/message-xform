@@ -515,33 +515,53 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
 
 #### I6 — Error handling, body size, X-Forwarded-* headers
 
-- [ ] **T-004-26** — RFC 9457 error responses (FR-004-23, S-004-09/14)
+- [x] **T-004-26** — RFC 9457 error responses (FR-004-23, S-004-09/14)
   _Intent:_ All proxy errors produce RFC 9457 Problem Details JSON.
   _Test first:_ Write `Rfc9457ErrorTest` (integration):
   - Transform error → `502 Bad Gateway` with `{"type": "...", "title":
     "Transform Error", "status": 502, "detail": "..."}`.
   - Verify `Content-Type: application/problem+json`.
   - Verify `X-Request-ID` included in error responses.
-  _Implement:_ Create `ProblemDetailBuilder` or reuse Feature 001's
-  `ErrorResponseBuilder`. Register Javalin exception handlers.
+  _Implement:_ Created `ProblemDetail` utility class for proxy-level
+  RFC 9457 errors (backend, body size, bad request, method not allowed).
+  Transform errors already produce RFC 9457 via core `ErrorResponseBuilder`.
   _Verify:_ `Rfc9457ErrorTest` passes.
   _Verification commands:_
   - `./gradlew :adapter-standalone:test --tests "*Rfc9457ErrorTest*"`
   - `./gradlew spotlessApply check`
+  _Verification log:_
+  ```
+  S-004-09: Request transform error → 502 with RFC 9457 body PASSED
+  S-004-14: Response transform error → 502 with RFC 9457 body PASSED
+  RFC 9457 'instance' field contains the request path PASSED
+  X-Request-ID generated in error response (no inbound header) PASSED
+  X-Request-ID echoed in error response (inbound header present) PASSED
+  BUILD SUCCESSFUL — 5/5 tests passed
+  ```
 
-- [ ] **T-004-27** — Backend error responses (FR-004-24/25, S-004-18/19/20)
+- [x] **T-004-27** — Backend error responses (FR-004-24/25, S-004-18/19/20)
   _Intent:_ Backend connectivity failures produce structured error responses.
   _Test first:_ Write `BackendErrorTest` (integration):
   - Backend unreachable → `502 Bad Gateway` RFC 9457 (S-004-18).
   - Backend timeout → `504 Gateway Timeout` RFC 9457 (S-004-19).
   - Backend connection refused → `502 Bad Gateway` (S-004-20).
-  _Implement:_ Catch upstream exceptions in `ProxyHandler`, wrap in RFC 9457.
+  _Implement:_ Added try-catch in `ProxyHandler.handle()` for
+  `UpstreamTimeoutException` (→ 504) and `UpstreamConnectException` (→ 502).
+  Uses `ProblemDetail` factory methods for RFC 9457 body generation.
+  Added `writeProblemResponse()` helper for proxy-level errors.
   _Verify:_ `BackendErrorTest` passes.
   _Verification commands:_
   - `./gradlew :adapter-standalone:test --tests "*BackendErrorTest*"`
   - `./gradlew spotlessApply check`
+  _Verification log:_
+  ```
+  S-004-18: Backend unreachable → 502 RFC 9457 PASSED
+  S-004-19: Backend read timeout → 504 RFC 9457 PASSED
+  S-004-20: Backend connection refused → 502 RFC 9457 PASSED
+  BUILD SUCCESSFUL — 3/3 tests passed
+  ```
 
-- [ ] **T-004-28** — Non-JSON body rejection (FR-004-26, S-004-21/55)
+- [x] **T-004-28** — Non-JSON body rejection (FR-004-26, S-004-21/55)
   _Intent:_ When a profile matches by path/method but the body is non-JSON,
   return `400 Bad Request`.
   _Test first:_ Write `NonJsonBodyTest` (integration):
@@ -549,11 +569,23 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
     `400 Bad Request` RFC 9457 (S-004-55).
   - `POST /api/orders` with invalid JSON body → `400 Bad Request` (S-004-21).
   - No matching profile → passthrough regardless of content type.
-  _Implement:_ Add JSON parse validation in `ProxyHandler` before transform.
+  _Implement:_ Catch `IllegalArgumentException` from `wrapRequest()` in
+  `ProxyHandler`. Use `wrapRequestRaw()`/`wrapResponseRaw()` (NullNode body)
+  for profile matching. If profile matches → 400; if PASSTHROUGH → forward raw.
+  Also fixed PASSTHROUGH branch to use already-parsed headers instead of
+  re-calling `wrapRequest()`.
   _Verify:_ `NonJsonBodyTest` passes.
   _Verification commands:_
   - `./gradlew :adapter-standalone:test --tests "*NonJsonBodyTest*"`
   - `./gradlew spotlessApply check`
+  _Verification log:_
+  ```
+  S-004-55: POST with text/xml on matched route → 400 RFC 9457 PASSED
+  S-004-21: POST with malformed JSON on matched route → 400 RFC 9457 PASSED
+  No matching profile → passthrough with any content type PASSED
+  X-Request-ID present in 400 Bad Request response PASSED
+  BUILD SUCCESSFUL — 4/4 tests passed
+  ```
 
 - [ ] **T-004-29** — Request body size enforcement (FR-004-13, S-004-22)
   _Intent:_ Reject requests exceeding `proxy.max-body-bytes` with `413 Payload

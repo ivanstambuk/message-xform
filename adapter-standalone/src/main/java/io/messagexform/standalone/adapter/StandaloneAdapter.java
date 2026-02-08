@@ -61,6 +61,36 @@ public final class StandaloneAdapter implements GatewayAdapter<Context> {
         return new Message(body, headers, headersAll, null, contentType, requestPath, requestMethod, queryString);
     }
 
+    /**
+     * Wraps a Javalin request into a {@link Message} with a {@link NullNode}
+     * body, bypassing JSON body parsing. Used when the request body fails to
+     * parse as JSON (FR-004-26) — this allows profile matching to proceed
+     * on path/method without requiring a valid JSON body.
+     *
+     * @param ctx the Javalin request context
+     * @return a {@link Message} with NullNode body and all other fields populated
+     */
+    public Message wrapRequestRaw(Context ctx) {
+        Map<String, String> headers = normalizeHeaders(ctx.headerMap());
+        Map<String, List<String>> headersAll = extractHeadersAll(ctx);
+        String contentType = ctx.contentType();
+        String requestPath = ctx.path();
+        String requestMethod = ctx.method().name();
+        String queryString = ctx.queryString();
+
+        LOG.debug("wrapRequestRaw: {} {} (body skipped, headers={})", requestMethod, requestPath, headers.size());
+
+        return new Message(
+                NullNode.getInstance(),
+                headers,
+                headersAll,
+                null,
+                contentType,
+                requestPath,
+                requestMethod,
+                queryString);
+    }
+
     @Override
     public Message wrapResponse(Context ctx) {
         // Read response body from ctx.result() (set by ProxyHandler)
@@ -94,6 +124,42 @@ public final class StandaloneAdapter implements GatewayAdapter<Context> {
 
         // queryString is null for responses
         return new Message(body, headers, headersAll, statusCode, contentType, requestPath, requestMethod, null);
+    }
+
+    /**
+     * Wraps a Javalin response into a {@link Message} with a {@link NullNode}
+     * body, bypassing JSON body parsing. Used when the backend response body
+     * is not valid JSON — allows profile matching to proceed on path/method
+     * for response direction transforms.
+     *
+     * @param ctx the Javalin context (with upstream response data)
+     * @return a {@link Message} with NullNode body and all other fields populated
+     */
+    public Message wrapResponseRaw(Context ctx) {
+        Map<String, String> headers = new LinkedHashMap<>();
+        Map<String, List<String>> headersAll = new LinkedHashMap<>();
+        for (String name : ctx.res().getHeaderNames()) {
+            String lowerName = name.toLowerCase();
+            headers.putIfAbsent(lowerName, ctx.res().getHeader(name));
+            headersAll.putIfAbsent(
+                    lowerName,
+                    Collections.unmodifiableList(new ArrayList<>(ctx.res().getHeaders(name))));
+        }
+
+        int statusCode = ctx.statusCode();
+        String contentType = headers.get("content-type");
+        String requestPath = ctx.path();
+        String requestMethod = ctx.method().name();
+
+        LOG.debug(
+                "wrapResponseRaw: {} {} → {} (body skipped, headers={})",
+                requestMethod,
+                requestPath,
+                statusCode,
+                headers.size());
+
+        return new Message(
+                NullNode.getInstance(), headers, headersAll, statusCode, contentType, requestPath, requestMethod, null);
     }
 
     @Override
