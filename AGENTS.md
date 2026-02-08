@@ -122,12 +122,18 @@ Update both `docs/architecture/roadmap.md` and the Roadmap table above when stat
    - **The test:** "Would a competent teammate do this without asking?" If yes → do it. If no → ask.
    - **Anti-patterns to eliminate:** "Should I commit?", "Would you like me to update tasks.md?", "Shall I proceed to the next task?", "Should I run tests?" — **NEVER ask these**.
 6. **Incremental Auto-Commit Protocol** ⚡ **(NON-NEGOTIABLE)**: Commit after **every atomic unit of work** — automatically, silently, without asking. **NEVER ask "should I commit?" or "would you like me to commit?"** — just do it. Committing is like breathing; it happens on its own.
-   - **Implementation work**: One task (`T-xxx-yy`) = one commit. Tests pass → `git add -A && git commit` → move on. No announcement, no permission request, no summary-then-wait.
+   - **Implementation work**: One task (`T-xxx-yy`) = one commit. Tests pass → run the **Pre-Commit Checklist** below → `git add -A && git commit` → move on. No announcement, no permission request, no summary-then-wait.
    - **Non-task work**: One self-contained change = one commit. Examples: one ADR + its spec/scenario updates, one open question resolution, one terminology fix, one `AGENTS.md` update, one backlog item.
    - Use descriptive commit messages that explain *what* and *why* (not just *what*).
    - **Do NOT batch unrelated changes** in one commit.
    - **Narrow exception**: Multiple tasks may share a single commit **only** when they are trivially coupled — i.e., they modify the same method/class and none can compile or pass tests independently. Document all task IDs in the commit message.
-   - **Task tracker rule**: If a commit completes one or more tasks (`T-xxx-yy`), update `tasks.md` in the **same** commit — check off the task, update the verification log, and set `_Status:_` if this is the first task being checked off.
+   - **Pre-Commit Checklist for Task Commits** ⚡ **(MANDATORY — every task commit)**:
+     Before running `git add -A && git commit` for any task (`T-xxx-yy`):
+     1. ☐ `tasks.md`: Mark the task `[x]`, add `_Verification log:_` with test count, result, and commit hash.
+     2. ☐ `tasks.md`: Update `_Status:_` and `_Last updated:_` header if not already current.
+     3. ☐ `plan.md`: Update the parent increment status (e.g., ✅ DONE or 🔧 IN PROGRESS) and add a `_Result:_` line if the increment is newly completed.
+     4. ☐ `plan.md`: Update `_Status:_` and `_Last updated:_` header if not already current.
+     All four items go into the **same** commit as the implementation code.
    - **User override**: If the user requests "no commits" / "commit in bulk later", follow their instruction.
    - **Format**: `<type>(<scope>): T-xxx-yy — <short description>` — types: `fix`, `feat`, `docs`, `refactor`, `retro`, `session`, `backlog`, `terminology`.
 7. **Autonomous Operations**: If you can run a command to verify or fix something, do it — don't instruct the user to do it.
