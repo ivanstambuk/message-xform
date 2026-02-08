@@ -539,6 +539,22 @@ in the JSLT API. Consequences:
   This is considered a Phase 7+ optimisation if real-world workloads
   demonstrate a need.
 
+#### JSLT ArithmeticException Leakage (T-001-31)
+
+JSLT's `Expression.apply()` catches `JsltException` internally, but
+**not `java.lang.ArithmeticException`**. This means `1/0` in a JSLT
+expression throws a raw `ArithmeticException` that escapes the JSLT
+runtime, rather than being wrapped in a `JsltException`.
+
+- The `JsltExpressionEngine.evaluate()` method catches `JsltException`
+  but not `ArithmeticException` — this is a known gap.
+- For chain abort testing, **strict schema validation** is a more
+  reliable mechanism to trigger controlled failures than arithmetic
+  errors.
+- A future hardening task could add a catch-all `RuntimeException`
+  handler in `JsltExpressionEngine.evaluate()`, but this risks masking
+  genuine bugs. Recommend targeting specific exception types instead.
+
 ---
 
 *Status: COMPLETE — Engine evaluation done. JSLT recommended.*

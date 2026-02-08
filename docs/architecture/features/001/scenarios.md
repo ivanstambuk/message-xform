@@ -3461,6 +3461,50 @@ error_detail_contains: "conflicting directions"
 
 ---
 
+### S-001-74: Chain Step Logging — Structured Fields per Step
+
+Validates that each chain step emits structured log entries with `chain_step`,
+`spec_id`, and `profile_id` (NFR-001-08, T-001-33).
+
+```yaml
+scenario: S-001-74
+name: chain-step-structured-logging
+description: >
+  A profile with 3 matching entries is executed. The engine MUST emit structured
+  log entries for each step containing: chain_step (e.g. "2/3"), spec_id, and
+  profile_id. Start and completion events MUST also be logged.
+  Validates NFR-001-08 chain-level logging.
+tags: [chain-step-logging, structured-logging, nfr-001-08, profile-chaining]
+requires: [FR-001-05]
+
+profile:
+  id: log-test-profile
+  transforms:
+    - spec: step-1@1.0.0
+      direction: response
+      match: { path: "/api/chain", method: POST }
+    - spec: step-2@1.0.0
+      direction: response
+      match: { path: "/api/chain", method: POST }
+    - spec: step-3@1.0.0
+      direction: response
+      match: { path: "/api/chain", method: POST }
+
+expected_log_entries:
+  - message_contains: "Starting chain execution"
+    fields: { profile_id: "log-test-profile", chain_steps: 3 }
+  - message_contains: "Executing chain step"
+    fields: { chain_step: "1/3", spec_id: "step-1", profile_id: "log-test-profile" }
+  - message_contains: "Executing chain step"
+    fields: { chain_step: "2/3", spec_id: "step-2", profile_id: "log-test-profile" }
+  - message_contains: "Executing chain step"
+    fields: { chain_step: "3/3", spec_id: "step-3", profile_id: "log-test-profile" }
+  - message_contains: "Chain execution complete"
+    fields: { profile_id: "log-test-profile", steps: 3 }
+```
+
+---
+
 ## Scenario Index
 
 | ID | Name | Category | Tags |
@@ -3545,6 +3589,7 @@ error_detail_contains: "conflicting directions"
 | S-001-71 | headers-all-x-forwarded-for-chain | Multi-Value Headers | headers, multi-value, headers-all, x-forwarded-for, adr-0026 |
 | S-001-72 | header-case-normalization | Header Transforms | headers, case-insensitive, normalization, rfc9110 |
 | S-001-73 | chain-direction-conflict-rejected | Transform Profiles | profile, chain, direction, validation, error, load-time |
+| S-001-74 | chain-step-structured-logging | Chain Step Logging | chain-step-logging, structured-logging, nfr-001-08, profile-chaining |
 
 ## Coverage Matrix
 
@@ -3569,7 +3614,7 @@ error_detail_contains: "conflicting directions"
 | NFR-001-02 (Zero gateway deps) | *Verified by dependency analysis, not scenario-testable* |
 | NFR-001-05 (Hot reload) | *Integration test — add when adapter is implemented* |
 | NFR-001-06 (Sensitive fields) | S-001-62; *static analysis + code review — add more when engine is implemented* |
-| NFR-001-08 (Match logging) | S-001-44, S-001-46 (matched profile logged) |
+| NFR-001-08 (Match logging) | S-001-44, S-001-46 (matched profile logged), S-001-74 (chain step logging) |
 | NFR-001-09 (Telemetry SPI) | S-001-47 |
 | NFR-001-10 (Trace correlation) | S-001-48 |
 
