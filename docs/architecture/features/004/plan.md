@@ -55,8 +55,8 @@ responses transformed on the return path.
 | Dependency | Notes |
 |------------|-------|
 | `core` module (Feature 001) | `TransformEngine`, `Message`, `TransformResult`, `TransformContext`, `GatewayAdapter` SPI |
-| `io.javalin:javalin:6.x` | HTTP server with Jetty 12, virtual threads (ADR-0029) |
-| `org.eclipse.jetty:jetty-server:12.x` | Embedded in Javalin — TLS configuration via Jetty API |
+| `io.javalin:javalin:6.x` | HTTP server with Jetty 11, virtual threads (ADR-0029) |
+| `org.eclipse.jetty:jetty-server:11.x` | Embedded in Javalin — TLS configuration via Jetty API |
 | JDK `java.net.http.HttpClient` | Upstream HTTP client (built-in, zero extra deps) |
 | JDK `java.nio.file.WatchService` | File-system watching for hot reload |
 | `com.fasterxml.jackson` (Jackson) | YAML config parsing, JSON body handling (already in core) |
@@ -70,7 +70,7 @@ responses transformed on the return path.
 |------|--------|------------|
 | Javalin 6 API instability | **Medium** — Breaking changes between RC and stable | Pin exact Javalin version. Check release notes before upgrading. |
 | JDK HttpClient connection pool is JVM-global | **Low** — Pool config via system properties, not per-instance | Document limitation (already in spec FR-004-18 note). If finer control needed, swap to Apache HttpClient 5 behind `UpstreamClient`. |
-| Jetty 12 TLS API differs significantly from Jetty 11 | **Medium** — TLS configuration may require trial-and-error | Research Jetty 12 `ServerConnector` + `SslContextFactory` API before Phase 6. Create integration test with self-signed certs early. |
+| Jetty 11 TLS API configuration | **Low** — Jetty 11 `SslContextFactory` is well-documented | Research Jetty 11 `ServerConnector` + `SslContextFactory` API before Phase 6. Create integration test with self-signed certs early. |
 | Virtual threads may have platform-specific gotchas | **Low** — Well-tested on JDK 21+ | Enable via `Javalin.create { it.useVirtualThreads = true }`. Verify under load in Phase 7. |
 | Core engine API change (Q-042) may affect existing tests | **Low** — Additive overload, old API preserved | Implement as first task (Phase 1). Run full Feature 001 test suite after change. |
 

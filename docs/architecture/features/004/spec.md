@@ -10,7 +10,7 @@
 | Roadmap entry | #4 – Standalone HTTP Proxy Mode |
 | Depends on | Feature 001 (core engine; minor API addition — Q-042) |
 | Research | `docs/research/standalone-proxy-http-server.md` |
-| Decisions | ADR-0029 (Javalin 6 / Jetty 12) |
+| Decisions | ADR-0029 (Javalin 6 / Jetty 11) |
 
 > Guardrail: This specification is the single normative source of truth for the feature.
 > Track questions in `docs/architecture/open-questions.md`, encode resolved answers
@@ -41,7 +41,7 @@ overload — Q-042).
 ## Goals
 
 - G-004-01 – Implement a fully functional HTTP reverse proxy using Javalin 6
-  (Jetty 12) with Java 21 virtual threads for concurrency (ADR-0029).
+  (Jetty 11) with Java 21 virtual threads for concurrency (ADR-0029).
 - G-004-02 – Implement `GatewayAdapter<Context>` — the first concrete adapter
   implementation — serving as a reference for all subsequent gateway adapters.
 - G-004-03 – Apply request and response transformations via `TransformEngine`,
@@ -603,7 +603,7 @@ overload — Q-042).
                     ┌─────────────────────────────────────────────────┐
                     │              adapter-standalone                  │
                     │                                                  │
-  Client ──HTTP──▶  │  Javalin 6 (Jetty 12, Virtual Threads)          │
+  Client ──HTTP──▶  │  Javalin 6 (Jetty 11, Virtual Threads)          │
                     │    │                                             │
                     │    ▼                                             │
                     │  ProxyHandler                                    │

@@ -1,4 +1,4 @@
-# ADR-0029 – Javalin 6 (Jetty 12) for Standalone HTTP Proxy
+# ADR-0029 – Javalin 6 (Jetty 11) for Standalone HTTP Proxy
 
 Date: 2026-02-08 | Status: Accepted
 
@@ -19,12 +19,12 @@ Research: `docs/research/standalone-proxy-http-server.md`
 
 ### Options Considered
 
-- **Option A – Javalin 6 (Jetty 12)** (chosen)
-  - Lightweight web framework on Jetty 12. Simplest API, virtual threads via
+- **Option A – Javalin 6 (Jetty 11)** (chosen)
+  - Lightweight web framework on Jetty 11. Simplest API, virtual threads via
     `config.jetty.useVirtualThreads`, clean routing DSL, built-in middleware.
   - Pros: minimal boilerplate, excellent documentation, "reference adapter" code
     will be crystal clear. Jetty is production-proven.
-  - Cons: adds Jetty transitive dependency (~5 MB). Jetty 12 is relatively new.
+  - Cons: adds Jetty transitive dependency (~5 MB).
 
 - **Option B – JDK HttpServer** (rejected)
   - Built-in `com.sun.net.httpserver.HttpServer`. Zero external dependencies.
@@ -62,7 +62,7 @@ Research: `docs/research/standalone-proxy-http-server.md`
 
 ## Decision
 
-We adopt **Option A – Javalin 6 (Jetty 12)** as the HTTP server for the standalone
+We adopt **Option A – Javalin 6 (Jetty 11)** as the HTTP server for the standalone
 proxy module (`adapter-standalone`).
 
 Concretely:
@@ -82,7 +82,7 @@ Positive:
 - JDK `HttpClient` for upstream forwarding adds zero additional dependencies.
 
 Negative / trade-offs:
-- Jetty 12 transitive dependency (~5 MB). Acceptable for a standalone deployment.
+- Jetty 11 transitive dependency (~5 MB). Acceptable for a standalone deployment.
 - Adapter code is coupled to Javalin's `Context` type. This is by design — each
   adapter is coupled to its gateway's native types (per ADR-0025).
 - Javalin 6 requires Java 17+ (we target 21, so no issue).

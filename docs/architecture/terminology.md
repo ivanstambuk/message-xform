@@ -287,10 +287,11 @@ terminology agreements must be captured here immediately.
     transform → return to client. Implements the `TransformResult` dispatch table
     (FR-004-35) and generates/echoes `X-Request-ID` headers (FR-004-38).
 
-- **Proxy config** (`ProxyConfig`, `BackendConfig`, `TlsConfig`, `PoolConfig`)
+- **Proxy config** (`ProxyConfig`, `BackendTlsConfig`, `TlsConfig`, `PoolConfig`)
   - Immutable record hierarchy defining all proxy configuration. Loaded from YAML
-    (`message-xform-proxy.yaml`) with environment variable overlay (FR-004-11).
-    `ProxyConfig` is the root; nested records hold backend, TLS, and connection pool
+    (`message-xform-proxy.yaml`) via `ConfigLoader` with environment variable
+    overlay (FR-004-11). `ProxyConfig` is the root (with flat backend fields and
+    a builder); nested records hold inbound TLS, outbound TLS, and connection pool
     settings. 41 config keys (CFG-004-01 through CFG-004-41) with corresponding
     environment variable mappings.
 
