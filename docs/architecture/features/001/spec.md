@@ -211,6 +211,8 @@ public interface CompiledExpression {
  public interface TransformContext {
     /** HTTP headers as a JsonNode object (keys = header names, values = first value). */
     JsonNode getHeaders();
+    /** All HTTP header values as a JsonNode object (keys = header names, values = arrays of strings). ADR-0026. */
+    JsonNode getHeadersAll();
     /** HTTP status code, or null for request transforms (ADR-0017, ADR-0020). */
     Integer getStatusCode();
     /** Request path (e.g., "/json/alpha/authenticate"). */
@@ -325,11 +327,14 @@ public interface Message {
     JsonNode getBodyAsJson();
     void setBodyFromJson(JsonNode body);
     Map<String, List<String>> getHeaders();
-    void setHeader(String name, String value);
+    void setHeader(String name, String value);   // replaces all values for this name
+    void addHeader(String name, String value);   // appends to existing values (multi-value)
     void removeHeader(String name);
     int getStatusCode();          // response only
     void setStatusCode(int code); // response only
     String getContentType();
+    String getRequestPath();      // e.g. "/json/alpha/authenticate"
+    String getRequestMethod();    // e.g. "POST"
 }
 ```
 
@@ -418,6 +423,12 @@ The engine MUST:
    referenced version is not found.
 3. If a profile references `spec: callback-prettify` **without** a version suffix,
    the engine MUST resolve to the **latest** loaded version (highest semver).
+4. Verify that the spec's prerequisite `match` block (ADR-0015) is compatible with
+   the profile entry's `match` criteria. Both MUST be satisfied for a transform to
+   apply — the spec prerequisite is ANDed with the profile match. A spec prerequisite
+   that logically conflicts with the profile match (e.g., spec requires
+   `application/xml` but profile matches `application/json`) SHOULD be reported as
+   a load-time warning.
 
 When multiple entries **within a single profile** match the same request, the engine
 uses **most-specific-wins** resolution (ADR-0006):
@@ -460,6 +471,11 @@ they form an **ordered pipeline** executed in declaration order:
    client or the downstream service.
 5. Structured logging MUST include the chain step index (e.g., `chain_step: 2/3`)
    alongside the spec id for each evaluated step.
+6. **Direction consistency**: all entries in a chain MUST share the same `direction`.
+   The direction is determined by the adapter's invocation point (request phase or
+   response phase). A profile with matching entries that declare conflicting
+   directions (e.g., one `response`, one `request` on the same path/method) MUST
+   be rejected at load time.
 
 This is the mechanism that enables mixed-engine composition (ADR-0008), e.g., JOLT
 structural shift → JSLT conditional enrichment on the same route.
@@ -759,6 +775,12 @@ Dynamic header values use an `expr` sub-key containing a JSLT expression evaluat
 against the **transformed** body. This enables **body-to-header injection** (e.g.,
 extract an error code from the body and emit it as a response header).
 
+**Header name normalization:** The engine MUST normalize all header names to
+**lowercase** when binding `$headers` and `$headers_all` (RFC 9110 §5.1 — HTTP
+headers are case-insensitive; HTTP/2 mandates lowercase). Header names in
+`headers.add`, `headers.remove`, and `headers.rename` MUST use case-insensitive
+matching.
+
 Additionally, the engine MUST expose request/response headers as a **read-only JSLT
 variable** `$headers`, allowing JSLT body expressions to reference header values
 (**header-to-body injection**):
@@ -811,8 +833,13 @@ Processing order:
 | Success path | Headers block parsed → add/remove/rename applied after body transform |
 | Validation path | Invalid glob in `remove` → reject at load time |
 | Failure path | Referenced header missing → `$headers."X-Missing"` evaluates to `null` (JSLT default) |
-| Failure path | Dynamic header `expr` returns non-string → coerce to string or reject |
+| Failure path | Dynamic header `expr` returns non-string → coerce to JSON string representation |
 | Source | Kong transformer add/remove/rename pattern, ADR-0002 |
+
+**Dynamic header `expr` engine:** Dynamic header expressions are evaluated using
+the **same engine** as the transform's `lang` declaration. For engines that do not
+support context variables (e.g., JOLT), dynamic header expressions MUST be
+rejected at load time.
 
 ### FR-001-11: Status Code Transformations
 
@@ -883,7 +910,7 @@ Processing order:
 ## Branch & Scenario Matrix
 
 > Full scenario definitions, test vectors, and coverage matrix are maintained in
-> [`scenarios.md`](scenarios.md) (55 scenarios: S-001-01 through S-001-55).
+> [`scenarios.md`](scenarios.md) (71 scenarios: S-001-01 through S-001-71).
 > This summary lists representative scenarios for quick reference.
 
 | Scenario ID | Description / Expected outcome |
@@ -931,7 +958,7 @@ Processing order:
 | DO-001-04 | `TransformProfile` — user-supplied binding of specs to URL/method/content-type patterns | core |
 | DO-001-05 | `TransformResult` — outcome of applying a spec (success/aborted + diagnostics) | core |
 | DO-001-06 | `ExpressionEngine` — pluggable engine SPI (compile + evaluate) | core |
-| DO-001-07 | `TransformContext` — read-only context passed to engines (headers, headers_all, status, request path/method) | core |
+| DO-001-07 | `TransformContext` — read-only context passed to engines (headers, headersAll, status, request path/method, queryParams, cookies) | core |
 
 ### Core Engine API
 
@@ -976,11 +1003,11 @@ Processing order:
 | CFG-001-02 | `profiles-dir` | path | Directory containing transform profile YAML files |
 | CFG-001-03 | `error-response.format` | enum | `rfc9457` (default) or `custom` — error response format for transform failures (ADR-0022) |
 | CFG-001-04 | `error-response.status` | int | Default HTTP status code for transform failure error responses (default: 502) |
-| CFG-001-09 | `error-response.custom-template` | string | JSON template with `{{error.*}}` placeholders — used when `error-response.format: custom` |
-| CFG-001-05 | `engines.defaults.max-eval-ms` | int | Per-expression evaluation time budget (default: 50ms) |
-| CFG-001-06 | `engines.defaults.max-output-bytes` | int | Max output size per evaluation (default: 1MB) |
-| CFG-001-07 | `engines.<id>.enabled` | boolean | Enable/disable a specific expression engine |
-| CFG-001-08 | `schema-validation-mode` | enum | `strict` (validate input/output schemas at evaluation time) or `lenient` (skip, default). Separate from `error-mode` (CFG-001-03) which governs transform failure handling. |
+| CFG-001-05 | `error-response.custom-template` | string | JSON template with `{{error.*}}` placeholders — used when `error-response.format: custom` |
+| CFG-001-06 | `engines.defaults.max-eval-ms` | int | Per-expression evaluation time budget (default: 50ms) |
+| CFG-001-07 | `engines.defaults.max-output-bytes` | int | Max output size per evaluation (default: 1MB) |
+| CFG-001-08 | `engines.<id>.enabled` | boolean | Enable/disable a specific expression engine |
+| CFG-001-09 | `schema-validation-mode` | enum | `strict` (validate input/output schemas at evaluation time) or `lenient` (skip, default). Separate from `error-mode` (CFG-001-03) which governs transform failure handling. |
 
 ### Fixtures & Sample Data
 
@@ -1011,6 +1038,12 @@ domain_objects:
         constraints: "response only"
       - name: contentType
         type: string
+      - name: requestPath
+        type: string
+        note: "e.g. /json/alpha/authenticate"
+      - name: requestMethod
+        type: string
+        note: "e.g. POST"
   - id: DO-001-02
     name: TransformSpec
     fields:
@@ -1079,6 +1112,58 @@ domain_objects:
       - name: cookies
         type: JsonNode
         note: "$cookies — request-side only, keys are cookie names (ADR-0021)"
+    # Future: $queryParams_all and $cookies_all (array-of-strings shape, like
+    # $headers_all) may be added if multi-value query params or cookies are needed.
+    # Not normative for Feature 001.
+  - id: DO-001-05
+    name: TransformResult
+    fields:
+      - name: status
+        type: "enum: SUCCESS, ERROR, PASSTHROUGH"
+        note: "Outcome of the transform invocation"
+      - name: message
+        type: Message
+        constraints: "nullable — null when status is PASSTHROUGH or ERROR"
+        note: "The transformed message copy (on SUCCESS)"
+      - name: errorResponse
+        type: JsonNode
+        constraints: "nullable — present only when status is ERROR"
+        note: "RFC 9457 or custom error body (ADR-0022)"
+      - name: errorStatusCode
+        type: Integer
+        constraints: "nullable — present only when status is ERROR"
+        note: "HTTP status for the error response (CFG error-response.status)"
+      - name: diagnostics
+        type: "List<String>"
+        constraints: "always present, may be empty"
+        note: "Structured log entries for matched profile, chain steps, warnings"
+  - id: DO-001-08
+    name: TransformProfile
+    fields:
+      - name: id
+        type: string
+      - name: version
+        type: string
+      - name: description
+        type: string
+        constraints: "optional"
+      - name: transforms
+        type: "List<TransformEntry>"
+      - name: entry.spec
+        type: string
+        note: "id@version reference to a loaded TransformSpec"
+      - name: entry.direction
+        type: "enum: request, response"
+        constraints: "required"
+      - name: entry.match.path
+        type: string
+        note: "URL path pattern (glob wildcards)"
+      - name: entry.match.method
+        type: string
+        constraints: "optional"
+      - name: entry.match.content-type
+        type: string
+        constraints: "optional"
 
 engine_api:
   - id: API-001-01
@@ -1091,6 +1176,9 @@ engine_api:
   - id: API-001-03
     method: loadSpec
     inputs: [Path]
+  - id: API-001-04
+    method: reload
+    note: "Hot-reload: re-parse specs, recompile, atomic swap (NFR-001-05)"
   - id: API-001-05
     method: registerEngine
     inputs: [ExpressionEngine]
@@ -1117,6 +1205,10 @@ adapter_spi:
     method: wrapResponse
     inputs: [native]
     outputs: [Message]
+  - id: SPI-001-06
+    method: applyChanges
+    inputs: [Message, native]
+    note: "Write Message changes back to native object"
 ```
 
 ## Appendix
@@ -1174,13 +1266,12 @@ version: "1.0.0"
 
 transforms:
   - spec: callback-prettify    # references specs/callback-prettify.yaml
-    direction: response
+    direction: response         # forward expression applied to response body
     match:
       path: "/json/*/authenticate"
       method: POST
   - spec: callback-prettify
-    direction: request
-    reverse: true
+    direction: request          # reverse expression applied to request body
     match:
       path: "/json/*/authenticate"
       method: POST
