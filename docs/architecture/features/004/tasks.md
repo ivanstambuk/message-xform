@@ -1,7 +1,7 @@
 # Feature 004 — Standalone HTTP Proxy Mode — Tasks
 
-_Status:_ In Progress (Phase 2 — I3)
-_Last updated:_ 2026-02-08T22:40+01:00
+_Status:_ In Progress (Phase 3 — I5)
+_Last updated:_ 2026-02-08T23:25+01:00
 
 **Governing spec:** `docs/architecture/features/004/spec.md`
 **Implementation plan:** `docs/architecture/features/004/plan.md`
@@ -265,7 +265,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
 
 #### I5 — StandaloneAdapter + ProxyHandler
 
-- [ ] **T-004-15** — StandaloneAdapter.wrapRequest (FR-004-06, FR-004-07, FR-004-09)
+- [x] **T-004-15** — StandaloneAdapter.wrapRequest (FR-004-06, FR-004-07, FR-004-09)
   _Intent:_ Implement `GatewayAdapter<Context>.wrapRequest()` for Javalin.
   Extracts body, headers, path, method, query string from `Context`. Headers
   normalized to lowercase. Creates deep copy (ADR-0013).
@@ -282,6 +282,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   _Verification commands:_
   - `./gradlew :adapter-standalone:test --tests "*StandaloneAdapterTest*"`
   - `./gradlew spotlessApply check`
+  _Verification log:_ ✅ 10/10 tests PASSED (POST body, header lowercase normalization, headersAll multi-value, path/method extraction, queryString, NullNode for empty/absent body, contentType, statusCode null for request, deep copy semantics). Full suite GREEN. Commit `c662cdc`.
 
 - [ ] **T-004-16** — StandaloneAdapter: cookie extraction into TransformContext (FR-004-37, S-004-67/68/69)
   _Intent:_ Parse cookies from the `Cookie` header via `ctx.cookieMap()` and
