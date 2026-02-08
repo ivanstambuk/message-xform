@@ -301,7 +301,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `./gradlew spotlessApply check`
   _Verification log:_ ✅ 3/3 tests PASSED (populated cookies S-004-67, empty map S-004-68, URL-decoded S-004-69). Commit `c969332`.
 
-- [ ] **T-004-17** — StandaloneAdapter: query param extraction into TransformContext (FR-004-39, S-004-74/75/76/77)
+- [x] **T-004-17** — StandaloneAdapter: query param extraction into TransformContext (FR-004-39, S-004-74/75/76/77)
   _Intent:_ Parse query parameters from the URL via `ctx.queryParamMap()` and
   build a `TransformContext` with queryParams populated. First value only for
   multi-value params (consistent with single-value `$headers`).
@@ -316,6 +316,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   _Verification commands:_
   - `./gradlew :adapter-standalone:test --tests "*QueryParamExtractionTest*"`
   - `./gradlew spotlessApply check`
+  _Verification log:_ ✅ 4/4 tests PASSED (populated params S-004-74, empty map S-004-75, multi-value first-only S-004-76, URL-decoded S-004-77). Full adapter-standalone suite GREEN. Commit `cd68bb5`.
 
 - [ ] **T-004-18** — StandaloneAdapter.wrapResponse (FR-004-06a, FR-004-06b, FR-004-07)
   _Intent:_ Implement `wrapResponse()` — reads upstream response data from

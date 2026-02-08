@@ -88,7 +88,10 @@ public final class StandaloneAdapter implements GatewayAdapter<Context> {
         // Cookies from Javalin (already URL-decoded)
         Map<String, String> cookies = new LinkedHashMap<>(ctx.cookieMap());
 
-        return new TransformContext(headers, headersAll, null, Map.of(), cookies);
+        // Query params — first value only for multi-value (FR-004-39)
+        Map<String, String> queryParams = extractQueryParams(ctx);
+
+        return new TransformContext(headers, headersAll, null, queryParams, cookies);
     }
 
     /**
@@ -140,5 +143,20 @@ public final class StandaloneAdapter implements GatewayAdapter<Context> {
             }
         }
         return headersAll;
+    }
+
+    /**
+     * Extracts query parameters from the Javalin context with first-value
+     * semantics for multi-value params (FR-004-39, S-004-76). Values are
+     * already URL-decoded by Javalin.
+     */
+    private static Map<String, String> extractQueryParams(Context ctx) {
+        Map<String, String> queryParams = new LinkedHashMap<>();
+        ctx.queryParamMap().forEach((key, values) -> {
+            if (values != null && !values.isEmpty()) {
+                queryParams.put(key, values.getFirst());
+            }
+        });
+        return queryParams;
     }
 }
