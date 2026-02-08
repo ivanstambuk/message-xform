@@ -883,7 +883,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
 
 #### I15 — Gateway Adapter SPI + test adapter
 
-- [ ] **T-001-48** — GatewayAdapter SPI definition (SPI-001-04/05/06)
+- [x] **T-001-48** — GatewayAdapter SPI definition (SPI-001-04/05/06) ✅ 2026-02-08
   _Intent:_ Define the adapter interface that all gateway integrations
   implement. Pure interface — no implementation in core.
   _Test first:_ Compile-time verification is sufficient. Write a mock
@@ -894,8 +894,12 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   _Verification commands:_
   - `./gradlew :core:test`
   - `./gradlew spotlessApply check`
+  _Verification log:_ ✅ 6/6 GatewayAdapterSpiTest tests pass. Generic
+  `GatewayAdapter<R>` interface with three per-request methods. ADR-0025
+  (no lifecycle) and ADR-0013 (copy-on-wrap) documented in Javadoc. 317
+  tests pass. Commit: 48e10b8.
 
-- [ ] **T-001-49** — TestGatewayAdapter for scenarios
+- [x] **T-001-49** — TestGatewayAdapter for scenarios ✅ 2026-02-08
   _Intent:_ Create an in-memory adapter implementation for running
   scenario tests end-to-end.
   _Test first:_ Write `TestAdapterTest`:
@@ -906,6 +910,9 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   _Verification commands:_
   - `./gradlew :core:test --tests "*TestAdapterTest*"`
   - `./gradlew spotlessApply check`
+  _Verification log:_ ✅ 22/22 TestAdapterTest tests pass. TestMessage
+  fluent builder (5), wrapRequest (6), wrapResponse (2), applyChanges (5),
+  end-to-end with real TransformEngine (4). 339 tests pass. Commit: 28e00fa.
 
 #### I16 — Full scenario sweep + coverage matrix
 
@@ -968,6 +975,8 @@ Track long-running or shared commands with timestamps to avoid duplicate work.
 - 2026-02-08 15:32 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL — 300 tests passed after T-001-45
 - 2026-02-08 15:40 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL — 306 tests passed after T-001-46
 - 2026-02-08 15:45 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL — 311 tests passed after T-001-47
+- 2026-02-08 16:20 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL — 317 tests passed after T-001-48
+- 2026-02-08 16:24 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL — 339 tests passed after T-001-49
 
 ## Completion Criteria
 
