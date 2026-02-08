@@ -1,0 +1,35 @@
+# PF-001-01: PingAM callback prettification profile
+# Exercises: FR-001-05 (profile format), ADR-0006 (most-specific-wins),
+#            DO-001-04 (TransformProfile), DO-001-08 (ProfileEntry)
+#
+# This profile binds transform specs to URL/method patterns for the PingAM
+# callback prettification use case. It includes:
+#   - An exact-path entry (3 literal segments → specificity 3)
+#   - A glob-wildcard entry (2 literal segments → specificity 2)
+#   - A second exact-path entry on a different route
+#
+# Used by: ProfileParserTest, ProfileMatcherTest, ProfileIntegrationTest
+
+profile: pingam-callback-prettify
+description: "Transforms PingAM callback responses into clean JSON for frontend consumption"
+version: "1.0.0"
+
+transforms:
+  - spec: simple-rename@1.0.0
+    direction: response
+    match:
+      path: "/json/alpha/authenticate"
+      method: POST
+      content-type: "application/json"
+
+  - spec: simple-rename@1.0.0
+    direction: response
+    match:
+      path: "/json/*/authenticate"
+      method: POST
+
+  - spec: conditional-response@1.0.0
+    direction: response
+    match:
+      path: "/json/bravo/authenticate"
+      method: POST

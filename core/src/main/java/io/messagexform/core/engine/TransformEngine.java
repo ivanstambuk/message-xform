@@ -11,9 +11,12 @@ import io.messagexform.core.error.InputSchemaViolation;
 import io.messagexform.core.error.TransformEvalException;
 import io.messagexform.core.model.Direction;
 import io.messagexform.core.model.Message;
+import io.messagexform.core.model.ProfileEntry;
 import io.messagexform.core.model.TransformContext;
+import io.messagexform.core.model.TransformProfile;
 import io.messagexform.core.model.TransformResult;
 import io.messagexform.core.model.TransformSpec;
+import io.messagexform.core.spec.ProfileParser;
 import io.messagexform.core.spec.SpecParser;
 import io.messagexform.core.spi.CompiledExpression;
 import java.nio.file.Path;
@@ -24,16 +27,21 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
- * Core transformation engine (API-001-01/03, FR-001-01, FR-001-02, FR-001-04).
- * Loads transform specs from YAML files and applies them to messages.
+ * Core transformation engine (API-001-01/03, FR-001-01, FR-001-02, FR-001-04,
+ * FR-001-05).
+ * Loads transform specs and profiles from YAML files and applies them to
+ * messages.
  *
  * <p>
- * Phase 4 scope: single-spec loading and body-only transformation.
- * Profile matching (Phase 5), context variable binding (T-001-21), error
- * responses (T-001-22..24), and hot reload (Phase 7) are added incrementally.
+ * Phase 5 scope: profile-based routing with most-specific-wins matching
+ * (ADR-0006).
+ * When a profile is loaded, the engine uses {@link ProfileMatcher} to select
+ * the appropriate spec. When no profile is loaded, falls back to single-spec
+ * mode
+ * (Phase 4 behaviour).
  *
  * <p>
- * Thread-safe: uses a {@link ConcurrentHashMap} for the spec registry.
+ * Thread-safe: uses {@link ConcurrentHashMap} for the spec registry.
  */
 public final class TransformEngine {
 
@@ -46,6 +54,7 @@ public final class TransformEngine {
     private final EvalBudget budget;
     private final SchemaValidationMode schemaValidationMode;
     private final Map<String, TransformSpec> specs = new ConcurrentHashMap<>();
+    private volatile TransformProfile activeProfile;
 
     /**
      * Creates a new engine backed by the given spec parser, using the default
@@ -118,14 +127,45 @@ public final class TransformEngine {
      */
     public TransformSpec loadSpec(Path path) {
         TransformSpec spec = specParser.parse(path);
+        // Store by both "id" (for Phase 4 compat) and "id@version" (for profile
+        // resolution)
         specs.put(spec.id(), spec);
+        specs.put(spec.id() + "@" + spec.version(), spec);
         return spec;
     }
 
     /**
-     * Transforms the given message using the first loaded spec. In Phase 4,
-     * there is no profile matching — the engine transforms using the most
-     * recently loaded spec. Profile-based routing is added in Phase 5.
+     * Loads a transform profile from a YAML file. The profile's spec references
+     * are resolved against already-loaded specs. Specs MUST be loaded before
+     * the profile that references them.
+     *
+     * @param path path to the profile YAML file
+     * @return the loaded and resolved profile
+     * @throws io.messagexform.core.error.ProfileResolveException if the profile
+     *                                                            YAML is invalid or
+     *                                                            spec references
+     *                                                            cannot be resolved
+     */
+    public TransformProfile loadProfile(Path path) {
+        ProfileParser profileParser = new ProfileParser(specs);
+        TransformProfile profile = profileParser.parse(path);
+        this.activeProfile = profile;
+        return profile;
+    }
+
+    /**
+     * Returns the currently active profile, or {@code null} if no profile is
+     * loaded.
+     */
+    public TransformProfile activeProfile() {
+        return activeProfile;
+    }
+
+    /**
+     * Transforms the given message. When a profile is loaded, the engine uses
+     * {@link ProfileMatcher} to select the appropriate spec entry by matching
+     * the message's path, method, content-type, and direction. When no profile
+     * is loaded, falls back to single-spec mode (Phase 4 behaviour).
      *
      * <p>
      * For unidirectional specs, the compiled expression is used regardless of
@@ -137,20 +177,38 @@ public final class TransformEngine {
      * @param direction the direction of the transform (REQUEST or RESPONSE)
      * @return a {@link TransformResult} — SUCCESS with the transformed message,
      *         ERROR with an RFC 9457 body if evaluation fails (ADR-0022),
-     *         or PASSTHROUGH if no spec is loaded
+     *         or PASSTHROUGH if no spec or profile matches
      */
     public TransformResult transform(Message message, Direction direction) {
         Objects.requireNonNull(message, "message must not be null");
         Objects.requireNonNull(direction, "direction must not be null");
 
+        // Phase 5: Profile-based routing via ProfileMatcher
+        TransformProfile profile = this.activeProfile;
+        if (profile != null) {
+            ProfileEntry bestMatch = ProfileMatcher.findBestMatch(
+                    profile, message.requestPath(), message.requestMethod(), message.contentType(), direction);
+            if (bestMatch == null) {
+                return TransformResult.passthrough();
+            }
+            return transformWithSpec(bestMatch.spec(), message, direction);
+        }
+
+        // Phase 4 fallback: single-spec mode (no profile loaded)
         if (specs.isEmpty()) {
             return TransformResult.passthrough();
         }
 
-        // Phase 4: use the most recently loaded spec (single-spec mode).
-        // Phase 5 will add profile matching to select the correct spec.
+        // Use the first loaded spec (for backward compatibility with Phase 4 tests)
         TransformSpec spec = specs.values().iterator().next();
+        return transformWithSpec(spec, message, direction);
+    }
 
+    /**
+     * Applies a single spec to the message. Shared between profile-routed and
+     * single-spec (Phase 4 fallback) paths.
+     */
+    private TransformResult transformWithSpec(TransformSpec spec, Message message, Direction direction) {
         // Resolve the expression based on directionality
         CompiledExpression expr = resolveExpression(spec, direction);
 
@@ -158,6 +216,7 @@ public final class TransformEngine {
         // For REQUEST transforms, $status is null (ADR-0017).
         Integer status = direction == Direction.RESPONSE ? message.statusCode() : null;
         TransformContext context = new TransformContext(message.headers(), message.headersAll(), status, null, null);
+
         // Evaluate the expression — catch eval exceptions per ADR-0022
         try {
             // T-001-26: Strict-mode input schema validation
