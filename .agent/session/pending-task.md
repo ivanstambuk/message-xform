@@ -1,24 +1,22 @@
 # Pending Task
 
-**Focus**: Phase 3 — Spec Parsing + Loading
-**Status**: Ready to start (Phases 1–2 complete, all design work done)
-**Next Step**: T-001-13 — Create test fixture YAML files
+**Focus**: Phase 3 — Spec Parsing + Loading (Feature 001)
+**Status**: T-001-13 and T-001-14 complete. Next is T-001-15 (error handling).
+**Next Step**: Implement `SpecParserTest` negative cases and `SpecParser` error paths.
 
 ## Context Notes
-- This session was entirely spec/design work: FR-001-12 (URL Rewriting),
-  ADR-0027, Rule 18, 7 scenarios, 6 tasks, terminology updates.
-- No implementation changes — build is green at 61 tests.
-- Phase 3 starts with creating YAML test fixtures (T-001-13), then parsing
-  them into TransformSpec (T-001-14). TDD cadence: tests first.
-- The `url` block in TransformSpec needs to be parsed by SpecParser (Phase 6,
-  T-001-38a), but the domain model + spec are ready for it when we get there.
+- `TransformSpec` record created in `core/src/main/java/io/messagexform/core/model/TransformSpec.java`
+- `SpecParser` created in `core/src/main/java/io/messagexform/core/spec/SpecParser.java`
+- 3 fixture YAML files in `core/src/test/resources/test-vectors/` (FX-001-01/02/03)
+- 72 tests passing, build clean
+- IDE upgraded: `redhat.java` v1.12 → v1.53 for Java 21 support
+- `.vscode/settings.json` created (gitignored) with JDK 21 runtime config
 
-## Key Files for Phase 3
-- `docs/architecture/features/001/tasks.md` — T-001-13 through T-001-18
-- `docs/architecture/features/001/spec.md` — FR-001-01 (spec format), DO-001-02
-- `core/src/test/resources/test-vectors/` — where fixtures go
-- `core/src/main/java/.../core/spec/` — where SpecParser will live
+## Remaining Phase 3 Tasks
+- **T-001-15** — Error handling: missing fields, bad YAML, unknown engine → SpecParseException
+- **T-001-16** — Create bidirectional fixture (FX-001-04 with forward/reverse blocks)
+- **T-001-17** — Parse bidirectional specs (forward + reverse expressions)
+- **T-001-18** — Schema validation on parsed specs (FR-001-09)
 
 ## SDD Gaps
-- None identified. Retro audit passed all checks.
-- ADR-0027 validating scenarios added during retro.
+- None identified — retro audit was clean across all 5 checks.
