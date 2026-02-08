@@ -765,7 +765,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
 
 #### I13 — Structured logging + TelemetryListener SPI
 
-- [ ] **T-001-41** — Structured log entries for matched transforms (NFR-001-08)
+- [x] **T-001-41** — Structured log entries for matched transforms (NFR-001-08) ✅ 2026-02-08
   _Intent:_ Every matched request MUST produce a JSON log entry with
   profile id, spec id@version, path, specificity score, eval duration.
   _Test first:_ Write `StructuredLoggingTest`:

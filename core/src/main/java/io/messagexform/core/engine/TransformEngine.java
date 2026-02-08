@@ -20,6 +20,7 @@ import io.messagexform.core.model.TransformSpec;
 import io.messagexform.core.spec.ProfileParser;
 import io.messagexform.core.spec.SpecParser;
 import io.messagexform.core.spi.CompiledExpression;
+import io.messagexform.core.spi.TelemetryListener;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -58,6 +59,7 @@ public final class TransformEngine {
     private final ErrorResponseBuilder errorResponseBuilder;
     private final EvalBudget budget;
     private final SchemaValidationMode schemaValidationMode;
+    private final TelemetryListener telemetryListener;
     private final Map<String, TransformSpec> specs = new ConcurrentHashMap<>();
     private volatile TransformProfile activeProfile;
 
@@ -68,7 +70,7 @@ public final class TransformEngine {
      * @param specParser the parser used to load and compile spec YAML files
      */
     public TransformEngine(SpecParser specParser) {
-        this(specParser, new ErrorResponseBuilder(), EvalBudget.DEFAULT, SchemaValidationMode.LENIENT);
+        this(specParser, new ErrorResponseBuilder(), EvalBudget.DEFAULT, SchemaValidationMode.LENIENT, null);
     }
 
     /**
@@ -79,7 +81,7 @@ public final class TransformEngine {
      * @param errorResponseBuilder the builder for RFC 9457 error responses
      */
     public TransformEngine(SpecParser specParser, ErrorResponseBuilder errorResponseBuilder) {
-        this(specParser, errorResponseBuilder, EvalBudget.DEFAULT, SchemaValidationMode.LENIENT);
+        this(specParser, errorResponseBuilder, EvalBudget.DEFAULT, SchemaValidationMode.LENIENT, null);
     }
 
     /**
@@ -92,11 +94,11 @@ public final class TransformEngine {
      * @param budget               evaluation budget (max-eval-ms, max-output-bytes)
      */
     public TransformEngine(SpecParser specParser, ErrorResponseBuilder errorResponseBuilder, EvalBudget budget) {
-        this(specParser, errorResponseBuilder, budget, SchemaValidationMode.LENIENT);
+        this(specParser, errorResponseBuilder, budget, SchemaValidationMode.LENIENT, null);
     }
 
     /**
-     * Creates a new engine with all configuration options.
+     * Creates a new engine with all configuration options (no telemetry listener).
      *
      * @param specParser           the parser used to load and compile spec YAML
      *                             files
@@ -109,12 +111,34 @@ public final class TransformEngine {
             ErrorResponseBuilder errorResponseBuilder,
             EvalBudget budget,
             SchemaValidationMode schemaValidationMode) {
+        this(specParser, errorResponseBuilder, budget, schemaValidationMode, null);
+    }
+
+    /**
+     * Creates a new engine with all configuration options and an optional
+     * telemetry listener (T-001-42, NFR-001-09).
+     *
+     * @param specParser           the parser used to load and compile spec YAML
+     *                             files
+     * @param errorResponseBuilder the builder for RFC 9457 error responses
+     * @param budget               evaluation budget (max-eval-ms, max-output-bytes)
+     * @param schemaValidationMode STRICT or LENIENT (FR-001-09, CFG-001-09)
+     * @param telemetryListener    optional listener for transform lifecycle events,
+     *                             may be null
+     */
+    public TransformEngine(
+            SpecParser specParser,
+            ErrorResponseBuilder errorResponseBuilder,
+            EvalBudget budget,
+            SchemaValidationMode schemaValidationMode,
+            TelemetryListener telemetryListener) {
         this.specParser = Objects.requireNonNull(specParser, "specParser must not be null");
         this.errorResponseBuilder =
                 Objects.requireNonNull(errorResponseBuilder, "errorResponseBuilder must not be null");
         this.budget = Objects.requireNonNull(budget, "budget must not be null");
         this.schemaValidationMode =
                 Objects.requireNonNull(schemaValidationMode, "schemaValidationMode must not be null");
+        this.telemetryListener = telemetryListener; // nullable
     }
 
     /**
@@ -131,12 +155,20 @@ public final class TransformEngine {
      *                                                               compile
      */
     public TransformSpec loadSpec(Path path) {
-        TransformSpec spec = specParser.parse(path);
-        // Store by both "id" (for Phase 4 compat) and "id@version" (for profile
-        // resolution)
-        specs.put(spec.id(), spec);
-        specs.put(spec.id() + "@" + spec.version(), spec);
-        return spec;
+        try {
+            TransformSpec spec = specParser.parse(path);
+            // Store by both "id" (for Phase 4 compat) and "id@version" (for profile
+            // resolution)
+            specs.put(spec.id(), spec);
+            specs.put(spec.id() + "@" + spec.version(), spec);
+            // T-001-42: Notify telemetry listener of successful spec load
+            notifySpecLoaded(spec, path);
+            return spec;
+        } catch (Exception e) {
+            // T-001-42: Notify telemetry listener of spec rejection
+            notifySpecRejected(path, e);
+            throw e;
+        }
     }
 
     /**
@@ -290,14 +322,16 @@ public final class TransformEngine {
         // Save the original body for URL rewriting (ADR-0027: "route the input")
         JsonNode originalBody = message.body();
 
+        // T-001-42: Notify telemetry listener of transform start
+        notifyTransformStarted(spec, direction);
+
         // Evaluate the expression — catch eval exceptions per ADR-0022
+        long startNanos = System.nanoTime();
         try {
             // T-001-26: Strict-mode input schema validation
             if (schemaValidationMode == SchemaValidationMode.STRICT && spec.inputSchema() != null) {
                 validateInputSchema(message.body(), spec);
             }
-
-            long startNanos = System.nanoTime();
 
             // T-001-39: Apply pipeline or single expression evaluation (FR-001-08,
             // ADR-0014)
@@ -337,6 +371,12 @@ public final class TransformEngine {
 
             // T-001-41: Emit structured log entry for matched transform (NFR-001-08)
             emitTransformMatchedLog(spec, elapsedMs, logCtx);
+
+            // T-001-42: Notify telemetry listener of successful completion
+            notifyTransformCompleted(spec, direction, elapsedMs);
+
+            // T-001-42: Notify profile matched event
+            notifyProfileMatched(spec, logCtx);
 
             // Build the transformed message, preserving envelope metadata
             Message transformedMessage = new Message(
@@ -384,6 +424,9 @@ public final class TransformEngine {
 
             return TransformResult.success(transformedMessage);
         } catch (TransformEvalException e) {
+            long failedMs = (System.nanoTime() - startNanos) / 1_000_000;
+            // T-001-42: Notify telemetry listener of transform failure
+            notifyTransformFailed(spec, direction, failedMs, e.getMessage());
             // ADR-0022: Never pass through the original message on eval error.
             // Build an RFC 9457 error response instead.
             JsonNode errorBody = errorResponseBuilder.buildErrorResponse(e, message.requestPath());
@@ -436,6 +479,70 @@ public final class TransformEngine {
             builder = builder.addKeyValue("chain_step", logCtx.chainStep());
         }
         builder.log("transform.matched");
+    }
+
+    // --- Telemetry notification helpers (T-001-42, NFR-001-09) ---
+    // Listener exceptions are caught and logged — they MUST NOT affect
+    // transform execution.
+
+    private void notifyTransformStarted(TransformSpec spec, Direction direction) {
+        if (telemetryListener == null) return;
+        try {
+            telemetryListener.onTransformStarted(
+                    new TelemetryListener.TransformStartedEvent(spec.id(), spec.version(), direction));
+        } catch (Exception e) {
+            LOG.warn("TelemetryListener.onTransformStarted failed: {}", e.getMessage());
+        }
+    }
+
+    private void notifyTransformCompleted(TransformSpec spec, Direction direction, long durationMs) {
+        if (telemetryListener == null) return;
+        try {
+            telemetryListener.onTransformCompleted(
+                    new TelemetryListener.TransformCompletedEvent(spec.id(), spec.version(), direction, durationMs));
+        } catch (Exception e) {
+            LOG.warn("TelemetryListener.onTransformCompleted failed: {}", e.getMessage());
+        }
+    }
+
+    private void notifyTransformFailed(TransformSpec spec, Direction direction, long durationMs, String errorDetail) {
+        if (telemetryListener == null) return;
+        try {
+            telemetryListener.onTransformFailed(new TelemetryListener.TransformFailedEvent(
+                    spec.id(), spec.version(), direction, durationMs, errorDetail));
+        } catch (Exception e) {
+            LOG.warn("TelemetryListener.onTransformFailed failed: {}", e.getMessage());
+        }
+    }
+
+    private void notifyProfileMatched(TransformSpec spec, LogContext logCtx) {
+        if (telemetryListener == null || logCtx == null) return;
+        try {
+            telemetryListener.onProfileMatched(new TelemetryListener.ProfileMatchedEvent(
+                    logCtx.profileId(), spec.id(), spec.version(), logCtx.requestPath(), logCtx.specificityScore()));
+        } catch (Exception e) {
+            LOG.warn("TelemetryListener.onProfileMatched failed: {}", e.getMessage());
+        }
+    }
+
+    private void notifySpecLoaded(TransformSpec spec, Path path) {
+        if (telemetryListener == null) return;
+        try {
+            telemetryListener.onSpecLoaded(
+                    new TelemetryListener.SpecLoadedEvent(spec.id(), spec.version(), path.toString()));
+        } catch (Exception e) {
+            LOG.warn("TelemetryListener.onSpecLoaded failed: {}", e.getMessage());
+        }
+    }
+
+    private void notifySpecRejected(Path path, Exception cause) {
+        if (telemetryListener == null) return;
+        try {
+            telemetryListener.onSpecRejected(
+                    new TelemetryListener.SpecRejectedEvent(path.toString(), cause.getMessage()));
+        } catch (Exception e) {
+            LOG.warn("TelemetryListener.onSpecRejected failed: {}", e.getMessage());
+        }
     }
 
     private CompiledExpression resolveExpression(TransformSpec spec, Direction direction) {
