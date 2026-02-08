@@ -88,7 +88,7 @@ no changes).
 
 | ID | Requirement | Success path | Validation path | Failure path | Source |
 |----|-------------|--------------|-----------------|--------------|--------|
-| FR-004-06 | The proxy MUST implement `GatewayAdapter<Context>` where `Context` is Javalin's request context, providing `wrapRequest`, `wrapResponse`, and `applyChanges`. | `wrapRequest(ctx)` extracts body → `JsonNode`, headers, status, path, method, query string and returns a `Message`. | Request with no body → `Message.body()` is `null` or empty `ObjectNode`. | JSON parse error on request body → proxy returns `400 Bad Request` with RFC 9457 error. | SPI-001-04/05/06, ADR-0013. |
+| FR-004-06 | The proxy MUST implement `GatewayAdapter<Context>` where `Context` is Javalin's request context, providing `wrapRequest`, `wrapResponse`, and `applyChanges`. | `wrapRequest(ctx)` extracts body → `JsonNode`, headers, status, path, method, query string and returns a `Message`. | Request with no body → `Message.body()` is `NullNode` (per `Message` contract — body is never null). | JSON parse error on request body → proxy returns `400 Bad Request` with RFC 9457 error. | SPI-001-04/05/06, ADR-0013. |
 | FR-004-07 | `wrapRequest` and `wrapResponse` MUST create **deep copies** of the native message data, consistent with copy-on-wrap semantics (ADR-0013). | Mutations to the `Message` returned by `wrapRequest` do not affect the original Javalin context until `applyChanges` is called. | n/a | n/a | ADR-0013. |
 | FR-004-08 | `applyChanges` MUST write the transformed `Message` fields (body, headers, status code) back to the Javalin response context. | Transformed body, headers, and status code are written to `ctx.result()`, `ctx.header()`, `ctx.status()`. | If the transformed `Message.body()` is null, `applyChanges` MUST set an empty response body. | n/a | SPI-001-06. |
 | FR-004-09 | Header names MUST be normalized to lowercase in `wrapRequest` and `wrapResponse`, consistent with core engine conventions. | `Content-Type: application/json` → `content-type: application/json` in `Message.headers()`. | n/a | n/a | Feature 001 spec. |
@@ -126,7 +126,7 @@ no changes).
 
 | ID | Requirement | Success path | Validation path | Failure path | Source |
 |----|-------------|--------------|-----------------|--------------|--------|
-| FR-004-19 | The proxy MUST watch `engine.specs-dir` and `engine.profiles-dir` for file changes using `java.nio.file.WatchService` (when `reload.enabled: true`) and trigger `TransformEngine.reload()`. | Save a new spec YAML → watcher detects → `reload()` → new spec available for subsequent requests. | Debounce (default 500ms) prevents rapid successive reloads during editing. | Reload fails (invalid YAML, schema error) → previous registry stays active, error logged. | NFR-001-05, Research §6. |
+| FR-004-19 | The proxy MUST watch `engine.specs-dir` and `engine.profiles-dir` for file changes using `java.nio.file.WatchService` (when `reload.enabled: true`) and trigger `TransformEngine.reload(specPaths, profilePath)`. On each reload, the proxy scans `engine.specs-dir` for all `*.yaml`/`*.yml` files and resolves the active profile from `engine.profile` (or `engine.profiles-dir`). | Save a new spec YAML → watcher detects → `reload()` → new spec available for subsequent requests. | Debounce (default 500ms) prevents rapid successive reloads during editing. | Reload fails (invalid YAML, schema error) → previous registry stays active, error logged. | NFR-001-05, Research §6. |
 | FR-004-20 | The proxy MUST expose `POST /admin/reload` to trigger `TransformEngine.reload()` programmatically. | `POST /admin/reload` → engine reloads → `200 OK` with reload summary. | n/a | Reload fails → `500 Internal Server Error` with error details. Admin endpoints are NOT subject to transform matching. | Research §6. |
 
 ### Health & Readiness
@@ -134,7 +134,7 @@ no changes).
 | ID | Requirement | Success path | Validation path | Failure path | Source |
 |----|-------------|--------------|-----------------|--------------|--------|
 | FR-004-21 | The proxy MUST expose `GET /health` (liveness probe). | Returns `200 OK` with `{"status": "UP"}` when the JVM and HTTP server are running. | Health endpoint is NOT subject to transform matching. | Server not accepting connections → probe fails (Kubernetes restarts pod). | K8s liveness probe. |
-| FR-004-22 | The proxy MUST expose `GET /ready` (readiness probe). | Returns `200 OK` with `{"status": "READY", "engine": "loaded", "backend": "reachable"}` when engine has loaded specs AND backend is reachable. | During startup (before engine loads) → `503 Service Unavailable`. After failed reload → still `200` (old registry is still active). | Backend unreachable → `503 Service Unavailable` with `{"status": "NOT_READY", "reason": "backend_unreachable"}`. | K8s readiness probe. |
+| FR-004-22 | The proxy MUST expose `GET /ready` (readiness probe). | Returns `200 OK` with `{"status": "READY", "engine": "loaded", "backend": "reachable"}` when engine has loaded specs AND backend is reachable (verified via TCP connect to `backend.host:backend.port` with `backend.connect-timeout-ms` timeout). | During startup (before engine loads) → `503 Service Unavailable`. After failed reload → still `200` (old registry is still active). | Backend unreachable → `503 Service Unavailable` with `{"status": "NOT_READY", "reason": "backend_unreachable"}`. | K8s readiness probe. |
 
 ### Error Handling
 
@@ -166,7 +166,7 @@ no changes).
 | ID | Requirement | Success path | Validation path | Failure path | Source |
 |----|-------------|--------------|-----------------|--------------|--------|
 | FR-004-33 | The proxy MUST force HTTP/1.1 for upstream connections (via `HttpClient.Version.HTTP_1_1`). | Proxy sends `GET /` via HTTP/1.1. | n/a | n/a | Non-Goal: HTTP/2 upstream. |
-| FR-004-34 | The proxy MUST recalculate the `Content-Length` header for the upstream request based on the *transformed* body size. It MUST NOT blindly copy the `Content-Length` from the original request. | Client sends 100 bytes → spec adds 50 bytes → Upstream receives `Content-Length: 150`. | n/a | n/a | HTTP framing correctness. |
+| FR-004-34 | The proxy MUST recalculate the `Content-Length` header based on the *transformed* body size for **both** upstream requests and client responses. It MUST NOT blindly copy the `Content-Length` from the original message in either direction. | Request: client sends 100 bytes → spec adds 50 bytes → upstream receives `Content-Length: 150`. Response: backend returns 200 bytes → spec removes 50 bytes → client receives `Content-Length: 150`. | n/a | n/a | HTTP framing correctness. |
 
 ---
 
@@ -301,6 +301,13 @@ no changes).
 |-------------|--------------------------------|
 | S-004-52 | **HTTP/1.1 enforced:** Upstream request uses HTTP/1.1 regardless of client protocol version (FR-004-33). |
 | S-004-53 | **Content-Length recalculated:** After request body transform changes size, upstream receives correct `Content-Length` (FR-004-34). |
+| S-004-54 | **Response Content-Length recalculated:** After response body transform changes size, client receives correct `Content-Length` (FR-004-34). |
+
+> **Note on chunked transfer encoding:** When clients or backends use
+> `Transfer-Encoding: chunked`, the proxy relies on Javalin/Jetty to assemble the
+> full body before parsing (consistent with ADR-0018 body buffering). No special
+> handling is required in `ProxyHandler` — the assembled body is treated identically
+> to a content-length-framed body.
 
 ---
 
@@ -383,7 +390,7 @@ no changes).
 | CFG-004-26 | `backend.tls.keystore-type` | enum | `PKCS12` | `PKCS12` or `JKS` |
 | CFG-004-27 | `engine.specs-dir` | path | `./specs` | Directory containing transform spec YAML files |
 | CFG-004-28 | `engine.profiles-dir` | path | `./profiles` | Directory containing transform profile YAML files |
-| CFG-004-29 | `engine.profile` | path | — | Explicit single profile path (alternative to profiles-dir) |
+| CFG-004-29 | `engine.profile` | path | — | Explicit single profile path (alternative to profiles-dir). When both `engine.profile` and `engine.profiles-dir` are set, `engine.profile` takes precedence and `profiles-dir` is ignored with a warning. |
 | CFG-004-30 | `engine.schema-validation` | enum | `lenient` | `lenient` or `strict` |
 | CFG-004-31 | `reload.enabled` | boolean | `true` | Enable file-system watching for hot reload |
 | CFG-004-32 | `reload.watch-dirs` | list | `[specs-dir, profiles-dir]` | Directories to watch for changes |
@@ -400,12 +407,14 @@ no changes).
 |---------|------------|
 | `PROXY_HOST` | `proxy.host` |
 | `PROXY_PORT` | `proxy.port` |
+| `PROXY_TLS_ENABLED` | `proxy.tls.enabled` |
 | `PROXY_TLS_KEYSTORE` | `proxy.tls.keystore` |
 | `PROXY_TLS_KEYSTORE_PASSWORD` | `proxy.tls.keystore-password` |
 | `PROXY_TLS_KEYSTORE_TYPE` | `proxy.tls.keystore-type` |
 | `PROXY_TLS_CLIENT_AUTH` | `proxy.tls.client-auth` |
 | `PROXY_TLS_TRUSTSTORE` | `proxy.tls.truststore` |
 | `PROXY_TLS_TRUSTSTORE_PASSWORD` | `proxy.tls.truststore-password` |
+| `PROXY_TLS_TRUSTSTORE_TYPE` | `proxy.tls.truststore-type` |
 | `BACKEND_SCHEME` | `backend.scheme` |
 | `BACKEND_HOST` | `backend.host` |
 | `BACKEND_PORT` | `backend.port` |
@@ -413,12 +422,15 @@ no changes).
 | `BACKEND_READ_TIMEOUT_MS` | `backend.read-timeout-ms` |
 | `BACKEND_MAX_BODY_BYTES` | `backend.max-body-bytes` |
 | `BACKEND_POOL_MAX_CONNECTIONS` | `backend.pool.max-connections` |
+| `BACKEND_POOL_KEEP_ALIVE` | `backend.pool.keep-alive` |
 | `BACKEND_POOL_IDLE_TIMEOUT_MS` | `backend.pool.idle-timeout-ms` |
 | `BACKEND_TLS_TRUSTSTORE` | `backend.tls.truststore` |
 | `BACKEND_TLS_TRUSTSTORE_PASSWORD` | `backend.tls.truststore-password` |
+| `BACKEND_TLS_TRUSTSTORE_TYPE` | `backend.tls.truststore-type` |
 | `BACKEND_TLS_VERIFY_HOSTNAME` | `backend.tls.verify-hostname` |
 | `BACKEND_TLS_KEYSTORE` | `backend.tls.keystore` |
 | `BACKEND_TLS_KEYSTORE_PASSWORD` | `backend.tls.keystore-password` |
+| `BACKEND_TLS_KEYSTORE_TYPE` | `backend.tls.keystore-type` |
 | `SPECS_DIR` | `engine.specs-dir` |
 | `PROFILES_DIR` | `engine.profiles-dir` |
 | `ENGINE_PROFILE` | `engine.profile` |
@@ -427,6 +439,8 @@ no changes).
 | `RELOAD_WATCH_DIRS` | `reload.watch-dirs` (comma-separated list) |
 | `RELOAD_DEBOUNCE_MS` | `reload.debounce-ms` |
 | `HEALTH_ENABLED` | `health.enabled` |
+| `HEALTH_PATH` | `health.path` |
+| `HEALTH_READY_PATH` | `health.ready-path` |
 | `LOG_FORMAT` | `logging.format` |
 | `LOG_LEVEL` | `logging.level` |
 
