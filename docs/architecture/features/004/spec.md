@@ -235,7 +235,7 @@ no changes).
 | S-004-01 | **Passthrough GET:** `GET /api/users` with no matching profile → forwarded unmodified, response returned unmodified. |
 | S-004-02 | **Passthrough POST with body:** `POST /api/data` with JSON body, no matching profile → body forwarded unmodified. |
 | S-004-03 | **Method forwarding:** Each of GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS proxied correctly. |
-| S-004-04 | **Header forwarding:** Request headers forwarded to backend (hop-by-hop stripped). Response headers returned to client. |
+| S-004-04 | **Header forwarding:** Request headers forwarded to backend (hop-by-hop stripped). Response headers returned to client (hop-by-hop stripped in both directions, FR-004-04). |
 | S-004-05 | **Query string forwarding:** `GET /api/users?page=2&size=10` → query string forwarded intact. |
 | S-004-06 | **Path forwarding:** `GET /api/v1/nested/resource/123` → full path forwarded to backend. |
 
@@ -273,9 +273,10 @@ no changes).
 | S-004-19 | **Backend timeout:** Backend does not respond within `read-timeout-ms` → `504 Gateway Timeout`. |
 | S-004-20 | **Backend connection refused:** Backend port not listening → `502 Bad Gateway`. |
 | S-004-21 | **Malformed JSON body:** POST with `Content-Type: application/json` but invalid JSON → `400 Bad Request`. |
-| S-004-22 | **Body too large:** Request body exceeds `max-body-bytes` → `413 Payload Too Large`. |
+| S-004-22 | **Request body too large:** Request body exceeds `max-body-bytes` → `413 Payload Too Large`. |
 | S-004-23 | **Unknown method:** Custom HTTP method → `405 Method Not Allowed`. |
 | S-004-55 | **Non-JSON body with matching profile:** `POST /api/orders` with `Content-Type: text/xml` matches profile by path/method → `400 Bad Request` (Q-036). |
+| S-004-56 | **Response body too large:** Backend returns response exceeding `max-body-bytes` → client receives `502 Bad Gateway` (Q-037, FR-004-13). |
 
 ### Category 6 — Configuration
 
@@ -342,6 +343,14 @@ no changes).
 | S-004-52 | **HTTP/1.1 enforced:** Upstream request uses HTTP/1.1 regardless of client protocol version (FR-004-33). |
 | S-004-53 | **Content-Length recalculated:** After request body transform changes size, upstream receives correct `Content-Length` (FR-004-34). |
 | S-004-54 | **Response Content-Length recalculated:** After response body transform changes size, client receives correct `Content-Length` (FR-004-34). |
+
+### Category 13 — Forwarded Headers
+
+| Scenario ID | Description / Expected outcome |
+|-------------|--------------------------------|
+| S-004-57 | **X-Forwarded-* added (default):** `proxy.forwarded-headers.enabled: true` (default) → upstream request includes `X-Forwarded-For` (client IP), `X-Forwarded-Proto`, `X-Forwarded-Host` (FR-004-36). |
+| S-004-58 | **X-Forwarded-* disabled:** `proxy.forwarded-headers.enabled: false` → upstream request does NOT include any `X-Forwarded-*` headers (FR-004-36). |
+| S-004-59 | **X-Forwarded-For appended:** Client behind an existing proxy sends `X-Forwarded-For: 1.1.1.1` → proxy appends client IP → backend receives `X-Forwarded-For: 1.1.1.1, 10.0.0.5` (FR-004-36). |
 
 > **Note on chunked transfer encoding:** When clients or backends use
 > `Transfer-Encoding: chunked`, the proxy relies on Javalin/Jetty to assemble the
