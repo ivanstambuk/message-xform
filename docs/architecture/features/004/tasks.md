@@ -202,7 +202,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `./gradlew spotlessApply check`
   _Verification log:_ ✅ 7/7 tests PASSED (includes `httpClient_configuredWithHttp11` verifying `HttpClient.Version.HTTP_1_1`). HTTP/1.1 was already configured in T-004-09 constructor; this task adds the explicit test. `spotlessApply check` GREEN.
 
-- [ ] **T-004-11** — UpstreamClient: Content-Length recalculation (FR-004-34, S-004-53/54)
+- [x] **T-004-11** — UpstreamClient: Content-Length recalculation (FR-004-34, S-004-53/54)
   _Intent:_ After body transformation changes the body size, recalculate
   `Content-Length` header for both upstream requests and client responses.
   _Test first:_ Write `ContentLengthTest`:
@@ -217,6 +217,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   _Verification commands:_
   - `./gradlew :adapter-standalone:test --tests "*ContentLengthTest*"`
   - `./gradlew spotlessApply check`
+  _Verification log:_ ✅ 3/3 tests PASSED (transformed body with wrong CL header → recalculated, no CL header → JDK sets correct, empty body → CL 0). Content-Length filtering handled by `isRestrictedHeader()` in UpstreamClient. Response path deferred to ProxyHandler (I5). `spotlessApply check` GREEN.
 
 - [ ] **T-004-12** — UpstreamClient: hop-by-hop header stripping (FR-004-04)
   _Intent:_ Strip hop-by-hop headers (`Connection`, `Transfer-Encoding`,
