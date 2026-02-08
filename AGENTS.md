@@ -240,6 +240,38 @@ The agent SHOULD also **consider** suggesting a session boundary (soft signals):
 **Format:** When suggesting a boundary, the agent says:
 > 🔄 **Session boundary suggested** — [reason]. Shall I run `/retro` then `/handover`?
 
+## Autonomous Task Sequencing
+
+When a task plan exists (e.g., `tasks.md` with ordered tasks), the agent MUST
+execute tasks **continuously** without stopping to ask "should I continue with
+the next task?" between each one.
+
+**The rule:** Commit each task → immediately start the next. Do **not** pause for
+user input unless a **session boundary signal** (see above) is triggered.
+
+**Rationale:** The task plan already encodes the sequencing and dependencies.
+Stopping after each task to ask permission is waste — it breaks flow, adds
+latency, and provides no value when the plan is clear.
+
+**Specifically, do NOT:**
+- Ask "shall I proceed to T-001-XX?" after completing T-001-(XX-1).
+- Summarise what you just did and wait for acknowledgement before starting the
+  next task.
+- Present a menu of "options" when the task plan already defines the next step.
+
+**DO:**
+- Commit each completed task atomically (per Auto-Commit rule).
+- Immediately begin the next task in sequence.
+- Continue until a session boundary signal fires (phase boundary, context
+  truncation, 3+ errors) — then suggest `/retro` + `/handover`.
+- If a task fails or produces unexpected results, fix it and continue. Only
+  stop if you're genuinely blocked and need human input.
+
+**Exception:** If the next task involves a **design decision not yet captured in
+an ADR** or a **new architectural direction**, pause and ask. The distinction
+is: mechanical execution continues autonomously; novel design decisions require
+human input.
+
 ## Exhaustive Execution for Scoped Tasks
 
 - When the owner describes a task with an explicit scope (e.g., "all scenarios",
