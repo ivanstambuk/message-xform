@@ -1,36 +1,33 @@
-# Current Session — Feature 004 Implementation (Phase 3)
+# Current Session
 
-**Date:** 2026-02-08T22:53+01:00
-**Feature:** 004 — Standalone HTTP Proxy Mode
-**Phase:** Phase 3 — Core Proxy: Handler + Upstream Client (I4 starting)
+**Feature**: 004 — Standalone HTTP Proxy Mode
+**Phase**: Phase 3 — Core Proxy: Handler + Upstream Client
+**Increment**: I5 — StandaloneAdapter + ProxyHandler
+**Status**: I4 complete, I5 not started
 
-## Progress
+## Completed This Session
 
-### Phase 1 ✅ DONE
-- T-004-01: 3-arg `transform()` overload in core engine (6 tests)
-- T-004-02: Scaffold `adapter-standalone` Gradle submodule
-- T-004-03: Zero gateway-dependency verification (2 tests)
+- T-004-09 — UpstreamClient: basic forwarding (6 tests)
+- T-004-10 — UpstreamClient: HTTP/1.1 enforcement (1 test)
+- T-004-11 — UpstreamClient: Content-Length recalculation (3 tests)
+- T-004-12 — UpstreamClient: hop-by-hop header stripping (4 tests)
+- T-004-13 — UpstreamClient: backend error handling (4 tests)
+- T-004-14 — UpstreamClient: connection pool configuration (3 tests)
 
-### Phase 2 ✅ DONE
-- T-004-04: ProxyConfig record hierarchy (8 tests)
-- T-004-05: Config test fixtures (3 files)
-- T-004-06: YAML config loader (8 tests)
-- T-004-07: Environment variable overlay (47 tests)
-- T-004-08: Config validation (19 tests)
-
-### Phase 3 🔧 IN PROGRESS (I4)
-- T-004-09: UpstreamClient basic forwarding — NOT STARTED
-- T-004-10: HTTP/1.1 enforcement — NOT STARTED
-- T-004-11: Content-Length recalculation — NOT STARTED
-- T-004-12: Hop-by-hop header stripping — NOT STARTED
-- T-004-13: Backend error handling — NOT STARTED
-- T-004-14: Connection pool configuration — NOT STARTED
+**Total**: 6 tasks, 21 tests, 6 commits (d54c624..ccdca69)
 
 ## Key Decisions
-- Javalin 6.7.0 ships Jetty 11, not Jetty 12. All docs corrected.
-- ProxyConfig uses flat backend fields + Builder (no separate BackendConfig record).
-  Nested records: TlsConfig (inbound), BackendTlsConfig (outbound), PoolConfig.
 
-## Test Count
-- 90 tests across Phase 1+2 (all GREEN)
-- Full `spotlessApply check` GREEN
+- Mock backend strategy: JDK `com.sun.net.httpserver.HttpServer` (zero deps)
+- Domain exception hierarchy: UpstreamException → UpstreamConnectException, UpstreamTimeoutException
+- Content-Length and Host are restricted headers (JDK-managed)
+- All 8 RFC 7230 §6.1 hop-by-hop headers filtered in both directions
+
+## Next
+
+I5 — StandaloneAdapter + ProxyHandler (T-004-15..T-004-19):
+- T-004-15: StandaloneAdapter (GatewayAdapter for Javalin Context)
+- T-004-16: ProxyHandler: happy path
+- T-004-17: ProxyHandler: error responses (RFC 9457)
+- T-004-18: ProxyHandler: Javalin integration
+- T-004-19: ProxyHandler: body size limit enforcement
