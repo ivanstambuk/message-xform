@@ -1,0 +1,13 @@
+# Invalid JSON Schema — the "type" field has an invalid value
+id: "invalid-schema"
+version: "1.0.0"
+input:
+  schema:
+    type: not-a-type
+output:
+  schema:
+    type: object
+transform:
+  lang: jslt
+  expr: |
+    { "x": .x }

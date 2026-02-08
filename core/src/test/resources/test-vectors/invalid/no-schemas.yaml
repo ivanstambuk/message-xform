@@ -1,0 +1,7 @@
+# Spec with no input/output schema blocks at all
+id: "no-schemas"
+version: "1.0.0"
+transform:
+  lang: jslt
+  expr: |
+    { "x": .x }
