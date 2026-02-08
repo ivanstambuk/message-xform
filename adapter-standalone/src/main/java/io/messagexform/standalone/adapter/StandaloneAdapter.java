@@ -62,8 +62,34 @@ public final class StandaloneAdapter implements GatewayAdapter<Context> {
 
     @Override
     public Message wrapResponse(Context ctx) {
-        // Placeholder — implemented in T-004-18
-        throw new UnsupportedOperationException("wrapResponse not yet implemented (T-004-18)");
+        // Read response body from ctx.result() (set by ProxyHandler)
+        JsonNode body = parseBody(ctx.result());
+
+        // Read response headers from servlet response (FR-004-06a)
+        Map<String, String> headers = new LinkedHashMap<>();
+        Map<String, List<String>> headersAll = new LinkedHashMap<>();
+        for (String name : ctx.res().getHeaderNames()) {
+            String lowerName = name.toLowerCase();
+            headers.putIfAbsent(lowerName, ctx.res().getHeader(name));
+            headersAll.putIfAbsent(lowerName,
+                    Collections.unmodifiableList(new ArrayList<>(ctx.res().getHeaders(name))));
+        }
+
+        int statusCode = ctx.statusCode();
+        String contentType = headers.get("content-type");
+
+        // Original request path/method for profile matching (FR-004-06b)
+        String requestPath = ctx.path();
+        String requestMethod = ctx.method().name();
+
+        LOG.debug("wrapResponse: {} {} → {} (body={} bytes, headers={})",
+                requestMethod, requestPath, statusCode,
+                ctx.result() != null ? ctx.result().length() : 0,
+                headers.size());
+
+        // queryString is null for responses
+        return new Message(body, headers, headersAll, statusCode, contentType,
+                requestPath, requestMethod, null);
     }
 
     @Override

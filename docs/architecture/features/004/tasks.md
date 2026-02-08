@@ -318,7 +318,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `./gradlew spotlessApply check`
   _Verification log:_ ✅ 4/4 tests PASSED (populated params S-004-74, empty map S-004-75, multi-value first-only S-004-76, URL-decoded S-004-77). Full adapter-standalone suite GREEN. Commit `cd68bb5`.
 
-- [ ] **T-004-18** — StandaloneAdapter.wrapResponse (FR-004-06a, FR-004-06b, FR-004-07)
+- [x] **T-004-18** — StandaloneAdapter.wrapResponse (FR-004-06a, FR-004-06b, FR-004-07)
   _Intent:_ Implement `wrapResponse()` — reads upstream response data from
   Javalin `Context` (after `ProxyHandler` populates it). Includes original
   request path and method for response-direction profile matching.
@@ -335,6 +335,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   _Verification commands:_
   - `./gradlew :adapter-standalone:test --tests "*StandaloneAdapterTest*"`
   - `./gradlew spotlessApply check`
+  _Verification log:_ ✅ 16/16 tests PASSED (10 wrapRequest + 6 wrapResponse: body extraction, status preservation, header normalization, requestPath/requestMethod FR-004-06b, null queryString, 204 NullNode). Commit `61bb040`.
 
 - [ ] **T-004-19** — StandaloneAdapter.applyChanges (FR-004-08)
   _Intent:_ Write the transformed `Message` fields back to Javalin response
