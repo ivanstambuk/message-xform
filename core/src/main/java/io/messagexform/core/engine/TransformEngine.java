@@ -26,6 +26,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Core transformation engine (API-001-01/03, FR-001-01, FR-001-02, FR-001-04,
@@ -46,6 +48,7 @@ import java.util.stream.Collectors;
  */
 public final class TransformEngine {
 
+    private static final Logger LOG = LoggerFactory.getLogger(TransformEngine.class);
     private static final ObjectMapper SIZE_MAPPER = new ObjectMapper();
     private static final JsonSchemaFactory SCHEMA_FACTORY =
             JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012);
@@ -214,22 +217,49 @@ public final class TransformEngine {
      * the entire chain aborts — no partial results reach the caller.
      */
     private TransformResult transformChain(List<ProfileEntry> chain, Message message, Direction direction) {
+        TransformProfile profile = this.activeProfile;
+        String profileId = profile != null ? profile.id() : "unknown";
+        int totalSteps = chain.size();
+
+        LOG.info(
+                "Starting chain execution: profile_id={}, chain_steps={}, direction={}",
+                profileId,
+                totalSteps,
+                direction);
+
         Message current = message;
         for (int i = 0; i < chain.size(); i++) {
             ProfileEntry entry = chain.get(i);
+            String stepLabel = (i + 1) + "/" + totalSteps;
+
+            LOG.info(
+                    "Executing chain step: chain_step={}, spec_id={}, profile_id={}",
+                    stepLabel,
+                    entry.spec().id(),
+                    profileId);
+
             TransformResult stepResult = transformWithSpec(entry.spec(), current, direction);
 
             if (stepResult.isError()) {
-                // Chain aborted — return the error immediately (no partial results)
+                LOG.warn(
+                        "Chain aborted at step {}: spec_id={}, profile_id={}",
+                        stepLabel,
+                        entry.spec().id(),
+                        profileId);
                 return stepResult;
             }
             if (stepResult.isPassthrough()) {
-                // Passthrough from a chain step — pass the message through to next step
+                LOG.debug(
+                        "Chain step {} passthrough: spec_id={}",
+                        stepLabel,
+                        entry.spec().id());
                 continue;
             }
             // SUCCESS — feed the output to the next step
             current = stepResult.message();
         }
+
+        LOG.info("Chain execution complete: profile_id={}, steps={}", profileId, totalSteps);
         return TransformResult.success(current);
     }
 

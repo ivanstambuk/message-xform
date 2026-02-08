@@ -15,5 +15,5 @@ dependencies {
     // Test
     testImplementation(catalog.findLibrary("mockito-core").get())
     testImplementation(catalog.findLibrary("mockito-junit-jupiter").get())
-    testRuntimeOnly(catalog.findLibrary("logback-classic").get())
+    testImplementation(catalog.findLibrary("logback-classic").get())
 }
