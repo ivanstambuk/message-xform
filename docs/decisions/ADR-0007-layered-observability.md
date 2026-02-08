@@ -11,7 +11,7 @@ error rates, and trace correlation for debugging across request chains.
 The engine core (NFR-001-02) prohibits gateway-specific dependencies. Adding
 Micrometer or OpenTelemetry directly to the core would violate this constraint.
 
-JourneyForge (ADR-0025) solved this with a layered model: a small always-on core +
+A proven approach to this problem is a layered model: a small always-on core +
 configurable extension packs, mediated by a generic event/SPI model. This keeps
 telemetry dependencies out of the core while providing full observability.
 
@@ -27,7 +27,7 @@ telemetry dependencies out of the core while providing full observability.
   - Core engine emits semantic events via a `TelemetryListener` SPI. Adapters/plugins
     provide concrete OTel/Micrometer implementations. Core has zero telemetry deps.
   - Pros: production-grade visibility from day 1, respects NFR-001-02 (no direct deps),
-    consistent with JourneyForge ADR-0025, extensible via packs.
+    proven layered pattern, extensible via packs.
   - Cons: requires designing a telemetry SPI, more implementation effort.
 
 - **Option C – Defer to implementation** (rejected)
@@ -38,7 +38,6 @@ telemetry dependencies out of the core while providing full observability.
 
 Related ADRs:
 - ADR-0006 – Profile Match Resolution (NFR-001-08 structured logging)
-- JourneyForge ADR-0025 – Observability and Telemetry Layers
 
 ## Decision
 
@@ -112,7 +111,7 @@ Positive:
 - Production-grade visibility: latency histograms, error rates, trace correlation.
 - Core stays dependency-free: telemetry SPI is a plain Java interface in core module.
   Adapter modules provide OTel/Micrometer bindings.
-- Consistent with JourneyForge ADR-0025 pattern: layered, privacy-first, config-driven.
+- Layered, privacy-first, config-driven telemetry model.
 - Portable: same metrics vocabulary across PingAccess, PingGateway, Kong, standalone.
 
 Negative / trade-offs:
@@ -128,5 +127,4 @@ Follow-ups:
 
 References:
 - Feature 001 spec: `docs/architecture/features/001/spec.md` (NFR-001-08, NFR-001-09)
-- JourneyForge ADR-0025: Observability and Telemetry Layers
 - Validating scenarios: S-001-47, S-001-48

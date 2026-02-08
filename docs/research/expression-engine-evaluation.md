@@ -311,8 +311,7 @@ for message-xform.
 
 ### 6. DataWeave (MuleSoft)
 
-**What it is:** A powerful data transformation language from MuleSoft/Salesforce.
-The expression engine used by JourneyForge.
+A powerful data transformation language from MuleSoft/Salesforce.
 
 **Syntax example:**
 ```dataweave
@@ -328,7 +327,6 @@ output application/json
 
 **Pros:**
 - ✅ Very powerful — supports XML, CSV, JSON, etc.
-- ✅ JourneyForge already chose it as default engine
 
 **Cons:**
 - ❌ **Proprietary** — part of MuleSoft's commercial platform
@@ -338,8 +336,8 @@ output application/json
 
 **Assessment: ❌ NOT VIABLE — proprietary, no embeddable runtime**
 
-DataWeave is powerful but closed. JourneyForge specifies it as an engine id, but
-actually running it requires MuleSoft's runtime. Not viable for message-xform.
+DataWeave is powerful but closed. Some transformation engines specify it as an engine
+id, but actually running it requires MuleSoft's runtime. Not viable for message-xform.
 
 ---
 
@@ -471,8 +469,8 @@ JSLT gives us:
 
 ### Pluggable Engine Architecture
 
-Even though JSLT is the recommended primary engine, message-xform SHOULD adopt the
-pluggable Expression Engine SPI pattern from JourneyForge (ADR-0027):
+Even though JSLT is the recommended primary engine, message-xform SHOULD adopt a
+pluggable Expression Engine SPI (ADR-0010):
 
 ```java
 public interface TransformEngine {

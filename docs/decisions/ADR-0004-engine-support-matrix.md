@@ -12,8 +12,8 @@ predicates, access `$headers`/`$status` variables, or support bidirectional spec
 Without an explicit capability matrix, a spec author could write `lang: jolt` with a
 `when` predicate (FR-001-11), which would fail at runtime rather than at load time.
 
-JourneyForge (ADR-0027) defines a similar matrix that blocks JOLT from predicate
-contexts. DataWeave is JourneyForge's canonical engine; it is being open-sourced by
+Other transformation engines define similar capability matrices that block JOLT from
+predicate contexts. DataWeave is being open-sourced by
 MuleSoft under BSD-3 license.
 
 ### Options Considered
@@ -22,7 +22,7 @@ MuleSoft under BSD-3 license.
   - Define a capability matrix table in FR-001-02 listing each engine and its supported
     operations. Engine loads validate capabilities at spec load time.
   - Pros: load-time safety (catch "JOLT cannot do predicates" before runtime), clear
-    authoring guidance, prior art in JourneyForge.
+    authoring guidance, proven pattern from prior art research.
   - Cons: matrix must be maintained as engines evolve.
 
 - **Option B – Per-engine in adapter specs** (rejected)
@@ -32,7 +32,7 @@ MuleSoft under BSD-3 license.
     validation in core engine, easy to miss capability gaps.
 
 Related ADRs:
-- JourneyForge ADR-0027 – Expression Engines and `lang` Extensibility
+- Prior art research: `docs/research/journeyforge-dsl-patterns.md`
 
 ## Decision
 
@@ -54,7 +54,7 @@ Baseline engine: `jslt` (always available, supports all capabilities).
 Positive:
 - Load-time safety: capability mismatches caught at deploy time, not runtime.
 - Clear authoring guidance: one table to consult for engine capabilities.
-- Consistent with JourneyForge's proven approach.
+- Consistent with proven approaches in existing transformation engines.
 
 Negative / trade-offs:
 - Matrix must be updated when new engines are added or existing engines gain capabilities.
@@ -69,5 +69,5 @@ Follow-ups:
 
 References:
 - Feature 001 spec: `docs/architecture/features/001/spec.md` (FR-001-02, engine matrix)
-- JourneyForge ADR-0027: Expression Engines and `lang` Extensibility
+- Prior art research: `docs/research/journeyforge-dsl-patterns.md`
 - Validating scenarios: S-001-39 (JOLT predicate rejected), S-001-40 (JOLT $headers rejected)

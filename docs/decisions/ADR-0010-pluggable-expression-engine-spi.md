@@ -23,7 +23,7 @@ pluggable model where alternative expression engines can be registered.
     engine can implement. Engines register via a string id (e.g., `jslt`, `jolt`, `jq`).
     Specs declare their engine via `lang: <engineId>`. The engine registry resolves the
     id at load time.
-  - Modeled after JourneyForge ADR-0027 (Expression Engines and `lang` Extensibility).
+  - Inspired by prior art in pluggable expression engine models (see `docs/research/journeyforge-dsl-patterns.md`).
   - Pros:
     - Users can bring existing JOLT/jq/JSONata/DataWeave specs without rewriting.
     - Each engine is a separate module — no bloated core dependency tree.

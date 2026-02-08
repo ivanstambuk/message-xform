@@ -9,7 +9,7 @@ shape. Without a formal contract for what the input looks like and what the outp
 produce, structural mismatches (e.g., upstream API renames a field) are only caught at
 runtime in production — the expression silently produces `null` or missing fields.
 
-JourneyForge (ADR-0027) supports optional inline JSON Schema 2020-12 on its transform
+Other transformation engines support optional inline JSON Schema 2020-12 on transform
 states. The question for message-xform was whether schemas should be mandatory, optional,
 or deferred to a future version.
 
@@ -34,7 +34,7 @@ or deferred to a future version.
   - Cons: retrofitting mandatory schemas later is a breaking change to all specs.
 
 Related ADRs:
-- JourneyForge ADR-0027 – Expression Engines and `lang` Extensibility
+- Prior art research: `docs/research/journeyforge-dsl-patterns.md` (inline schema pattern)
 
 ## Decision
 
@@ -73,4 +73,4 @@ Follow-ups:
 
 References:
 - Feature 001 spec: `docs/architecture/features/001/spec.md` (FR-001-09, NFR-001-02)
-- JourneyForge schema pattern: `docs/research/journeyforge-dsl-patterns.md`, lines 333–358
+- Prior art research (inline schema pattern): `docs/research/journeyforge-dsl-patterns.md`, lines 333–358

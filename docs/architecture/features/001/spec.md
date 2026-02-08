@@ -26,7 +26,7 @@ and transformation language. JSLT was chosen for its readability (the spec looks
 the desired output), native Jackson integration (`JsonNode` in/out), and production
 maturity (9 billion transforms/day at Schibsted since 2018). The engine architecture
 is **pluggable**: alternative expression engines (JOLT, jq, JSONata) can be registered
-via an Expression Engine SPI, following the pattern established by JourneyForge ADR-0027.
+via an Expression Engine SPI (ADR-0010).
 
 The engine is **gateway-agnostic** — the core transformation logic has zero dependencies
 on any specific gateway SDK. Thin adapters bind the engine to specific gateway extension
@@ -164,7 +164,7 @@ in sequence.
 | Success path | Valid YAML spec → schemas parsed → JSLT expression compiled → immutable `Expression` object cached |
 | Validation path | Invalid YAML → fail fast with descriptive parse error including line/column |
 | Failure path | JSLT syntax error → reject at load time, not at evaluation time |
-| Source | JSLT (Schibsted), JourneyForge transform state pattern, ADR-0008 |
+| Source | JSLT (Schibsted), ADR-0008 |
 
 ### FR-001-02: Expression Engine SPI (Pluggable Engines)
 
@@ -176,7 +176,7 @@ and implements a common Java interface.
 /**
  * Expression engine plugin — evaluates a transform expression against a JSON input.
  * Implementations MUST be pure (no I/O), thread-safe, and respect engine limits.
- * Adapted from JourneyForge ADR-0027.
+ * See ADR-0010 (Pluggable Expression Engine SPI).
  */
 public interface ExpressionEngine {
     /** Engine identifier, e.g. "jslt", "jolt", "jq". */
@@ -263,7 +263,7 @@ the engine MUST reject the spec at load time with a diagnostic message (e.g.,
 | Validation path | Unknown engine id → reject spec at load time with clear message |
 | Validation path | Spec uses capability engine doesn't support → reject at load time |
 | Failure path | Engine evaluation exceeds time/size budget → abort, return error response (ADR-0022) |
-| Source | JourneyForge ADR-0027 (Expression Engines and `lang` Extensibility), ADR-0004, ADR-0009, ADR-0010 |
+| Source | ADR-0004, ADR-0009, ADR-0010 |
 
 ### FR-001-03: Bidirectional Transformation
 
@@ -705,7 +705,7 @@ transform:
 | Validation path | `expr` missing from `apply` list → reject at load time |
 | Validation path | `expr` appears more than once in `apply` → reject at load time |
 | Failure path | Circular mapperRef → reject at load time |
-| Source | JourneyForge `spec.mappers` + `mapperRef` pattern, ADR-0014 |
+| Source | ADR-0014 |
 
 ### FR-001-09: Input/Output Schema Validation
 
@@ -751,7 +751,7 @@ At evaluation time (optional, configurable):
 | Success path | Schemas parse as valid JSON Schema 2020-12 → stored with spec |
 | Validation path | Invalid JSON Schema syntax → reject spec at load time |
 | Failure path | Evaluation-time validation failure (strict mode) → return error response (ADR-0022) |
-| Source | JourneyForge schema validation pattern, ADR-0001 |
+| Source | ADR-0001 |
 
 ### FR-001-10: Header Transformations
 
@@ -987,7 +987,7 @@ and dynamic) are percent-encoded per RFC 3986 §3.4.
 | NFR-001-06 | The engine MUST NOT log, cache, or inspect the content of fields marked as `sensitive` in the spec. Sensitive fields are declared via a top-level `sensitive` list of JSON path expressions (ADR-0019). Paths use RFC 9535 dot-notation with `[*]` wildcard. The engine validates path syntax at load time. Matched fields are replaced with `"[REDACTED]"` in structured logs and MUST NOT appear in cache keys or telemetry payloads. | Security — passwords, tokens, and secrets must never appear in logs. | Static analysis + code review to confirm no sensitive-field logging. | Core. | Security, ADR-0019. |
 | NFR-001-07 | Expression evaluation MUST be bounded by configurable time (`max-eval-ms`) and output size (`max-output-bytes`) limits. Exceeding either budget MUST abort the evaluation. | Prevents runaway expressions from blocking gateway threads. | Test with deliberately slow/large expressions. | Core. | Safety. |
 | NFR-001-08 | When a profile matches a request, the engine MUST emit a structured log entry containing: matched profile id, matched spec id@version, request path, match specificity score, and evaluation duration. Format: JSON structured log line. | Operational traceability — operators must always know which profile was selected and why. | Integration test: verify log output contains required fields for each matched request. | Core + SLF4J or equivalent. | Observability, ADR-0006. |
-| NFR-001-09 | The core engine MUST define a `TelemetryListener` SPI interface for semantic transform events (started, completed, failed, matched, loaded, rejected). The SPI is a plain Java interface with zero external dependencies. Adapter modules provide concrete OTel/Micrometer bindings. Core metrics vocabulary: `transform_evaluations_total`, `transform_duration_seconds`, `profile_matches_total`, `spec_load_errors_total`. | Production-grade observability without violating NFR-001-02 (zero gateway deps). Consistent with JourneyForge ADR-0025. | Integration test: verify TelemetryListener receives events for each transform lifecycle stage. | Core (SPI interface only). | Observability, ADR-0007. |
+| NFR-001-09 | The core engine MUST define a `TelemetryListener` SPI interface for semantic transform events (started, completed, failed, matched, loaded, rejected). The SPI is a plain Java interface with zero external dependencies. Adapter modules provide concrete OTel/Micrometer bindings. Core metrics vocabulary: `transform_evaluations_total`, `transform_duration_seconds`, `profile_matches_total`, `spec_load_errors_total`. | Production-grade observability without violating NFR-001-02 (zero gateway deps). Consistent with ADR-0007 layered model. | Integration test: verify TelemetryListener receives events for each transform lifecycle stage. | Core (SPI interface only). | Observability, ADR-0007. |
 | NFR-001-10 | The engine MUST propagate incoming trace context headers (`X-Request-ID`, `traceparent`) through all structured log entries and telemetry events. The engine participates in the caller's trace context but does NOT create new traces. | Enables end-to-end request correlation across gateway → engine → upstream services. | Integration test: send request with `X-Request-ID` → verify it appears in all log/telemetry output. | Core. | Observability, ADR-0007. |
 
 ## Branch & Scenario Matrix
@@ -1418,7 +1418,7 @@ reverse:
 ### D. Research References
 
 - Expression Engine Evaluation: `docs/research/expression-engine-evaluation.md`
-- JourneyForge DSL Patterns: `docs/research/journeyforge-dsl-patterns.md`
+- Prior Art Research (DSL Patterns): `docs/research/journeyforge-dsl-patterns.md`
 - Transformation Patterns: `docs/research/transformation-patterns.md`
 - PingAccess Plugin API: `docs/research/pingaccess-plugin-api.md`
 - PingAM Authentication API: `docs/research/pingam-authentication-api.md`

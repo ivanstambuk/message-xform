@@ -267,8 +267,7 @@ terminology agreements must be captured here immediately.
 - Use **"load time"** for spec/profile loading and validation.
 - Use **"evaluation time"** for per-request transform execution (when the engine
   evaluates a compiled expression against a message).
-- Do **not** introduce "runtime" as a generic noun in new prose. This aligns with
-  JourneyForge's identical convention (their `terminology.md`, line 29). Legacy
+- Do **not** introduce "runtime" as a generic noun in new prose. Legacy
   identifiers or external system names containing "runtime" may remain unchanged.
 
 ### Canonical term map (use vs avoid)
@@ -284,7 +283,7 @@ terminology agreements must be captured here immediately.
 | deployment model | routing config, rule binding |
 | load time | deploy time, startup time, init time |
 | evaluation time | runtime, execution time (when referring to transform execution) |
-| body | payload (except in JourneyForge context), message body |
+| body | payload, message body |
 | `$headers` | the first-value header context variable |
 | `$headers_all` | the multi-value header context variable (arrays) — ADR-0026 |
 | passthrough | bypass, skip, no-op |

@@ -115,7 +115,7 @@ operations:
 | # | Feature | Notes |
 |---|---------|-------|
 | 14 | **PingAM response format** | Explore and support PingAM-specific response structures |
-| 15 | **Stateless flow patterns** | Extract learnings from journeyoforge for stateless transformation chains |
+| 15 | **Stateless flow patterns** | Research stateless transformation chain patterns from prior art |
 | 16 | **Conditional transforms** | Apply transforms based on payload content or header values |
 | 17 | **Transform chaining** | Compose multiple transforms in sequence |
 
@@ -139,10 +139,10 @@ operations:
 
 - [ ] **PingAccess plugin API** — Understand extension points for request/response interception
 - [ ] **PingAM response format** — Document structure, explore transformation needs
-- [ ] **journeyoforge stateless flows** — Extract applicable patterns for stateless transformation chains
+- [ ] **Stateless flow patterns** — Research stateless transformation chain patterns from prior art
 - [ ] **Kong plugin development** — Lua vs. Go plugin SDK
 - [ ] **NGINX transformation** — njs (JavaScript) vs. native module approach
-- [ ] **SDD adoption** — Study spec-driven development patterns from `sdd-specs/`, `journeyforge/`, and `openauth-sim/` for adoption in this project
+- [ ] **SDD adoption** — Study spec-driven development patterns from `sdd-specs/` and `openauth-sim/` for adoption in this project
 
 ---
 
@@ -195,7 +195,6 @@ Adopt the SDD methodology used in sibling projects. SDD mandates that every feat
 **Reference projects** (all under `~/dev/`):
 - **`sdd-specs/`** — Spec-only repo with templates, schemas, catalogs, and validation tooling. Start here for the spec format and authoring guidelines.
 - **`sdd-sample-bundle/`** — Example SDD bundle (`sdd-bundle.yaml`) with document types (Feature, Requirement, Task, ADR, Component, etc.) and layout conventions.
-- **`journeyforge/`** — Full SDD adoption in a Java project: spec-first workflow, feature specs at `docs/4-architecture/features/<NNN>/`, ADRs, open-questions log, and two-phase LLM interaction protocol.
 - **`openauth-sim/`** — Mature SDD example: mandatory spec pipeline, pre-implementation checklist, analysis gates, `llms.txt` manifest, and `ReadMe.LLM` for AI agents.
 
 **Adoption tasks**:
@@ -208,8 +207,8 @@ Adopt the SDD methodology used in sibling projects. SDD mandates that every feat
 
 ### Governance Parity: Deferred Items (gap analysis 2026-02-08)
 
-Items identified from a systematic gap analysis against `openauth-sim` and
-`journeyforge` sibling projects. Each item has a **trigger** — the point at
+Items identified from a systematic gap analysis against `openauth-sim`
+sibling project. Each item has a **trigger** — the point at
 which it should be picked up.
 
 **Trigger: When Gradle project is initialized (Feature 001 implementation start)**
@@ -233,7 +232,7 @@ which it should be picked up.
 - [ ] **Quality Gate documentation** — Create `docs/operations/quality-gate.md` explaining
   the Gradle quality gate pipeline, which tasks it runs, and how to interpret failures.
 - [ ] **CI workflow** — Create `.github/workflows/ci.yml` with: spotlessCheck, check,
-  gitlint, gitleaks (for secrets scanning). Model on `journeyforge/.github/workflows/ci.yml`.
+  gitlint, gitleaks (for secrets scanning). Model on `openauth-sim/.github/workflows/ci.yml`.
 
 **Trigger: Nice-to-have (low priority, pick up when convenient)**
 
