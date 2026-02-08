@@ -21,7 +21,7 @@ message-xform/
 ├── engine-jolt/                   # JOLT expression engine plugin (future)
 ├── adapter-pingaccess/            # PingAccess gateway adapter
 ├── adapter-pinggateway/           # PingGateway adapter (future)
-├── adapter-standalone/            # Standalone HTTP proxy mode (future)
+├── adapter-standalone/            # Standalone HTTP proxy mode (Feature 004, Spec Ready)
 └── docs/                          # Specifications, ADRs, research
 ```
 

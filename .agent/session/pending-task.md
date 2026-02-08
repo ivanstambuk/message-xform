@@ -1,19 +1,18 @@
 # Pending Task
 
 **Focus**: Feature 004 — Standalone HTTP Proxy Mode implementation planning
-**Status**: Spec review complete, ready for implementation planning
-**Next Step**: Create `docs/architecture/features/004/plan.md` (phased implementation plan)
-  and `docs/architecture/features/004/tasks.md` (granular task breakdown)
+**Status**: Spec is Ready (all open questions resolved). No plan or tasks exist yet.
+**Next Step**: Create `docs/architecture/features/004/plan.md` (phased implementation plan) and `docs/architecture/features/004/tasks.md` (granular task breakdown).
 
 ## Context Notes
-- Feature 004 spec is now comprehensive: 36 FRs, 8 NFRs, 59 scenarios, 40 config entries
-- All open questions resolved (Q-029 through Q-038)
-- Two decisions made this session:
-  - Q-037: `max-body-bytes` applies to both request and response (Option A)
-  - Q-038: Configurable `X-Forwarded-*` headers, default enabled (Option C)
-- New FRs added: FR-004-06b (response metadata), FR-004-36 (forwarded headers)
-- New config: CFG-004-39 (drain timeout), CFG-004-40 (forwarded headers enabled)
-- Key gap fixed: response Message must carry request path/method for profile matching
+- Spec has 37 FRs, 7 NFRs, 69 scenarios — comprehensive and reviewed against actual code
+- Key design choice: `applyChanges` is response-only; request → UpstreamClient directly reads from Message
+- Cookie binding ($cookies) is IN scope for v1 (Q-041 Option B)
+- Body size enforcement uses Jetty `maxRequestContentSize` for chunked safety (Q-040)
+- Config key is `proxy.max-body-bytes` not `backend.max-body-bytes` (Q-039)
+- The core engine already passes null for cookies in TransformContext (line 407 of TransformEngine.java) — this needs to be updated when implementing the adapter
+- No separate scenarios.md — all scenarios are inline in spec.md
+- Knowledge map and roadmap both show Feature 004 as "Spec Ready"
 
 ## SDD Gaps
-- None — retro audit passed, all findings fixed and committed
+- None identified. All checks passed in retro audit.
