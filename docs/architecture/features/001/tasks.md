@@ -934,6 +934,73 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `./gradlew :core:test`
   - Review: `docs/architecture/open-questions.md` has no open entries.
 
+### Phase 8 — Performance Validation
+
+#### I17 — Synthetic performance testing (NFR-001-07)
+
+Target: **10,000 req/s** sustained throughput on development hardware.
+All tests are synthetic (no real gateway backends).
+
+- [ ] **T-001-53** — JMH micro-benchmark harness
+  _Intent:_ Set up JMH (Java Microbenchmark Harness) infrastructure with
+  a Gradle `jmh` source set. Provides repeatable, warm-up-aware benchmarks
+  for core transform operations.
+  _Implement:_
+  - Add JMH Gradle plugin (me.champeau.jmh) and dependencies.
+  - Create `core/src/jmh/java/` source set with a baseline benchmark:
+    `TransformEngineBenchmark` — measures single-spec transform throughput
+    (ops/sec) with a simple identity JSLT expression.
+  - Include both request and response direction benchmarks.
+  _Verify:_ `./gradlew jmh` runs and produces a benchmark report.
+  _Verification commands:_
+  - `./gradlew jmh`
+
+- [ ] **T-001-54** — Throughput benchmark suite (10K req/s target)
+  _Intent:_ Measure whether the engine can sustain 10,000 req/s for
+  representative transform workloads. Synthetic — no real HTTP backends.
+  _Test first:_ Write `ThroughputBenchmark`:
+  - **Identity transform** — pass-through JSLT (`.`) → baseline ops/sec.
+  - **Simple field mapping** — 5-field JSLT transform → ops/sec.
+  - **Complex transform** — nested structure w/ array iteration → ops/sec.
+  - **Chained pipeline** — 3-step apply pipeline → ops/sec.
+  - Each benchmark reports: throughput (ops/sec), average latency (µs),
+    p99 latency (µs), and allocation rate (bytes/op).
+  _Implement:_ Multiple `@Benchmark` methods with `@BenchmarkMode` of
+  `Throughput` and `AverageTime`, using `@State(Scope.Thread)`.
+  _Verify:_ All benchmarks run. Identity transform exceeds 10K ops/sec.
+  _Verification commands:_
+  - `./gradlew jmh`
+
+- [ ] **T-001-55** — Memory and resource profiling benchmark
+  _Intent:_ Measure memory consumption and GC pressure for sustained
+  transform workloads. Provides data for sizing guidance.
+  _Implement:_ Write `ResourceProfileBenchmark`:
+  - Measure heap allocation per transform (bytes/op) using JMH's
+    GC profiler (`-prof gc`).
+  - Measure with varying payload sizes: 1 KB, 10 KB, 100 KB JSON.
+  - Report: allocation rate, GC pause frequency, live set size after
+    warmup.
+  _Verify:_ Benchmark runs with GC profiler. Results published as
+  JMH JSON output in `build/reports/jmh/`.
+  _Verification commands:_
+  - `./gradlew jmh -Pjmh.profilers=gc`
+
+- [ ] **T-001-56** — CI performance gate (GitHub Actions / Gradle task)
+  _Intent:_ Integrate performance benchmarks into CI pipeline. Not a hard
+  gate initially — report results and flag regressions.
+  _Implement:_
+  - Create Gradle task `perfTest` that runs a subset of JMH benchmarks
+    with reduced iterations (for CI speed).
+  - Output JMH results as JSON to `build/reports/jmh/results.json`.
+  - Add a shell script `scripts/perf-gate.sh` that parses the JSON and
+    fails if throughput drops below a configurable threshold (default:
+    5,000 ops/sec — conservative CI floor).
+  _Verify:_ `./gradlew perfTest` runs in < 60s and produces a report.
+  _Verification commands:_
+  - `./gradlew perfTest`
+  - `scripts/perf-gate.sh build/reports/jmh/results.json`
+
+
 ## Verification Log
 
 Track long-running or shared commands with timestamps to avoid duplicate work.
@@ -957,7 +1024,7 @@ Track long-running or shared commands with timestamps to avoid duplicate work.
 
 ## Completion Criteria
 
-- [ ] All 52 tasks checked off
+- [ ] All 56 tasks checked off
 - [ ] Quality gate passes (`./gradlew spotlessApply check`)
 - [ ] All 73 scenarios pass as parameterized JUnit 5 tests
 - [ ] Coverage matrix in `scenarios.md` has no uncovered FRs/NFRs

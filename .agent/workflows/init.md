@@ -31,6 +31,19 @@ Check for previous session state (read in this order):
 - Run `git status` and `git log -5 --oneline` to understand recent activity.
 - Scan the repository structure for any new or changed files.
 
+### 3.5. Codebase Size Report
+// turbo
+Run the CLOC report script to show lines-of-code statistics:
+```bash
+scripts/cloc-report.sh .
+```
+Include the output table in the summary. This shows:
+- **Production code** (src/main/java) vs **Test code** (src/test/java)
+- Files, lines, comments, blanks breakdown
+- Test-to-total ratio
+
+If `cloc` is not installed, note it as a gap and continue.
+
 ### 4. Present Summary
 Report to the user:
 - **Project context**: Brief recap of what message-xform is and its current state.
