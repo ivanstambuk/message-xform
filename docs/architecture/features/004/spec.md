@@ -111,7 +111,7 @@ no changes).
 
 | ID | Requirement | Success path | Validation path | Failure path | Source |
 |----|-------------|--------------|-----------------|--------------|--------|
-| FR-004-13 | The proxy MUST enforce a configurable maximum body size (`backend.max-body-bytes`, default 10 MB) in **both directions**. Requests exceeding this limit MUST receive `413 Payload Too Large` without forwarding to the backend. Backend responses exceeding this limit MUST result in `502 Bad Gateway` returned to the client (the response is too large to buffer and transform safely). | `POST /api/data` with 5 MB body → accepted and forwarded. Backend response 3 MB → accepted and returned. | `backend.max-body-bytes: 1048576` → 1 MB limit applied to both directions. | Request 15 MB → `413 Payload Too Large`. Response 15 MB → `502 Bad Gateway`. | Q-031, Q-037 resolution, ADR-0018. |
+| FR-004-13 | The proxy MUST enforce a configurable maximum body size (`proxy.max-body-bytes`, default 10 MB) in **both directions**. Requests exceeding this limit MUST receive `413 Payload Too Large` without forwarding to the backend. Backend responses exceeding this limit MUST result in `502 Bad Gateway` returned to the client (the response is too large to buffer and transform safely). | `POST /api/data` with 5 MB body → accepted and forwarded. Backend response 3 MB → accepted and returned. | `proxy.max-body-bytes: 1048576` → 1 MB limit applied to both directions. | Request 15 MB → `413 Payload Too Large`. Response 15 MB → `502 Bad Gateway`. | Q-031, Q-037, Q-039 resolution, ADR-0018. |
 
 ### TLS
 
@@ -456,7 +456,7 @@ no changes).
 | CFG-004-13 | `backend.port` | int | `80`/`443` | Backend port (auto-derived from scheme if omitted) |
 | CFG-004-14 | `backend.connect-timeout-ms` | int | `5000` | TCP connect timeout (ms) |
 | CFG-004-15 | `backend.read-timeout-ms` | int | `30000` | Response read timeout (ms) |
-| CFG-004-16 | `backend.max-body-bytes` | int | `10485760` | Max request body size (10 MB). 413 if exceeded. |
+| CFG-004-16 | `proxy.max-body-bytes` | int | `10485760` | Max body size in both directions (10 MB). Request > limit → 413; response > limit → 502. |
 | CFG-004-17 | `backend.pool.max-connections` | int | `100` | Max concurrent connections to backend |
 | CFG-004-18 | `backend.pool.keep-alive` | boolean | `true` | Use HTTP keep-alive |
 | CFG-004-19 | `backend.pool.idle-timeout-ms` | int | `60000` | Close idle connections after (ms) |
@@ -501,7 +501,7 @@ no changes).
 | `BACKEND_PORT` | `backend.port` |
 | `BACKEND_CONNECT_TIMEOUT_MS` | `backend.connect-timeout-ms` |
 | `BACKEND_READ_TIMEOUT_MS` | `backend.read-timeout-ms` |
-| `BACKEND_MAX_BODY_BYTES` | `backend.max-body-bytes` |
+| `PROXY_MAX_BODY_BYTES` | `proxy.max-body-bytes` |
 | `BACKEND_POOL_MAX_CONNECTIONS` | `backend.pool.max-connections` |
 | `BACKEND_POOL_KEEP_ALIVE` | `backend.pool.keep-alive` |
 | `BACKEND_POOL_IDLE_TIMEOUT_MS` | `backend.pool.idle-timeout-ms` |
