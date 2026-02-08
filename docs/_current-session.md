@@ -1,13 +1,14 @@
 # Current Session State
 
-**Date:** 2026-02-08
-**Status:** Phase 5 complete — all I8+I9 tasks done, 181 tests passing
+**Date:** 2026-02-09
+**Status:** Phase 6 I10 complete — header transformations done, 199 tests passing
 
 ## Active Work
 
 Feature 001 — Message Transformation Engine (core). Implementing from
 `docs/architecture/features/001/tasks.md`. Phases 1–5 complete (T-001-01..33).
-Ready to begin Phase 6 (Headers, Status, URL, Mappers).
+Phase 6 I10 (Header transformations) complete (T-001-34..36).
+Ready to begin Phase 6 I11 (Status code transformations).
 
 ## Session Progress
 
@@ -23,40 +24,32 @@ Ready to begin Phase 6 (Headers, Status, URL, Mappers).
 | Phase 4 — I7 | T-001-22..26 | ErrorResponseBuilder (RFC 9457), custom templates, eval error handling, budgets, strict-mode |
 | Phase 5 — I8 | T-001-27..30 | Profile fixture, ProfileParser, ProfileMatcher (specificity scoring), TransformEngine profile integration |
 | Phase 5 — I9 | T-001-31..33 | Profile-level chaining (pipeline), bidirectional profiles, chain step structured logging |
+| **Phase 6 — I10** | **T-001-34..36** | **Header add/remove/rename, dynamic expr, name normalization** |
 
 ### Work Done This Session
 | Commit | Description |
 |--------|-------------|
-| `ef9e232` | Autonomous Task Sequencing rule in AGENTS.md |
-| `4df7567` | Phase 5 I8 — Profile parser + matching (T-001-27..30) |
-| `01adf9a` | T-001-31 — Profile-level chaining (ADR-0012, S-001-49) |
-| `e783dbf` | T-001-32/33 — Bidirectional profiles + chain step logging |
-| `0d07332` | Mark Phase 5 tasks as completed in tasks.md |
-| `4c1f805` | Codify per-task commit discipline in AGENTS.md |
-| `96b4931` | Broaden coupled-task exception to multiple tasks |
-| `2a9af7e` | Restore non-task commit scope in auto-commit protocol |
+| `e3a7745` | T-001-34 — Header add/remove/rename operations (HeaderSpec, HeaderTransformer, SpecParser, 9 tests) |
+| `2c66d91` | T-001-35 — Dynamic header expressions (expr sub-key, body-to-header injection, 4 tests) |
+| `d9626c8` | T-001-36 — Header name normalization to lowercase (RFC 9110 §5.1, 5 tests) |
+| `d6e9ff5` | Mark T-001-34/35/36 complete in tasks.md |
 
 ### Key Decisions
 | Decision | Outcome | Location |
 |----------|---------|----------|
-| Chaining model | Multiple matching entries execute as a pipeline in declaration order; abort-on-failure | TransformEngine.transformChain(), ADR-0012 |
-| Chaining vs. specificity | Chaining wins — use non-overlapping patterns for mutual exclusion | ProfileIntegrationTest, ADR-0006/0012 |
-| Per-task commit discipline | One task = one commit; narrow exception for trivially coupled tasks | AGENTS.md §5 |
-| JSLT ArithmeticException leakage | 1/0 throws raw ArithmeticException, not JsltException — use strict schema for test failures | docs/research/expression-engine-evaluation.md |
-| logback-classic scope | Promoted to testImplementation for ListAppender access in ChainStepLoggingTest | core/build.gradle.kts |
+| Dynamic expr evaluates against transformed body | Confirmed per FR-001-10 spec line 831, not input body | HeaderTransformer, DynamicHeaderTest |
+| S-001-34 scenario fix | Expr `.callbacks` → `.type` to match transformed body | scenarios.md S-001-34 |
+| HeaderSpec separates static/dynamic add | Two maps (String values + CompiledExpression) for clean type safety | HeaderSpec record |
 
 ### Build Status
-- 181 tests passing
+- 199 tests passing
 - `./gradlew spotlessApply check` → BUILD SUCCESSFUL
 - Java 21, Gradle 9.2.0, JSLT 0.1.14
 
-### Process Updates
-| Change | Location |
-|--------|----------|
-| Autonomous Task Sequencing | AGENTS.md (new section) |
-| Per-task commit discipline | AGENTS.md §5 (refined from "logical increment") |
-| JSLT ArithmeticException quirk | docs/research/expression-engine-evaluation.md |
-| S-001-74 chain step logging scenario | scenarios.md + coverage matrix |
+### SDD Audit Fixes Applied
+- S-001-34 scenario: fixed dynamic expr to reference transformed body (`.type`) instead of input body (`.callbacks`)
+- spec.md FR-001-10 example: same fix applied to code block at line 769-770
+- knowledge-map.md: added HeaderSpec to model/ and header transforms to engine/
 
 ## Remaining Open Questions
 None — all resolved.
@@ -65,11 +58,10 @@ None — all resolved.
 None.
 
 ## Next Steps
-1. **Phase 6 — Headers, Status, URL, Mappers** (T-001-34..38b)
-   - T-001-34: Header add/remove/rename (HeaderTransformer)
-   - T-001-35: Dynamic header expressions
-   - T-001-36: Header name normalization (RFC 9110)
-   - T-001-37: Status code override with `when` predicate
-   - T-001-38: $status binding in JSLT
-   - T-001-38a/38b: URL path rewrite + query param operations
-2. Through Phases 6-7: Mappers, gateway adapter API, hot reload
+1. **Phase 6 — I11: Status Code Transformations** (T-001-37, T-001-38)
+   - T-001-37: Status code override with `set` + optional `when` predicate
+   - T-001-38: $status binding in JSLT expressions
+2. **Phase 6 — I11a: URL Rewriting** (T-001-38a, T-001-38b)
+   - T-001-38a: URL path rewrite
+   - T-001-38b: Query param operations
+3. Through Phases 6-7: Mappers, gateway adapter API, hot reload

@@ -1519,8 +1519,8 @@ Extract values from the transformed body and emit them as response headers.
 scenario: S-001-34
 name: body-to-header-injection
 description: >
-  Extract error code and auth method from the response body and emit them
-  as response headers using dynamic expr in the headers.add block.
+  Extract error code and auth method from the transformed response body and
+  emit them as response headers using dynamic expr in the headers.add block.
   Validates ADR-0002 body-to-header bridge.
 tags: [header, body, injection, dynamic, adr-0002]
 requires: [FR-001-10]
@@ -1537,7 +1537,7 @@ transform:
 headers:
   add:
     X-Auth-Method:
-      expr: if (.callbacks) "challenge" else "simple"
+      expr: .type
     X-Error-Code:
       expr: .error.code
     X-Transformed-By: "message-xform"

@@ -766,8 +766,8 @@ headers:
     X-Spec-Version: "1.0.0"                     # static value
     X-Error-Code:                                # dynamic — from body
       expr: .error.code
-    X-Auth-Method:                               # dynamic — from body
-      expr: if (.callbacks) "challenge" else "simple"
+    X-Auth-Method:                               # dynamic — from transformed body
+      expr: .type
   remove: ["X-Internal-*", "X-Debug-*"]         # glob patterns supported
   rename:
     X-Old-Header: X-New-Header
