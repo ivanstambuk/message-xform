@@ -310,6 +310,11 @@ public final class TransformEngine {
                     message.requestPath(),
                     message.requestMethod());
 
+            // T-001-34: Apply declarative header operations (FR-001-10)
+            if (spec.headerSpec() != null) {
+                transformedMessage = HeaderTransformer.apply(transformedMessage, spec.headerSpec());
+            }
+
             return TransformResult.success(transformedMessage);
         } catch (TransformEvalException e) {
             // ADR-0022: Never pass through the original message on eval error.

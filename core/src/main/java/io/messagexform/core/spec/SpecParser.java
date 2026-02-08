@@ -11,11 +11,17 @@ import io.messagexform.core.engine.EngineRegistry;
 import io.messagexform.core.error.ExpressionCompileException;
 import io.messagexform.core.error.SchemaValidationException;
 import io.messagexform.core.error.SpecParseException;
+import io.messagexform.core.model.HeaderSpec;
 import io.messagexform.core.model.TransformSpec;
 import io.messagexform.core.spi.CompiledExpression;
 import io.messagexform.core.spi.ExpressionEngine;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -110,8 +116,65 @@ public final class SpecParser {
                     "Spec must have either a 'transform' block or both 'forward' and 'reverse' blocks", id, source);
         }
 
+        // Parse optional headers block (FR-001-10, T-001-34)
+        HeaderSpec headerSpec = parseHeaderSpec(root, id, source);
+
         return new TransformSpec(
-                id, version, description, lang, inputSchema, outputSchema, compiledExpr, forward, reverse);
+                id, version, description, lang, inputSchema, outputSchema, compiledExpr, forward, reverse, headerSpec);
+    }
+
+    /**
+     * Parses the optional {@code headers} block from the spec YAML (FR-001-10).
+     * Returns {@code null} if no headers block is present.
+     */
+    private HeaderSpec parseHeaderSpec(JsonNode root, String specId, String source) {
+        JsonNode headersNode = root.get("headers");
+        if (headersNode == null || headersNode.isNull()) {
+            return null;
+        }
+
+        // Parse 'add' — static values only (T-001-34); dynamic expr deferred to
+        // T-001-35
+        Map<String, String> staticAdd = new LinkedHashMap<>();
+        JsonNode addNode = headersNode.get("add");
+        if (addNode != null && addNode.isObject()) {
+            Iterator<Map.Entry<String, JsonNode>> fields = addNode.fields();
+            while (fields.hasNext()) {
+                Map.Entry<String, JsonNode> field = fields.next();
+                String headerName = field.getKey().toLowerCase();
+                JsonNode value = field.getValue();
+                if (value.isTextual()) {
+                    staticAdd.put(headerName, value.asText());
+                }
+                // Dynamic expr entries (value is object with 'expr' key) — T-001-35
+            }
+        }
+
+        // Parse 'remove' — list of glob patterns
+        List<String> remove = new ArrayList<>();
+        JsonNode removeNode = headersNode.get("remove");
+        if (removeNode != null && removeNode.isArray()) {
+            for (JsonNode pattern : removeNode) {
+                if (pattern.isTextual()) {
+                    remove.add(pattern.asText().toLowerCase());
+                }
+            }
+        }
+
+        // Parse 'rename' — old name → new name
+        Map<String, String> rename = new LinkedHashMap<>();
+        JsonNode renameNode = headersNode.get("rename");
+        if (renameNode != null && renameNode.isObject()) {
+            Iterator<Map.Entry<String, JsonNode>> fields = renameNode.fields();
+            while (fields.hasNext()) {
+                Map.Entry<String, JsonNode> field = fields.next();
+                rename.put(
+                        field.getKey().toLowerCase(), field.getValue().asText().toLowerCase());
+            }
+        }
+
+        HeaderSpec spec = new HeaderSpec(staticAdd, null, remove, rename);
+        return spec.isEmpty() ? null : spec;
     }
 
     // --- Private helpers ---

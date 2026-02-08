@@ -23,9 +23,9 @@ import java.util.Objects;
  * <p>
  * Fields populated in Phase 3: id, version, description, lang, inputSchema,
  * outputSchema,
- * compiledExpr, forward, reverse. Fields populated in later phases (null until
- * then): sensitive,
- * match, headers, status, mappers, url (FR-001-12/ADR-0027, Phase 6 / I11a).
+ * compiledExpr, forward, reverse. Fields populated in Phase 6: headerSpec.
+ * Fields populated in later phases (null until then): sensitive, match, status,
+ * mappers, url (FR-001-12/ADR-0027, Phase 6 / I11a).
  */
 public record TransformSpec(
         String id,
@@ -36,7 +36,8 @@ public record TransformSpec(
         JsonNode outputSchema,
         CompiledExpression compiledExpr,
         CompiledExpression forward,
-        CompiledExpression reverse) {
+        CompiledExpression reverse,
+        HeaderSpec headerSpec) {
 
     /**
      * Canonical constructor — validates required fields.
@@ -47,6 +48,23 @@ public record TransformSpec(
         Objects.requireNonNull(id, "id must not be null");
         Objects.requireNonNull(version, "version must not be null");
         Objects.requireNonNull(lang, "lang must not be null");
+    }
+
+    /**
+     * Convenience constructor for specs without header operations (backward
+     * compatibility).
+     */
+    public TransformSpec(
+            String id,
+            String version,
+            String description,
+            String lang,
+            JsonNode inputSchema,
+            JsonNode outputSchema,
+            CompiledExpression compiledExpr,
+            CompiledExpression forward,
+            CompiledExpression reverse) {
+        this(id, version, description, lang, inputSchema, outputSchema, compiledExpr, forward, reverse, null);
     }
 
     /**
