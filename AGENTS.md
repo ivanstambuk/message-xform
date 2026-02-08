@@ -217,7 +217,7 @@ Update both `docs/architecture/roadmap.md` and the Roadmap table above when stat
 
 ## Session Boundary Convention
 
-The agent SHOULD proactively suggest a `/retro` followed by `/handover` (starting a
+The agent SHOULD proactively suggest a `/retro` (starting a
 fresh session) when any of the following **hard signals** are observed:
 
 | Signal | Why it matters |
@@ -239,7 +239,7 @@ The agent SHOULD also **consider** suggesting a session boundary (soft signals):
 - Small mechanical tasks that chain tightly (e.g., two sub-tasks that are naturally one unit).
 
 **Format:** When suggesting a boundary, the agent says:
-> 🔄 **Session boundary suggested** — [reason]. Shall I run `/retro` then `/handover`?
+> 🔄 **Session boundary suggested** — [reason]. Shall I run `/retro`?
 
 ## Autonomous Task Sequencing
 
@@ -264,7 +264,7 @@ latency, and provides no value when the plan is clear.
 - Commit each completed task atomically (per Auto-Commit rule).
 - Immediately begin the next task in sequence.
 - Continue until a session boundary signal fires (phase boundary, context
-  truncation, 3+ errors) — then suggest `/retro` + `/handover`.
+  truncation, 3+ errors) — then suggest `/retro`.
 - If a task fails or produces unexpected results, fix it and continue. Only
   stop if you're genuinely blocked and need human input.
 

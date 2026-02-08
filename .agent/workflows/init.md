@@ -58,7 +58,7 @@ Offer 2–4 concrete options for the session based on:
 - **Open questions first**: If open questions exist, the default first option MUST
   be to resolve them (one by one, per Rule 8 in AGENTS.md). Open questions block
   spec finalization.
-- **SDD gaps**: If the retro/handover flagged missing scenarios, terminology, or
+- **SDD gaps**: If the `/retro` flagged missing scenarios, terminology, or
   ADRs, propose fixing those.
 - Pending tasks from the previous session.
 - Open items in `PLAN.md` (research, features, decisions).
