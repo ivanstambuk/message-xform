@@ -3035,6 +3035,50 @@ expected_error:
 
 ---
 
+### S-001-75: Valid Sensitive Paths Parsed and Stored
+
+Validates that valid JSON path expressions in the `sensitive` block are parsed
+and stored on the `TransformSpec` at load time (ADR-0019, NFR-001-06).
+
+```yaml
+scenario: S-001-75
+name: sensitive-paths-valid-parsed
+description: >
+  A spec declares a `sensitive` list with valid RFC 9535 JSON path expressions.
+  The engine MUST accept the spec and store the paths on TransformSpec.sensitivePaths.
+  Validates ADR-0019 / NFR-001-06 (happy path).
+tags: [sensitive, validation, load-time, adr-0019, nfr-001-06]
+requires: [FR-001-01]
+
+spec:
+  id: valid-sensitive-spec
+  version: "1.0.0"
+  sensitive:
+    - "$.authId"
+    - "$.credentials.password"
+    - "$.callbacks[*].input[*].value"
+
+  input:
+    schema:
+      type: object
+  output:
+    schema:
+      type: object
+
+  transform:
+    lang: jslt
+    expr: '.'
+
+expected:
+  load_succeeds: true
+  sensitive_paths:
+    - "$.authId"
+    - "$.credentials.password"
+    - "$.callbacks[*].input[*].value"
+```
+
+---
+
 ### S-001-63: Nullable Status Code — Integer Contract
 
 Validates that `$status` is properly null (not -1 or any sentinel) for request
@@ -3622,6 +3666,7 @@ expected_log_entries:
 | S-001-60 | direction-agnostic-both-bindings | Direction Semantics | direction, agnostic, profile, adr-0016 |
 | S-001-61 | status-null-in-request-transform | Status Code | status, null, request, direction, adr-0017 |
 | S-001-62 | sensitive-path-invalid-syntax-rejected | Sensitive Fields | sensitive, validation, error, adr-0019, nfr-001-06 |
+| S-001-75 | sensitive-paths-valid-parsed | Sensitive Fields | sensitive, validation, load-time, adr-0019, nfr-001-06 |
 | S-001-63 | nullable-status-integer-contract | Status Code | status, null, nullable, integer, adr-0020 |
 | S-001-64 | query-params-in-body-expression | TransformContext | query-params, context, branching, adr-0021 |
 | S-001-65 | cookies-in-body-expression | TransformContext | cookies, context, adr-0021 |
@@ -3657,7 +3702,7 @@ expected_log_entries:
 | NFR-001-07 (Eval budget) | S-001-24 |
 | NFR-001-02 (Zero gateway deps) | *Verified by dependency analysis, not scenario-testable* |
 | NFR-001-05 (Hot reload) | *Integration test — add when adapter is implemented* |
-| NFR-001-06 (Sensitive fields) | S-001-62; *static analysis + code review — add more when engine is implemented* |
+| NFR-001-06 (Sensitive fields) | S-001-62, S-001-75; *static analysis + code review — add more when engine is implemented* |
 | NFR-001-08 (Match logging) | S-001-44, S-001-46 (matched profile logged), S-001-74 (chain step logging) |
 | NFR-001-09 (Telemetry SPI) | S-001-47 |
 | NFR-001-10 (Trace correlation) | S-001-48 |
