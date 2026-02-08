@@ -3104,6 +3104,73 @@ expected_output:
 
 ---
 
+```yaml
+scenario: S-001-72
+name: header-case-normalization
+description: >
+  Headers are normalized to lowercase when bound to $headers and $headers_all.
+  JSLT expressions reference lowercase names regardless of the original casing
+  provided by the gateway. Validates FR-001-10 header normalization rule.
+tags: [headers, case-insensitive, normalization, rfc9110]
+requires: [FR-001-10]
+
+transform:
+  lang: jslt
+  expr: |
+    {
+      "contentType": $headers."content-type",
+      "auth": $headers."authorization",
+      "allAuth": $headers_all."authorization"
+    }
+
+context:
+  headers:
+    Content-Type: ["application/json"]
+    Authorization: ["Bearer abc123"]
+
+input:
+  data: "test"
+
+expected_output:
+  contentType: "application/json"
+  auth: "Bearer abc123"
+  allAuth: ["Bearer abc123"]
+```
+
+---
+
+```yaml
+scenario: S-001-73
+name: chain-direction-conflict-rejected
+description: >
+  A profile where two entries match the same path/method but declare
+  conflicting directions (one 'request', one 'response') MUST be rejected
+  at load time. Validates FR-001-05 direction consistency rule.
+tags: [profile, chain, direction, validation, error, load-time]
+requires: [FR-001-05]
+
+profile:
+  id: conflicting-directions
+  version: "1.0.0"
+  transforms:
+    - spec: spec-a
+      direction: response
+      match:
+        path: "/api/v1/test"
+        method: POST
+    - spec: spec-b
+      direction: request      # conflicts with spec-a's direction on same route
+      match:
+        path: "/api/v1/test"
+        method: POST
+
+expected_behaviour: LOAD_TIME_REJECTION
+expected_error_type: TransformLoadException
+error_detail_contains: "conflicting directions"
+```
+
+---
+
 ## Scenario Index
 
 | ID | Name | Category | Tags |
@@ -3179,6 +3246,8 @@ expected_output:
 | S-001-69 | headers-all-set-cookie-multi-value | Multi-Value Headers | headers, multi-value, headers-all, set-cookie, adr-0026 |
 | S-001-70 | headers-all-missing-returns-null | Multi-Value Headers | headers, multi-value, headers-all, null, edge-case, adr-0026 |
 | S-001-71 | headers-all-x-forwarded-for-chain | Multi-Value Headers | headers, multi-value, headers-all, x-forwarded-for, adr-0026 |
+| S-001-72 | header-case-normalization | Header Transforms | headers, case-insensitive, normalization, rfc9110 |
+| S-001-73 | chain-direction-conflict-rejected | Transform Profiles | profile, chain, direction, validation, error, load-time |
 
 ## Coverage Matrix
 
@@ -3188,12 +3257,12 @@ expected_output:
 | FR-001-02 (Expression Engine SPI) | S-001-25, S-001-26, S-001-27, S-001-28, S-001-39, S-001-40, S-001-57, S-001-63, S-001-64, S-001-65 |
 | FR-001-03 (Bidirectional) | S-001-02, S-001-29, S-001-30, S-001-60 |
 | FR-001-04 (Message Envelope) | S-001-19, S-001-58 |
-| FR-001-05 (Transform Profiles) | S-001-41, S-001-42, S-001-43, S-001-44, S-001-45, S-001-46, S-001-49, S-001-56 |
+| FR-001-05 (Transform Profiles) | S-001-41, S-001-42, S-001-43, S-001-44, S-001-45, S-001-46, S-001-49, S-001-56, S-001-73 |
 | FR-001-06 (Passthrough) | S-001-18, S-001-19 |
 | FR-001-07 (Error Handling) | S-001-24, S-001-28, S-001-56, S-001-58, S-001-66, S-001-67, S-001-68 |
 | FR-001-08 (Reusable Mappers) | S-001-50, S-001-51, S-001-52, S-001-59 |
 | FR-001-09 (Schema Validation) | S-001-53, S-001-54, S-001-55 |
-| FR-001-10 (Header Transforms) | S-001-33, S-001-34, S-001-35, S-001-57, S-001-69, S-001-70, S-001-71 |
+| FR-001-10 (Header Transforms) | S-001-33, S-001-34, S-001-35, S-001-57, S-001-69, S-001-70, S-001-71, S-001-72 |
 | FR-001-11 (Status Code Transforms) | S-001-36, S-001-37, S-001-38, S-001-61, S-001-63 |
 | NFR-001-01 (Stateless) | All — implicit in test harness design |
 | NFR-001-03 (Latency <5ms) | S-001-23 |

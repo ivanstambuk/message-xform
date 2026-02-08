@@ -910,7 +910,7 @@ Processing order:
 ## Branch & Scenario Matrix
 
 > Full scenario definitions, test vectors, and coverage matrix are maintained in
-> [`scenarios.md`](scenarios.md) (71 scenarios: S-001-01 through S-001-71).
+> [`scenarios.md`](scenarios.md) (73 scenarios: S-001-01 through S-001-73).
 > This summary lists representative scenarios for quick reference.
 
 | Scenario ID | Description / Expected outcome |
@@ -1082,7 +1082,7 @@ domain_objects:
       - name: reverse
         type: CompiledExpression
         constraints: "optional, for bidirectional specs"
-  - id: DO-001-03
+  - id: DO-001-06
     name: ExpressionEngine
     fields:
       - name: id
@@ -1090,7 +1090,7 @@ domain_objects:
         note: "e.g. jslt, jolt, jq, jsonata"
       - name: compile
         type: "(String) → CompiledExpression"
-  - id: DO-001-04
+  - id: DO-001-03
     name: CompiledExpression
     fields:
       - name: evaluate
