@@ -45,6 +45,9 @@ docs/architecture/roadmap.md
 docs/architecture/open-questions.md
 
 # Research
+docs/research/pingaccess-plugin-api.md
+docs/research/pingaccess-docker-and-sdk.md
+docs/research/gateway-candidates.md
 docs/research/pingam-callback-api.md
 docs/research/t-001-12-jslt-context-variables.md
 

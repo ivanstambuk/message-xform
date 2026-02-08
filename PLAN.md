@@ -137,7 +137,7 @@ operations:
 
 ## Research & Exploration
 
-- [ ] **PingAccess plugin API** — Understand extension points for request/response interception
+- [x] **PingAccess plugin API** — Extension points fully documented (`docs/research/pingaccess-plugin-api.md`, `docs/research/pingaccess-docker-and-sdk.md`). Docker image (9.0.1) pulled, SDK JAR decompiled, installer SDK samples analyzed. Key finding: `RuleInterceptor` SPI with `handleRequest`/`handleResponse` is the primary integration point; must use Site rules for body access.
 - [ ] **PingAM response format** — Document structure, explore transformation needs
 - [ ] **Stateless flow patterns** — Research stateless transformation chain patterns from prior art
 - [ ] **Kong plugin development** — Lua vs. Go plugin SDK
