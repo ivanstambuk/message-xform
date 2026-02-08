@@ -1,26 +1,23 @@
 # Pending Task
 
-**Focus**: Feature 004 — Standalone HTTP Proxy Mode, Phase 2 I3 (Configuration)
-**Status**: T-004-04..06 done, T-004-07 and T-004-08 remain in I3
-**Next Step**: Implement T-004-07 — Environment variable overlay (FR-004-11)
+**Focus**: Feature 004 — Standalone HTTP Proxy Mode, Phase 3 I4 (UpstreamClient)
+**Status**: I3 complete (all 5 tasks done), I4 starting
+**Next Step**: Implement T-004-09 — UpstreamClient basic forwarding (FR-004-01)
 
 ## Context Notes
-- ProxyConfig uses a builder pattern with scheme-derived port resolution
+- ProxyConfig fully implemented with builder, env var overlay, and validation
 - ConfigLoader maps YAML → ProxyConfig via Jackson YAML (manual JsonNode traversal)
-- ConfigLoadException for structured startup errors
-- Javalin 6.7.0 confirmed = Jetty 11 (all docs corrected this session)
-- AGENTS.md pre-commit checklist now requires tasks.md + plan.md in every task commit
+- Javalin 6.7.0 confirmed = Jetty 11
+- Need mock HTTP backend for UpstreamClient tests (WireMock or similar)
+- JDK HttpClient for upstream forwarding (zero extra deps)
 
-## Remaining in I3
-1. T-004-07: EnvVarOverlayTest + env var overlay layer in ConfigLoader
-   - BACKEND_HOST, PROXY_PORT, all 41 env var mappings
-   - Empty/whitespace env vars treated as unset
-2. T-004-08: ConfigValidationTest + validation logic
-   - Missing backend.host → error
-   - Invalid scheme/client-auth/logging-level → error
-   - backend.port auto-derived from scheme
+## Tasks in I4
+1. T-004-09: UpstreamClient basic forwarding (GET/POST, response intact)
+2. T-004-10: HTTP/1.1 enforcement (FR-004-33)
+3. T-004-11: Content-Length recalculation (FR-004-34)
+4. T-004-12: Hop-by-hop header stripping (FR-004-04)
+5. T-004-13: Backend error handling (FR-004-24/25)
+6. T-004-14: Connection pool configuration (FR-004-18)
 
-## After I3: Phase 3 (Core Proxy)
-- T-004-09: UpstreamClient (JDK HttpClient)
-- T-004-10: ProxyHandler (Javalin handler)
-- T-004-11: GatewayAdapter bridge
+## After I4: I5 — StandaloneAdapter + ProxyHandler
+- T-004-15 through T-004-25
