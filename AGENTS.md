@@ -182,6 +182,7 @@ Update both `docs/architecture/roadmap.md` and the Roadmap table above when stat
 ### Known Pitfalls
 
 - **File edit tool + Spotless concurrency** (2026-02-08): When `./gradlew spotlessApply` runs concurrently with `replace_file_content` or `multi_replace_file_content`, Spotless may overwrite edits silently — the tool reports success but the file on disk is unchanged. **Workaround**: run `spotlessApply` first, *then* edit, *then* `check`. Or use `sed` / Python for edits that must survive.
+- **Antigravity IDE — Java 21 red squiggles** (2026-02-08): The Antigravity IDE (VS Code over SSH) stores remote extensions in `~/.antigravity-server/extensions/`, *not* `~/.vscode-server/extensions/`. The default-bundled `redhat.java` v1.12.0 does **not** support `JavaSE-21` — upgrade to v1.53+ (download VSIX from Open VSX, install via `Extensions: Install from VSIX...`). Also requires `.vscode/settings.json` with `java.configuration.runtimes` pointing at the SDKMAN JDK path.
 
 ## Pre-Implementation Checklist (Mandatory)
 

@@ -13,8 +13,10 @@ message-xform/
 ├── core/                          # Transform engine (zero gateway deps)
 │   ├── model/                     # TransformSpec, TransformProfile, Message
 │   ├── engine/                    # Expression evaluation, profile matching
+│   ├── spec/                      # SpecParser — YAML to TransformSpec loading
 │   ├── spi/                       # ExpressionEngine, TelemetryListener
-│   └── schema/                    # JSON Schema validation
+│   ├── schema/                    # JSON Schema validation
+│   └── test-vectors/              # Golden YAML fixtures (FX-001-01/02/03)
 ├── engine-jslt/                   # JSLT expression engine plugin
 ├── engine-jolt/                   # JOLT expression engine plugin (future)
 ├── adapter-pingaccess/            # PingAccess gateway adapter
