@@ -304,7 +304,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
 
 #### I6 — TransformEngine: basic transform
 
-- [ ] **T-001-19** — Basic transform: load spec + transform message (FR-001-01, FR-001-02, FR-001-04, API-001-01/03)
+- [x] **T-001-19** — Basic transform: load spec + transform message (FR-001-01, FR-001-02, FR-001-04, API-001-01/03)
   _Intent:_ The core transform path: load a spec, create a message, call
   `transform()`, get back a `TransformResult` with the transformed body.
   This is the moment the engine comes alive.
@@ -917,6 +917,7 @@ Track long-running or shared commands with timestamps to avoid duplicate work.
 - 2026-02-08 10:40 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — 81 tests passed after T-001-15
 - 2026-02-08 10:45 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — 89 tests passed after T-001-16..17
 - 2026-02-08 10:50 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — 93 tests passed after T-001-18
+- 2026-02-08 11:10 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — 99 tests passed after T-001-19 (S-001-09 adjusted for JSLT absent-field behavior)
 
 ## Completion Criteria
 
