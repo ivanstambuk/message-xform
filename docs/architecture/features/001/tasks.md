@@ -396,7 +396,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `./gradlew :core:test --tests "*EvalErrorTest*"`
   - `./gradlew spotlessApply check`
 
-- [ ] **T-001-25** — Evaluation budget: max-eval-ms + max-output-bytes (NFR-001-07, CFG-001-06/07)
+- [x] **T-001-25** — Evaluation budget: max-eval-ms + max-output-bytes (NFR-001-07, CFG-001-06/07)
   _Intent:_ Runaway expressions must be terminated. Enforce time and output
   size budgets.
   _Test first:_ Write `EvalBudgetTest`:
@@ -413,7 +413,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   Evaluate if JSLT evaluation can be interrupted. If not, document as a
   known limitation and rely on output size budget as primary guard.
 
-- [ ] **T-001-26** — Strict-mode schema validation at evaluation time (FR-001-09, CFG-001-09)
+- [x] **T-001-26** — Strict-mode schema validation at evaluation time (FR-001-09, CFG-001-09)
   _Intent:_ In strict mode, validate input against `input.schema` before
   eval and output against `output.schema` after eval.
   _Test first:_ Write `StrictModeTest`:
@@ -923,6 +923,8 @@ Track long-running or shared commands with timestamps to avoid duplicate work.
 - 2026-02-08 11:30 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — 119 tests passed after T-001-22
 - 2026-02-08 11:35 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — 124 tests passed after T-001-24
 - 2026-02-08 11:40 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — 130 tests passed after T-001-23
+- 2026-02-08 11:45 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — 133 tests passed after T-001-25
+- 2026-02-08 11:50 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — 138 tests passed after T-001-26
 
 ## Completion Criteria
 
