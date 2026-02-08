@@ -14,6 +14,7 @@ import io.messagexform.core.error.SpecParseException;
 import io.messagexform.core.model.HeaderSpec;
 import io.messagexform.core.model.StatusSpec;
 import io.messagexform.core.model.TransformSpec;
+import io.messagexform.core.model.UrlSpec;
 import io.messagexform.core.spi.CompiledExpression;
 import io.messagexform.core.spi.ExpressionEngine;
 import java.io.IOException;
@@ -41,8 +42,8 @@ public final class SpecParser {
 
     private static final String DEFAULT_LANG = "jslt";
     private static final ObjectMapper YAML_MAPPER = new ObjectMapper(new YAMLFactory());
-    private static final JsonSchemaFactory SCHEMA_FACTORY = JsonSchemaFactory
-            .getInstance(SpecVersion.VersionFlag.V202012);
+    private static final JsonSchemaFactory SCHEMA_FACTORY =
+            JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012);
 
     private final EngineRegistry engineRegistry;
 
@@ -123,9 +124,22 @@ public final class SpecParser {
         // Parse optional status block (FR-001-11, T-001-37)
         StatusSpec statusSpec = parseStatusSpec(root, engine, id, source);
 
+        // Parse optional url block (FR-001-12, ADR-0027, T-001-38a)
+        UrlSpec urlSpec = parseUrlSpec(root, engine, id, source);
+
         return new TransformSpec(
-                id, version, description, lang, inputSchema, outputSchema, compiledExpr, forward, reverse,
-                headerSpec, statusSpec);
+                id,
+                version,
+                description,
+                lang,
+                inputSchema,
+                outputSchema,
+                compiledExpr,
+                forward,
+                reverse,
+                headerSpec,
+                statusSpec,
+                urlSpec);
     }
 
     /**
@@ -228,6 +242,46 @@ public final class SpecParser {
         return new StatusSpec(statusCode, whenExpr);
     }
 
+    /**
+     * Parses the optional {@code url} block from the spec YAML (FR-001-12,
+     * ADR-0027).
+     * Returns {@code null} if no url block is present.
+     *
+     * <p>
+     * Currently parses:
+     * <ul>
+     * <li>{@code url.path.expr} — compiled JSLT path rewrite expression
+     * (T-001-38a)</li>
+     * </ul>
+     * Query and method parsing added in T-001-38b/38c.
+     */
+    private UrlSpec parseUrlSpec(JsonNode root, ExpressionEngine engine, String specId, String source) {
+        JsonNode urlNode = root.get("url");
+        if (urlNode == null || urlNode.isNull()) {
+            return null;
+        }
+
+        // Parse path.expr (T-001-38a)
+        CompiledExpression pathExpr = null;
+        JsonNode pathNode = urlNode.get("path");
+        if (pathNode != null && pathNode.has("expr")) {
+            JsonNode exprNode = pathNode.get("expr");
+            if (exprNode.isTextual()) {
+                pathExpr = compileExpression(engine, exprNode.asText(), specId, source);
+            } else {
+                throw new SpecParseException("url.path.expr must be a string expression", specId, source);
+            }
+        }
+
+        // Query and method parsing stubs — implemented in T-001-38b/38c
+        if (pathExpr == null) {
+            // No url operations parsed yet — return null to indicate no url block
+            return null;
+        }
+
+        return new UrlSpec(pathExpr, null, null, null, null, null);
+    }
+
     // --- Private helpers ---
 
     private JsonNode readYaml(Path path, String source) {
@@ -258,8 +312,8 @@ public final class SpecParser {
     private ExpressionEngine resolveEngine(String lang, String specId, String source) {
         return engineRegistry
                 .getEngine(lang)
-                .orElseThrow(() -> new ExpressionCompileException("Unknown expression engine: '" + lang + "'", specId,
-                        source));
+                .orElseThrow(() ->
+                        new ExpressionCompileException("Unknown expression engine: '" + lang + "'", specId, source));
     }
 
     private JsonNode extractSchema(JsonNode root, String block, String specId, String source) {

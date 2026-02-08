@@ -70,8 +70,10 @@ public final class StatusTransformer {
             }
         } catch (Exception e) {
             // When predicate evaluation error → abort, keep original status (T-001-37)
-            LOG.warn("Status when predicate evaluation failed — keeping original status {}: {}",
-                    originalStatus, e.getMessage());
+            LOG.warn(
+                    "Status when predicate evaluation failed — keeping original status {}: {}",
+                    originalStatus,
+                    e.getMessage());
             return originalStatus;
         }
     }

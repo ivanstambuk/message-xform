@@ -18,7 +18,4 @@ import io.messagexform.core.spi.CompiledExpression;
  * @param when optional compiled JSLT predicate — status is only changed when
  *             this evaluates to true
  */
-public record StatusSpec(
-        int set,
-        CompiledExpression when) {
-}
+public record StatusSpec(int set, CompiledExpression when) {}

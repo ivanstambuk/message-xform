@@ -50,8 +50,8 @@ public final class TransformEngine {
 
     private static final Logger LOG = LoggerFactory.getLogger(TransformEngine.class);
     private static final ObjectMapper SIZE_MAPPER = new ObjectMapper();
-    private static final JsonSchemaFactory SCHEMA_FACTORY = JsonSchemaFactory
-            .getInstance(SpecVersion.VersionFlag.V202012);
+    private static final JsonSchemaFactory SCHEMA_FACTORY =
+            JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012);
 
     private final SpecParser specParser;
     private final ErrorResponseBuilder errorResponseBuilder;
@@ -109,11 +109,11 @@ public final class TransformEngine {
             EvalBudget budget,
             SchemaValidationMode schemaValidationMode) {
         this.specParser = Objects.requireNonNull(specParser, "specParser must not be null");
-        this.errorResponseBuilder = Objects.requireNonNull(errorResponseBuilder,
-                "errorResponseBuilder must not be null");
+        this.errorResponseBuilder =
+                Objects.requireNonNull(errorResponseBuilder, "errorResponseBuilder must not be null");
         this.budget = Objects.requireNonNull(budget, "budget must not be null");
-        this.schemaValidationMode = Objects.requireNonNull(schemaValidationMode,
-                "schemaValidationMode must not be null");
+        this.schemaValidationMode =
+                Objects.requireNonNull(schemaValidationMode, "schemaValidationMode must not be null");
     }
 
     /**
@@ -276,6 +276,9 @@ public final class TransformEngine {
         Integer status = direction == Direction.RESPONSE ? message.statusCode() : null;
         TransformContext context = new TransformContext(message.headers(), message.headersAll(), status, null, null);
 
+        // Save the original body for URL rewriting (ADR-0027: "route the input")
+        JsonNode originalBody = message.body();
+
         // Evaluate the expression — catch eval exceptions per ADR-0022
         try {
             // T-001-26: Strict-mode input schema validation
@@ -310,6 +313,15 @@ public final class TransformEngine {
                     message.requestPath(),
                     message.requestMethod());
 
+            // T-001-38a: Apply declarative URL rewrite (FR-001-12, ADR-0027)
+            // Processing order: body transform → URL rewrite (original body) → headers →
+            // status
+            // URL expressions evaluate against the ORIGINAL body ("route the input, enrich
+            // the output")
+            if (spec.urlSpec() != null && direction == Direction.REQUEST) {
+                transformedMessage = UrlTransformer.apply(transformedMessage, spec.urlSpec(), originalBody, context);
+            }
+
             // T-001-34/35: Apply declarative header operations (FR-001-10)
             if (spec.headerSpec() != null) {
                 transformedMessage = HeaderTransformer.apply(transformedMessage, spec.headerSpec(), transformedBody);
@@ -319,8 +331,8 @@ public final class TransformEngine {
             // Processing order: bind $status → JSLT body → headers → when predicate → set
             // status
             if (spec.statusSpec() != null) {
-                Integer newStatus = StatusTransformer.apply(
-                        transformedMessage.statusCode(), spec.statusSpec(), transformedBody);
+                Integer newStatus =
+                        StatusTransformer.apply(transformedMessage.statusCode(), spec.statusSpec(), transformedBody);
                 if (!java.util.Objects.equals(newStatus, transformedMessage.statusCode())) {
                     transformedMessage = new Message(
                             transformedMessage.body(),

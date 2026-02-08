@@ -612,7 +612,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
 
 #### I11a — URL rewriting
 
-- [ ] **T-001-38a** — URL path rewrite with JSLT expression (FR-001-12, ADR-0027, S-001-38a)
+- [x] **T-001-38a** — URL path rewrite with JSLT expression (FR-001-12, ADR-0027, S-001-38a) ✅ 2026-02-08
   _Intent:_ Implement `url.path.expr` — a JSLT expression that constructs a new
   request path from body fields. The expression evaluates against the **original**
   (pre-transform) body (ADR-0027), so routing fields stripped by the body transform
@@ -626,12 +626,17 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `path.expr` returns null → `ExpressionEvalException`.
   - `path.expr` returns non-string → `ExpressionEvalException`.
   _Implement:_ Create `UrlTransformer` class. Extend `SpecParser` to parse
-  `url.path` block. Add `url` field to `TransformSpec`. Add `setRequestPath`
-  to `Message` interface.
+  `url.path` block. Add `urlSpec` field to `TransformSpec`. Wire into
+  `TransformEngine.transformWithSpec()` — evaluates against original body per ADR-0027.
   _Verify:_ `UrlPathRewriteTest` passes.
   _Verification commands:_
   - `./gradlew :core:test --tests "*UrlPathRewriteTest*"`
   - `./gradlew spotlessApply check`
+  _Status:_ ✅ Complete (2026-02-08). 8 tests pass: de-polymorphize dispatch (S-001-38a),
+  original-body evaluation (ADR-0027), RFC 3986 percent-encoding (spaces, special chars),
+  null/non-string error handling, direction restriction (request only), backward compatibility.
+  New files: UrlSpec.java, UrlTransformer.java, UrlPathRewriteTest.java. Modified: TransformSpec,
+  SpecParser (parseUrlSpec), TransformEngine (URL rewrite step). All 220 tests pass.
 
 - [ ] **T-001-38b** — URL query parameter add/remove (FR-001-12, S-001-38b)
   _Intent:_ Implement `url.query.add` (static + dynamic) and `url.query.remove`
