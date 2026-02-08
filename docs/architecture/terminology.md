@@ -81,10 +81,12 @@ terminology agreements must be captured here immediately.
 ## Message envelope
 
 - **Message** (`Message`)
-  - The domain object representing a gateway request or response. Contains three
-    dimensions: body (JSON), headers (multi-valued map), and status code (integer).
-  - The engine operates on all three dimensions — body via JSLT expressions, headers
-    via the declarative `headers` block, status via the declarative `status` block.
+  - The domain object representing a gateway request or response. Contains four
+    dimensions: body (JSON), headers (multi-valued map), status code (integer),
+    and URL (request path + query parameters + HTTP method).
+  - The engine operates on all four dimensions — body via JSLT expressions, headers
+    via the declarative `headers` block, status via the declarative `status` block,
+    and URL via the declarative `url` block (ADR-0027).
 
 - **Body**
   - The JSON payload of the message. Represented as Jackson `JsonNode` internally.
@@ -98,6 +100,28 @@ terminology agreements must be captured here immediately.
 - **Status code**
   - The HTTP response status code (integer). Manipulated via the declarative `status`
     block and exposed as the read-only `$status` JSLT variable.
+
+- **URL block** (`url`)
+  - The declarative block for rewriting the request URL. Contains three sub-blocks:
+    `path` (JSLT expression → new request path), `query` (add/remove query
+    parameters), and `method` (override HTTP method with `set`/`when` pattern).
+  - URL expressions evaluate against the **original** (pre-transform) body, not
+    the transformed body (ADR-0027). This is a documented exception to the convention
+    used by `headers.add.expr` and `status.when`.
+  - Only meaningful for request-direction transforms.
+
+- **De-polymorphization**
+  - The process of converting a polymorphic endpoint (e.g., `POST /dispatch` where
+    the operation is determined by a body field like `action`) into specific
+    REST-style URLs (e.g., `DELETE /api/users/123`). The primary use case for URL
+    rewriting (FR-001-12, ADR-0027).
+
+- **Original-body evaluation context**
+  - URL expressions evaluate against the body as received from the gateway, before
+    the body transform has run. This ensures routing fields (e.g., `action`,
+    `resourceId`) are available for URL construction even though the body transform
+    may strip them. Contrast with headers/status, which use the **transformed** body.
+    Rationale: "route the input, enrich the output" (ADR-0027).
 
 ## Versioning & resolution
 

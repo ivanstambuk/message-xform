@@ -83,6 +83,7 @@ ADR-0023 (Cross-Profile)  ── governs ── FR-001-05, references ADR-0006
 ADR-0024 (Error Catalogue) ─ governs ── FR-001-07, FR-001-02, references ADR-0022, ADR-0001, ADR-0012, ADR-0019
 ADR-0025 (Adapter Lifecycle) governs ── Gateway Adapter SPI, references ADR-0023, ADR-0024
 ADR-0026 (Multi-Value Hdrs)  governs ── FR-001-10, references ADR-0002, ADR-0021
+ADR-0027 (URL Rewriting)     governs ── FR-001-12, references ADR-0002, ADR-0003, ADR-0013
 ```
 
 ## Feature → ADR → NFR Traceability
@@ -102,6 +103,7 @@ ADR-0026 (Multi-Value Hdrs)  governs ── FR-001-10, references ADR-0002, ADR-
 | FR-001-07 (Error Handling) | ADR-0022, ADR-0024 | — |
 | Gateway Adapter SPI | ADR-0025 | — |
 | FR-001-09 (Schema Validation) | ADR-0001, ADR-0022 | — |
+| FR-001-12 (URL Rewriting) | ADR-0027 | — |
 
 ## Research Documents
 
