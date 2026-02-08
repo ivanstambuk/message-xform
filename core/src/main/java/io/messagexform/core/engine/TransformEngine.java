@@ -1,6 +1,7 @@
 package io.messagexform.core.engine;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import io.messagexform.core.error.TransformEvalException;
 import io.messagexform.core.model.Direction;
 import io.messagexform.core.model.Message;
 import io.messagexform.core.model.TransformContext;
@@ -28,15 +29,30 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class TransformEngine {
 
     private final SpecParser specParser;
+    private final ErrorResponseBuilder errorResponseBuilder;
     private final Map<String, TransformSpec> specs = new ConcurrentHashMap<>();
 
     /**
-     * Creates a new engine backed by the given spec parser.
+     * Creates a new engine backed by the given spec parser, using the default
+     * error response builder (HTTP 502).
      *
      * @param specParser the parser used to load and compile spec YAML files
      */
     public TransformEngine(SpecParser specParser) {
+        this(specParser, new ErrorResponseBuilder());
+    }
+
+    /**
+     * Creates a new engine with a custom error response builder.
+     *
+     * @param specParser           the parser used to load and compile spec YAML
+     *                             files
+     * @param errorResponseBuilder the builder for RFC 9457 error responses
+     */
+    public TransformEngine(SpecParser specParser, ErrorResponseBuilder errorResponseBuilder) {
         this.specParser = Objects.requireNonNull(specParser, "specParser must not be null");
+        this.errorResponseBuilder =
+                Objects.requireNonNull(errorResponseBuilder, "errorResponseBuilder must not be null");
     }
 
     /**
@@ -71,10 +87,9 @@ public final class TransformEngine {
      *
      * @param message   the input message to transform
      * @param direction the direction of the transform (REQUEST or RESPONSE)
-     * @return a {@link TransformResult} (SUCCESS with the transformed message,
-     *         or PASSTHROUGH if no spec is loaded)
-     * @throws io.messagexform.core.error.ExpressionEvalException if evaluation
-     *                                                            fails
+     * @return a {@link TransformResult} — SUCCESS with the transformed message,
+     *         ERROR with an RFC 9457 body if evaluation fails (ADR-0022),
+     *         or PASSTHROUGH if no spec is loaded
      */
     public TransformResult transform(Message message, Direction direction) {
         Objects.requireNonNull(message, "message must not be null");
@@ -95,19 +110,27 @@ public final class TransformEngine {
         // For REQUEST transforms, $status is null (ADR-0017).
         Integer status = direction == Direction.RESPONSE ? message.statusCode() : null;
         TransformContext context = new TransformContext(message.headers(), message.headersAll(), status, null, null);
-        JsonNode transformedBody = expr.evaluate(message.body(), context);
+        // Evaluate the expression — catch eval exceptions per ADR-0022
+        try {
+            JsonNode transformedBody = expr.evaluate(message.body(), context);
 
-        // Build the transformed message, preserving envelope metadata
-        Message transformedMessage = new Message(
-                transformedBody,
-                message.headers(),
-                message.headersAll(),
-                message.statusCode(),
-                message.contentType(),
-                message.requestPath(),
-                message.requestMethod());
+            // Build the transformed message, preserving envelope metadata
+            Message transformedMessage = new Message(
+                    transformedBody,
+                    message.headers(),
+                    message.headersAll(),
+                    message.statusCode(),
+                    message.contentType(),
+                    message.requestPath(),
+                    message.requestMethod());
 
-        return TransformResult.success(transformedMessage);
+            return TransformResult.success(transformedMessage);
+        } catch (TransformEvalException e) {
+            // ADR-0022: Never pass through the original message on eval error.
+            // Build an RFC 9457 error response instead.
+            JsonNode errorBody = errorResponseBuilder.buildErrorResponse(e, message.requestPath());
+            return TransformResult.error(errorBody, errorResponseBuilder.status());
+        }
     }
 
     /**

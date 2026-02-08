@@ -3,7 +3,6 @@ package io.messagexform.core.engine;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.messagexform.core.error.EvalBudgetExceededException;
 import io.messagexform.core.error.ExpressionEvalException;
 import io.messagexform.core.error.InputSchemaViolation;
@@ -19,8 +18,6 @@ import org.junit.jupiter.api.Test;
  */
 @DisplayName("T-001-22: Error response builder — RFC 9457")
 class ErrorResponseBuilderTest {
-
-    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private ErrorResponseBuilder builder;
 
