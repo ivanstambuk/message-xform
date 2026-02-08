@@ -334,7 +334,9 @@ public interface Message {
     void setStatusCode(int code); // response only
     String getContentType();
     String getRequestPath();      // e.g. "/json/alpha/authenticate"
+    void setRequestPath(String path);   // URL rewrite (ADR-0027)
     String getRequestMethod();    // e.g. "POST"
+    void setRequestMethod(String method); // method override (ADR-0027)
 }
 ```
 
@@ -892,6 +894,87 @@ Processing order:
 | Failure path | `when` predicate evaluation error → abort, keep original status |
 | Source | ADR-0003, ADR-0017 |
 
+### FR-001-12: URL Rewriting
+
+**Requirement:** Transform specs MAY include an optional `url` block to rewrite the
+request path, modify query parameters, and override the HTTP method. URL rewriting
+enables de-polymorphization of orchestration endpoints — converting a generic
+`POST /dispatch` (where the operation is determined by a body field) into specific
+REST-style URLs like `DELETE /api/users/123`.
+
+```yaml
+url:
+  # Path rewrite — JSLT expression, MUST return a string
+  path:
+    expr: '"/api/" + .action + "/" + .resourceId'
+
+  # Query parameter operations (same pattern as headers block)
+  query:
+    add:
+      format: "json"                          # static value
+      correlationId:
+        expr: '$headers."X-Correlation-ID"'   # dynamic — from header context
+    remove: ["_debug", "_internal"]           # glob patterns (like header remove)
+
+  # HTTP method override (same set/when pattern as status block)
+  method:
+    set: "DELETE"
+    when: '.action == "delete"'               # optional predicate
+```
+
+**Expression evaluation context (ADR-0027):** URL expressions (`url.path.expr`,
+`url.query.add.*.expr`, `url.method.when`) evaluate against the **original**
+(pre-transform) body, NOT the transformed body. This is a documented exception to
+the convention used by `headers.add.expr` and `status.when` (which use transformed
+body). Rationale: URL rewrite *routes the input* — routing fields like `action` and
+`resourceId` are typically stripped by the body transform; they must remain available
+for URL construction.
+
+Context variables `$headers`, `$headers_all`, `$status`, `$requestPath`,
+`$requestMethod`, `$queryParams`, and `$cookies` are available in URL expressions
+(same bindings as body expressions).
+
+**Direction restriction:** URL rewriting is only meaningful for **request transforms**.
+A `url` block on a response-direction transform is ignored with a warning logged at
+load time.
+
+**URL encoding:** The engine MUST percent-encode the result of `url.path.expr` per
+RFC 3986 §3.3. Body field values containing spaces, `?`, `#`, or other reserved
+characters are encoded. Path separators (`/`) are preserved as-is because the
+expression is expected to construct a valid path structure.
+
+Processing order (updated — see also FR-001-10, FR-001-11):
+1. Engine reads metadata → binds `$headers`, `$headers_all`, `$status`,
+   `$requestPath`, `$requestMethod`, `$queryParams`, `$cookies`.
+2. JSLT body expression evaluates (`transform.expr`) → transformed body.
+3. **URL rewrite applied** (against **original** body):
+   a. `path.expr` evaluated → new request path (string).
+   b. `query.remove` — strip matching query parameters (glob patterns).
+   c. `query.add` (static) — set query parameters with literal values.
+   d. `query.add` (dynamic) — evaluate `expr` against original body.
+   e. `method.when` predicate evaluated → if true (or absent), `method.set` applied.
+4. Header operations applied (against **transformed** body):
+   a. `remove` → `rename` → `add` (static) → `add` (dynamic).
+5. Status `when` predicate evaluated (against **transformed** body) → status set.
+
+| Aspect | Detail |
+|--------|--------|
+| Success path | URL block parsed → path/query/method applied after body transform |
+| Validation path | `method.set` not a valid HTTP method → reject at load time |
+| Validation path | Invalid glob in `query.remove` → reject at load time |
+| Validation path | `url` block on response-direction transform → warning at load time |
+| Failure path | `path.expr` returns null or non-string → `ExpressionEvalException` |
+| Failure path | `path.expr` evaluation error → abort, keep original URL |
+| Failure path | `method.when` evaluation error → abort, keep original method |
+| Source | PingAccess URL Rewrite Rules, ADR-0027 |
+
+**Method validation:** `method.set` MUST be one of: `GET`, `POST`, `PUT`, `DELETE`,
+`PATCH`, `HEAD`, `OPTIONS`. Any other value is rejected at load time with a
+`SpecParseException`.
+
+**Query parameter encoding:** Query parameter values from `query.add` (both static
+and dynamic) are percent-encoded per RFC 3986 §3.4.
+
 ## Non-Functional Requirements
 
 | ID | Requirement | Driver | Measurement | Dependencies | Source |
@@ -1082,6 +1165,10 @@ domain_objects:
       - name: reverse
         type: CompiledExpression
         constraints: "optional, for bidirectional specs"
+      - name: url
+        type: UrlRewriteSpec
+        constraints: "optional — path, query, method rewrite (ADR-0027)"
+        note: "Only applied for request-direction transforms"
   - id: DO-001-06
     name: ExpressionEngine
     fields:
