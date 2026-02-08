@@ -196,6 +196,7 @@ overload — Q-042).
 | FR-004-36 | When `proxy.forwarded-headers.enabled` is `true` (default), the proxy MUST add `X-Forwarded-For` (client IP), `X-Forwarded-Proto` (`http` or `https` based on inbound scheme), and `X-Forwarded-Host` (original `Host` header value) to upstream requests. If these headers already exist (e.g., from an upstream proxy), the proxy MUST **append** to `X-Forwarded-For` and preserve existing `X-Forwarded-Proto`/`X-Forwarded-Host` values. When disabled, no forwarded headers are added or modified. | Client `10.0.0.5` via HTTPS → backend receives `X-Forwarded-For: 10.0.0.5`, `X-Forwarded-Proto: https`, `X-Forwarded-Host: api.example.com`. | `proxy.forwarded-headers.enabled: false` → no headers added. | n/a | Q-038 resolution, RFC 7239. |
 | FR-004-37 | `wrapRequest` MUST parse cookies from the `Cookie` header (via Javalin's `ctx.cookieMap()`) and pass them to `TransformContext` as the `cookies` parameter. This enables `$cookies` binding in JSLT expressions (Feature 001 DO-001-07). `wrapResponse` does NOT populate cookies (cookies are a request-direction concept). | Request with `Cookie: session=abc123; lang=en` → `$cookies.session` evaluates to `"abc123"`, `$cookies.lang` evaluates to `"en"`. | Request with no `Cookie` header → `$cookies` is an empty map (not null). | n/a | Q-041 resolution, DO-001-07. |
 | FR-004-38 | When the inbound request does NOT contain an `X-Request-ID` header, `ProxyHandler` MUST generate a random UUID and inject it as an `X-Request-ID` response header. If the header IS present, the proxy MUST echo the original value back in the response. In both cases the request ID is included in structured log entries (NFR-004-07). | Request without `X-Request-ID` → proxy generates UUID, logs with it, returns `X-Request-ID: <uuid>` in response. | Request with `X-Request-ID: abc-123` → proxy logs with `abc-123`, returns `X-Request-ID: abc-123` in response. | n/a | Observability best practice. |
+| FR-004-39 | `wrapRequest` MUST parse query parameters from the URL (via Javalin's `ctx.queryParamMap()`) and pass them to `TransformContext` as the `queryParams` parameter. This enables `$queryParams` binding in JSLT expressions (Feature 001 DO-001-07). For multi-value query params, only the **first value** is used (consistent with single-value `$headers` semantics). `wrapResponse` does NOT populate query params (query params are a request-direction concept). | Request `GET /api?page=2&sort=name` → `$queryParams.page` evaluates to `"2"`, `$queryParams.sort` evaluates to `"name"`. | Request with no query string → `$queryParams` is an empty map (not null). | n/a | Q-043 resolution, DO-001-07. |
 
 ### TransformResult Dispatch
 
@@ -234,12 +235,14 @@ overload — Q-042).
 
 > **TransformContext injection (Q-042 resolution):** Feature 004 requires a new
 > `TransformEngine.transform(Message, Direction, TransformContext)` overload.
-> The adapter builds a `TransformContext` with adapter-specific data (cookies,
-> query params) and passes it to the engine. The engine uses this context instead
-> of constructing its own. The existing 2-arg `transform(Message, Direction)`
-> remains backward-compatible — it builds an empty context internally. This is a
-> minor, additive core change (~10 lines) that does not break any existing tests
-> or API contracts.
+> The adapter builds a `TransformContext` with adapter-specific data (cookies
+> via `ctx.cookieMap()`, query params via `ctx.queryParamMap()`) and passes it
+> to the engine. The engine uses this context instead of constructing its own.
+> The existing 2-arg `transform(Message, Direction)` remains backward-compatible
+> — it builds an empty context internally. This is a minor, additive core change
+> (~10 lines) that does not break any existing tests or API contracts.
+> Both `$cookies` (FR-004-37) and `$queryParams` (FR-004-39, Q-043 resolution)
+> are populated via this mechanism.
 
 ---
 
@@ -419,6 +422,15 @@ overload — Q-042).
 | S-004-71 | **Request ID generated:** Request without `X-Request-ID` header → response includes `X-Request-ID: <uuid>` (FR-004-38). Structured log entry includes the generated UUID. |
 | S-004-72 | **Request ID echoed:** Request with `X-Request-ID: abc-123` → response includes `X-Request-ID: abc-123` (FR-004-38). Structured log entry includes `abc-123`. |
 | S-004-73 | **Request ID in error response:** Request that triggers `502 Bad Gateway` (backend unreachable) → error response still includes `X-Request-ID` header (generated or echoed). |
+
+### Category 18 — Query Parameter Binding
+
+| Scenario ID | Description / Expected outcome |
+|-------------|--------------------------------|
+| S-004-74 | **Query param binding in JSLT:** Request `GET /api?page=2&sort=name` → JSLT expression `$queryParams.page` evaluates to `"2"`, `$queryParams.sort` evaluates to `"name"` (FR-004-39). |
+| S-004-75 | **No query string:** Request `GET /api` with no query string → `$queryParams` is an empty map, `$queryParams.page` evaluates to `null`. No error. |
+| S-004-76 | **Multi-value query param:** Request `GET /api?tag=a&tag=b` → `$queryParams.tag` evaluates to `"a"` (first value wins, consistent with single-value `$headers`). |
+| S-004-77 | **URL-encoded query param:** Request `GET /api?name=hello%20world` → `$queryParams.name` evaluates to `"hello world"` (Javalin decodes). |
 
 > **Note on chunked transfer encoding:** When clients or backends use
 > `Transfer-Encoding: chunked`, the proxy relies on Javalin/Jetty to assemble the

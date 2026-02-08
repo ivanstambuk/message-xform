@@ -21,7 +21,7 @@ Hard rules:
 
 | ID | Owner | Question | Options (A preferred) | Status | Asked | Notes |
 |----|-------|----------|------------------------|--------|-------|-------|
-| Q-043 | Ivan | **Should `$queryParams` binding be in-scope for Feature 004 v1?** The proxy has direct access to query parameters via Javalin's `ctx.queryParamMap()`. Feature 001 `TransformContext` (DO-001-07) already defines a `queryParams` field, and `JsltExpressionEngine` binds it as `$queryParams`. Currently, the engine always passes `null`. The proxy is the natural place to populate this. | **A.** Yes — add FR-004-XX and scenarios for `$queryParams`. Trivial to implement alongside `$cookies` (both are `TransformContext` fields). **B.** No — defer to a future feature. `$queryParams` is less commonly needed for body transformations. Document in Non-Goals. | Open | 2026-02-08 | Related to Q-042 (same API change enables both). If Q-042 picks Option A, adding queryParams is one extra line in the adapter. |
+
 
 
 
