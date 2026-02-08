@@ -45,6 +45,11 @@ docs/architecture/open-questions.md
 
 # Research
 docs/research/pingam-callback-api.md
+docs/research/t-001-12-jslt-context-variables.md
+
+# Implementation tracking
+docs/architecture/features/001/tasks.md
+docs/architecture/features/001/plan.md
 
 # Plan
 PLAN.md

@@ -1,50 +1,38 @@
 # Current Session State
 
-**Date:** 2026-02-08  
-**Status:** Handed over
+**Date:** 2026-02-08
+**Status:** Active — Feature 001 implementation in progress
 
 ## Active Work
 
-Feature 001 — Message Transformation Engine (core) spec complete. All open
-questions resolved. Ready for implementation planning (plan.md + tasks.md).
+Feature 001 — Message Transformation Engine (core). Implementing from
+`tasks.md`. Phases 1–2 complete (T-001-01..12). Phase 3 next.
 
 ## Session Progress
 
-### Open Questions Resolved
-| Decision | Option Chosen | ADR |
-|----------|--------------|-----|
-| Q-024: Error type hierarchy | Structured exception catalogue with source path | ADR-0024 |
-| Q-026: Adapter SPI lifecycle | Adapter-scoped — engine has no lifecycle SPI | ADR-0025 |
-| Q-023: Multi-value headers | $headers_all as normative Feature 001 variable | ADR-0026 |
-| Q-028: transform() profile matching | Engine extracts from Message (Option A) | Clarification in spec |
+### Implementation Completed
+| Phase | Tasks | Description |
+|-------|-------|-------------|
+| Phase 1 — I1 | T-001-01, T-001-02 | Gradle 9.2.0 init, core module, Spotless, dependencies |
+| Phase 1 — I2 | T-001-03..08 | Domain model (Message, TransformContext, TransformResult, Direction), exception hierarchy (11 classes) |
+| Phase 2 — I3 | T-001-09..12 | ExpressionEngine + CompiledExpression SPI, JSLT engine, EngineRegistry, context variable research |
 
-### Deep Spec Review (14 findings fixed)
-| Finding | Fix |
-|---------|-----|
-| R-1: TransformContext missing getHeadersAll() | Added to interface |
-| R-3: Message missing addHeader(), getRequestPath(), getRequestMethod() | Added |
-| R-4: Chain direction consistency | Load-time validation rule |
-| Y-1: Spec vs profile match precedence | ANDed (clarified) |
-| Y-2: Header case normalization | Lowercase (RFC 9110) |
-| Y-3: Appendix reverse:true | Fixed to use direction field |
-| Y-4: Stale scenario count | 55→73 |
-| Y-5: queryParams_all/cookies_all | Future extension note |
-| Y-6: TransformResult undefined | Defined (SUCCESS/ERROR/PASSTHROUGH) |
-| Y-7: TransformProfile missing from DSL | Added as DO-001-08 |
-| Y-8: Dynamic header expr engine | Same as transform lang |
-| B-2: Config ID ordering | Resequenced CFG-001-05–09 |
-| B-3/B-4: DSL completeness | Added SPI-001-06, API-001-04 |
-| B-5: DO-001-07 description | Updated to include all fields |
+### Key Decisions
+| Decision | Outcome |
+|----------|---------|
+| JSLT context variable binding (T-001-12) | Native external variables via `Expression.apply(Map, JsonNode)` — no wrapper needed |
+| Task tracker rule | `tasks.md` must be updated in same commit that completes a task |
+
+### Build Status
+- 61 tests passing
+- `./gradlew spotlessApply check` → BUILD SUCCESSFUL
+- Java 21, Gradle 9.2.0, JSLT 0.1.14
 
 ### Process Updates
 | Change | Location |
 |--------|----------|
-| Speech-to-text note | AGENTS.md |
-
-### Retro SDD Audit Fixes
-- S-001-72: header case normalization scenario
-- S-001-73: chain direction conflict scenario
-- DSL DO IDs aligned with catalogue table
+| Task tracker rule added to auto-commit protocol | AGENTS.md |
+| JSLT context variable research | docs/research/t-001-12-jslt-context-variables.md |
 
 ## Remaining Open Questions
 None — all resolved.
@@ -53,5 +41,7 @@ None — all resolved.
 None.
 
 ## Next Steps
-1. **Begin Feature 001 implementation planning** — draft `plan.md` and `tasks.md`
-   breaking the spec into implementation phases, milestones, and tasks.
+1. **Phase 3 — Spec Parsing + Loading (T-001-13..20)**: YAML fixtures,
+   TransformSpec record, SpecParser, profile-spec resolution, spec loading.
+2. **Phase 4 — Transform Pipeline (T-001-21..30)**: Core transform execution
+   with header/status transforms, abort-on-failure, passthrough.

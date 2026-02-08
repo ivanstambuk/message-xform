@@ -109,3 +109,4 @@ ADR-0026 (Multi-Value Hdrs)  governs ── FR-001-10, references ADR-0002, ADR-
 |----------|-------|------------|
 | `docs/research/pingam-callback-api.md` | PingAM callback API analysis | Feature 001 scenarios |
 | `docs/research/gateway-extension-models.md` | Gateway adapter comparison | Features 002–008 |
+| `docs/research/t-001-12-jslt-context-variables.md` | JSLT context variable binding approach | T-001-10 (JsltExpressionEngine), ADR-0021 |
