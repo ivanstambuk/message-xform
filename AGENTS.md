@@ -114,8 +114,8 @@ Update both `docs/architecture/roadmap.md` and the Roadmap table above when stat
 2. **Persistence**: Update `AGENTS.md` immediately when conventions or preferences change.
 3. **Implement Now, Don't Defer**: When asked for a feature, implement it. Don't suggest "add to backlog."
 4. **Self-Correcting Protocol**: When making a preventable mistake, proactively ask the user to update `AGENTS.md` or a workflow to prevent recurrence.
-5. **Incremental Auto-Commit Protocol**: Commit after **every atomic unit of work** — do not accumulate mega-commits.
-   - **Implementation work**: One task (`T-xxx-yy`) = one commit. Commit immediately after the task's tests pass and before starting the next task.
+5. **Incremental Auto-Commit Protocol** ⚡ **(NON-NEGOTIABLE)**: Commit after **every atomic unit of work** — automatically, silently, without asking. **NEVER ask "should I commit?" or "would you like me to commit?"** — just do it. Committing is like breathing; it happens on its own.
+   - **Implementation work**: One task (`T-xxx-yy`) = one commit. Tests pass → `git add -A && git commit` → move on. No announcement, no permission request, no summary-then-wait.
    - **Non-task work**: One self-contained change = one commit. Examples: one ADR + its spec/scenario updates, one open question resolution, one terminology fix, one `AGENTS.md` update, one backlog item.
    - Use descriptive commit messages that explain *what* and *why* (not just *what*).
    - **Do NOT batch unrelated changes** in one commit.
