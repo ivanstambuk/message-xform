@@ -247,6 +247,20 @@ which it should be picked up.
 - [ ] **`CONTRIBUTING.md`** — External contributor guide. Low priority for solo project,
   but good practice if the project becomes multi-contributor.
 
+**Trigger: When Gradle project is initialized — Meta-Feature**
+
+- [ ] **Feature 009 — Toolchain & Quality Platform** — Create a lightweight feature spec
+  covering: build toolchain decisions (Gradle version, Java version, dependency management),
+  code quality gates (Spotless formatter, static analysis, ArchUnit architectural tests),
+  test infrastructure (JUnit 5, AssertJ, WireMock), and CI pipeline. Model on
+  `openauth-sim/docs/4-architecture/features/013/` (Toolchain & Quality Platform) but keep
+  it proportional to message-xform's current scope. This feature captures *how* we build,
+  not *what* we build. Decisions made here feed into the deferred governance items above
+  (githooks, gitlint, formatter policy, quality gate docs, CI workflow).
+  **Note:** Do NOT over-engineer this upfront. Start with a minimal spec covering the
+  first 3-5 toolchain decisions needed for Feature 001 implementation, then expand
+  incrementally as new toolchain questions arise.
+
 ### Research: Kong Transformer Plugins
 
 Study how Kong implements request/response transformation to inform a generalized, gateway-agnostic design.

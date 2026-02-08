@@ -12,6 +12,7 @@
 | 006 | Apache APISIX Adapter | 🔲 Not Started | `features/006/spec.md` | Feature 001 | Java (Plugin Runner) |
 | 007 | Kong Gateway Adapter | 🔲 Not Started | `features/007/spec.md` | Feature 001 | Lua or sidecar |
 | 008 | NGINX Adapter | 🔲 Not Started | `features/008/spec.md` | Feature 001 | njs / sidecar |
+| 009 | Toolchain & Quality Platform | 🔲 Not Started | `features/009/spec.md` | Feature 001 (co-created) | Java / Gradle |
 
 ## Feature Overview
 
@@ -59,6 +60,14 @@ Options: (a) Lua reimplementation (defeats shared core), (b) sidecar proxy,
 Similar to Kong — no native Java. Four approaches documented:
 (a) njs (JavaScript), (b) OpenResty (Lua), (c) C module, (d) sidecar proxy.
 **Sidecar is the pragmatic default** — run standalone mode, NGINX proxies through.
+
+### Feature 009 — Toolchain & Quality Platform
+
+**Meta-feature.** Captures *how* we build: Gradle configuration, Java version,
+dependency management, code formatter (Spotless), static analysis, ArchUnit
+architectural tests, test infrastructure (JUnit 5, AssertJ, WireMock), Git hooks,
+gitlint, and CI pipeline. Decisions made here feed into all other features.
+**Created when Gradle project is initialized alongside Feature 001.**
 
 > **Note:** PingAM callback transformations are covered as **test scenarios** in Feature 001
 > (S-001-01 through S-001-05, S-001-29, S-001-32). They are validation data for the
