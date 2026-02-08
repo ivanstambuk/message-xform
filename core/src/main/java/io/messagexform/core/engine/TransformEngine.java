@@ -30,6 +30,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 /**
  * Core transformation engine (API-001-01/03, FR-001-01, FR-001-02, FR-001-04,
@@ -218,6 +219,20 @@ public final class TransformEngine {
         Objects.requireNonNull(message, "message must not be null");
         Objects.requireNonNull(direction, "direction must not be null");
 
+        // T-001-44: Propagate trace context headers to MDC (NFR-001-10)
+        setTraceContext(message);
+        try {
+            return transformInternal(message, direction);
+        } finally {
+            clearTraceContext();
+        }
+    }
+
+    /**
+     * Internal transform logic — separated to allow try-finally MDC cleanup in
+     * {@link #transform(Message, Direction)}.
+     */
+    private TransformResult transformInternal(Message message, Direction direction) {
         // Phase 5: Profile-based routing via ProfileMatcher
         TransformProfile profile = this.activeProfile;
         if (profile != null) {
@@ -578,5 +593,36 @@ public final class TransformEngine {
             throw new InputSchemaViolation(
                     String.format("Input schema violation in spec '%s': %s", spec.id(), detail), spec.id(), null);
         }
+    }
+
+    // --- Trace context propagation (T-001-44, NFR-001-10) ---
+
+    /** MDC key for X-Request-ID header. */
+    private static final String MDC_REQUEST_ID = "requestId";
+    /** MDC key for traceparent header (W3C Trace Context). */
+    private static final String MDC_TRACEPARENT = "traceparent";
+
+    /**
+     * Extracts trace context headers from the message and sets them in MDC.
+     * Called at the start of {@link #transform(Message, Direction)}.
+     */
+    private void setTraceContext(Message message) {
+        String requestId = message.headers().get("x-request-id");
+        if (requestId != null && !requestId.isBlank()) {
+            MDC.put(MDC_REQUEST_ID, requestId);
+        }
+        String traceparent = message.headers().get("traceparent");
+        if (traceparent != null && !traceparent.isBlank()) {
+            MDC.put(MDC_TRACEPARENT, traceparent);
+        }
+    }
+
+    /**
+     * Clears trace context from MDC. Called in finally block of
+     * {@link #transform(Message, Direction)}.
+     */
+    private void clearTraceContext() {
+        MDC.remove(MDC_REQUEST_ID);
+        MDC.remove(MDC_TRACEPARENT);
     }
 }

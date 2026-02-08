@@ -792,7 +792,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `./gradlew :core:test --tests "*TelemetryListenerTest*"`
   - `./gradlew spotlessApply check`
 
-- [ ] **T-001-43** — Sensitive field redaction (NFR-001-06, ADR-0019)
+- [x] **T-001-43** — Sensitive field redaction (NFR-001-06, ADR-0019) ✅ 2026-02-08
   _Intent:_ Fields marked as `sensitive` in the spec MUST be replaced with
   `"[REDACTED]"` in all log output.
   _Test first:_ Write `SensitiveFieldRedactionTest`:
