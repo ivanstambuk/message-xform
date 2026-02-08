@@ -55,9 +55,10 @@ Every feature progresses through these steps. Do not skip steps.
 2. **Scenarios** — Define concrete test scenarios with input/output JSON pairs in `features/<NNN>/scenarios.md`.
 3. **Spec** — Write the feature specification (SDD) in `features/<NNN>/spec.md`.
 4. **Plan** — Break the spec into implementation phases in `features/<NNN>/plan.md`.
-5. **Tasks** — Granular task breakdown in `features/<NNN>/tasks.md`.
-6. **Implement** — Write code, tests, and documentation.
-7. **Verify** — Run integration tests against scenarios. All scenarios must pass.
+5. **Tasks** — Granular task breakdown in `features/<NNN>/tasks.md`. Order tests before code in every task.
+6. **Test** — Write failing tests for the first task increment. Confirm they fail. This validates that the test infrastructure is wired and the assertions are meaningful.
+7. **Implement** — Drive failing tests to green. Write production code, then refactor. Repeat per task increment.
+8. **Verify** — Run the full quality gate and integration tests against scenarios. All scenarios must pass.
 
 Update both `docs/architecture/roadmap.md` and the Roadmap table above when status changes.
 
@@ -141,6 +142,12 @@ Update both `docs/architecture/roadmap.md` and the Roadmap table above when stat
     - **Test:** If a future agent or the user could reasonably re-raise the same question, the current capture is insufficient. The artefact must contain enough context that a reader can find it, understand the decision, and know it's settled.
     - **When in doubt, create an ADR.** ADRs are cheap; rediscussion is expensive. Even a short ADR that says "we considered X and decided not to do it" prevents future rework.
     - This rule applies even when the decision is "do nothing" or "this is out of scope" — the reasoning must still be recorded.
+12. **Test-First Cadence (TDD)**: Write tests before production code. This is non-negotiable.
+    - **Red → Green → Refactor**: For every task increment, write or extend failing tests first, confirm they fail (red), write the minimum production code to make them pass (green), then refactor.
+    - **Branch coverage upfront**: When outlining a task, list the expected success, validation, and failure branches. Add thin failing tests for each branch **before** writing implementation code so coverage grows organically.
+    - **Quality gate after every increment**: Run the build quality gate (e.g., `./gradlew spotlessApply check`) after every self-contained increment. A red build must be fixed or the failing test explicitly quarantined with a TODO, a documented reason, and a follow-up captured in the plan.
+    - **Tests validate scenarios**: Executable tests MUST map back to the scenarios defined in `scenarios.md`. When a scenario has no corresponding test, that's a gap — fill it before moving on.
+    - **No "implement then test" sequences**: Task breakdowns in `tasks.md` MUST order test creation before production code for each increment. A task that reads "implement X, then add tests" is incorrectly structured — restructure it as "write failing tests for X, then implement X."
 
 ## Pre-Implementation Checklist (Mandatory)
 
@@ -149,7 +156,9 @@ Update both `docs/architecture/roadmap.md` and the Roadmap table above when stat
 > - [ ] Spec has been reviewed/acknowledged by owner
 > - [ ] Feature plan exists at `docs/architecture/features/<NNN>/plan.md`
 > - [ ] Feature tasks exist at `docs/architecture/features/<NNN>/tasks.md`
+> - [ ] Tasks order tests before code for every increment
 > - [ ] Scenarios with input/output contracts exist
+> - [ ] Failing tests exist for the first task increment (red phase)
 > - [ ] Analysis gate checklist (`docs/operations/analysis-gate-checklist.md`) passed
 > - [ ] Current task is marked "in-progress" in tasks.md
 >
