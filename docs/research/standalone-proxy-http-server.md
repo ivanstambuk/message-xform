@@ -310,66 +310,143 @@ Client Request
 ### Configuration Model (Resolved)
 
 Q-030 resolved: **single backend per proxy instance** with structured backend
-config (not a raw URL). The `backend` block is extensible for future auth.
+config. Q-031 resolved: **10 MB default** body limit. Q-032 resolved: **TLS
+supported via config** (plaintext default, optional TLS for both inbound and
+outbound).
+
+**Design principle:** Every operational knob is runtime-configurable via YAML
+and/or environment variables. No rebuild required for tuning.
 
 ```yaml
 # message-xform-proxy.yaml
-proxy:
-  port: 9090
-  host: 0.0.0.0
+# ──────────────────────────────────────────────────────────────
+# All values shown are DEFAULTS. Override via YAML or env vars.
+# ──────────────────────────────────────────────────────────────
 
-# Structured backend configuration — NOT a raw URL.
-# One backend per proxy instance (sidecar model).
-# Extensible for future auth (client-cert, API key, bearer token).
+# ── Inbound (proxy ← client) ─────────────────────────────────
+proxy:
+  host: 0.0.0.0
+  port: 9090
+  tls:                                    # Inbound TLS (optional)
+    enabled: false                        # true → serve HTTPS
+    keystore: /path/to/server.p12         # Server certificate + private key
+    keystore-password: ${KEYSTORE_PASS}
+    keystore-type: PKCS12                 # PKCS12 | JKS
+    # Mutual TLS (client certificate verification):
+    client-auth: none                     # none | want | need
+    truststore: /path/to/client-ca.p12    # Required when client-auth != none
+    truststore-password: ${CLIENT_CA_PASS}
+    truststore-type: PKCS12
+
+# ── Outbound (proxy → backend) ────────────────────────────────
 backend:
-  scheme: http                       # http | https
+  scheme: http                            # http | https
   host: backend-service
   port: 8080
-  connect-timeout-ms: 5000
-  read-timeout-ms: 30000
-  max-body-bytes: 10485760           # 10 MB default (Q-031)
+
+  # Timeouts
+  connect-timeout-ms: 5000               # TCP connect timeout
+  read-timeout-ms: 30000                 # Response read timeout (socket timeout)
+
+  # Body limits (per ADR-0018: adapter concern)
+  max-body-bytes: 10485760               # 10 MB default; 413 if exceeded
+
+  # Connection pool
+  pool:
+    max-connections: 100                  # Max concurrent connections to backend
+    keep-alive: true                      # Use HTTP keep-alive
+    idle-timeout-ms: 60000               # Close idle connections after (ms)
+    # Note: JDK HttpClient exposes pool tuning via system properties
+    # (jdk.httpclient.connectionPoolSize, jdk.httpclient.keepalive.timeout).
+    # These config values map to those properties at startup.
+    # If finer-grained pool control is needed in production, Apache
+    # HttpClient 5 can be substituted as an implementation detail.
+
+  # Outbound TLS (when scheme=https)
+  tls:
+    truststore: /path/to/backend-ca.p12  # CA certs for backend validation
+    truststore-password: ${BACKEND_CA_PASS}
+    truststore-type: PKCS12
+    verify-hostname: true                 # Default: true (disable at your own risk)
+    # Client certificate for mTLS with backend:
+    keystore: /path/to/client.p12         # Client cert + private key
+    keystore-password: ${CLIENT_KEY_PASS}
+    keystore-type: PKCS12
+
   # Future — not implemented in v1:
   # auth:
-  #   type: none                     # none | api-key | client-cert | bearer-token
+  #   type: none                          # none | api-key | bearer-token
   #   api-key:
   #     header: X-API-Key
   #     value: ${API_KEY}
-  #   client-cert:
-  #     keystore: /path/to/keystore.p12
-  #     password: ${KEYSTORE_PASS}
   #   bearer-token:
   #     token: ${JWT_TOKEN}
 
+# ── Transform engine ──────────────────────────────────────────
 engine:
   specs-dir: ./specs
-  profiles-dir: ./profiles          # Optional — single profile per proxy instance
-  profile: ./profiles/dev.yaml      # Or explicit single profile path
-  schema-validation: lenient        # lenient (default) or strict
+  profiles-dir: ./profiles               # Optional — single profile per instance
+  profile: ./profiles/dev.yaml           # Or explicit single profile path
+  schema-validation: lenient             # lenient (default) | strict
 
+# ── Hot reload ────────────────────────────────────────────────
 reload:
   enabled: true
-  watch-dirs:                        # Directories to watch for changes
+  watch-dirs:                             # Directories to watch for changes
     - ./specs
     - ./profiles
-  debounce-ms: 500                   # Debounce file change events
+  debounce-ms: 500                        # Debounce file change events
 
+# ── Health / readiness ────────────────────────────────────────
 health:
   enabled: true
-  path: /health                      # Liveness
-  ready-path: /ready                 # Readiness (engine loaded + upstream reachable)
+  path: /health                           # Liveness probe
+  ready-path: /ready                      # Readiness (engine loaded + backend reachable)
 
+# ── Logging ───────────────────────────────────────────────────
 logging:
-  format: json                       # json or text
+  format: json                            # json | text
   level: INFO
 ```
 
-Environment variable overrides for Docker/K8s:
-- `PROXY_PORT` → `proxy.port`
-- `BACKEND_SCHEME` → `backend.scheme`
-- `BACKEND_HOST` → `backend.host`
-- `BACKEND_PORT` → `backend.port`
-- `SPECS_DIR` → `engine.specs-dir`
-- `LOG_LEVEL` → `logging.level`
+#### Environment Variable Overrides
+
+Every config key maps to an env var for Docker/K8s:
+
+| Env Var | Config Path | Example |
+|---------|------------|---------|
+| `PROXY_PORT` | `proxy.port` | `9090` |
+| `PROXY_TLS_ENABLED` | `proxy.tls.enabled` | `true` |
+| `BACKEND_SCHEME` | `backend.scheme` | `https` |
+| `BACKEND_HOST` | `backend.host` | `my-backend` |
+| `BACKEND_PORT` | `backend.port` | `8080` |
+| `BACKEND_CONNECT_TIMEOUT_MS` | `backend.connect-timeout-ms` | `5000` |
+| `BACKEND_READ_TIMEOUT_MS` | `backend.read-timeout-ms` | `30000` |
+| `BACKEND_MAX_BODY_BYTES` | `backend.max-body-bytes` | `10485760` |
+| `BACKEND_POOL_MAX_CONNECTIONS` | `backend.pool.max-connections` | `100` |
+| `BACKEND_POOL_IDLE_TIMEOUT_MS` | `backend.pool.idle-timeout-ms` | `60000` |
+| `SPECS_DIR` | `engine.specs-dir` | `/specs` |
+| `LOG_LEVEL` | `logging.level` | `DEBUG` |
+
+#### TLS Configuration Summary
+
+| Direction | Purpose | Config Section | Minimum Keys |
+|-----------|---------|---------------|-------------|
+| **Inbound** (client → proxy) | Serve HTTPS | `proxy.tls` | `enabled`, `keystore`, `keystore-password` |
+| **Inbound mTLS** | Verify client certs | `proxy.tls` | + `client-auth: need`, `truststore` |
+| **Outbound** (proxy → backend) | Validate backend cert | `backend.tls` | `truststore`, `truststore-password` |
+| **Outbound mTLS** | Present client cert to backend | `backend.tls` | + `keystore`, `keystore-password` |
+
+#### Connection Pool Notes
+
+The JDK `HttpClient` exposes connection pool tuning via system properties:
+- `jdk.httpclient.connectionPoolSize` — max cached connections (0 = unlimited)
+- `jdk.httpclient.keepalive.timeout` — idle keepalive timeout (seconds)
+
+Our config maps `backend.pool.*` to these system properties at startup. If
+production users need finer-grained pool control (per-route limits, eviction
+policies, detailed metrics), we can substitute Apache HttpClient 5 as an
+implementation detail behind `UpstreamClient` without changing the config schema.
 
 ### GatewayAdapter Implementation
 
@@ -439,9 +516,11 @@ The standalone proxy adds a **trigger mechanism**:
 | ID | Question | Impact | Resolution |
 |----|----------|--------|------------|
 | Q-029 | HTTP server choice | High | ✅ Resolved → ADR-0029: Javalin 6 (Jetty 12) |
-| Q-030 | Upstream routing model | Medium | ✅ Resolved: single backend per instance, structured config (not raw URL) |
-| Q-031 | Body size limits for proxy buffering | Medium | Open — see §7.2 |
-| Q-032 | TLS termination: proxy serves HTTPS or plaintext only | Low | Open — see §7.3 |
+| Q-030 | Upstream routing model | Medium | ✅ Resolved: single backend per instance, structured config (scheme/host/port) |
+| Q-031 | Body size limits for proxy buffering | Medium | ✅ Resolved: 10 MB default, configurable via `backend.max-body-bytes` |
+| Q-032 | TLS termination | Low | ✅ Resolved: plaintext default + TLS via config (inbound + outbound) |
+
+All four questions are now resolved. Decisions documented in §5 Configuration Model.
 
 ### 7.1 Upstream Routing (Resolved)
 
@@ -453,21 +532,24 @@ breaking the config schema. See §5 Configuration Model for the full YAML.
 Multiple backends require multiple proxy instances — natural for Docker/K8s
 deployments where each container handles one upstream.
 
-### 7.2 Body Size Limits
+### 7.2 Body Size Limits (Resolved)
 
 Per ADR-0018, body buffering is an adapter concern. The standalone proxy needs
 its own limit to prevent OOM from large payloads.
 
-**Recommendation:** Default `max-body-bytes: 10485760` (10 MB) with YAML config
+**Decision:** Default `max-body-bytes: 10485760` (10 MB) with YAML config
 override. Requests exceeding the limit get a 413 Payload Too Large response.
+Configurable via `backend.max-body-bytes` and `BACKEND_MAX_BODY_BYTES` env var.
 
-### 7.3 TLS Termination
+### 7.3 TLS (Resolved)
 
-**Recommendation:** Plaintext HTTP only for v1. The proxy is intended for:
-- Local development (no TLS needed)
-- Sidecar behind NGINX/LB (TLS terminated at the edge)
+**Decision:** TLS is supported via YAML config (plaintext is the default).
 
-TLS can be added in a future iteration if demand exists.
+- **Inbound TLS** (`proxy.tls`): server cert + optional mTLS (client cert validation)
+- **Outbound TLS** (`backend.tls`): truststore for backend cert validation +
+  optional client cert for mTLS with backend
+
+See §5 Configuration Model for the full TLS config structure.
 
 ---
 
@@ -495,7 +577,7 @@ Test ← HTTP → Proxy ← HTTP → Mock Upstream
 
 ---
 
-## 9. Summary & Resolved Decisions
+## 9. Summary — All Decisions Resolved
 
 | Decision | Resolution | Status |
 |----------|-----------|--------|
@@ -505,10 +587,11 @@ Test ← HTTP → Proxy ← HTTP → Mock Upstream
 | Backend model | **Structured config** (scheme/host/port), single per instance | ✅ Resolved |
 | Hot reload | **WatchService + admin endpoint** | ✅ Resolved |
 | Docker packaging | **Multi-stage Dockerfile**, shadow JAR, JRE Alpine | ✅ In scope |
-| TLS | **Plaintext only** (v1) — run behind LB | Open (Q-032) |
-| Body limit | **10 MB default** (configurable) | Open (Q-031) |
+| TLS | **Plaintext default + TLS via config** (inbound + outbound) | ✅ Resolved |
+| Body limit | **10 MB default** (configurable via YAML/env) | ✅ Resolved |
+| Connection pool | Configurable via `backend.pool.*` (maps to JDK system props) | ✅ Resolved |
 | Gradle module | `adapter-standalone` | ✅ Resolved |
 | CLI parsing | **picocli** or manual `args` | Low — to be decided |
 
-Remaining open questions: Q-031 (body limit) and Q-032 (TLS). Both are low/medium
-impact and can be resolved during spec writing.
+All key research questions are resolved. The research phase is complete.
+Next step: write the Feature 004 specification (`docs/architecture/features/004/spec.md`).

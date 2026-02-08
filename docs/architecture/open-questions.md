@@ -21,6 +21,5 @@ Hard rules:
 
 | ID | Owner | Question | Options (A preferred) | Status | Asked | Notes |
 |----|-------|----------|------------------------|--------|-------|-------|
-| Q-031 | Ivan | **Proxy body size limit:** What default max body size should the proxy enforce before returning 413? | **A) 10 MB** (covers most JSON APIs, safe for JVM heap). B) 1 MB (conservative). C) Configurable only, no default. | Open | 2026-02-08 | MEDIUM impact. Per ADR-0018, body buffering is adapter-scoped. |
-| Q-032 | Ivan | **TLS termination:** Should the standalone proxy support HTTPS natively, or operate as plaintext-only (behind LB/NGINX)? | **A) Plaintext only** for v1 (run behind LB). B) Optional TLS via YAML config. | Open | 2026-02-08 | LOW impact. Can be deferred; sidecar and dev use cases are plaintext. |
+
 
