@@ -348,8 +348,9 @@ backend:
   connect-timeout-ms: 5000               # TCP connect timeout
   read-timeout-ms: 30000                 # Response read timeout (socket timeout)
 
-  # Body limits (per ADR-0018: adapter concern)
-  max-body-bytes: 10485760               # 10 MB default; 413 if exceeded
+# Body limits — moved to proxy.* namespace per Q-039 resolution.
+  # See spec.md CFG-004-16 for the normative definition.
+  # max-body-bytes is now under proxy: block (proxy.max-body-bytes)
 
   # Connection pool
   pool:
@@ -422,7 +423,7 @@ Every config key maps to an env var for Docker/K8s:
 | `BACKEND_PORT` | `backend.port` | `8080` |
 | `BACKEND_CONNECT_TIMEOUT_MS` | `backend.connect-timeout-ms` | `5000` |
 | `BACKEND_READ_TIMEOUT_MS` | `backend.read-timeout-ms` | `30000` |
-| `BACKEND_MAX_BODY_BYTES` | `backend.max-body-bytes` | `10485760` |
+| `PROXY_MAX_BODY_BYTES` | `proxy.max-body-bytes` | `10485760` |
 | `BACKEND_POOL_MAX_CONNECTIONS` | `backend.pool.max-connections` | `100` |
 | `BACKEND_POOL_IDLE_TIMEOUT_MS` | `backend.pool.idle-timeout-ms` | `60000` |
 | `SPECS_DIR` | `engine.specs-dir` | `/specs` |
@@ -539,7 +540,8 @@ its own limit to prevent OOM from large payloads.
 
 **Decision:** Default `max-body-bytes: 10485760` (10 MB) with YAML config
 override. Requests exceeding the limit get a 413 Payload Too Large response.
-Configurable via `backend.max-body-bytes` and `BACKEND_MAX_BODY_BYTES` env var.
+Configurable via `proxy.max-body-bytes` and `PROXY_MAX_BODY_BYTES` env var
+(renamed from `backend.max-body-bytes` per Q-039).
 
 ### 7.3 TLS (Resolved)
 

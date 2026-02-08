@@ -88,6 +88,13 @@ no changes).
 | FR-004-04 | The proxy MUST forward the HTTP method, path, query string, and headers from the (potentially transformed) request to the backend. | `PUT /api/users/123?fields=name` with `Authorization: Bearer xxx` → all forwarded to backend. | Hop-by-hop headers (`Connection`, `Transfer-Encoding`, etc.) MUST be stripped per RFC 7230 §6.1 in both request and response directions. | n/a | HTTP proxy semantics. |
 | FR-004-05 | The proxy MUST support `GET`, `POST`, `PUT`, `DELETE`, `PATCH`, `HEAD`, and `OPTIONS` HTTP methods. | All seven methods are proxied without modification (unless a URL rewrite transform changes the method). | Unknown method → proxy returns `405 Method Not Allowed`. | n/a | HTTP/1.1a standard. |
 
+> **Rationale for rejecting unknown methods (FR-004-05):** A general-purpose reverse
+> proxy would forward any method. This proxy is purpose-built for JSON body
+> transformation, and non-standard methods (e.g., WebDAV `PROPFIND`) are unlikely
+> to carry transformable payloads. Restricting to seven well-known methods keeps the
+> proxy's surface area predictable. If future adapters need to support additional
+> methods, this can be relaxed without breaking existing behaviour.
+
 ### GatewayAdapter Implementation
 
 | ID | Requirement | Success path | Validation path | Failure path | Source |
@@ -104,7 +111,7 @@ no changes).
 | ID | Requirement | Success path | Validation path | Failure path | Source |
 |----|-------------|--------------|-----------------|--------------|--------|
 | FR-004-10 | The proxy MUST load configuration from a YAML file (`message-xform-proxy.yaml` by default) at startup. | Proxy reads `./message-xform-proxy.yaml` → starts with configured settings. | Config file path overridable via `--config` CLI argument. | Config file not found → proxy exits with error and usage message. | Research §5. |
-| FR-004-11 | Every configuration key MUST be overridable via an environment variable. Env vars take precedence over YAML values. | `BACKEND_HOST=my-service` overrides `backend.host: localhost` in YAML. | Env var with empty string → treated as "unset", YAML value used. | n/a | Docker/K8s deployment. |
+| FR-004-11 | Every configuration key MUST be overridable via an environment variable. Env vars take precedence over YAML values. | `BACKEND_HOST=my-service` overrides `backend.host: localhost` in YAML. | Env var with empty string or whitespace-only value → treated as "unset", YAML value used. An env var is considered "set" if and only if it is defined AND its trimmed value is non-empty. | n/a | Docker/K8s deployment. |
 | FR-004-12 | The backend MUST be configured via a structured object with `scheme`, `host`, and `port` fields (not a raw URL string). | `backend.scheme: https`, `backend.host: api.example.com`, `backend.port: 443` → proxy connects to `https://api.example.com:443`. | Missing `backend.host` → startup fails with descriptive error. `backend.scheme` defaults to `http`. `backend.port` defaults to `80` (http) or `443` (https). | Invalid scheme (not `http` or `https`) → startup fails. | Q-030 resolution. |
 
 ### Body Size Enforcement
@@ -186,7 +193,8 @@ no changes).
 | FR-004-33 | The proxy MUST force HTTP/1.1 for upstream connections (via `HttpClient.Version.HTTP_1_1`). | Proxy sends `GET /` via HTTP/1.1. | n/a | n/a | Non-Goal: HTTP/2 upstream. |
 | FR-004-34 | The proxy MUST recalculate the `Content-Length` header based on the *transformed* body size for **both** upstream requests and client responses. It MUST NOT blindly copy the `Content-Length` from the original message in either direction. | Request: client sends 100 bytes → spec adds 50 bytes → upstream receives `Content-Length: 150`. Response: backend returns 200 bytes → spec removes 50 bytes → client receives `Content-Length: 150`. | n/a | n/a | HTTP framing correctness. |
 | FR-004-36 | When `proxy.forwarded-headers.enabled` is `true` (default), the proxy MUST add `X-Forwarded-For` (client IP), `X-Forwarded-Proto` (`http` or `https` based on inbound scheme), and `X-Forwarded-Host` (original `Host` header value) to upstream requests. If these headers already exist (e.g., from an upstream proxy), the proxy MUST **append** to `X-Forwarded-For` and preserve existing `X-Forwarded-Proto`/`X-Forwarded-Host` values. When disabled, no forwarded headers are added or modified. | Client `10.0.0.5` via HTTPS → backend receives `X-Forwarded-For: 10.0.0.5`, `X-Forwarded-Proto: https`, `X-Forwarded-Host: api.example.com`. | `proxy.forwarded-headers.enabled: false` → no headers added. | n/a | Q-038 resolution, RFC 7239. |
-| FR-004-37 | `wrapRequest` MUST parse cookies from the `Cookie` header (via Javalin’s `ctx.cookieMap()`) and pass them to `TransformContext` as the `cookies` parameter. This enables `$cookies` binding in JSLT expressions (Feature 001 DO-001-07). `wrapResponse` does NOT populate cookies (cookies are a request-direction concept). | Request with `Cookie: session=abc123; lang=en` → `$cookies.session` evaluates to `"abc123"`, `$cookies.lang` evaluates to `"en"`. | Request with no `Cookie` header → `$cookies` is an empty map (not null). | n/a | Q-041 resolution, DO-001-07. |
+| FR-004-37 | `wrapRequest` MUST parse cookies from the `Cookie` header (via Javalin's `ctx.cookieMap()`) and pass them to `TransformContext` as the `cookies` parameter. This enables `$cookies` binding in JSLT expressions (Feature 001 DO-001-07). `wrapResponse` does NOT populate cookies (cookies are a request-direction concept). | Request with `Cookie: session=abc123; lang=en` → `$cookies.session` evaluates to `"abc123"`, `$cookies.lang` evaluates to `"en"`. | Request with no `Cookie` header → `$cookies` is an empty map (not null). | n/a | Q-041 resolution, DO-001-07. |
+| FR-004-38 | When the inbound request does NOT contain an `X-Request-ID` header, `ProxyHandler` MUST generate a random UUID and inject it as an `X-Request-ID` response header. If the header IS present, the proxy MUST echo the original value back in the response. In both cases the request ID is included in structured log entries (NFR-004-07). | Request without `X-Request-ID` → proxy generates UUID, logs with it, returns `X-Request-ID: <uuid>` in response. | Request with `X-Request-ID: abc-123` → proxy logs with `abc-123`, returns `X-Request-ID: abc-123` in response. | n/a | Observability best practice. |
 
 ### TransformResult Dispatch
 
@@ -321,6 +329,7 @@ no changes).
 | S-004-36 | **Readiness NOT_READY (startup):** `GET /ready` before engine loads → `503 {"status": "NOT_READY"}`. |
 | S-004-37 | **Readiness NOT_READY (backend down):** `GET /ready` when backend unreachable → `503 {"status": "NOT_READY", "reason": "backend_unreachable"}`. |
 | S-004-38 | **Health/ready not transformed:** Health and readiness endpoints are NOT subject to profile matching. |
+| S-004-70 | **Wildcard profile vs admin/health:** Profile with `path: /*` or `path: /health` exists → `GET /health` still returns health response, NOT transformed. Admin/health routing takes precedence over profile matching (FR-004-21/22 + endpoint routing priority note). |
 
 ### Category 9 — TLS
 
@@ -390,6 +399,14 @@ no changes).
 | S-004-67 | **Cookie binding in JSLT:** Request with `Cookie: session=abc123; lang=en` → JSLT expression `$cookies.session` evaluates to `"abc123"` (FR-004-37). |
 | S-004-68 | **No cookies:** Request with no `Cookie` header → `$cookies` is an empty map, `$cookies.session` evaluates to `null`. No error. |
 | S-004-69 | **URL-encoded cookie value:** Request with `Cookie: name=hello%20world` → `$cookies.name` evaluates to `"hello world"` (Javalin decodes). |
+
+### Category 17 — Request ID
+
+| Scenario ID | Description / Expected outcome |
+|-------------|--------------------------------|
+| S-004-71 | **Request ID generated:** Request without `X-Request-ID` header → response includes `X-Request-ID: <uuid>` (FR-004-38). Structured log entry includes the generated UUID. |
+| S-004-72 | **Request ID echoed:** Request with `X-Request-ID: abc-123` → response includes `X-Request-ID: abc-123` (FR-004-38). Structured log entry includes `abc-123`. |
+| S-004-73 | **Request ID in error response:** Request that triggers `502 Bad Gateway` (backend unreachable) → error response still includes `X-Request-ID` header (generated or echoed). |
 
 > **Note on chunked transfer encoding:** When clients or backends use
 > `Transfer-Encoding: chunked`, the proxy relies on Javalin/Jetty to assemble the
@@ -487,9 +504,10 @@ no changes).
 | CFG-004-35 | `health.path` | string | `/health` | Liveness probe path |
 | CFG-004-36 | `health.ready-path` | string | `/ready` | Readiness probe path |
 | CFG-004-37 | `logging.format` | enum | `json` | `json` or `text` |
-| CFG-004-38 | `logging.level` | enum | `INFO` | Root log level |
+| CFG-004-38 | `logging.level` | enum | `INFO` | Root log level. Valid values: `TRACE`, `DEBUG`, `INFO`, `WARN`, `ERROR`. Maps to SLF4J/Logback levels. |
 | CFG-004-39 | `proxy.shutdown.drain-timeout-ms` | int | `30000` | Max wait for in-flight requests during graceful shutdown (ms) |
 | CFG-004-40 | `proxy.forwarded-headers.enabled` | boolean | `true` | Add `X-Forwarded-For/Proto/Host` headers to upstream requests (Q-038) |
+| CFG-004-41 | `admin.reload-path` | string | `/admin/reload` | Reload trigger endpoint path. Configurable for consistency with `health.path`/`health.ready-path`. |
 
 ### Environment Variable Mapping
 
@@ -535,6 +553,7 @@ no changes).
 | `LOG_LEVEL` | `logging.level` |
 | `PROXY_SHUTDOWN_DRAIN_TIMEOUT_MS` | `proxy.shutdown.drain-timeout-ms` |
 | `PROXY_FORWARDED_HEADERS_ENABLED` | `proxy.forwarded-headers.enabled` |
+| `ADMIN_RELOAD_PATH` | `admin.reload-path` |
 
 ### Fixtures & Sample Data
 
