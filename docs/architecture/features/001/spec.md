@@ -243,7 +243,7 @@ engines:
 Engine support matrix — the engine MUST validate at load time that a spec does not
 use capabilities the declared engine does not support:
 
-| Engine    | Body Transform | Predicates (`when`) | `$headers` / `$status` | `$queryParams` / `$cookies` | Bidirectional | Status |
+| Engine    | Body Transform | Predicates (`when`) | `$headers` / `$headers_all` / `$status` | `$queryParams` / `$cookies` | Bidirectional | Status |
 |-----------|:-:|:-:|:-:|:-:|:-:|-----------|
 | `jslt`    | ✅ | ✅ | ✅ | ✅ | ✅ | Baseline — always available |
 | `jolt`    | ✅ | ❌ | ❌ | ❌ | ❌ | Structural shift/default/remove only |
@@ -251,7 +251,7 @@ use capabilities the declared engine does not support:
 | `jsonata` | ✅ | ✅ | ✅ | ✅ | ✅ | Future — via adapter |
 | `dataweave` | ✅ | ✅ | ✅ | ✅ | ✅ | Future — being open-sourced by MuleSoft (BSD-3), via adapter |
 
-If a spec declares `lang: jolt` with a `when` predicate or `$headers` reference,
+If a spec declares `lang: jolt` with a `when` predicate or `$headers` / `$headers_all` reference,
 the engine MUST reject the spec at load time with a diagnostic message (e.g.,
 "engine 'jolt' does not support predicates — use 'jslt' or 'jq'").
 
@@ -775,13 +775,31 @@ transform:
 ```
 
 The `$headers` variable is a `JsonNode` object where each key is a header name and
-each value is the first header value (string). Multi-value headers are accessible
-via `$headers."Set-Cookie"` returning the first value; accessing all values requires
-a future extension.
+each value is the first header value (string). For multi-value headers (e.g.,
+`Set-Cookie`, `X-Forwarded-For`), use `$headers_all` which exposes **all** values
+as arrays of strings (ADR-0026):
+
+```yaml
+transform:
+  lang: jslt
+  expr: |
+    {
+      "firstCookie": $headers."Set-Cookie",           # → "session=abc" (first only)
+      "allCookies": $headers_all."Set-Cookie",         # → ["session=abc", "lang=en"]
+      "clientIps": $headers_all."X-Forwarded-For",     # → ["1.1.1.1", "2.2.2.2"]
+      "contentType": $headers_all."Content-Type"       # → ["application/json"]
+    }
+```
+
+`$headers_all` is a `JsonNode` object where keys are header names and values are
+**always arrays of strings** — even for single-value headers. Missing headers
+evaluate to `null` (not empty array).
 
 Processing order:
-1. Engine reads headers from the `Message` envelope → binds as `$headers`.
-2. JSLT body expression evaluates with `$headers` available as read-only context.
+1. Engine reads headers from the `Message` envelope → binds as `$headers` (first
+   value per name) and `$headers_all` (all values as arrays).
+2. JSLT body expression evaluates with `$headers` and `$headers_all` available as
+   read-only context.
 3. Declarative header operations applied:
    a. `remove` — strip matching headers (glob patterns).
    b. `rename` — rename header keys.
@@ -913,7 +931,7 @@ Processing order:
 | DO-001-04 | `TransformProfile` — user-supplied binding of specs to URL/method/content-type patterns | core |
 | DO-001-05 | `TransformResult` — outcome of applying a spec (success/aborted + diagnostics) | core |
 | DO-001-06 | `ExpressionEngine` — pluggable engine SPI (compile + evaluate) | core |
-| DO-001-07 | `TransformContext` — read-only context passed to engines (headers, status, request path/method) | core |
+| DO-001-07 | `TransformContext` — read-only context passed to engines (headers, headers_all, status, request path/method) | core |
 
 ### Core Engine API
 
@@ -1043,6 +1061,9 @@ domain_objects:
       - name: headers
         type: JsonNode
         note: "Read-only $headers — keys are header names, values are first value"
+      - name: headersAll
+        type: JsonNode
+        note: "Read-only $headers_all — keys are header names, values are arrays of all values (ADR-0026)"
       - name: statusCode
         type: Integer
         note: "$status — null for request transforms (ADR-0017, ADR-0020)"

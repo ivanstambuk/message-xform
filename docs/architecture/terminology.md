@@ -261,6 +261,8 @@ terminology agreements must be captured here immediately.
 | load time | deploy time, startup time, init time |
 | evaluation time | runtime, execution time (when referring to transform execution) |
 | body | payload (except in JourneyForge context), message body |
+| `$headers` | the first-value header context variable |
+| `$headers_all` | the multi-value header context variable (arrays) — ADR-0026 |
 | passthrough | bypass, skip, no-op |
 | specificity score | priority number, weight, rank |
 | product-defined | implementation-defined, adapter-defined (for cross-profile routing) |

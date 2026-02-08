@@ -22,8 +22,6 @@ Hard rules:
 | ID | Owner | Question | Options (A preferred) | Status | Asked | Notes |
 |----|-------|----------|------------------------|--------|-------|-------|
 
-| Q-023 | Ivan | **Multi-value header access**: FR-001-10 says `$headers."Set-Cookie"` returns the first value and "accessing all values requires a future extension." Is this documented well enough, or should we define the exact future API now? Real-world scenarios: `Set-Cookie` always has multiple values, `X-Forwarded-For` chains multiple IPs. | A) Define the multi-value API now as `$headers_all` (a JsonNode where values are arrays of strings) but mark it as **deferred implementation** — document the shape so adapters can prepare for it. B) Ship single-value only and defer entirely. The workaround is header-to-body injection via the adapter. C) Change `$headers` to always use arrays (breaking); this is the most honest representation. | Open | 2026-02-07 | Severity: LOW-MEDIUM — `Set-Cookie` and `X-Forwarded-For` are the main multi-value headers. Most transform scenarios only need request headers which are typically single-value. |
-
 
 
 

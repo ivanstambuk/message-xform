@@ -59,14 +59,14 @@ Positive:
 - Consistent with Kong/Apigee transformer patterns.
 
 Negative / trade-offs:
-- Multi-value headers: `$headers` exposes the first value only in v1. Full multi-value
-  support is deferred to a future extension.
+- Multi-value headers: `$headers` exposes the first value only. Full multi-value
+  access is available via `$headers_all` (ADR-0026) — normative in Feature 001.
 - Dynamic header `expr` evaluated against the **transformed** body — could return non-string
   values that need coercion.
 
 Follow-ups:
 - FR-001-10 added to encode this requirement.
-- Multi-value header support tracked for a future version.
+- Multi-value header access defined in ADR-0026 (`$headers_all`).
 
 References:
 - Feature 001 spec: `docs/architecture/features/001/spec.md` (FR-001-10)

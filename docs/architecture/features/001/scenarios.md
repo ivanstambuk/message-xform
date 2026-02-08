@@ -2989,6 +2989,121 @@ expected_error:
 
 ---
 
+## Category 15: Multi-Value Header Access (ADR-0026)
+
+Scenarios validating that `$headers_all` exposes all header values as arrays.
+
+### S-001-69: Multi-Value Set-Cookie via `$headers_all`
+
+```yaml
+scenario: S-001-69
+name: headers-all-set-cookie-multi-value
+description: >
+  A response carries two Set-Cookie headers. $headers returns only the first
+  value, while $headers_all returns both as an array. Validates ADR-0026.
+tags: [headers, multi-value, headers-all, set-cookie, adr-0026]
+requires: [FR-001-10]
+
+transform:
+  lang: jslt
+  expr: |
+    {
+      "firstCookie": $headers."Set-Cookie",
+      "allCookies": $headers_all."Set-Cookie",
+      "cookieCount": size($headers_all."Set-Cookie"),
+      "singleHeader": $headers_all."Content-Type",
+      "data": .data
+    }
+
+context:
+  headers:
+    Set-Cookie: ["session=abc123; Path=/", "lang=en; Path=/"]
+    Content-Type: ["application/json"]
+
+input:
+  data: "hello"
+
+expected_output:
+  firstCookie: "session=abc123; Path=/"
+  allCookies: ["session=abc123; Path=/", "lang=en; Path=/"]
+  cookieCount: 2
+  singleHeader: ["application/json"]
+  data: "hello"
+```
+
+### S-001-70: `$headers_all` Missing Header Returns Null
+
+```yaml
+scenario: S-001-70
+name: headers-all-missing-returns-null
+description: >
+  When a header is not present, $headers_all returns null (not an empty array).
+  This is consistent with $headers behaviour. Validates ADR-0026.
+tags: [headers, multi-value, headers-all, null, edge-case, adr-0026]
+requires: [FR-001-10]
+
+transform:
+  lang: jslt
+  expr: |
+    {
+      "existing": $headers_all."Content-Type",
+      "missing": $headers_all."X-Does-Not-Exist",
+      "hasMissing": $headers_all."X-Does-Not-Exist" != null,
+      "data": .data
+    }
+
+context:
+  headers:
+    Content-Type: ["application/json"]
+
+input:
+  data: "test"
+
+expected_output:
+  existing: ["application/json"]
+  missing: null
+  hasMissing: false
+  data: "test"
+```
+
+### S-001-71: X-Forwarded-For Chain via `$headers_all`
+
+```yaml
+scenario: S-001-71
+name: headers-all-x-forwarded-for-chain
+description: >
+  X-Forwarded-For carries multiple IPs through proxy layers. $headers_all
+  exposes all values. The spec extracts the original client IP (first element).
+  Validates ADR-0026.
+tags: [headers, multi-value, headers-all, x-forwarded-for, adr-0026]
+requires: [FR-001-10]
+
+transform:
+  lang: jslt
+  expr: |
+    {
+      "clientIp": $headers_all."X-Forwarded-For"[0],
+      "proxyChain": $headers_all."X-Forwarded-For",
+      "hopCount": size($headers_all."X-Forwarded-For"),
+      "data": .data
+    }
+
+context:
+  headers:
+    X-Forwarded-For: ["192.168.1.1", "10.0.0.1", "172.16.0.1"]
+
+input:
+  data: "request"
+
+expected_output:
+  clientIp: "192.168.1.1"
+  proxyChain: ["192.168.1.1", "10.0.0.1", "172.16.0.1"]
+  hopCount: 3
+  data: "request"
+```
+
+---
+
 ## Scenario Index
 
 | ID | Name | Category | Tags |
@@ -3061,6 +3176,9 @@ expected_error:
 | S-001-66 | load-time-error-type-discrimination | Error Type Catalogue | error-catalogue, load-time, exception-hierarchy, adr-0024 |
 | S-001-67 | eval-budget-exceeded-exception-type | Error Type Catalogue | error-catalogue, eval-time, budget, exception-hierarchy, adr-0024 |
 | S-001-68 | spec-parse-exception-source-path | Error Type Catalogue | error-catalogue, load-time, source-path, adr-0024 |
+| S-001-69 | headers-all-set-cookie-multi-value | Multi-Value Headers | headers, multi-value, headers-all, set-cookie, adr-0026 |
+| S-001-70 | headers-all-missing-returns-null | Multi-Value Headers | headers, multi-value, headers-all, null, edge-case, adr-0026 |
+| S-001-71 | headers-all-x-forwarded-for-chain | Multi-Value Headers | headers, multi-value, headers-all, x-forwarded-for, adr-0026 |
 
 ## Coverage Matrix
 
@@ -3075,7 +3193,7 @@ expected_error:
 | FR-001-07 (Error Handling) | S-001-24, S-001-28, S-001-56, S-001-58, S-001-66, S-001-67, S-001-68 |
 | FR-001-08 (Reusable Mappers) | S-001-50, S-001-51, S-001-52, S-001-59 |
 | FR-001-09 (Schema Validation) | S-001-53, S-001-54, S-001-55 |
-| FR-001-10 (Header Transforms) | S-001-33, S-001-34, S-001-35, S-001-57 |
+| FR-001-10 (Header Transforms) | S-001-33, S-001-34, S-001-35, S-001-57, S-001-69, S-001-70, S-001-71 |
 | FR-001-11 (Status Code Transforms) | S-001-36, S-001-37, S-001-38, S-001-61, S-001-63 |
 | NFR-001-01 (Stateless) | All — implicit in test harness design |
 | NFR-001-03 (Latency <5ms) | S-001-23 |
