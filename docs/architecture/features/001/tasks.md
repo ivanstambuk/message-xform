@@ -325,7 +325,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `./gradlew :core:test --tests "*TransformEngineTest*"`
   - `./gradlew spotlessApply check`
 
-- [ ] **T-001-20** — Passthrough for non-matching messages (FR-001-06)
+- [x] **T-001-20** — Passthrough for non-matching messages (FR-001-06)
   _Intent:_ When no spec/profile matches, the engine MUST return the message
   completely unmodified. This is the default safety behaviour.
   _Test first:_ Write `PassthroughTest`:

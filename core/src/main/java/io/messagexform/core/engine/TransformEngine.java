@@ -91,9 +91,10 @@ public final class TransformEngine {
         // Resolve the expression based on directionality
         CompiledExpression expr = resolveExpression(spec, direction);
 
-        // Evaluate the expression against the message body
-        // Phase 4: no context variable binding (T-001-21 adds $headers, $status)
-        TransformContext context = TransformContext.empty();
+        // Build context from message metadata (T-001-21, FR-001-10/11).
+        // For REQUEST transforms, $status is null (ADR-0017).
+        Integer status = direction == Direction.RESPONSE ? message.statusCode() : null;
+        TransformContext context = new TransformContext(message.headers(), message.headersAll(), status, null, null);
         JsonNode transformedBody = expr.evaluate(message.body(), context);
 
         // Build the transformed message, preserving envelope metadata
