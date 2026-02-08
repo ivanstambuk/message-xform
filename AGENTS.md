@@ -177,6 +177,7 @@ Update both `docs/architecture/roadmap.md` and the Roadmap table above when stat
     - **Library/API quirks** → the relevant `docs/research/` document.
     - **Tooling/process pitfalls** → `AGENTS.md` (this file), under "Known Pitfalls" below.
     - **Conventions** → `AGENTS.md` operational rules.
+18. **No Cascading Renumber**: When inserting new increments, tasks, scenarios, or requirements between existing ones, use **letter suffixes** (e.g., I11a, T-001-36a, S-001-74a, FR-001-12a) instead of renumbering all downstream IDs. This avoids churn across cross-referencing documents (spec, plan, tasks, scenarios, knowledge-map). A dedicated cleanup pass may renumber IDs at the end of a feature when the structure is stable — never during active refinement.
 
 ### Known Pitfalls
 

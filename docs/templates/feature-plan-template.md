@@ -76,6 +76,13 @@ prerequisites, deliverables, tests, and commands. **Order tests before code.**
 Add as many increments as required. For parallel work, split into sub-increments
 (I3a/I3b) instead of bloating a single entry.
 
+> **No cascading renumber rule:** When inserting a new increment between existing
+> ones, use **letter suffixes** (e.g., I11a, I11b) instead of renumbering all
+> downstream increments. This avoids churn in cross-references (scenario tracking,
+> tasks, intent log). A dedicated cleanup pass may renumber IDs at the end of a
+> feature when the structure is stable. The same rule applies to task IDs
+> (T-NNN-36a) and scenario IDs (S-NNN-74a).
+
 ## Scenario Tracking
 
 Map each Scenario ID to the increments/tasks that implement it so changes remain

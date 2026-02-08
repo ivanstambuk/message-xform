@@ -23,6 +23,11 @@ _Last updated:_ YYYY-MM-DD
 Tasks are ordered by dependency. Each task references the spec requirement it
 implements and **sequences tests before code** (Rule 12 — TDD cadence).
 
+> **No cascading renumber rule:** When inserting a new task between existing ones,
+> use **letter suffixes** (e.g., T-NNN-36a, T-NNN-36b) instead of renumbering all
+> downstream task IDs. This avoids churn in cross-references. A dedicated cleanup
+> pass may renumber IDs when the feature structure is stable.
+
 ### Phase 1 — <Title>
 
 - [ ] **T-<NNN>-01** — <Task title> (FR-<NNN>-XX, S-<NNN>-XX)
