@@ -11,8 +11,8 @@ contributors to understand how components connect.
 ```
 message-xform/
 ├── core/                          # Transform engine (zero gateway deps)
-│   ├── model/                     # TransformSpec, TransformProfile, Message, HeaderSpec
-│   ├── engine/                    # Expression evaluation, profile matching, header transforms
+│   ├── model/                     # TransformSpec, TransformProfile, Message, HeaderSpec, StatusSpec
+│   ├── engine/                    # Expression evaluation, profile matching, header + status transforms
 │   ├── spec/                      # SpecParser — YAML to TransformSpec loading
 │   ├── spi/                       # ExpressionEngine, TelemetryListener
 │   ├── schema/                    # JSON Schema validation

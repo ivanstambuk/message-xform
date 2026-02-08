@@ -1717,6 +1717,48 @@ expected_status: 202
 
 ---
 
+### S-001-38i: Status When Predicate Evaluation Error — Keep Original Status
+
+**Narrative**: When the `when` predicate on a status block fails at evaluation time
+(e.g., type error, missing function argument), the engine keeps the original status
+code and does NOT abort the entire transform — the body transform still succeeds.
+
+```yaml
+scenario: S-001-38i
+title: Status when predicate evaluation error — keep original status
+category: Status Code Transforms
+requires: [FR-001-11]
+references: [ADR-0003]
+tags: [status, error-handling, when-predicate]
+
+transform:
+  lang: jslt
+  expr: |
+    { "data": .data }
+
+status:
+  set: 500
+  when: 'contains(.nonexistentArray, "value")'
+
+input:
+  data: "test"
+
+request_status: 200
+
+expected_output:
+  data: "test"
+
+expected_status: 200
+
+notes: >
+  The when predicate calls contains() on a null/missing field, which triggers
+  a JSLT evaluation error. Per ADR-0003, status predicate errors are non-fatal:
+  the engine logs a warning and preserves the original status code. The body
+  transform is unaffected.
+```
+
+---
+
 ## Category 10a: URL Rewriting
 
 Scenarios validating URL rewriting — path rewrite, query parameter operations,
@@ -3605,7 +3647,7 @@ expected_log_entries:
 | FR-001-08 (Reusable Mappers) | S-001-50, S-001-51, S-001-52, S-001-59 |
 | FR-001-09 (Schema Validation) | S-001-53, S-001-54, S-001-55 |
 | FR-001-10 (Header Transforms) | S-001-33, S-001-34, S-001-35, S-001-57, S-001-69, S-001-70, S-001-71, S-001-72 |
-| FR-001-11 (Status Code Transforms) | S-001-36, S-001-37, S-001-38, S-001-61, S-001-63 |
+| FR-001-11 (Status Code Transforms) | S-001-36, S-001-37, S-001-38, S-001-38i, S-001-61, S-001-63 |
 | FR-001-12 (URL Rewriting) | S-001-38a, S-001-38b, S-001-38c, S-001-38d, S-001-38e, S-001-38f, S-001-38g |
 | NFR-001-01 (Stateless) | All — implicit in test harness design |
 | NFR-001-03 (Latency <5ms) | S-001-23 |

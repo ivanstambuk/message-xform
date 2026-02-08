@@ -54,6 +54,12 @@ Context variables are bound as **top-level JSLT external variables** using
    `{ * - secret : . }` (the minus in the matcher), **not** `{ * : . } - "secret"`
    (which is an invalid subtraction expression).
 
+6. **`contains()` on null/missing fields throws** — calling `contains(.missingField, "value")`
+   where `.missingField` is null or absent triggers a `JsltException` at evaluation
+   time (not a false return). This matters for `status.when` predicates: a `when`
+   predicate that calls `contains()` on a field that doesn't exist in the transformed
+   body will fail, causing the engine to keep the original status code (S-001-38i).
+
 ## Implications
 
 - No wrapper or adapter layer needed — the JSLT library's native variable
