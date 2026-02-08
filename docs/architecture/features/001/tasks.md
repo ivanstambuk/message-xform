@@ -214,6 +214,10 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `jslt-simple-rename.yaml` (FX-001-01)
   - `jslt-conditional.yaml` (FX-001-02)
   - `jslt-array-reshape.yaml` (FX-001-03)
+  All fixtures MUST include `input.schema` and `output.schema` blocks
+  (FR-001-09 — schemas are required). This ensures T-001-14 exercises the
+  full parse path and T-001-18 can reuse the same fixtures for schema
+  validation testing.
   _Verify:_ Files exist and are valid YAML.
   _Verification commands:_
   - N/A — file creation only.
@@ -231,9 +235,10 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   Use Jackson YAML parser. Resolve engine via `EngineRegistry`.
   _Design note:_ `TransformSpec` is an immutable record with nullable fields
   for attributes populated by later phases (sensitive, match, headers, status,
-  mappers). Phase 3 populates: id, version, description, lang, inputSchema,
-  outputSchema, compiledExpr, forward, reverse. Remaining fields are null
-  until Phases 5–6 extend parsing.
+  mappers, url). Phase 3 populates: id, version, description, lang,
+  inputSchema, outputSchema, compiledExpr, forward, reverse. Remaining
+  fields are null until Phases 5–6 extend parsing (url is Phase 6 / I11a
+  per FR-001-12/ADR-0027).
   _Verify:_ `SpecParserTest` passes.
   _Verification commands:_
   - `./gradlew :core:test --tests "*SpecParserTest*"`
