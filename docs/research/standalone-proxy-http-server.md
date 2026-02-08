@@ -307,7 +307,10 @@ Client Request
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### Configuration Model (Draft)
+### Configuration Model (Resolved)
+
+Q-030 resolved: **single backend per proxy instance** with structured backend
+config (not a raw URL). The `backend` block is extensible for future auth.
 
 ```yaml
 # message-xform-proxy.yaml
@@ -315,10 +318,27 @@ proxy:
   port: 9090
   host: 0.0.0.0
 
-upstream:
-  url: http://backend:8080
+# Structured backend configuration — NOT a raw URL.
+# One backend per proxy instance (sidecar model).
+# Extensible for future auth (client-cert, API key, bearer token).
+backend:
+  scheme: http                       # http | https
+  host: backend-service
+  port: 8080
   connect-timeout-ms: 5000
   read-timeout-ms: 30000
+  max-body-bytes: 10485760           # 10 MB default (Q-031)
+  # Future — not implemented in v1:
+  # auth:
+  #   type: none                     # none | api-key | client-cert | bearer-token
+  #   api-key:
+  #     header: X-API-Key
+  #     value: ${API_KEY}
+  #   client-cert:
+  #     keystore: /path/to/keystore.p12
+  #     password: ${KEYSTORE_PASS}
+  #   bearer-token:
+  #     token: ${JWT_TOKEN}
 
 engine:
   specs-dir: ./specs
@@ -342,6 +362,14 @@ logging:
   format: json                       # json or text
   level: INFO
 ```
+
+Environment variable overrides for Docker/K8s:
+- `PROXY_PORT` → `proxy.port`
+- `BACKEND_SCHEME` → `backend.scheme`
+- `BACKEND_HOST` → `backend.host`
+- `BACKEND_PORT` → `backend.port`
+- `SPECS_DIR` → `engine.specs-dir`
+- `LOG_LEVEL` → `logging.level`
 
 ### GatewayAdapter Implementation
 
@@ -408,31 +436,22 @@ The standalone proxy adds a **trigger mechanism**:
 
 ## 7. Key Design Decisions for Spec Phase
 
-These require resolution before the Feature 004 spec is written:
+| ID | Question | Impact | Resolution |
+|----|----------|--------|------------|
+| Q-029 | HTTP server choice | High | ✅ Resolved → ADR-0029: Javalin 6 (Jetty 12) |
+| Q-030 | Upstream routing model | Medium | ✅ Resolved: single backend per instance, structured config (not raw URL) |
+| Q-031 | Body size limits for proxy buffering | Medium | Open — see §7.2 |
+| Q-032 | TLS termination: proxy serves HTTPS or plaintext only | Low | Open — see §7.3 |
 
-| ID | Question | Impact | See |
-|----|----------|--------|-----|
-| Q-029 | HTTP server choice: Javalin vs JDK HttpServer | High | §2 |
-| Q-030 | Upstream routing model: single vs per-profile upstream | Medium | §7.1 |
-| Q-031 | Body size limits for proxy buffering | Medium | §7.2 |
-| Q-032 | TLS termination: proxy serves HTTPS or plaintext only | Low | §7.3 |
+### 7.1 Upstream Routing (Resolved)
 
-### 7.1 Upstream Routing Model
+**Decision: Single backend per proxy instance** with structured backend config.
+The `backend` block uses `scheme`, `host`, `port` instead of a raw URL string.
+This is extensible for future auth (client-cert, API key, bearer token) without
+breaking the config schema. See §5 Configuration Model for the full YAML.
 
-**Option A — Single upstream (per proxy instance):**
-All requests are forwarded to one upstream URL. Multiple upstreams require
-multiple proxy instances. Simple, Docker-friendly.
-
-**Option B — Per-profile upstream:**
-Each profile entry can specify its own upstream URL. One proxy instance can
-forward to multiple backends based on the matched profile.
-
-**Option C — Hybrid:**
-Single default upstream + optional per-profile override.
-
-**Recommendation:** Start with **Option A** (single upstream per instance).
-This is the simplest model, aligns with sidecar deployment, and avoids
-premature complexity. Can evolve to Option C later.
+Multiple backends require multiple proxy instances — natural for Docker/K8s
+deployments where each container handles one upstream.
 
 ### 7.2 Body Size Limits
 
@@ -476,19 +495,20 @@ Test ← HTTP → Proxy ← HTTP → Mock Upstream
 
 ---
 
-## 9. Summary & Recommendation
+## 9. Summary & Resolved Decisions
 
-| Decision | Recommendation | Confidence |
-|----------|---------------|------------|
-| HTTP server | **Javalin 6** (Jetty 12) | High — best API/effort ratio |
-| HTTP client | **JDK `HttpClient`** (built-in) | Very High — zero deps |
-| Config format | **YAML** (`message-xform-proxy.yaml`) | High — consistent with specs |
-| Hot reload | **WatchService + admin endpoint** | High |
-| Upstream model | **Single upstream per instance** (v1) | High — simplest model |
-| TLS | **Plaintext only** (v1) | High — run behind LB |
-| Body limit | **10 MB default** (configurable) | Medium |
-| Gradle module | `adapter-standalone` | High — per knowledge map |
+| Decision | Resolution | Status |
+|----------|-----------|--------|
+| HTTP server | **Javalin 6** (Jetty 12) — ADR-0029 | ✅ Resolved |
+| HTTP client | **JDK `HttpClient`** (built-in, zero deps) | ✅ Resolved |
+| Config format | **YAML** (`message-xform-proxy.yaml`) | ✅ Resolved |
+| Backend model | **Structured config** (scheme/host/port), single per instance | ✅ Resolved |
+| Hot reload | **WatchService + admin endpoint** | ✅ Resolved |
+| Docker packaging | **Multi-stage Dockerfile**, shadow JAR, JRE Alpine | ✅ In scope |
+| TLS | **Plaintext only** (v1) — run behind LB | Open (Q-032) |
+| Body limit | **10 MB default** (configurable) | Open (Q-031) |
+| Gradle module | `adapter-standalone` | ✅ Resolved |
 | CLI parsing | **picocli** or manual `args` | Low — to be decided |
 
-The top-level open question is **Q-029 (HTTP server choice)**. All other decisions
-flow naturally from the architecture constraints.
+Remaining open questions: Q-031 (body limit) and Q-032 (TLS). Both are low/medium
+impact and can be resolved during spec writing.
