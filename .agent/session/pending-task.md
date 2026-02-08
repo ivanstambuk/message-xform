@@ -1,22 +1,17 @@
 # Pending Task
 
-**Focus**: Phase 3 — Spec Parsing + Loading (Feature 001)
-**Status**: T-001-13 and T-001-14 complete. Next is T-001-15 (error handling).
-**Next Step**: Implement `SpecParserTest` negative cases and `SpecParser` error paths.
+**Focus**: Feature 001 — Phase 4: Core Transform Pipeline (T-001-19)
+**Status**: Phase 3 complete (T-001-01..18, 93 tests). Ready to start Phase 4.
+**Next Step**: Implement T-001-19 — Basic transform: load spec + transform message
 
 ## Context Notes
-- `TransformSpec` record created in `core/src/main/java/io/messagexform/core/model/TransformSpec.java`
-- `SpecParser` created in `core/src/main/java/io/messagexform/core/spec/SpecParser.java`
-- 3 fixture YAML files in `core/src/test/resources/test-vectors/` (FX-001-01/02/03)
-- 72 tests passing, build clean
-- IDE upgraded: `redhat.java` v1.12 → v1.53 for Java 21 support
-- `.vscode/settings.json` created (gitignored) with JDK 21 runtime config
+- Phase 3 implemented: SpecParser, TransformSpec, bidirectional parsing, schema validation
+- All 93 tests passing, build clean (`./gradlew spotlessApply check`)
+- The `TransformEngine` class (the central orchestrator) does not exist yet — T-001-19 creates it
+- Key domain objects for Phase 4: `TransformEngine`, `TransformResult`, `Message`, `TransformContext`
+  (Message and TransformContext already exist from Phase 1; TransformResult exists as a record)
+- T-001-19 is the "engine comes alive" moment: load a spec via SpecParser, pass a Message, get a TransformResult
+- Session Boundary Convention codified in AGENTS.md — agent suggests /retro+/handover at phase boundaries
 
-## Remaining Phase 3 Tasks
-- **T-001-15** — Error handling: missing fields, bad YAML, unknown engine → SpecParseException
-- **T-001-16** — Create bidirectional fixture (FX-001-04 with forward/reverse blocks)
-- **T-001-17** — Parse bidirectional specs (forward + reverse expressions)
-- **T-001-18** — Schema validation on parsed specs (FR-001-09)
-
-## SDD Gaps
-- None identified — retro audit was clean across all 5 checks.
+## SDD Gaps (if any)
+- None identified. Retro audit was clean across all 5 checks.
