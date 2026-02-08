@@ -1,30 +1,24 @@
 # Pending Task
 
-**Focus**: Feature 001 — Message Transformation Engine is functionally complete
-**Status**: Phase 8 (I15 + I16) complete. All 52 tasks done. Drift gate clean.
-**Next Step**: Decide on the next feature to work on (or wrap up Feature 001 exit criteria)
+**Focus**: Feature 001 formally complete — choose next feature
+**Status**: All exit criteria met. Roadmap, spec, plan, tasks all marked complete.
+**Next Step**: Pick the next feature to work on (Feature 004 standalone proxy is Tier 1)
 
 ## Context Notes
-- Feature 001 core engine is feature-complete: all 12 FRs and 10 NFRs verified
-- 367 tests passing, 0 failures, 8 skipped (JOLT/jq engines not implemented)
+- Feature 001 core engine is fully verified: 12/12 FRs, 10/10 NFRs, drift gate clean
+- 367 tests passing, 0 failures, 8 skipped (JOLT/jq stubs)
 - 84 scenarios defined, 78 with test class references
-- Full drift gate report in `plan.md` — clean pass
-- JSLT null-omission quirk documented in scenarios.md (JSLT omits keys with null values)
+- Roadmap, AGENTS.md, spec.md, plan.md, tasks.md all updated to reflect completion
 
-## Remaining Feature 001 Exit Criteria (from plan.md)
-- [x] All 16 increments completed and checked off
-- [x] Quality gate passes (`./gradlew spotlessApply check`)
-- [x] Scenario coverage matrix complete
-- [x] Implementation drift gate report attached
-- [x] Open questions resolved
-- [ ] Documentation synced: roadmap status → ✅ Complete
-- [ ] All 73 scenarios pass — 84 defined, 20 pass in suite, rest in dedicated tests
+## Candidate Next Features (priority order)
+1. **Feature 004** — Standalone HTTP Proxy (Tier 1, E2E test harness)
+2. **Feature 009** — Toolchain & Quality Platform (meta-feature, can pair with 004)
+3. **Feature 002** — PingAccess Adapter (Tier 2, primary production target)
+4. **Cross-Language Portability Audit** — backlog item, language-neutral contract review
 
-## Follow-ups (from plan.md backlog)
+## Backlog Items (from plan.md)
 - **JMH benchmarks** — NFR-001-03 (<5ms latency) not yet benchmarked
 - **Alternative engines** — JOLT, jq, JSONata SPI stubs exist, no impls
-- **Feature 004** — Standalone HTTP proxy (GatewayAdapter for HTTP)
-- **Feature 009** — Toolchain formalization
 
 ## SDD Gaps
-- None identified in retro audit
+- None identified

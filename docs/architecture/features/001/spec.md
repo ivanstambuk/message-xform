@@ -2,8 +2,8 @@
 
 | Field | Value |
 |-------|-------|
-| Status | Draft |
-| Last updated | 2026-02-07 |
+| Status | Ready |
+| Last updated | 2026-02-08 |
 | Owners | Ivan |
 | Linked plan | `docs/architecture/features/001/plan.md` |
 | Linked tasks | `docs/architecture/features/001/tasks.md` |
