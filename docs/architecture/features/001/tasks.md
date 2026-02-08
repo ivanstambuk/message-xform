@@ -1,6 +1,6 @@
 # Feature 001 — Message Transformation Engine — Tasks
 
-_Status:_ In Progress
+_Status:_ In Progress (Phase 9 — T-001-53 pending)
 _Last updated:_ 2026-02-08
 
 **Governing spec:** `docs/architecture/features/001/spec.md`
@@ -964,6 +964,45 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - Review: `docs/architecture/open-questions.md` has no open entries.
 
 
+---
+
+## Phase 9 — Performance Verification (ADR-0028)
+
+> **Scope:** Lightweight NFR-001-03 verification only. Heavy infrastructure (JMH,
+> CI gate, regression tracking) is deferred to Feature 009 (Toolchain).
+> See ADR-0028 for rationale.
+
+### T-001-53 — TransformEngineBenchmark (NFR-001-03)
+
+- [ ] **T-001-53** — Lightweight opt-in benchmark verifying NFR-001-03
+  _Intent:_ Prove that core transform latency is < 5ms for typical payloads (< 50KB).
+  Uses the openauth-sim pattern: plain JUnit 5 + `assumeTrue` + `System.nanoTime()`.
+  No JMH required.
+  _Test-first:_
+  - Create `TransformEngineBenchmark.java` in `core/src/test/java/io/messagexform/core/engine/`.
+  - Guard with `assumeTrue(isBenchmarkEnabled())` using `-Dio.messagexform.benchmark=true`
+    or env var `IO_MESSAGEXFORM_BENCHMARK=true`.
+  - Implement warmup phase (2,000 iterations) + measured phase (20,000 iterations).
+  - Compute and log: p50, p90, p95, p99, max latency (ms), throughput (ops/sec).
+  - Benchmark scenarios:
+    - **Identity transform** — JSLT `.` expression, 1KB body.
+    - **Simple field mapping** — 5-field JSLT, 10KB body.
+    - **Complex transform** — nested structure with array, 50KB body.
+  - Log structured output: `xform-bench.<scenario> warmup=2000 measured=20000 totalMs=... p95Ms=... p99Ms=...`
+  - Soft-assert p95 < 5ms for all scenarios (log warning, don't fail build).
+  _Implement:_
+  - `BenchmarkReport` record with percentile and throughput helpers (follow openauth-sim pattern).
+  - Environment summary method (`os.name`, `os.arch`, `java.runtime.version`, `availableProcessors`).
+  - Test fixtures: preloaded specs + sample JSON bodies at 1KB, 10KB, 50KB.
+  _Verify:_
+  - `IO_MESSAGEXFORM_BENCHMARK=true ./gradlew :core:test --tests "*TransformEngineBenchmark*" --info`
+  - Benchmark is skipped when flag is not set (default `./gradlew check` unaffected).
+  - Results logged with percentile data + environment summary.
+  _Scenarios:_ S-001-53a, S-001-53b, S-001-53c
+  _ADR:_ ADR-0028
+
+---
+
 ## Verification Log
 
 Track long-running or shared commands with timestamps to avoid duplicate work.
@@ -992,7 +1031,8 @@ Track long-running or shared commands with timestamps to avoid duplicate work.
 
 ## Completion Criteria
 
-- [x] All 52 tasks checked off
+- [x] All 52 Phase 1–8 tasks checked off
+- [ ] T-001-53 (Phase 9 — performance benchmark) checked off
 - [x] Quality gate passes (`./gradlew spotlessApply check`)
 - [x] All 84 scenarios verified — 20 in parameterized suite, 58 in dedicated test classes, 4 skipped (JOLT/jq stubs), 2 no-test (dynamic/placeholder)
 - [x] Coverage matrix in `scenarios.md` has no uncovered FRs/NFRs

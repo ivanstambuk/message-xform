@@ -512,7 +512,8 @@ engine working) and Phase 8 completion (all scenarios pass).
 
 ## Exit Criteria
 
-- [x] All 16 increments completed and checked off
+- [x] All 16 increments (Phase 1–8) completed and checked off
+- [ ] Phase 9 (T-001-53 — performance benchmark) completed
 - [x] Quality gate passes (`./gradlew spotlessApply check`)
 - [x] All 84 scenarios verified — 20 in parameterized suite, 58 in dedicated test classes, 4 skipped (JOLT/jq not implemented), 2 no-test (dynamic/placeholder)
 - [x] Coverage matrix in `scenarios.md` has no uncovered FRs/NFRs
@@ -529,8 +530,12 @@ Record key prompts, decisions, and validation commands per increment:
 
 ## Follow-ups / Backlog
 
-- **JMH benchmarks** — Add microbenchmarks after functional completeness to
-  verify NFR-001-03 (< 5ms latency). Separate benchmark source set.
+- **T-001-53: TransformEngineBenchmark** (Phase 9) — Lightweight opt-in benchmark
+  verifying NFR-001-03 (< 5ms for < 50KB). Uses openauth-sim pattern: plain JUnit +
+  `assumeTrue` + `System.nanoTime()`. See ADR-0028.
+- **Feature 009: Performance Infrastructure** — JMH Gradle plugin, CI performance
+  gate, regression tracking, and cross-feature load test harness. The existing
+  `docs/operations/performance-testing.md` is seed material. See ADR-0028.
 - **Alternative engine implementations** — JOLT, jq, JSONata engine adapters.
   SPI stubs are defined in Feature 001; actual implementations are a follow-up
   or community contribution.

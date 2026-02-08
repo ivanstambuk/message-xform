@@ -1,24 +1,22 @@
 # Pending Task
 
-**Focus**: Feature 001 formally complete — choose next feature
-**Status**: All exit criteria met. Roadmap, spec, plan, tasks all marked complete.
-**Next Step**: Pick the next feature to work on (Feature 004 standalone proxy is Tier 1)
+**Focus**: T-001-53 — TransformEngineBenchmark (NFR-001-03 verification)
+**Status**: Task defined in tasks.md (Phase 9). ADR-0028 accepted. Ready to implement.
+**Next Step**: Implement TransformEngineBenchmark.java following the openauth-sim pattern.
 
 ## Context Notes
-- Feature 001 core engine is fully verified: 12/12 FRs, 10/10 NFRs, drift gate clean
-- 367 tests passing, 0 failures, 8 skipped (JOLT/jq stubs)
-- 84 scenarios defined, 78 with test class references
-- Roadmap, AGENTS.md, spec.md, plan.md, tasks.md all updated to reflect completion
+- ADR-0028 decided: hybrid approach — feature-scoped lightweight benchmarks + Feature 009 for heavy infra
+- T-001-53 added to Feature 001 tasks.md as Phase 9
+- plan.md exit criteria updated to include Phase 9
+- docs/operations/performance-testing.md superseded, retained as Feature 009 seed material
+- Knowledge map + llms.txt updated with ADR-0028
 
-## Candidate Next Features (priority order)
-1. **Feature 004** — Standalone HTTP Proxy (Tier 1, E2E test harness)
-2. **Feature 009** — Toolchain & Quality Platform (meta-feature, can pair with 004)
-3. **Feature 002** — PingAccess Adapter (Tier 2, primary production target)
-4. **Cross-Language Portability Audit** — backlog item, language-neutral contract review
-
-## Backlog Items (from plan.md)
-- **JMH benchmarks** — NFR-001-03 (<5ms latency) not yet benchmarked
-- **Alternative engines** — JOLT, jq, JSONata SPI stubs exist, no impls
+## Implementation Reference
+- Pattern: `openauth-sim/core/src/test/.../MapDbCredentialStoreBaselineBenchmark.java`
+- Pattern: `openauth-sim/core-ocra/src/test/.../OcraReplayVerifierBenchmark.java`
+- Opt-in flag: `-Dio.messagexform.benchmark=true` or `IO_MESSAGEXFORM_BENCHMARK=true`
+- Target: p95 < 5ms for < 50KB payloads (NFR-001-03)
+- Scenarios: S-001-53a (identity 1KB), S-001-53b (5-field 10KB), S-001-53c (skip when disabled)
 
 ## SDD Gaps
-- None identified
+- Scenarios S-001-53a/b/c not yet added to scenarios.md (add when implementing T-001-53)

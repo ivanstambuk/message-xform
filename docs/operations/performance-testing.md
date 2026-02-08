@@ -1,5 +1,15 @@
 # Synthetic Performance Testing
 
+> **⚠️ Superseded by ADR-0028.** This document is retained as **seed material** for
+> Feature 009 (Toolchain & Quality Platform). Per ADR-0028, the performance testing
+> strategy is:
+> - **Layer 1** — Feature-scoped lightweight benchmarks (e.g., T-001-53 for NFR-001-03)
+>   live in each feature's test source set.
+> - **Layer 2** — JMH infrastructure, CI gate, and regression tracking live in Feature 009.
+>
+> The tasks below (PERF-01..04) will be incorporated into Feature 009's spec/plan/tasks
+> when that feature is implemented.
+
 Cross-cutting performance validation for the message-xform engine.
 Uses JMH (Java Microbenchmark Harness) with synthetic workloads —
 no real gateway backends required.
