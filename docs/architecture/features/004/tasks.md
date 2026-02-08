@@ -174,7 +174,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
 
 #### I4 — UpstreamClient
 
-- [ ] **T-004-09** — UpstreamClient: basic forwarding (IMPL-004-03, FR-004-01)
+- [x] **T-004-09** — UpstreamClient: basic forwarding (IMPL-004-03, FR-004-01)
   _Intent:_ Implement the JDK `HttpClient`-based upstream forwarder. Forward
   requests and return responses with status/headers/body intact.
   _Test first:_ Write `UpstreamClientTest` with a mock HTTP backend
@@ -188,6 +188,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   _Verification commands:_
   - `./gradlew :adapter-standalone:test --tests "*UpstreamClientTest*"`
   - `./gradlew spotlessApply check`
+  _Verification log:_ ✅ 6/6 tests PASSED (GET forwarding with body+headers, POST with body echo, query string preservation, custom headers forwarding, 204 no-content). Mock backend strategy: JDK `com.sun.net.httpserver.HttpServer` (zero deps, sufficient for UpstreamClient tests). `spotlessApply check` GREEN.
 
 - [ ] **T-004-10** — UpstreamClient: HTTP/1.1 enforcement (FR-004-33, S-004-52)
   _Intent:_ Force HTTP/1.1 for all upstream connections.
