@@ -998,7 +998,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `IO_MESSAGEXFORM_BENCHMARK=true ./gradlew :core:test --tests "*TransformEngineBenchmark*" --info`
   - Benchmark is skipped when flag is not set (default `./gradlew check` unaffected).
   - Results logged with percentile data + environment summary.
-  _Scenarios:_ S-001-53a, S-001-53b, S-001-53c
+  _Scenarios:_ S-001-79, S-001-80, S-001-81
   _ADR:_ ADR-0028
 
 ---

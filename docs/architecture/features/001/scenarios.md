@@ -3716,6 +3716,108 @@ assertion: each_result_version_is_one_of ["v1", "v2"]
 
 ---
 
+## Category 17: Performance Benchmarks (NFR-001-03, ADR-0028)
+
+Opt-in benchmark scenarios verifying NFR-001-03 (transformation p95 latency < 5ms
+for ≤ 50KB payloads). Enabled via `-Dio.messagexform.benchmark=true` or
+`IO_MESSAGEXFORM_BENCHMARK=true`. See ADR-0028 for the hybrid performance testing
+strategy.
+
+### S-001-79: Identity JSLT Transform — p95 < 5ms (1KB body)
+
+```yaml
+scenario: S-001-79
+name: benchmark-identity-1kb
+description: >
+  Identity JSLT pass-through transform ("." expression) with a ~1KB payload.
+  Measures p50, p90, p95, p99, max latency and throughput.
+  p95 MUST be < 5ms per NFR-001-03.
+tags: [benchmark, performance, identity, nfr-001-03, adr-0028]
+requires: [NFR-001-03]
+
+transform:
+  lang: jslt
+  expr: "."
+
+payload_size: ~1KB
+warmup_iterations: 2000
+measured_iterations: 20000
+
+assert:
+  p95_latency_ms: "< 5.0"
+```
+
+### S-001-80: 5-Field Mapping JSLT Transform — p95 < 5ms (10KB body)
+
+```yaml
+scenario: S-001-80
+name: benchmark-field-mapping-10kb
+description: >
+  5-field rename/restructure transform with a ~10KB payload.
+  Representative of typical API versioning use cases.
+  p95 MUST be < 5ms per NFR-001-03.
+tags: [benchmark, performance, field-mapping, nfr-001-03, adr-0028]
+requires: [NFR-001-03]
+
+transform:
+  lang: jslt
+  expr: |
+    {
+      "userId": .user_id,
+      "firstName": .first_name,
+      "lastName": .last_name,
+      "emailAddress": .email_address,
+      "isActive": .is_active
+    }
+
+payload_size: ~10KB
+warmup_iterations: 2000
+measured_iterations: 20000
+
+assert:
+  p95_latency_ms: "< 5.0"
+```
+
+### S-001-81: Complex Nested/Array Transform — p95 < 5ms (50KB body)
+
+```yaml
+scenario: S-001-81
+name: benchmark-complex-50kb
+description: >
+  Complex transform with nested objects and array iteration (SCIM-style).
+  ~50KB payload — worst-case NFR-001-03 scenario.
+  p95 MUST be < 5ms per NFR-001-03.
+tags: [benchmark, performance, complex, array, nfr-001-03, adr-0028]
+requires: [NFR-001-03]
+
+transform:
+  lang: jslt
+  expr: |
+    {
+      "total": .totalResults,
+      "users": [for (.Resources)
+        {
+          "id": .id,
+          "username": .userName,
+          "displayName": .displayName,
+          "email": .emails[0].value,
+          "active": .active,
+          "status": if (.active) "enabled" else "disabled",
+          "role": if (.role) .role else "user"
+        }
+      ]
+    }
+
+payload_size: ~50KB
+warmup_iterations: 2000
+measured_iterations: 20000
+
+assert:
+  p95_latency_ms: "< 5.0"
+```
+
+---
+
 ## Scenario Index
 
 | ID | Name | Category | Tags |
@@ -3805,6 +3907,9 @@ assertion: each_result_version_is_one_of ["v1", "v2"]
 | S-001-76 | reload-swaps-registry-atomically | Hot Reload | hot-reload, atomic-swap, registry, nfr-001-05 |
 | S-001-77 | fail-safe-reload-preserves-old | Hot Reload | hot-reload, fail-safe, error, registry, nfr-001-05 |
 | S-001-78 | concurrent-reads-consistent-snapshot | Hot Reload | hot-reload, concurrent, thread-safety, atomic-swap, nfr-001-05 |
+| S-001-79 | benchmark-identity-1kb | Performance Benchmarks | benchmark, performance, identity, nfr-001-03, adr-0028 |
+| S-001-80 | benchmark-field-mapping-10kb | Performance Benchmarks | benchmark, performance, field-mapping, nfr-001-03, adr-0028 |
+| S-001-81 | benchmark-complex-50kb | Performance Benchmarks | benchmark, performance, complex, array, nfr-001-03, adr-0028 |
 
 ## Coverage Matrix
 
@@ -3823,7 +3928,7 @@ assertion: each_result_version_is_one_of ["v1", "v2"]
 | FR-001-11 (Status Code Transforms) | S-001-36, S-001-37, S-001-38, S-001-38i, S-001-61, S-001-63 |
 | FR-001-12 (URL Rewriting) | S-001-38a, S-001-38b, S-001-38c, S-001-38d, S-001-38e, S-001-38f, S-001-38g |
 | NFR-001-01 (Stateless) | All — implicit in test harness design |
-| NFR-001-03 (Latency <5ms) | S-001-23 |
+| NFR-001-03 (Latency <5ms) | S-001-23, S-001-79, S-001-80, S-001-81 |
 | NFR-001-04 (Open-world) | S-001-07, S-001-20 |
 | NFR-001-07 (Eval budget) | S-001-24 |
 | NFR-001-02 (Zero gateway deps) | *Verified by dependency analysis, not scenario-testable* |
@@ -3924,5 +4029,8 @@ assertion: each_result_version_is_one_of ["v1", "v2"]
 | S-001-76 | `HotReloadTest` | Reload swaps registry |
 | S-001-77 | `HotReloadTest` | Fail-safe reload preserves old |
 | S-001-78 | `HotReloadTest` | Concurrent reads see snapshot |
+| S-001-79 | `TransformEngineBenchmark` | Identity 1KB — p95 < 5ms (opt-in) |
+| S-001-80 | `TransformEngineBenchmark` | Field-mapping 10KB — p95 < 5ms (opt-in) |
+| S-001-81 | `TransformEngineBenchmark` | Complex 50KB — p95 < 5ms (opt-in) |
 
 

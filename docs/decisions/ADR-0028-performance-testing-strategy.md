@@ -120,9 +120,9 @@ Follow-ups:
 - llms.txt: add ADR-0028.
 
 Validating scenarios:
-- S-001-53a: TransformEngineBenchmark — identity JSLT transform p95 < 5ms for 1KB body
-- S-001-53b: TransformEngineBenchmark — 5-field mapping p95 < 5ms for 10KB body
-- S-001-53c: TransformEngineBenchmark — benchmark is skipped when flag is not set
+- S-001-79: TransformEngineBenchmark — identity JSLT transform p95 < 5ms for 1KB body
+- S-001-80: TransformEngineBenchmark — 5-field mapping p95 < 5ms for 10KB body
+- S-001-81: TransformEngineBenchmark — benchmark is skipped when flag is not set
 
 References:
 - Feature 001 spec: `docs/architecture/features/001/spec.md` (NFR-001-03)

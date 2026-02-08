@@ -38,9 +38,9 @@ import org.slf4j.LoggerFactory;
  * <p>
  * <b>Scenarios:</b>
  * <ul>
- * <li>S-001-53a: Identity JSLT transform, ~1KB body</li>
- * <li>S-001-53b: 5-field mapping JSLT transform, ~10KB body</li>
- * <li>S-001-53c: Complex nested/array transform, ~50KB body</li>
+ * <li>S-001-79: Identity JSLT transform, ~1KB body</li>
+ * <li>S-001-80: 5-field mapping JSLT transform, ~10KB body</li>
+ * <li>S-001-81: Complex nested/array transform, ~50KB body</li>
  * </ul>
  *
  * <p>
@@ -79,10 +79,10 @@ class TransformEngineBenchmark {
     }
 
     // -----------------------------------------------------------------------
-    // S-001-53a: Identity transform — ~1KB body
+    // S-001-79: Identity transform — ~1KB body
     // -----------------------------------------------------------------------
     @Test
-    @DisplayName("S-001-53a: Identity JSLT transform — p95 < 5ms (1KB body)")
+    @DisplayName("S-001-79: Identity JSLT transform — p95 < 5ms (1KB body)")
     void identityTransformBenchmark() throws Exception {
         assumeTrue(isBenchmarkEnabled(), "Benchmark flag not set — skipping (set -Dio.messagexform.benchmark=true)");
 
@@ -101,10 +101,10 @@ class TransformEngineBenchmark {
     }
 
     // -----------------------------------------------------------------------
-    // S-001-53b: 5-field mapping — ~10KB body
+    // S-001-80: 5-field mapping — ~10KB body
     // -----------------------------------------------------------------------
     @Test
-    @DisplayName("S-001-53b: 5-field mapping JSLT transform — p95 < 5ms (10KB body)")
+    @DisplayName("S-001-80: 5-field mapping JSLT transform — p95 < 5ms (10KB body)")
     void fieldMappingBenchmark() throws Exception {
         assumeTrue(isBenchmarkEnabled(), "Benchmark flag not set — skipping (set -Dio.messagexform.benchmark=true)");
 
@@ -117,10 +117,10 @@ class TransformEngineBenchmark {
     }
 
     // -----------------------------------------------------------------------
-    // S-001-53c: Complex array transform — ~50KB body
+    // S-001-81: Complex array transform — ~50KB body
     // -----------------------------------------------------------------------
     @Test
-    @DisplayName("S-001-53c: Complex nested/array transform — p95 < 5ms (50KB body)")
+    @DisplayName("S-001-81: Complex nested/array transform — p95 < 5ms (50KB body)")
     void complexTransformBenchmark() throws Exception {
         assumeTrue(isBenchmarkEnabled(), "Benchmark flag not set — skipping (set -Dio.messagexform.benchmark=true)");
 
