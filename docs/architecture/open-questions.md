@@ -21,7 +21,6 @@ Hard rules:
 
 | ID | Owner | Question | Options (A preferred) | Status | Asked | Notes |
 |----|-------|----------|------------------------|--------|-------|-------|
-| Q-035 | Ivan | **Admin endpoint security:** `POST /admin/reload` is on the same port as proxy traffic with no access control. In K8s sidecar deployments, it's network-accessible. | A: Document as non-goal v1, rely on K8s NetworkPolicy; B: Separate `admin.port` config (default disabled); C: Basic auth on admin endpoints | Open | 2026-02-08 | severity: high; Feature 004 |
 | Q-036 | Ivan | **Non-JSON body handling:** When a profile matches a request but the body is not JSON-parseable (text/xml, binary, etc.), what should happen? | A: Return `400 Bad Request`; B: Passthrough body, still apply header/status/url transforms; C: Full passthrough (no transforms at all) | Open | 2026-02-08 | severity: medium; Feature 004 |
 
 

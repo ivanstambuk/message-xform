@@ -69,6 +69,10 @@ no changes).
   DNS for dynamic resolution.
 - **Metrics endpoint (v1).** Prometheus/Micrometer integration is future scope.
   Structured JSON logging provides observability in v1.
+- **Admin endpoint authentication (v1).** The `/admin/reload` endpoint has no
+  access control in v1. It accepts no payload — it only triggers a reload of
+  specs already on disk. Use Kubernetes NetworkPolicy to restrict access in
+  production. The config schema reserves an `admin` block for future auth.
 
 ---
 
