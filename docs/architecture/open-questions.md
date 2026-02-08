@@ -21,6 +21,6 @@ Hard rules:
 
 | ID | Owner | Question | Options (A preferred) | Status | Asked | Notes |
 |----|-------|----------|------------------------|--------|-------|-------|
-| Q-036 | Ivan | **Non-JSON body handling:** When a profile matches a request but the body is not JSON-parseable (text/xml, binary, etc.), what should happen? | A: Return `400 Bad Request`; B: Passthrough body, still apply header/status/url transforms; C: Full passthrough (no transforms at all) | Open | 2026-02-08 | severity: medium; Feature 004 |
+
 
 

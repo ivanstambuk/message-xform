@@ -148,7 +148,7 @@ no changes).
 | FR-004-23 | Transform errors MUST return an RFC 9457 problem detail response to the client, consistent with Feature 001 error handling (ADR-0022). | Request transform fails → `502 Bad Gateway` with `{"type": "...", "title": "Transform Error", "status": 502, "detail": "..."}`. | n/a | n/a | ADR-0022, ADR-0024. |
 | FR-004-24 | Backend connection failures MUST return `502 Bad Gateway` with a descriptive error body. | Backend host unreachable or connection refused → `502` with `{"type": "...", "title": "Backend Unreachable", "status": 502}`. | n/a | n/a | HTTP proxy semantics. |
 | FR-004-25 | Backend response timeout MUST return `504 Gateway Timeout` with a descriptive error body. | Backend does not respond within `backend.read-timeout-ms` → `504`. | n/a | n/a | HTTP proxy semantics. |
-| FR-004-26 | Malformed JSON request body (when the matched spec expects JSON) MUST return `400 Bad Request` with a descriptive error body. | POST with non-JSON body to a transform-matched route → `400`. | Non-JSON content type with no matching spec → passthrough (no parse attempt). | n/a | ADR-0011. |
+| FR-004-26 | Malformed or non-JSON request body on a profile-matched route MUST return `400 Bad Request` with a descriptive RFC 9457 error body. If a profile matches by path/method, the proxy assumes JSON is expected — non-JSON content is a client error. Routes with **no** matching profile are passed through without body parsing. | POST with non-JSON body to a transform-matched route → `400 Bad Request`. | No matching profile → passthrough (no parse attempt). | n/a | ADR-0011, Q-036 resolution. |
 
 ### Startup & Shutdown
 
@@ -256,6 +256,7 @@ no changes).
 | S-004-21 | **Malformed JSON body:** POST with `Content-Type: application/json` but invalid JSON → `400 Bad Request`. |
 | S-004-22 | **Body too large:** Request body exceeds `max-body-bytes` → `413 Payload Too Large`. |
 | S-004-23 | **Unknown method:** Custom HTTP method → `405 Method Not Allowed`. |
+| S-004-55 | **Non-JSON body with matching profile:** `POST /api/orders` with `Content-Type: text/xml` matches profile by path/method → `400 Bad Request` (Q-036). |
 
 ### Category 6 — Configuration
 
