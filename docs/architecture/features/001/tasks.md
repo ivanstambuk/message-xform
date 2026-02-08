@@ -527,7 +527,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
 
 ---
 
-### Phase 6 — Headers, Status, Mappers
+### Phase 6 — Headers, Status, URL, Mappers
 
 #### I10 — Header transformations
 
@@ -598,6 +598,102 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   _Verify:_ `StatusBindingTest` passes.
   _Verification commands:_
   - `./gradlew :core:test --tests "*StatusBindingTest*"`
+  - `./gradlew spotlessApply check`
+
+#### I11a — URL rewriting
+
+- [ ] **T-001-38a** — URL path rewrite with JSLT expression (FR-001-12, ADR-0027, S-001-38a)
+  _Intent:_ Implement `url.path.expr` — a JSLT expression that constructs a new
+  request path from body fields. The expression evaluates against the **original**
+  (pre-transform) body (ADR-0027), so routing fields stripped by the body transform
+  are still available.
+  _Test first:_ Write `UrlPathRewriteTest`:
+  - Spec with `url.path.expr: '"/api/" + .action + "/" + .resourceId'` + body
+    `{"action": "users", "resourceId": "123"}` → path rewritten to `/api/users/123`.
+  - Body transform strips `.action` and `.resourceId` — path still rewritten
+    correctly (evaluates against **original** body).
+  - RFC 3986 §3.3 encoding: body field with spaces → percent-encoded in path.
+  - `path.expr` returns null → `ExpressionEvalException`.
+  - `path.expr` returns non-string → `ExpressionEvalException`.
+  _Implement:_ Create `UrlTransformer` class. Extend `SpecParser` to parse
+  `url.path` block. Add `url` field to `TransformSpec`. Add `setRequestPath`
+  to `Message` interface.
+  _Verify:_ `UrlPathRewriteTest` passes.
+  _Verification commands:_
+  - `./gradlew :core:test --tests "*UrlPathRewriteTest*"`
+  - `./gradlew spotlessApply check`
+
+- [ ] **T-001-38b** — URL query parameter add/remove (FR-001-12, S-001-38b)
+  _Intent:_ Implement `url.query.add` (static + dynamic) and `url.query.remove`
+  (glob patterns) for modifying query parameters.
+  _Test first:_ Write `UrlQueryParamTest`:
+  - `query.add.format: "json"` → static query param added.
+  - `query.add.correlationId.expr: '$headers."X-Correlation-ID"'` → dynamic
+    query param from header context.
+  - `query.remove: ["_debug", "_internal"]` → matching params removed.
+  - `query.remove: ["_*"]` → glob pattern removes all underscore-prefixed params.
+  - Query parameter values percent-encoded per RFC 3986 §3.4.
+  _Implement:_ Extend `UrlTransformer` with query parameter operations.
+  _Verify:_ `UrlQueryParamTest` passes.
+  _Verification commands:_
+  - `./gradlew :core:test --tests "*UrlQueryParamTest*"`
+  - `./gradlew spotlessApply check`
+
+- [ ] **T-001-38c** — HTTP method override (FR-001-12, ADR-0027, S-001-38c)
+  _Intent:_ Implement `url.method.set` with optional `when` predicate, using the
+  same pattern as `status` (FR-001-11). Enables complete de-polymorphization by
+  changing both the URL path and HTTP method.
+  _Test first:_ Write `UrlMethodOverrideTest`:
+  - `method.set: "DELETE"` (unconditional) → method changed to DELETE.
+  - `method.set: "GET"` + `when: '.action == "read"'` + matching body → method
+    changed to GET.
+  - `method.set: "GET"` + `when: '.action == "read"'` + non-matching body → method
+    unchanged.
+  - `method.when` predicate evaluates against **original** body (ADR-0027).
+  _Implement:_ Extend `UrlTransformer` with method override. Add `setRequestMethod`
+  to `Message` interface. Reuse `set`/`when` pattern from `StatusTransformer`.
+  _Verify:_ `UrlMethodOverrideTest` passes.
+  _Verification commands:_
+  - `./gradlew :core:test --tests "*UrlMethodOverrideTest*"`
+  - `./gradlew spotlessApply check`
+
+- [ ] **T-001-38d** — URL method validation at load time (FR-001-12, S-001-38d)
+  _Intent:_ Invalid HTTP methods in `method.set` MUST be rejected at load time
+  with a `SpecParseException`. Valid methods: GET, POST, PUT, DELETE, PATCH, HEAD,
+  OPTIONS.
+  _Test first:_ Write `UrlMethodValidationTest`:
+  - `method.set: "YOLO"` → `SpecParseException` at load time.
+  - `method.set: "GET"` → accepted.
+  - Invalid glob in `query.remove` → rejected at load time.
+  _Implement:_ Add validation to `SpecParser.parseUrlBlock()`.
+  _Verify:_ `UrlMethodValidationTest` passes.
+  _Verification commands:_
+  - `./gradlew :core:test --tests "*UrlMethodValidationTest*"`
+  - `./gradlew spotlessApply check`
+
+- [ ] **T-001-38e** — URL block on response transform → ignored with warning (FR-001-12, S-001-38e)
+  _Intent:_ URL rewriting only makes sense for request transforms. A `url` block
+  on a response-direction spec is ignored with a warning logged at load time.
+  _Test first:_ Write `UrlDirectionRestrictionTest`:
+  - Spec with `direction: response` + `url.path.expr` → warning logged at load
+    time, URL block ignored during transform.
+  - Spec with `direction: request` + `url.path.expr` → applied normally.
+  _Implement:_ Add direction check to `SpecParser` (warning) and `UrlTransformer`
+  (skip).
+  _Verify:_ `UrlDirectionRestrictionTest` passes.
+  _Verification commands:_
+  - `./gradlew :core:test --tests "*UrlDirectionRestrictionTest*"`
+  - `./gradlew spotlessApply check`
+
+- [ ] **T-001-38f** — Create URL rewrite test fixture YAML (FR-001-12)
+  _Intent:_ Create `url-rewrite-dispatch.yaml` fixture for parameterized testing
+  of the de-polymorphization use case.
+  _Implement:_ Write fixture at `core/src/test/resources/test-vectors/url-rewrite-dispatch.yaml`
+  with input body containing routing fields, expected output with stripped body,
+  expected path rewrite, expected query params, and expected method.
+  _Verify:_ Fixture is valid YAML and parseable.
+  _Verification commands:_
+  - `./gradlew :core:test`
   - `./gradlew spotlessApply check`
 
 #### I12 — Reusable mappers
