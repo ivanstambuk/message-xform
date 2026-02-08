@@ -207,7 +207,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
 
 #### I4 — YAML spec parser
 
-- [ ] **T-001-13** — Create test fixture YAML files (FX-001-01/02/03)
+- [x] **T-001-13** — Create test fixture YAML files (FX-001-01/02/03)
   _Intent:_ Create the YAML fixtures that all spec parsing tests will use.
   These are the "golden" test vectors from the spec.
   _Implement:_ Create in `core/src/test/resources/test-vectors/`:
