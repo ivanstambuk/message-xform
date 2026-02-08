@@ -2,8 +2,8 @@
 
 _Linked specification:_ `docs/architecture/features/004/spec.md`
 _Linked tasks:_ `docs/architecture/features/004/tasks.md`
-_Status:_ Not Started
-_Last updated:_ 2026-02-08
+_Status:_ In Progress (Phase 2 — I3)
+_Last updated:_ 2026-02-08T22:24+01:00
 
 > Guardrail: Keep this plan traceable back to the governing spec. Reference
 > FR/NFR/Scenario IDs from `spec.md` where relevant, log any new high- or
@@ -101,7 +101,7 @@ _To be completed after implementation._
 > a prerequisite for all adapter work. Do it first, verify Feature 001 tests
 > still pass, then set up the Gradle module.
 
-1. **I1 — Core engine API: TransformContext injection** (≤45 min)
+1. **I1 — Core engine API: TransformContext injection** (≤45 min) ✅ DONE
    - _Goal:_ Add `TransformEngine.transform(Message, Direction, TransformContext)`
      overload. Refactor `transformInternal` to accept a `TransformContext` parameter
      instead of building its own. The existing 2-arg method delegates to the 3-arg
@@ -115,8 +115,9 @@ _To be completed after implementation._
    - _Requirements covered:_ Q-042 resolution. Enables FR-004-37, FR-004-39.
    - _Commands:_ `./gradlew :core:test`, `./gradlew spotlessApply check`
    - _Exit:_ 3-arg overload works. All Feature 001 tests pass unchanged.
+   - _Result:_ 6 new tests (TransformContextInjectionTest), all Feature 001 tests GREEN. Commit `16dc2eb`.
 
-2. **I2 — Gradle module scaffold** (≤45 min)
+2. **I2 — Gradle module scaffold** (≤45 min) ✅ DONE
    - _Goal:_ Create `adapter-standalone` Gradle submodule with dependencies.
    - _Preconditions:_ I1 complete.
    - _Steps:_
@@ -130,31 +131,33 @@ _To be completed after implementation._
    - _Requirements covered:_ Project structure. Enables all subsequent increments.
    - _Commands:_ `./gradlew :adapter-standalone:compileJava`, `./gradlew spotlessApply check`
    - _Exit:_ Module compiles. Dependencies resolve. Main class exists.
+   - _Result:_ Javalin 6.7.0 (Jetty 11), Shadow 9.3.1, SnakeYAML 2.3 added. Dependency hygiene verified (2 tests). Commits `8cd869f`, `97657e9`.
 
 ### Phase 2 — Configuration & Bootstrap (≤90 min)
 
-3. **I3 — Configuration model + YAML loading** (≤90 min)
-   - _Goal:_ Implement `ProxyConfig`, `BackendConfig`, `TlsConfig`, `PoolConfig`
+3. **I3 — Configuration model + YAML loading** (≤90 min) 🔧 IN PROGRESS
+   - _Goal:_ Implement `ProxyConfig`, `BackendTlsConfig`, `TlsConfig`, `PoolConfig`
      domain objects and YAML configuration loading with environment variable overlay.
    - _Preconditions:_ I2 complete.
    - _Steps:_
-     1. **Test first:** Write test: parse minimal YAML config → `ProxyConfig`
+     1. ✅ **Test first:** Write test: parse minimal YAML config → `ProxyConfig`
         with correct defaults (FX-004-01 pattern).
-     2. Implement `ProxyConfig` record hierarchy (DO-004-01 through DO-004-04).
-     3. **Test first:** Write test: parse full YAML config → all fields populated
+     2. ✅ Implement `ProxyConfig` record hierarchy (DO-004-01 through DO-004-04).
+     3. ✅ **Test first:** Write test: parse full YAML config → all fields populated
         (FX-004-02 pattern).
-     4. **Test first:** Write test: env var overrides YAML value
+     4. ⬜ **Test first:** Write test: env var overrides YAML value
         (`BACKEND_HOST=override` → `config.backend().host()` returns `"override"`).
-     5. **Test first:** Write test: empty/whitespace-only env var → YAML value used.
-     6. Implement env var overlay (FR-004-11) — all 41 config keys.
-     7. **Test first:** Write test: missing `backend.host` → startup fails with
+     5. ⬜ **Test first:** Write test: empty/whitespace-only env var → YAML value used.
+     6. ⬜ Implement env var overlay (FR-004-11) — all 41 config keys.
+     7. ⬜ **Test first:** Write test: missing `backend.host` → startup fails with
         descriptive error (FR-004-12 validation path).
-     8. **Test first:** Write test: `--config /path/to/config.yaml` CLI argument.
-     9. Implement CLI argument parsing (FR-004-10).
+     8. ✅ **Test first:** Write test: `--config /path/to/config.yaml` CLI argument.
+     9. ✅ Implement CLI argument parsing (FR-004-10).
    - _Requirements covered:_ FR-004-10, FR-004-11, FR-004-12, DO-004-01/02/03/04,
      CFG-004-01 through CFG-004-41, S-004-39 through S-004-44.
    - _Commands:_ `./gradlew :adapter-standalone:test`, `./gradlew spotlessApply check`
    - _Exit:_ Config loads from YAML. Env vars override. Validation works.
+   - _Result (partial):_ T-004-04 (config records, 8 tests), T-004-05 (3 fixtures), T-004-06 (config loader, 8 tests) done. T-004-07 (env var overlay) and T-004-08 (validation) remain.
 
 ### Phase 3 — Core Proxy: Handler + Upstream Client (≤2 × 90 min)
 

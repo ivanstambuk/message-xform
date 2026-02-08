@@ -1,7 +1,7 @@
 # Feature 004 — Standalone HTTP Proxy Mode — Tasks
 
-_Status:_ Not Started
-_Last updated:_ 2026-02-08
+_Status:_ In Progress (Phase 2 — I3)
+_Last updated:_ 2026-02-08T22:24+01:00
 
 **Governing spec:** `docs/architecture/features/004/spec.md`
 **Implementation plan:** `docs/architecture/features/004/plan.md`
@@ -29,7 +29,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
 
 #### I1 — Core engine API: TransformContext injection
 
-- [ ] **T-004-01** — Add 3-arg `transform()` overload to TransformEngine (Q-042)
+- [x] **T-004-01** — Add 3-arg `transform()` overload to TransformEngine (Q-042)
   _Intent:_ The standalone adapter needs to inject gateway-specific context
   (cookies, query params) into the engine. Add
   `TransformEngine.transform(Message, Direction, TransformContext)` as a new
@@ -48,17 +48,18 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `./gradlew :core:test --tests "*TransformContextInjectionTest*"`
   - `./gradlew :core:test`
   - `./gradlew spotlessApply check`
+  _Verification log:_ ✅ 6/6 tests PASSED. All Feature 001 tests PASSED (BUILD SUCCESSFUL). `spotlessApply check` GREEN. Commit `16dc2eb`.
 
 #### I2 — Gradle module scaffold
 
-- [ ] **T-004-02** — Create `adapter-standalone` Gradle submodule
+- [x] **T-004-02** — Create `adapter-standalone` Gradle submodule
   _Intent:_ Establish the new module with correct dependencies: `core` (project
   dependency), Javalin 6, Logback. Shadow plugin for fat JAR.
   _Implement:_
   1. Add `include("adapter-standalone")` to `settings.gradle.kts`.
   2. Create `adapter-standalone/build.gradle.kts` with:
      - `implementation(project(":core"))` — core engine
-     - Javalin 6 (brings Jetty 12 transitively)
+     - Javalin 6 (brings Jetty 11 transitively — Javalin 6.x native)
      - Logback Classic (SLF4J binding)
      - Shadow plugin (for fat JAR, but configure later in Phase 8)
   3. Add Javalin, Logback, Shadow versions to `gradle/libs.versions.toml`.
@@ -69,8 +70,10 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `./gradlew :adapter-standalone:compileJava`
   - `./gradlew :adapter-standalone:dependencies --configuration compileClasspath`
   - `./gradlew spotlessApply check`
+  _Verification log:_ ✅ `compileJava` BUILD SUCCESSFUL. Dependencies resolved (Javalin 6.7.0, Jetty 11.0.25, Jackson, SLF4J). `spotlessApply check` GREEN. Commit `8cd869f`.
+  _Note:_ Javalin 6.7.0 brings Jetty 11 (not Jetty 12 as ADR-0029 subtitle stated). Jetty 11 is the Javalin 6 native version — functionally correct.
 
-- [ ] **T-004-03** — Verify zero gateway-specific dependencies in adapter-standalone
+- [x] **T-004-03** — Verify zero gateway-specific dependencies in adapter-standalone
   _Intent:_ The standalone adapter depends on `core` + Javalin + Logback. It
   MUST NOT depend on any other gateway SDK (PingAccess, PingGateway, Kong, etc.).
   _Test first:_ Write `StandaloneDependencyTest` — inspect dependency tree,
@@ -80,6 +83,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   _Verification commands:_
   - `./gradlew :adapter-standalone:test --tests "*StandaloneDependencyTest*"`
   - `./gradlew spotlessApply check`
+  _Verification log:_ ✅ 2/2 tests PASSED (no forbidden artifacts, all groups in allowed set). `spotlessApply check` GREEN. Commit `97657e9`.
 
 ---
 
@@ -87,23 +91,25 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
 
 #### I3 — Configuration model + YAML loading
 
-- [ ] **T-004-04** — ProxyConfig record hierarchy (DO-004-01/02/03/04, CFG-004-01..41)
+- [x] **T-004-04** — ProxyConfig record hierarchy (DO-004-01/02/03/04, CFG-004-01..41)
   _Intent:_ Define the immutable configuration model. `ProxyConfig` is the root,
-  containing `BackendConfig`, `TlsConfig`, `PoolConfig` as nested records.
+  containing `BackendTlsConfig`, `TlsConfig`, `PoolConfig` as nested records.
   _Test first:_ Write `ProxyConfigTest`:
   - Construct `ProxyConfig` with minimal fields → defaults applied correctly:
     `proxy.host` → `0.0.0.0`, `proxy.port` → `9090`, `backend.scheme` → `http`,
     `backend.port` → `80` (for http) / `443` (for https).
   - Construct with all fields → all accessible.
   - Immutability: config records are immutable after construction.
-  _Implement:_ Create `ProxyConfig`, `BackendConfig`, `TlsConfig`, `PoolConfig`
-  records in `io.messagexform.standalone.config`.
+  _Implement:_ Create `ProxyConfig`, `BackendTlsConfig`, `TlsConfig`, `PoolConfig`
+  records in `io.messagexform.standalone.config`. Builder pattern with
+  scheme-derived port auto-resolution.
   _Verify:_ `ProxyConfigTest` passes.
   _Verification commands:_
   - `./gradlew :adapter-standalone:test --tests "*ProxyConfigTest*"`
   - `./gradlew spotlessApply check`
+  _Verification log:_ ✅ 8/8 tests PASSED (defaults, port derivation, full construction, immutability). `spotlessApply check` GREEN. Commit `0ce36f2`.
 
-- [ ] **T-004-05** — Create config test fixtures (FX-004-01/02/03)
+- [x] **T-004-05** — Create config test fixtures (FX-004-01/02/03)
   _Intent:_ Create the YAML config fixtures used by all configuration tests.
   _Implement:_ Create in `adapter-standalone/src/test/resources/config/`:
   - `minimal-config.yaml` (FX-004-01) — only `backend.host` + `backend.port`.
@@ -112,8 +118,9 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   _Verify:_ Files exist and are valid YAML.
   _Verification commands:_
   - N/A — file creation only.
+  _Verification log:_ ✅ 3 fixtures created. Used by ConfigLoaderTest. Commit `c0100b0`.
 
-- [ ] **T-004-06** — YAML config loader (FR-004-10)
+- [x] **T-004-06** — YAML config loader (FR-004-10)
   _Intent:_ Parse YAML config file into `ProxyConfig`. Load from default path
   (`message-xform-proxy.yaml`) or custom path via `--config` CLI argument.
   _Test first:_ Write `ConfigLoaderTest`:
@@ -122,11 +129,13 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - Load `full-config.yaml` → all fields populated correctly.
   - Missing config file → startup error with usage message (S-004-26).
   - `--config /path/to/file` → loads from specified path.
-  _Implement:_ Create `ConfigLoader` class using Jackson YAML.
+  _Implement:_ Create `ConfigLoader` class using Jackson YAML. Also added
+  `ConfigLoadException` for structured error reporting.
   _Verify:_ `ConfigLoaderTest` passes.
   _Verification commands:_
   - `./gradlew :adapter-standalone:test --tests "*ConfigLoaderTest*"`
   - `./gradlew spotlessApply check`
+  _Verification log:_ ✅ 8/8 tests PASSED (minimal/full/TLS loading, CLI parsing, error paths). `spotlessApply check` GREEN. Commit `7c79a61`.
 
 - [ ] **T-004-07** — Environment variable overlay (FR-004-11)
   _Intent:_ Every config key overridable via environment variable. Env vars
