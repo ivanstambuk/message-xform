@@ -2,6 +2,12 @@
 
 > Project-level rules and conventions for AI agents working on message-xform.
 
+> **Speech-to-text**: The user communicates via speech-to-text software. Expect
+> occasional transcription errors (e.g., "eight" instead of "A", "take a leak of
+> face" instead of "take a leap of faith"). When the intended meaning is obvious
+> from context, silently correct and proceed — do not ask for clarification.
+> Only ask when the meaning is genuinely ambiguous.
+
 ## Project Overview
 
 **message-xform** is a standalone payload & header transformation engine for API Gateways.
