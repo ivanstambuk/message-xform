@@ -356,7 +356,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
 
 #### I7 — Error handling + evaluation budgets
 
-- [ ] **T-001-22** — Error response builder: RFC 9457 (FR-001-07, CFG-001-03/04)
+- [x] **T-001-22** — Error response builder: RFC 9457 (FR-001-07, CFG-001-03/04)
   _Intent:_ When a transform fails, the engine produces an error response.
   The default format is RFC 9457 Problem Details.
   _Test first:_ Write `ErrorResponseBuilderTest`:
@@ -383,7 +383,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `./gradlew :core:test --tests "*CustomErrorTemplateTest*"`
   - `./gradlew spotlessApply check`
 
-- [ ] **T-001-24** — JSLT evaluation error → error response (FR-001-07, S-001-22)
+- [x] **T-001-24** — JSLT evaluation error → error response (FR-001-07, S-001-22)
   _Intent:_ End-to-end: a broken JSLT expression at evaluation time should
   produce a proper error response, not crash the engine.
   _Test first:_ Write `EvalErrorTest`:
@@ -920,6 +920,8 @@ Track long-running or shared commands with timestamps to avoid duplicate work.
 - 2026-02-08 11:10 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — 99 tests passed after T-001-19 (S-001-09 adjusted for JSLT absent-field behavior)
 - 2026-02-08 11:15 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — 104 tests passed after T-001-20
 - 2026-02-08 11:20 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — 109 tests passed after T-001-21
+- 2026-02-08 11:30 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — 119 tests passed after T-001-22
+- 2026-02-08 11:35 — `./gradlew spotlessApply check` → BUILD SUCCESSFUL (1s) — 124 tests passed after T-001-24
 
 ## Completion Criteria
 
