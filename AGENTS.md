@@ -213,6 +213,32 @@ Update both `docs/architecture/roadmap.md` and the Roadmap table above when stat
 - Balance persistence with the SDD workflow and project guardrails. When you must
   stop early, state clearly what blocked you and what you would do next.
 
+## Session Boundary Convention
+
+The agent SHOULD proactively suggest a `/retro` followed by `/handover` (starting a
+fresh session) when any of the following **hard signals** are observed:
+
+| Signal | Why it matters |
+|--------|---------------|
+| **Context truncation** ("CHECKPOINT N" in the conversation) | Earlier decisions, file contents, and rationale are lost. The agent is operating on reconstructed context, increasing error rates. |
+| **3+ avoidable errors in a single task** (wrong method names, re-reading already-viewed files, incorrect fixture IDs, import management issues) | Symptoms of context pressure — the agent's effective memory is degraded. |
+| **Phase boundary reached** (all tasks in a phase completed) | Phases represent architectural shifts (e.g., "parsing specs" → "executing transforms"). A fresh session brings a clean mental model for the new domain. |
+
+The agent SHOULD also **consider** suggesting a session boundary (soft signals):
+
+- **4–6 tasks completed** in the current session — productive chunk, capture learnings.
+- **Significant cross-cutting refactoring** completed (e.g., touching 8+ files for a rename/cleanup).
+- **2+ hours of active work** — retro captures learnings while they're fresh.
+
+**When NOT to switch:**
+
+- Never mid-task — always finish the current task and commit.
+- When the next task directly depends on context just established in this session.
+- Small mechanical tasks that chain tightly (e.g., two sub-tasks that are naturally one unit).
+
+**Format:** When suggesting a boundary, the agent says:
+> 🔄 **Session boundary suggested** — [reason]. Shall I run `/retro` then `/handover`?
+
 ## Exhaustive Execution for Scoped Tasks
 
 - When the owner describes a task with an explicit scope (e.g., "all scenarios",
