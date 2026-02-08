@@ -1,0 +1,26 @@
+# FX-004-03: TLS configuration — inbound + outbound TLS
+proxy:
+  host: "0.0.0.0"
+  port: 8443
+  tls:
+    enabled: true
+    keystore: "/opt/certs/server-keystore.p12"
+    keystore-password: "server-ks-pass"
+    keystore-type: "PKCS12"
+    client-auth: "need"
+    truststore: "/opt/certs/client-truststore.p12"
+    truststore-password: "client-ts-pass"
+    truststore-type: "PKCS12"
+
+backend:
+  scheme: "https"
+  host: "secure-backend.internal"
+  port: 443
+  tls:
+    truststore: "/opt/certs/backend-truststore.jks"
+    truststore-password: "backend-ts-pass"
+    truststore-type: "JKS"
+    verify-hostname: true
+    keystore: "/opt/certs/client-keystore.p12"
+    keystore-password: "client-ks-pass"
+    keystore-type: "PKCS12"

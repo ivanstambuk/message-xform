@@ -1,0 +1,59 @@
+# FX-004-02: Full configuration — all 41 config keys populated
+proxy:
+  host: "127.0.0.1"
+  port: 8080
+  max-body-bytes: 5242880
+  tls:
+    enabled: true
+    keystore: "/opt/certs/server.p12"
+    keystore-password: "serverpass"
+    keystore-type: "PKCS12"
+    client-auth: "want"
+    truststore: "/opt/certs/client-ca.p12"
+    truststore-password: "trustpass"
+    truststore-type: "PKCS12"
+  shutdown:
+    drain-timeout-ms: 60000
+  forwarded-headers:
+    enabled: false
+
+backend:
+  scheme: "https"
+  host: "api.example.com"
+  port: 8443
+  connect-timeout-ms: 3000
+  read-timeout-ms: 15000
+  tls:
+    truststore: "/opt/certs/backend-ca.p12"
+    truststore-password: "backendtrust"
+    truststore-type: "JKS"
+    verify-hostname: true
+    keystore: "/opt/certs/client.p12"
+    keystore-password: "clientpass"
+    keystore-type: "PKCS12"
+  pool:
+    max-connections: 200
+    keep-alive: false
+    idle-timeout-ms: 30000
+
+engine:
+  specs-dir: "/opt/specs"
+  profiles-dir: "/opt/profiles"
+  profile: "/opt/profiles/main.yaml"
+  schema-validation: "strict"
+
+reload:
+  enabled: false
+  debounce-ms: 1000
+
+health:
+  enabled: true
+  path: "/healthz"
+  ready-path: "/readyz"
+
+logging:
+  format: "text"
+  level: "DEBUG"
+
+admin:
+  reload-path: "/ops/reload"

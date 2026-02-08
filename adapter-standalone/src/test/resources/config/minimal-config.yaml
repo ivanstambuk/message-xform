@@ -1,0 +1,5 @@
+# FX-004-01: Minimal configuration — only required fields
+# All other fields use documented defaults
+backend:
+  host: backend.local
+  port: 8080
