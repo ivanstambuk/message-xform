@@ -235,7 +235,6 @@ class GatewayAdapterSpiTest {
 
     @Test
     void applyChanges_notCalledOnFailure_nativeUnchanged() {
-        var adapter = new MockGatewayAdapter();
         var original =
                 new MockNativeExchange("{\"preserved\": true}", new HashMap<>(), 200, "/original", "GET", null, null);
 
