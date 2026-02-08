@@ -426,8 +426,12 @@ public final class SpecParser {
         }
 
         List<ApplyStep> steps = new ArrayList<>();
+        int exprCount = 0;
+        java.util.Set<String> seenMapperRefs = new java.util.HashSet<>();
+
         for (JsonNode stepNode : applyNode) {
             if (stepNode.isTextual() && "expr".equals(stepNode.asText())) {
+                exprCount++;
                 // Reference to the main transform expression
                 steps.add(ApplyStep.expr());
             } else if (stepNode.isObject() && stepNode.has("mapperRef")) {
@@ -442,6 +446,13 @@ public final class SpecParser {
                             specId,
                             source);
                 }
+                if (!seenMapperRefs.add(mapperRef)) {
+                    throw new SpecParseException(
+                            "Mapper '" + mapperRef
+                                    + "' appears more than once in apply — duplicate mapper references are not allowed",
+                            specId,
+                            source);
+                }
                 steps.add(ApplyStep.mapper(mapperRef, compiled));
             } else {
                 throw new SpecParseException(
@@ -449,6 +460,20 @@ public final class SpecParser {
                         specId,
                         source);
             }
+        }
+
+        // T-001-40: Validation — expr must appear exactly once in apply list
+        if (exprCount == 0) {
+            throw new SpecParseException(
+                    "'apply' directive must include 'expr' exactly once — the main transform expression is required",
+                    specId,
+                    source);
+        }
+        if (exprCount > 1) {
+            throw new SpecParseException(
+                    "'apply' directive must include 'expr' exactly once — found " + exprCount + " occurrences",
+                    specId,
+                    source);
         }
 
         return Collections.unmodifiableList(steps);
