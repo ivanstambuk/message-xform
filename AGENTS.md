@@ -342,6 +342,21 @@ If not running (or after server reboot):
 | `scripts/chrome-wrapper.sh` | Wrapper for Antigravity settings — injects `--no-sandbox`, `DISPLAY=:99` |
 | `scripts/cleanup-chrome-tabs.sh` | Close accumulated tabs, keep one blank tab |
 
+
+## Known Pitfalls
+
+### JSLT 0.1.14 Function Availability
+The project uses JSLT `0.1.14` (see `gradle/libs.versions.toml`). Not all JSLT
+built-in functions listed in the latest documentation are available in this version.
+Notably:
+- `uppercase()` is NOT available — calling it silently returns `null` (no compile
+  error, no runtime error). This is a JSLT quirk: unknown function names at
+  evaluation time produce `null` rather than throwing.
+- `upper-case()` (hyphenated) throws `JsltException: No such function` at compile
+  time, which is the correct behavior for a missing function.
+- **Workaround:** Use string concatenation (`+`) or structural transforms in tests
+  rather than relying on version-specific JSLT built-in string functions.
+
 ---
 
 *Created: 2026-02-07*

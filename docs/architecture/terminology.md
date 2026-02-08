@@ -222,6 +222,13 @@ terminology agreements must be captured here immediately.
     declaration), not where it is routed. Distinct from the profile-level `match`
     block which handles routing. See ADR-0015.
 
+- **Mapper** (spec `mappers` block entry)
+  - A named, reusable expression defined in the `mappers` block of a transform spec.
+    Each mapper has an `expr` (and optional `lang`) and is referenced by name via
+    `mapperRef` in the `apply` directive. Mappers are compiled at load time and
+    executed as pipeline steps — they are NOT callable as inline JSLT functions.
+    See FR-001-08, ADR-0014.
+
 - **Apply directive** (`apply`)
   - An ordered list of steps in the `transform` block that sequences named mappers
     with the main `expr`. Steps are either `mapperRef: <name>` or `expr` (the main

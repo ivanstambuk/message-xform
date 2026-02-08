@@ -32,7 +32,9 @@ TransformSpec ──────── defines ──────── Transfor
   │                                        │
   ├── id + version                         ├── transform block (JSLT expr)
   ├── input/output schemas                 ├── headers block (add/remove/rename)
-  ├── reverse block (bidirectional)        └── status block (status code)
+  ├── reverse block (bidirectional)        ├── status block (status code)
+  ├── mappers block (named exprs)          └── url block (path/query rewrite)
+  ├── apply directive (pipeline)
   └── lang: <engineId>
        │
        └── resolved by ──── ExpressionEngine SPI (FR-001-02)
