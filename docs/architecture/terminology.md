@@ -62,6 +62,35 @@ terminology agreements must be captured here immediately.
   - Cross-profile routing (whether multiple profiles can apply to the same request)
     is a deployment model concern, not an engine concern.
 
+- **Standalone Proxy Mode**
+  - A deployment model where the message-xform engine runs as an independent HTTP
+    reverse proxy (Feature 004). It intercepts traffic, transforms it, and forwards
+    it to a configured **upstream** backend.
+  - Supports **sidecar** and **standalone service** K8s patterns.
+
+- **Sidecar Pattern**
+  - A Kubernetes deployment pattern where the standalone proxy runs in the same Pod
+    as the application container (the upstream), sharing the network namespace
+    (`localhost`). The proxy handles transformation off-process.
+
+- **Upstream**
+  - The backend service to which the proxy forwards requests (and receives responses from).
+  - In a sidecar deployment, the upstream is usually `localhost`.
+
+- **Downstream**
+  - The client (user agent, mobile app, or another service) that sends requests
+    to the proxy.
+
+- **Shadow JAR**
+  - A packaging technique (Gradle Shadow Plugin) that combines the application code,
+    resources, and all dependency JARs into a single executable JAR file. Used for
+    distributing the standalone proxy.
+
+- **Virtual Threads**
+  - Java 21+ lightweight threads (Project Loom) managed by the JVM rather than the OS.
+    Javalin 6 uses virtual threads to handle high-concurrency I/O in the standalone
+    proxy (ADR-0029).
+
 - **Expression engine** (pluggable)
   - A pluggable evaluation component selected via `lang: <engineId>` in a transform
     spec's `transform` block.

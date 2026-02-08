@@ -21,7 +21,10 @@ message-xform/
 ├── engine-jolt/                   # JOLT expression engine plugin (future)
 ├── adapter-pingaccess/            # PingAccess gateway adapter
 ├── adapter-pinggateway/           # PingGateway adapter (future)
-├── adapter-standalone/            # Standalone HTTP proxy mode (future)
+├── adapter-standalone/            # Standalone HTTP proxy mode (Feature 004)
+│   ├── config/                    # ProxyConfig, BackendConfig, TlsConfig
+│   ├── main/                      # StandaloneMain (Javalin 6 boot)
+│   └── docker/                    # Dockerfile
 └── docs/                          # Specifications, ADRs, research
 ```
 
@@ -98,6 +101,7 @@ ADR-0025 (Adapter Lifecycle) governs ── Gateway Adapter SPI, references ADR-
 ADR-0026 (Multi-Value Hdrs)  governs ── FR-001-10, references ADR-0002, ADR-0021
 ADR-0027 (URL Rewriting)     governs ── FR-001-12, references ADR-0002, ADR-0003, ADR-0013
 ADR-0028 (Perf Strategy)     governs ── NFR-001-03, references Feature 009
+ADR-0029 (Javalin Proxy)     governs ── Feature 004, references ADR-0025, NFR-001-02
 ```
 
 ## Feature → ADR → NFR Traceability
@@ -119,6 +123,7 @@ ADR-0028 (Perf Strategy)     governs ── NFR-001-03, references Feature 009
 | FR-001-09 (Schema Validation) | ADR-0001, ADR-0022 | — |
 | FR-001-12 (URL Rewriting) | ADR-0027 | — |
 | NFR-001-03 (Latency) | ADR-0028 | NFR-001-03 |
+| Feature 004 (Standalone) | ADR-0029 | NFR-004-01..07 |
 | Hot Reload | — | NFR-001-05 |
 
 ## Research Documents

@@ -101,3 +101,14 @@ References:
 - ADR-0025 – Adapter Lifecycle is Adapter-Scoped
 - ADR-0013 – Copy-on-Wrap Message Adapter
 - NFR-001-02 – Zero gateway-specific dependencies in core
+
+## Validating Scenarios
+
+| Scenario | Description |
+|----------|-------------|
+| S-004-01 | Passthrough GET via Javalin proxy |
+| S-004-02 | Passthrough POST with body |
+| S-004-29 | Hot reload via WatchService |
+| S-004-34 | Liveness probe (Javalin route) |
+| S-004-44 | Startup and configuration loading |
+| S-004-46 | Graceful shutdown (Jetty) |
