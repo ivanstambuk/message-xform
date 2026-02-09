@@ -64,8 +64,15 @@ docs/research/standalone-proxy-http-server.md
 docs/architecture/features/001/tasks.md
 docs/architecture/features/001/plan.md
 
+# Feature 009 — Toolchain & Quality Platform
+docs/architecture/features/009/spec.md
+
 # Operations
+docs/operations/quality-gate.md
 docs/operations/performance-testing.md
+
+# LLM overview
+ReadMe.LLM
 
 # SPI interfaces
 core/src/main/java/io/messagexform/core/spi/TelemetryListener.java

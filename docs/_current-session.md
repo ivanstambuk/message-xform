@@ -1,26 +1,37 @@
-# Current Session
+# Current Session State
 
-**Date**: 2026-02-09
-**Focus**: Governance cleanup
-**Status**: ✅ Complete
+**Date:** 2026-02-09
+**Focus:** Governance cleanup + Feature 009 spec
 
-## Key Accomplishments
+## Completed This Session
 
-1. **Feature 004 closed** — roadmap, plan, AGENTS.md all marked ✅ Complete.
-2. **githooks/** — `pre-commit` (quality gate) + `commit-msg` (conventional commit enforcement).
-3. **`.gitlint`** — reference config for commit rules.
-4. **`.github/workflows/ci.yml`** — CI pipeline: Spotless, build, test, commit lint, Docker build + smoke.
-5. **`docs/operations/quality-gate.md`** — pipeline explanation with failure interpretation.
-6. **`AGENTS.md` updated** — Build & Test Commands filled, formatter policy documented, hook guard activated.
-7. **`ReadMe.LLM`** — LLM-oriented project overview.
-8. **`PLAN.md`** — 9 governance items checked off (8 triggered + 1 nice-to-have).
+1. **Governance cleanup** (`e1bd1e5`)
+   - Created `githooks/pre-commit` (quality gate) and `githooks/commit-msg` (conventional commits)
+   - Created `.github/workflows/ci.yml` (CI pipeline)
+   - Created `docs/operations/quality-gate.md`
+   - Updated `AGENTS.md` with build commands and formatter policy
+   - Created `.gitlint` reference config
 
-## Remaining Nice-to-Have Governance Items
-- [ ] Session Reset Runbook
-- [ ] Session Quick Reference
-- [ ] CONTRIBUTING.md
-- [ ] Feature 009 — Toolchain & Quality Platform spec
+2. **ReadMe.LLM** (`55ddd2e`)
+   - LLM-oriented project overview with module layout, entry points, build commands
 
-## Next
-- Tier 2: Feature 002 (PingAccess) or Feature 003 (PingGateway)
-- Cross-language portability audit
+3. **Feature 009 — Toolchain & Quality Platform spec** (`bbb34b1`)
+   - 15 functional requirements (10 already satisfied, 4 new, 1 passive)
+   - 4 non-functional requirements
+   - 10 scenarios
+   - New items: EditorConfig, ArchUnit, SpotBugs, Gradle upgrade runbook
+
+4. **Feature 004 closure** (`0a93d58`)
+   - Marked ✅ Complete across roadmap, plan, AGENTS.md
+
+## Key Decisions
+
+- Feature 009 captures both existing toolchain and planned additions
+- ArchUnit is the key new addition (4 rules: module boundaries, core isolation, no-reflect, SPI)
+- SpotBugs is SHOULD, not MUST — proportional to current scope
+- JaCoCo and mutation testing are explicitly non-goals
+
+## What's Next
+
+- Implement Feature 009 (EditorConfig → ArchUnit → SpotBugs → Gradle runbook)
+- Or pivot to Tier 2 features (002/003) or cross-language portability audit

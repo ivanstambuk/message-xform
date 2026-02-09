@@ -371,6 +371,20 @@ terminology agreements must be captured here immediately.
     transitive dependencies. Produced by the Gradle Shadow plugin. The Docker
     image runs `java -jar proxy.jar` with no classpath setup required.
 
+## Toolchain & quality (Feature 009)
+
+- **Quality gate**
+  - The automated verification pipeline that must pass before code is committed or
+    merged. In message-xform this means `./gradlew --no-daemon spotlessCheck check`
+    — which runs formatting verification, compilation with `-Werror`, and all JUnit 5
+    tests. Enforced locally by `githooks/pre-commit` and remotely by
+    `.github/workflows/ci.yml`. See `docs/operations/quality-gate.md` and Feature 009.
+
+- **Version catalog** (`gradle/libs.versions.toml`)
+  - Gradle's centralized dependency version management. All dependency and plugin
+    versions are pinned here — never in individual `build.gradle.kts` files.
+    Ensures version consistency across modules and makes upgrades auditable.
+
 ## Wording conventions
 
 - Use **"transform spec"** for the transformation definition YAML.

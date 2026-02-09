@@ -133,6 +133,11 @@ ADR-0029 (Javalin Proxy)     governs ── FR-004-01, references ADR-0025, ADR-
 | FR-004-29..32 (Docker/K8s) | — | NFR-004-04 |
 | FR-004-33..34 (Protocol) | ADR-0029 | — |
 | FR-004-36..39 (Context) | ADR-0021, ADR-0029 | — |
+| FR-009-01..10 (Baseline toolchain) | — | NFR-009-01 |
+| FR-009-11 (EditorConfig) | — | — |
+| FR-009-12 (ArchUnit) | — | NFR-009-02 |
+| FR-009-13 (SpotBugs) | — | NFR-009-01 |
+| FR-009-14 (Gradle upgrade) | — | — |
 
 ## Research Documents
 
