@@ -14,6 +14,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
@@ -52,6 +54,13 @@ class ZeroDowntimeReloadTest extends ProxyTestHarness {
     /**
      * S-004-66: Send 10 concurrent requests while triggering a reload. All
      * requests must complete successfully (200 OK). No failures due to reload.
+     *
+     * <p>
+     * Uses a dedicated thread pool instead of the common ForkJoinPool to
+     * guarantee all threads start immediately — the common pool on a 2-core
+     * CI runner has only ~1-2 threads, which queues tasks and causes the
+     * readyLatch to time out.
+     * </p>
      */
     @Test
     void concurrentRequests_duringReload_noFailures() throws Exception {
@@ -80,59 +89,68 @@ class ZeroDowntimeReloadTest extends ProxyTestHarness {
         AtomicInteger failureCount = new AtomicInteger(0);
         List<CompletableFuture<HttpResponse<String>>> futures = new ArrayList<>();
 
-        // Prepare concurrent requests
-        for (int i = 0; i < concurrentRequests; i++) {
-            int reqNum = i;
-            CompletableFuture<HttpResponse<String>> future = CompletableFuture.supplyAsync(() -> {
-                try {
-                    readyLatch.countDown();
-                    goLatch.await(5, TimeUnit.SECONDS);
-                    return post("/api/test-" + reqNum, "{\"req\":" + reqNum + "}");
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
-                }
-            });
-            futures.add(future);
-        }
-
-        // Wait for all threads to be ready
-        assertTrue(readyLatch.await(5, TimeUnit.SECONDS));
-
-        // Write a new spec to trigger reload on the same thread as the requests
-        writeSpec("second.yaml", """
-                id: second-spec
-                version: "1.0.0"
-                description: "Second"
-                input:
-                  schema:
-                    type: object
-                output:
-                  schema:
-                    type: object
-                transform:
-                  lang: jslt
-                  expr: .
-                """);
-
-        // Release all requests AND trigger reload simultaneously
-        goLatch.countDown();
-        // Trigger reload mid-flight
-        HttpResponse<String> reloadResp = adminReload();
-        assertEquals(200, reloadResp.statusCode());
-
-        // Wait for all concurrent requests to complete
-        for (CompletableFuture<HttpResponse<String>> f : futures) {
-            HttpResponse<String> resp = f.get(10, TimeUnit.SECONDS);
-            if (resp.statusCode() == 200) {
-                successCount.incrementAndGet();
-            } else {
-                failureCount.incrementAndGet();
+        // Dedicated pool guarantees 10 threads start immediately (not queued
+        // behind the common pool's limited parallelism on CI runners).
+        ExecutorService pool = Executors.newFixedThreadPool(concurrentRequests);
+        try {
+            // Prepare concurrent requests
+            for (int i = 0; i < concurrentRequests; i++) {
+                int reqNum = i;
+                CompletableFuture<HttpResponse<String>> future = CompletableFuture.supplyAsync(
+                        () -> {
+                            try {
+                                readyLatch.countDown();
+                                goLatch.await(10, TimeUnit.SECONDS);
+                                return post("/api/test-" + reqNum, "{\"req\":" + reqNum + "}");
+                            } catch (Exception e) {
+                                throw new RuntimeException(e);
+                            }
+                        },
+                        pool);
+                futures.add(future);
             }
-        }
 
-        // S-004-33: No request failures during reload
-        assertEquals(concurrentRequests, successCount.get(), "All requests should succeed during reload");
-        assertEquals(0, failureCount.get(), "No requests should fail during reload");
+            // Wait for all threads to be ready (generous timeout for slow CI)
+            assertTrue(readyLatch.await(10, TimeUnit.SECONDS), "All threads should reach ready state");
+
+            // Write a new spec to trigger reload on the same thread as the requests
+            writeSpec("second.yaml", """
+                    id: second-spec
+                    version: "1.0.0"
+                    description: "Second"
+                    input:
+                      schema:
+                        type: object
+                    output:
+                      schema:
+                        type: object
+                    transform:
+                      lang: jslt
+                      expr: .
+                    """);
+
+            // Release all requests AND trigger reload simultaneously
+            goLatch.countDown();
+            // Trigger reload mid-flight
+            HttpResponse<String> reloadResp = adminReload();
+            assertEquals(200, reloadResp.statusCode());
+
+            // Wait for all concurrent requests to complete
+            for (CompletableFuture<HttpResponse<String>> f : futures) {
+                HttpResponse<String> resp = f.get(15, TimeUnit.SECONDS);
+                if (resp.statusCode() == 200) {
+                    successCount.incrementAndGet();
+                } else {
+                    failureCount.incrementAndGet();
+                }
+            }
+
+            // S-004-33: No request failures during reload
+            assertEquals(concurrentRequests, successCount.get(), "All requests should succeed during reload");
+            assertEquals(0, failureCount.get(), "No requests should fail during reload");
+        } finally {
+            pool.shutdownNow();
+        }
     }
 
     /**
