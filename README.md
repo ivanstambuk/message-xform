@@ -273,7 +273,7 @@ message-xform/
 
 ## License
 
-This project is currently under development. License TBD.
+Licensed under the [Apache License 2.0](LICENSE).
 
 ---
 
