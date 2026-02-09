@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# Commit-msg hook: enforces conventional commit format.
+# Install: git config core.hooksPath githooks
+#
+# Format: <type>(<scope>): <description>
+# Types: fix, feat, docs, refactor, retro, session, backlog, terminology, test, chore
+# Max title length: 72 characters
+# Max body line length: 120 characters
+
+set -euo pipefail
+
+COMMIT_MSG_FILE="$1"
+COMMIT_MSG=$(cat "$COMMIT_MSG_FILE")
+
+# Extract the first line (title)
+TITLE=$(echo "$COMMIT_MSG" | head -1)
+
+# --- Rule 1: Title must match conventional commit format ---
+TYPES="fix|feat|docs|refactor|retro|session|backlog|terminology|test|chore"
+PATTERN="^($TYPES)(\([a-zA-Z0-9_-]+\))?: .+"
+
+if ! echo "$TITLE" | grep -qE "$PATTERN"; then
+    echo "❌ Commit message does not follow conventional commit format."
+    echo ""
+    echo "   Expected: <type>(<scope>): <description>"
+    echo "   Types:    $TYPES"
+    echo "   Got:      $TITLE"
+    echo ""
+    echo "   Examples:"
+    echo "     feat(004): T-004-55 — integration test sweep"
+    echo "     docs: update roadmap status"
+    echo "     fix(core): handle null body in transform"
+    exit 1
+fi
+
+# --- Rule 2: Title max length ---
+TITLE_LEN=${#TITLE}
+if [ "$TITLE_LEN" -gt 72 ]; then
+    echo "❌ Commit title too long: $TITLE_LEN chars (max 72)."
+    echo "   Title: $TITLE"
+    exit 1
+fi
+
+# --- Rule 3: Body line max length ---
+LINE_NUM=0
+while IFS= read -r LINE; do
+    LINE_NUM=$((LINE_NUM + 1))
+    if [ "$LINE_NUM" -le 2 ]; then
+        continue  # Skip title and blank separator
+    fi
+    LINE_LEN=${#LINE}
+    if [ "$LINE_LEN" -gt 120 ]; then
+        echo "❌ Commit body line $LINE_NUM too long: $LINE_LEN chars (max 120)."
+        echo "   Line: $LINE"
+        exit 1
+    fi
+done < "$COMMIT_MSG_FILE"
+
+# All checks passed

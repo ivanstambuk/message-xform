@@ -93,22 +93,44 @@ Update both `docs/architecture/roadmap.md` and the Roadmap table above when stat
 
 ## Build & Test Commands
 
-> **Stub — fill in when the Gradle project is initialized.**
-
 ```bash
 # Full formatting + verify (canonical quality gate):
-# ./gradlew --no-daemon spotlessApply check
+./gradlew --no-daemon spotlessApply check
+
+# Dry-run format check (CI-safe, no modifications):
+./gradlew --no-daemon spotlessCheck check
 
 # Focused core-only tests:
-# ./gradlew --no-daemon :core:test
+./gradlew --no-daemon :core:test
 
-# E2E integration tests:
-# ./gradlew --no-daemon :standalone:test
+# Standalone proxy tests:
+./gradlew --no-daemon :adapter-standalone:test
+
+# Single test class:
+./gradlew --no-daemon :core:test --tests "io.messagexform.core.engine.TransformEngineTest"
+
+# Shadow JAR (fat JAR for standalone proxy):
+./gradlew --no-daemon :adapter-standalone:shadowJar
+
+# Docker image build (from adapter-standalone/):
+docker build -t message-xform-proxy adapter-standalone/
 ```
+
+See `docs/operations/quality-gate.md` for full pipeline documentation.
+
+**Formatter policy:**
+- **Palantir Java Format** 2.78.0 via Spotless Gradle plugin 8.1.0.
+- Scope: `src/**/*.java` in every subproject.
+- Remove unused imports, trim trailing whitespace, end with newline.
+- Run `./gradlew spotlessApply` to auto-format before committing.
 
 **Prerequisites:**
 - Ensure `JAVA_HOME` points to a Java 21 JDK before invoking Gradle or Git hooks.
-- Verify `git config core.hooksPath githooks` before staging changes (once `githooks/` is set up).
+  Verify: `java -version` should show `21.x`. SDKMAN: `sdk use java 21.0.4-tem`.
+- **Git hooks** ⚡ **(MANDATORY)**: Run `git config core.hooksPath githooks` once
+  per clone. The `pre-commit` hook runs the quality gate; the `commit-msg` hook
+  enforces conventional commit format. Verify: `git config core.hooksPath` should
+  return `githooks`.
 
 ## Rules
 

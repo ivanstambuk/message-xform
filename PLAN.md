@@ -213,26 +213,25 @@ which it should be picked up.
 
 **Trigger: When Gradle project is initialized (Feature 001 implementation start)**
 
-- [ ] **`githooks/` directory** — Create managed `pre-commit` and `commit-msg` hooks.
-  Pre-commit: run `spotlessCheck` + `check`. Commit-msg: enforce conventional commit
-  format via gitlint. Model on `openauth-sim/githooks/`.
-- [ ] **`.gitlint` config** — Enforce conventional commit message format. Rules:
-  `title-max-length=72`, `body-max-line-length=120`, custom `contrib=contrib-title-conventional-commits`.
-- [ ] **Hook Guard in AGENTS.md** — Once `githooks/` exists, activate the prerequisite
-  check: "Verify `git config core.hooksPath githooks` before staging changes."
-- [ ] **Fill Build & Test Commands section** — Replace the stub in `AGENTS.md` with real
-  `./gradlew` targets: full gate, focused module tests, E2E targets.
-- [ ] **`JAVA_HOME` prerequisite check** — Add to session init: "Ensure `JAVA_HOME` points
-  to Java 21 JDK before invoking Gradle or Git hooks."
-- [ ] **Formatter policy** — Choose and document code formatter (e.g., Spotless +
-  Palantir Java Format or google-java-format) with line length. Add to AGENTS.md.
+- [x] **`githooks/` directory** — Created `pre-commit` (spotlessCheck + check) and
+  `commit-msg` (conventional commit enforcement via shell script). No external deps.
+- [x] **`.gitlint` config** — Created as reference config. Active enforcement is via
+  the self-contained `commit-msg` hook (no gitlint installation required).
+- [x] **Hook Guard in AGENTS.md** — Activated as a MANDATORY prerequisite in Build &
+  Test Commands section.
+- [x] **Fill Build & Test Commands section** — Replaced stub with real `./gradlew`
+  targets: full gate, module tests, single test class, shadow JAR, Docker build.
+- [x] **`JAVA_HOME` prerequisite check** — Documented in Build & Test Commands
+  prerequisites. Pre-commit hook sources SDKMAN automatically.
+- [x] **Formatter policy** — Palantir Java Format 2.78.0 via Spotless 8.1.0.
+  Documented in AGENTS.md Build & Test Commands section.
 
 **Trigger: After first passing quality gate (Feature 001 implementation midpoint)**
 
-- [ ] **Quality Gate documentation** — Create `docs/operations/quality-gate.md` explaining
-  the Gradle quality gate pipeline, which tasks it runs, and how to interpret failures.
-- [ ] **CI workflow** — Create `.github/workflows/ci.yml` with: spotlessCheck, check,
-  gitlint, gitleaks (for secrets scanning). Model on `openauth-sim/.github/workflows/ci.yml`.
+- [x] **Quality Gate documentation** — Created `docs/operations/quality-gate.md` with
+  pipeline explanation, failure interpretation, and prerequisites.
+- [x] **CI workflow** — Created `.github/workflows/ci.yml` with: spotlessCheck, check,
+  commit message lint (PRs), Docker build + size check + smoke test.
 
 **Trigger: Nice-to-have (low priority, pick up when convenient)**
 

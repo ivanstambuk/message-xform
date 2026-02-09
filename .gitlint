@@ -1,0 +1,17 @@
+# gitlint configuration for message-xform
+# Note: The project uses a self-contained shell-based commit-msg hook
+# (githooks/commit-msg) rather than the gitlint tool. This config file
+# documents the rules for reference and can be activated if gitlint is
+# installed in the future.
+
+[general]
+contrib = contrib-title-conventional-commits
+
+[title-max-length]
+line-length = 72
+
+[body-max-line-length]
+line-length = 120
+
+[contrib-title-conventional-commits]
+types = fix,feat,docs,refactor,retro,session,backlog,terminology,test,chore

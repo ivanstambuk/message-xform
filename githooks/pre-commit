@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Pre-commit hook: runs Spotless + full quality gate.
+# Install: git config core.hooksPath githooks
+
+set -euo pipefail
+
+echo "🔍 Pre-commit: running quality gate..."
+
+# Ensure JAVA_HOME is set (SDKMAN or explicit)
+if [ -z "${JAVA_HOME:-}" ]; then
+    if [ -f "$HOME/.sdkman/bin/sdkman-init.sh" ]; then
+        # shellcheck source=/dev/null
+        source "$HOME/.sdkman/bin/sdkman-init.sh"
+    fi
+fi
+
+if [ -z "${JAVA_HOME:-}" ]; then
+    echo "❌ JAVA_HOME is not set. Set it to a Java 21 JDK."
+    exit 1
+fi
+
+# Run the quality gate: format check + compile + tests
+./gradlew --no-daemon spotlessCheck check
+
+echo "✅ Pre-commit: quality gate passed."
