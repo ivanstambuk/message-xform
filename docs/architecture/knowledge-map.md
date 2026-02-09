@@ -104,6 +104,7 @@ ADR-0026 (Multi-Value Hdrs)  governs ── FR-001-10, references ADR-0002, ADR-
 ADR-0027 (URL Rewriting)     governs ── FR-001-12, references ADR-0002, ADR-0003, ADR-0013
 ADR-0028 (Perf Strategy)     governs ── NFR-001-03, references Feature 009
 ADR-0029 (Javalin Proxy)     governs ── FR-004-01, references ADR-0025, ADR-0013
+ADR-0030 (Session Context)   governs ── FR-001-13, references ADR-0021, ADR-0020, ADR-0025
 ```
 
 ## Feature → ADR → NFR Traceability
@@ -124,6 +125,7 @@ ADR-0029 (Javalin Proxy)     governs ── FR-004-01, references ADR-0025, ADR-
 | Gateway Adapter SPI | ADR-0025 | — |
 | FR-001-09 (Schema Validation) | ADR-0001, ADR-0022 | — |
 | FR-001-12 (URL Rewriting) | ADR-0027 | — |
+| FR-001-13 (Session Context) | ADR-0030 | — |
 | NFR-001-03 (Latency) | ADR-0028 | NFR-001-03 |
 | Hot Reload | — | NFR-001-05 |
 | FR-004-01 (Standalone Proxy) | ADR-0029 | NFR-004-01 through NFR-004-07 |

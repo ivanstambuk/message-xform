@@ -4032,5 +4032,168 @@ assert:
 | S-001-79 | `TransformEngineBenchmark` | Identity 1KB — p95 < 5ms (opt-in) |
 | S-001-80 | `TransformEngineBenchmark` | Field-mapping 10KB — p95 < 5ms (opt-in) |
 | S-001-81 | `TransformEngineBenchmark` | Complex 50KB — p95 < 5ms (opt-in) |
+| S-001-82 | — | `$session.sub` in request body (ADR-0030) |
+| S-001-83 | — | `$session.roles` conditional response (ADR-0030) |
+| S-001-84 | — | `$session` null — null-safe access (ADR-0030) |
+| S-001-85 | — | JOLT + `$session` → rejected at load time (ADR-0030) |
 
 
+---
+
+## Category 12: Session Context Binding
+
+Scenarios for gateway-provided session context (`$session`). See ADR-0030.
+
+### S-001-82: Inject Session Subject into Request Body
+
+The gateway provides session context with `sub` claim. The transform injects it
+into the request body as `userId`.
+
+```yaml
+scenario: S-001-82
+name: session-inject-subject-into-body
+description: >
+  Gateway session contains sub claim from a validated token. Transform injects
+  it into the request body as userId. Tests basic $session binding in request
+  direction.
+tags: [session, inject, request, adr-0030]
+
+transform:
+  lang: jslt
+  expr: |
+    . + {
+      "userId": $session.sub,
+      "tenantId": $session.tenantId
+    }
+
+# Session context provided by the gateway adapter
+session_context:
+  sub: "bjensen"
+  tenantId: "acme-corp"
+  roles: ["admin", "user"]
+
+input:
+  action: "create-order"
+  amount: 99.50
+  currency: "EUR"
+
+expected_output:
+  action: "create-order"
+  amount: 99.50
+  currency: "EUR"
+  userId: "bjensen"
+  tenantId: "acme-corp"
+```
+
+### S-001-83: Conditional Response Based on Session Roles
+
+The transform uses `$session.roles` to conditionally include admin-only fields
+in the response body.
+
+```yaml
+scenario: S-001-83
+name: session-conditional-response-by-role
+description: >
+  Gateway session contains roles array. Transform conditionally includes
+  sensitive admin fields in the response only when the session has the admin
+  role. Tests $session in response direction with conditional logic.
+tags: [session, conditional, response, adr-0030]
+
+transform:
+  lang: jslt
+  expr: |
+    {
+      "id": .id,
+      "name": .name,
+      "email": .email,
+      "adminPanel": if (contains($session.roles, "admin")) .adminData else null
+    }
+
+session_context:
+  sub: "bjensen"
+  roles: ["admin", "user"]
+
+input:
+  id: "usr-42"
+  name: "Bob Jensen"
+  email: "bjensen@example.com"
+  adminData:
+    lastLogin: "2026-02-09T08:00:00Z"
+    failedAttempts: 0
+
+expected_output:
+  id: "usr-42"
+  name: "Bob Jensen"
+  email: "bjensen@example.com"
+  adminPanel:
+    lastLogin: "2026-02-09T08:00:00Z"
+    failedAttempts: 0
+```
+
+### S-001-84: Null Session Context — Null-Safe Access
+
+When no session context is provided by the gateway, `$session` is `null`.
+JSLT handles null gracefully — accessing fields on null returns null.
+
+```yaml
+scenario: S-001-84
+name: session-null-safe-access
+description: >
+  No session context provided by gateway ($session is null). Transform
+  gracefully handles null session — JSLT null-access returns null, which
+  JSLT omits from output. Tests null-safety of $session binding.
+tags: [session, null, edge-case, adr-0030]
+
+transform:
+  lang: jslt
+  expr: |
+    {
+      "action": .action,
+      "userId": $session.sub,
+      "amount": .amount
+    }
+
+# session_context: null (not provided by gateway)
+
+input:
+  action: "create-order"
+  amount: 99.50
+
+expected_output:
+  action: "create-order"
+  # Note: JSLT omits keys whose value is null — no userId key here
+  amount: 99.50
+```
+
+### S-001-85: JOLT Engine with $session Reference — Rejected at Load Time
+
+JOLT does not support context variables. A spec declaring `lang: jolt` that
+references `$session` must be rejected at load time.
+
+```yaml
+scenario: S-001-85
+name: session-jolt-rejected-at-load-time
+description: >
+  Spec declares lang: jolt but the expression references $session. JOLT does
+  not support context variables. Engine MUST reject at load time.
+tags: [session, jolt, validation, load-time, adr-0030]
+
+transform:
+  lang: jolt
+  expr: |
+    [
+      {
+        "operation": "shift",
+        "spec": { "*": "&" }
+      }
+    ]
+
+# The spec itself doesn't reference $session in the JOLT spec (JOLT can't),
+# but any explicit $session reference in a JOLT-engine context would be
+# rejected at load time by the engine capability check (ADR-0004).
+
+expected_error:
+  type: load-time
+  exception: ExpressionCompileException
+  message_contains: "does not support context variables"
+```

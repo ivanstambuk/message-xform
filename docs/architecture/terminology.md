@@ -170,8 +170,17 @@ terminology agreements must be captured here immediately.
   - A read-only context object passed to expression engines during evaluation.
     Contains: `$headers` (JsonNode), `$status` (Integer, null for requests per
     ADR-0020), `$queryParams` (JsonNode, ADR-0021), `$cookies` (JsonNode,
-    request-side only, ADR-0021), request path, request method. Engines consume
-    whichever context they support.
+    request-side only, ADR-0021), `$session` (JsonNode, nullable, ADR-0030),
+    request path, request method. Engines consume whichever context they support.
+
+- **Session context** (`$session`, ADR-0030)
+  - An arbitrary JSON structure provided by the gateway's session management layer,
+    representing the state of a user or workload session. Not part of the HTTP message
+    itself — it's gateway-level metadata. Exposed as a read-only `$session` variable
+    in JSLT expressions. Nullable: when the gateway does not support sessions or no
+    session exists, `$session` is `null`. JSLT handles null gracefully.
+    Adapters are responsible for populating `Message.getSessionContext()` from their
+    gateway-native session API. See ADR-0030.
 
 - **Pipeline chaining** (profile-level chaining)
   - When multiple transform entries in a single profile match the same request,

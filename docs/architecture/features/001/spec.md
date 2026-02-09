@@ -3,7 +3,7 @@
 | Field | Value |
 |-------|-------|
 | Status | Ready |
-| Last updated | 2026-02-08 |
+| Last updated | 2026-02-09 |
 | Owners | Ivan |
 | Linked plan | `docs/architecture/features/001/plan.md` |
 | Linked tasks | `docs/architecture/features/001/tasks.md` |
@@ -223,6 +223,8 @@ public interface CompiledExpression {
     JsonNode getQueryParams();
     /** Request cookies as JsonNode object (keys = cookie names, values = cookie values). ADR-0021. */
     JsonNode getCookies();
+    /** Gateway session context as arbitrary JSON, or null if unavailable. ADR-0030. */
+    JsonNode getSessionContext();
 }
 ```
 
@@ -245,13 +247,13 @@ engines:
 Engine support matrix — the engine MUST validate at load time that a spec does not
 use capabilities the declared engine does not support:
 
-| Engine    | Body Transform | Predicates (`when`) | `$headers` / `$headers_all` / `$status` | `$queryParams` / `$cookies` | Bidirectional | Status |
-|-----------|:-:|:-:|:-:|:-:|:-:|-----------|
-| `jslt`    | ✅ | ✅ | ✅ | ✅ | ✅ | Baseline — always available |
-| `jolt`    | ✅ | ❌ | ❌ | ❌ | ❌ | Structural shift/default/remove only |
-| `jq`      | ✅ | ✅ | ✅ | ✅ | ✅ | Future — via adapter |
-| `jsonata` | ✅ | ✅ | ✅ | ✅ | ✅ | Future — via adapter |
-| `dataweave` | ✅ | ✅ | ✅ | ✅ | ✅ | Future — being open-sourced by MuleSoft (BSD-3), via adapter |
+| Engine    | Body Transform | Predicates (`when`) | `$headers` / `$headers_all` / `$status` | `$queryParams` / `$cookies` | `$session` | Bidirectional | Status |
+|-----------|:-:|:-:|:-:|:-:|:-:|:-:|-----------|
+| `jslt`    | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Baseline — always available |
+| `jolt`    | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | Structural shift/default/remove only |
+| `jq`      | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Future — via adapter |
+| `jsonata` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Future — via adapter |
+| `dataweave` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Future — being open-sourced by MuleSoft (BSD-3), via adapter |
 
 If a spec declares `lang: jolt` with a `when` predicate or `$headers` / `$headers_all` reference,
 the engine MUST reject the spec at load time with a diagnostic message (e.g.,
@@ -337,6 +339,9 @@ public interface Message {
     void setRequestPath(String path);   // URL rewrite (ADR-0027)
     String getRequestMethod();    // e.g. "POST"
     void setRequestMethod(String method); // method override (ADR-0027)
+    /** Gateway session context as arbitrary JSON, or null if unavailable. ADR-0030. */
+    JsonNode getSessionContext();
+    void setSessionContext(JsonNode session);
 }
 ```
 
@@ -931,8 +936,8 @@ body). Rationale: URL rewrite *routes the input* — routing fields like `action
 for URL construction.
 
 Context variables `$headers`, `$headers_all`, `$status`, `$requestPath`,
-`$requestMethod`, `$queryParams`, and `$cookies` are available in URL expressions
-(same bindings as body expressions).
+`$requestMethod`, `$queryParams`, `$cookies`, and `$session` are available in URL
+expressions (same bindings as body expressions).
 
 **Direction restriction:** URL rewriting is only meaningful for **request transforms**.
 A `url` block on a response-direction transform is ignored with a warning logged at
@@ -945,7 +950,7 @@ expression is expected to construct a valid path structure.
 
 Processing order (updated — see also FR-001-10, FR-001-11):
 1. Engine reads metadata → binds `$headers`, `$headers_all`, `$status`,
-   `$requestPath`, `$requestMethod`, `$queryParams`, `$cookies`.
+   `$requestPath`, `$requestMethod`, `$queryParams`, `$cookies`, `$session`.
 2. JSLT body expression evaluates (`transform.expr`) → transformed body.
 3. **URL rewrite applied** (against **original** body):
    a. `path.expr` evaluated → new request path (string).
@@ -974,6 +979,61 @@ Processing order (updated — see also FR-001-10, FR-001-11):
 
 **Query parameter encoding:** Query parameter values from `query.add` (both static
 and dynamic) are percent-encoded per RFC 3986 §3.4.
+
+### FR-001-13: Session Context Binding
+
+**Requirement:** The engine MUST support an optional, gateway-provided **session
+context** — an arbitrary JSON structure representing the state of a user or workload
+session. When present, the session context is exposed as a read-only JSLT variable
+`$session`, following the same pattern as `$headers`, `$status`, `$queryParams`, and
+`$cookies`.
+
+Session context is NOT part of the HTTP message. It comes from the gateway product's
+session management layer — e.g., PingAccess SDK session API, gateway policy output,
+token introspection result, or cookie-based session attributes. The shape of the
+session context is gateway-specific and unpredictable (arbitrary JSON).
+
+**`$session` variable:**
+- Type: `JsonNode` (nullable).
+- When the gateway does not provide session context, `$session` is `null`.
+- JSLT handles null gracefully: `$session.sub` returns `null` when `$session` is null.
+- Available in **both** request and response transforms — the session context does
+  not change between request/response processing in the same request lifecycle.
+
+```yaml
+transform:
+  lang: jslt
+  expr: |
+    . + {
+      "userId": $session.sub,
+      "tenantId": $session.tenantId,
+      "roles": $session.roles
+    }
+```
+
+**Adapter responsibilities:**
+- Each gateway adapter populates `Message.getSessionContext()` from its native
+  session API during `wrapRequest()` / `wrapResponse()`.
+- If the gateway has no session concept or no session exists, the adapter leaves
+  `sessionContext` as `null`.
+- Session context population is **optional** — adapters that do not support sessions
+  simply return `null`.
+
+**Mutability:** Read-only. Transforms consume session data but do NOT modify it.
+Writing to session state is a gateway-level concern, not a transform concern.
+Session write-back (`payload-to-session`) is a potential future extension.
+
+**Engine support matrix:** Engines that do not support context variables (JOLT)
+cannot access `$session`. Specs declaring `lang: jolt` with `$session` references
+MUST be rejected at load time with a diagnostic message.
+
+| Aspect | Detail |
+|--------|--------|
+| Success path | Adapter populates `sessionContext` → engine binds `$session` → JSLT accesses session fields |
+| Success path | No session provided → `$session` is null → null-safe access in JSLT |
+| Validation path | JOLT spec with `$session` reference → rejected at load time |
+| Failure path | N/A — `$session` is always nullable; null access is safe in JSLT |
+| Source | ADR-0030, ADR-0021 precedent |
 
 ## Non-Functional Requirements
 
@@ -1011,6 +1071,8 @@ and dynamic) are percent-encoded per RFC 3986 §3.4.
 | S-001-50 | Reusable mapper: `mapperRef` resolves to named expression |
 | S-001-53 | JSON Schema validated and stored at spec load time |
 | S-001-55 | Strict-mode evaluation-time schema validation rejects non-conforming input |
+| S-001-82 | `$session.sub` injected into request body (session context binding) |
+| S-001-84 | `$session` is null (no session provided) → null-safe access |
 
 ## Test Strategy
 
@@ -1041,7 +1103,7 @@ and dynamic) are percent-encoded per RFC 3986 §3.4.
 | DO-001-04 | `TransformProfile` — user-supplied binding of specs to URL/method/content-type patterns | core |
 | DO-001-05 | `TransformResult` — outcome of applying a spec (success/aborted + diagnostics) | core |
 | DO-001-06 | `ExpressionEngine` — pluggable engine SPI (compile + evaluate) | core |
-| DO-001-07 | `TransformContext` — read-only context passed to engines (headers, headersAll, status, request path/method, queryParams, cookies) | core |
+| DO-001-07 | `TransformContext` — read-only context passed to engines (headers, headersAll, status, request path/method, queryParams, cookies, sessionContext) | core |
 
 ### Core Engine API
 
@@ -1135,6 +1197,10 @@ domain_objects:
       - name: requestMethod
         type: string
         note: "e.g. POST"
+      - name: sessionContext
+        type: JsonNode
+        constraints: "optional, nullable — gateway-provided (ADR-0030)"
+        note: "Arbitrary JSON session data from gateway session API"
   - id: DO-001-02
     name: TransformSpec
     fields:
@@ -1207,6 +1273,9 @@ domain_objects:
       - name: cookies
         type: JsonNode
         note: "$cookies — request-side only, keys are cookie names (ADR-0021)"
+      - name: sessionContext
+        type: JsonNode
+        note: "$session — gateway-provided session context, nullable (ADR-0030)"
     # Future: $queryParams_all and $cookies_all (array-of-strings shape, like
     # $headers_all) may be added if multi-value query params or cookies are needed.
     # Not normative for Feature 001.
