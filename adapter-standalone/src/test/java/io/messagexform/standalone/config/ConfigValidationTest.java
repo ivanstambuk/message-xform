@@ -44,9 +44,9 @@ class ConfigValidationTest {
         @DisplayName("Missing backend.host → ConfigLoadException with descriptive message (S-004-27)")
         void missingBackendHost_throwsConfigLoadException() throws Exception {
             Path config = writeConfig("""
-                    proxy:
-                      port: 9090
-                    """);
+          proxy:
+            port: 9090
+          """);
 
             assertThatThrownBy(() -> ConfigLoader.load(config))
                     .isInstanceOf(ConfigLoadException.class)
@@ -58,9 +58,9 @@ class ConfigValidationTest {
         @DisplayName("Empty backend.host → ConfigLoadException")
         void emptyBackendHost_throwsConfigLoadException() throws Exception {
             Path config = writeConfig("""
-                    backend:
-                      host: ""
-                    """);
+          backend:
+            host: ""
+          """);
 
             assertThatThrownBy(() -> ConfigLoader.load(config))
                     .isInstanceOf(ConfigLoadException.class)
@@ -72,9 +72,9 @@ class ConfigValidationTest {
         @DisplayName("Whitespace-only backend.host → ConfigLoadException")
         void whitespaceOnlyBackendHost_throwsConfigLoadException() throws Exception {
             Path config = writeConfig("""
-                    backend:
-                      host: "   "
-                    """);
+          backend:
+            host: "   "
+          """);
 
             assertThatThrownBy(() -> ConfigLoader.load(config))
                     .isInstanceOf(ConfigLoadException.class)
@@ -95,10 +95,10 @@ class ConfigValidationTest {
         @DisplayName("Invalid backend.scheme → ConfigLoadException")
         void invalidBackendScheme_throwsConfigLoadException() throws Exception {
             Path config = writeConfig("""
-                    backend:
-                      host: api.example.com
-                      scheme: ftp
-                    """);
+          backend:
+            host: api.example.com
+            scheme: ftp
+          """);
 
             assertThatThrownBy(() -> ConfigLoader.load(config))
                     .isInstanceOf(ConfigLoadException.class)
@@ -110,14 +110,14 @@ class ConfigValidationTest {
         @DisplayName("Invalid proxy.tls.client-auth → ConfigLoadException")
         void invalidClientAuth_throwsConfigLoadException() throws Exception {
             Path config = writeConfig("""
-                    backend:
-                      host: api.example.com
-                    proxy:
-                      tls:
-                        enabled: true
-                        keystore: /path/to/keystore
-                        client-auth: always
-                    """);
+          backend:
+            host: api.example.com
+          proxy:
+            tls:
+              enabled: true
+              keystore: /path/to/keystore
+              client-auth: always
+          """);
 
             assertThatThrownBy(() -> ConfigLoader.load(config))
                     .isInstanceOf(ConfigLoadException.class)
@@ -129,11 +129,11 @@ class ConfigValidationTest {
         @DisplayName("Invalid logging.level → ConfigLoadException")
         void invalidLoggingLevel_throwsConfigLoadException() throws Exception {
             Path config = writeConfig("""
-                    backend:
-                      host: api.example.com
-                    logging:
-                      level: VERBOSE
-                    """);
+          backend:
+            host: api.example.com
+          logging:
+            level: VERBOSE
+          """);
 
             assertThatThrownBy(() -> ConfigLoader.load(config))
                     .isInstanceOf(ConfigLoadException.class)
@@ -145,11 +145,11 @@ class ConfigValidationTest {
         @DisplayName("Invalid engine.schema-validation → ConfigLoadException")
         void invalidSchemaValidation_throwsConfigLoadException() throws Exception {
             Path config = writeConfig("""
-                    backend:
-                      host: api.example.com
-                    engine:
-                      schema-validation: paranoid
-                    """);
+          backend:
+            host: api.example.com
+          engine:
+            schema-validation: paranoid
+          """);
 
             assertThatThrownBy(() -> ConfigLoader.load(config))
                     .isInstanceOf(ConfigLoadException.class)
@@ -161,14 +161,14 @@ class ConfigValidationTest {
         @DisplayName("Invalid proxy.tls.keystore-type → ConfigLoadException")
         void invalidKeystoreType_throwsConfigLoadException() throws Exception {
             Path config = writeConfig("""
-                    backend:
-                      host: api.example.com
-                    proxy:
-                      tls:
-                        enabled: true
-                        keystore: /path/to/keystore
-                        keystore-type: PEM
-                    """);
+          backend:
+            host: api.example.com
+          proxy:
+            tls:
+              enabled: true
+              keystore: /path/to/keystore
+              keystore-type: PEM
+          """);
 
             assertThatThrownBy(() -> ConfigLoader.load(config))
                     .isInstanceOf(ConfigLoadException.class)
@@ -180,11 +180,11 @@ class ConfigValidationTest {
         @DisplayName("Invalid logging.format → ConfigLoadException")
         void invalidLoggingFormat_throwsConfigLoadException() throws Exception {
             Path config = writeConfig("""
-                    backend:
-                      host: api.example.com
-                    logging:
-                      format: xml
-                    """);
+          backend:
+            host: api.example.com
+          logging:
+            format: xml
+          """);
 
             assertThatThrownBy(() -> ConfigLoader.load(config))
                     .isInstanceOf(ConfigLoadException.class)
@@ -205,10 +205,10 @@ class ConfigValidationTest {
         @DisplayName("backend.scheme: http → accepted")
         void httpScheme_accepted() throws Exception {
             Path config = writeConfig("""
-                    backend:
-                      host: api.example.com
-                      scheme: http
-                    """);
+          backend:
+            host: api.example.com
+            scheme: http
+          """);
 
             ProxyConfig result = ConfigLoader.load(config);
             assertThat(result.backendScheme()).isEqualTo("http");
@@ -218,10 +218,10 @@ class ConfigValidationTest {
         @DisplayName("backend.scheme: https → accepted")
         void httpsScheme_accepted() throws Exception {
             Path config = writeConfig("""
-                    backend:
-                      host: api.example.com
-                      scheme: https
-                    """);
+          backend:
+            host: api.example.com
+            scheme: https
+          """);
 
             ProxyConfig result = ConfigLoader.load(config);
             assertThat(result.backendScheme()).isEqualTo("https");
@@ -232,11 +232,11 @@ class ConfigValidationTest {
         void allLogLevels_accepted() throws Exception {
             for (String level : new String[] {"TRACE", "DEBUG", "INFO", "WARN", "ERROR"}) {
                 Path config = writeConfig("""
-                        backend:
-                          host: api.example.com
-                        logging:
-                          level: %s
-                        """.formatted(level));
+            backend:
+              host: api.example.com
+            logging:
+              level: %s
+            """.formatted(level));
 
                 ProxyConfig result = ConfigLoader.load(config);
                 assertThat(result.loggingLevel()).isEqualTo(level);
@@ -248,12 +248,12 @@ class ConfigValidationTest {
         void allClientAuthModes_accepted() throws Exception {
             for (String mode : new String[] {"none", "want", "need"}) {
                 Path config = writeConfig("""
-                        backend:
-                          host: api.example.com
-                        proxy:
-                          tls:
-                            client-auth: %s
-                        """.formatted(mode));
+            backend:
+              host: api.example.com
+            proxy:
+              tls:
+                client-auth: %s
+            """.formatted(mode));
 
                 ProxyConfig result = ConfigLoader.load(config);
                 assertThat(result.proxyTls().clientAuth()).isEqualTo(mode);
@@ -273,10 +273,10 @@ class ConfigValidationTest {
         @DisplayName("No backend.port + http → port 80")
         void httpScheme_port80() throws Exception {
             Path config = writeConfig("""
-                    backend:
-                      host: api.example.com
-                      scheme: http
-                    """);
+          backend:
+            host: api.example.com
+            scheme: http
+          """);
 
             ProxyConfig result = ConfigLoader.load(config);
             assertThat(result.backendPort()).isEqualTo(80);
@@ -286,10 +286,10 @@ class ConfigValidationTest {
         @DisplayName("No backend.port + https → port 443")
         void httpsScheme_port443() throws Exception {
             Path config = writeConfig("""
-                    backend:
-                      host: api.example.com
-                      scheme: https
-                    """);
+          backend:
+            host: api.example.com
+            scheme: https
+          """);
 
             ProxyConfig result = ConfigLoader.load(config);
             assertThat(result.backendPort()).isEqualTo(443);
@@ -299,11 +299,11 @@ class ConfigValidationTest {
         @DisplayName("Explicit backend.port → overrides auto-derivation")
         void explicitPort_overridesDerivation() throws Exception {
             Path config = writeConfig("""
-                    backend:
-                      host: api.example.com
-                      scheme: https
-                      port: 8443
-                    """);
+          backend:
+            host: api.example.com
+            scheme: https
+            port: 8443
+          """);
 
             ProxyConfig result = ConfigLoader.load(config);
             assertThat(result.backendPort()).isEqualTo(8443);
@@ -322,42 +322,40 @@ class ConfigValidationTest {
         @DisplayName("Negative proxy.port → ConfigLoadException")
         void negativeProxyPort_throwsConfigLoadException() throws Exception {
             Path config = writeConfig("""
-                    backend:
-                      host: api.example.com
-                    proxy:
-                      port: -1
-                    """);
+          backend:
+            host: api.example.com
+          proxy:
+            port: -1
+          """);
 
             assertThatThrownBy(() -> ConfigLoader.load(config))
                     .isInstanceOf(ConfigLoadException.class)
                     .hasMessageContaining("proxy.port")
-                    .hasMessageContaining("positive");
+                    .hasMessageContaining("non-negative");
         }
 
         @Test
-        @DisplayName("Zero proxy.port → ConfigLoadException")
-        void zeroProxyPort_throwsConfigLoadException() throws Exception {
+        @DisplayName("Zero proxy.port → accepted (ephemeral port)")
+        void zeroProxyPort_accepted() throws Exception {
             Path config = writeConfig("""
-                    backend:
-                      host: api.example.com
-                    proxy:
-                      port: 0
-                    """);
+          backend:
+            host: api.example.com
+          proxy:
+            port: 0
+          """);
 
-            assertThatThrownBy(() -> ConfigLoader.load(config))
-                    .isInstanceOf(ConfigLoadException.class)
-                    .hasMessageContaining("proxy.port")
-                    .hasMessageContaining("positive");
+            ProxyConfig result = ConfigLoader.load(config);
+            assertThat(result.proxyPort()).isEqualTo(0);
         }
 
         @Test
         @DisplayName("Negative backend.connect-timeout-ms → ConfigLoadException")
         void negativeConnectTimeout_throwsConfigLoadException() throws Exception {
             Path config = writeConfig("""
-                    backend:
-                      host: api.example.com
-                      connect-timeout-ms: -100
-                    """);
+          backend:
+            host: api.example.com
+            connect-timeout-ms: -100
+          """);
 
             assertThatThrownBy(() -> ConfigLoader.load(config))
                     .isInstanceOf(ConfigLoadException.class)

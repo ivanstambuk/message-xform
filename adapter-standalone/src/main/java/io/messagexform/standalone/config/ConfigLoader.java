@@ -249,7 +249,7 @@ public final class ConfigLoader {
         validateOneOf("backend.tls.truststore-type", config.backendTls().truststoreType(), "PKCS12", "JKS");
 
         // --- Positive integer constraints ---
-        validatePositive("proxy.port", config.proxyPort());
+        validateNonNegative("proxy.port", config.proxyPort()); // 0 = ephemeral port
         validatePositive("backend.port", config.backendPort());
         validatePositive("backend.connect-timeout-ms", config.backendConnectTimeoutMs());
         validatePositive("backend.read-timeout-ms", config.backendReadTimeoutMs());
@@ -276,6 +276,14 @@ public final class ConfigLoader {
         if (value <= 0) {
             throw new ConfigLoadException(
                     "Configuration error: '%s' must be positive, got %d.".formatted(field, value));
+        }
+    }
+
+    /** Validates that an integer value is non-negative (>= 0). */
+    private static void validateNonNegative(String field, int value) {
+        if (value < 0) {
+            throw new ConfigLoadException(
+                    "Configuration error: '%s' must be non-negative, got %d.".formatted(field, value));
         }
     }
 

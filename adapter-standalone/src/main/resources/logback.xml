@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Default Logback configuration for the standalone HTTP proxy (NFR-004-07).
+
+  This provides a sensible default that is reconfigured programmatically
+  by LogbackConfigurator at startup based on the proxy configuration
+  (logging.format: json|text, logging.level: TRACE|DEBUG|INFO|WARN|ERROR).
+
+  The default here is human-readable text so the proxy is usable before
+  config is loaded.
+-->
+<configuration>
+
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Suppress noisy Jetty DEBUG output -->
+    <logger name="org.eclipse.jetty" level="WARN" />
+    <logger name="io.javalin" level="INFO" />
+
+    <root level="INFO">
+        <appender-ref ref="STDOUT" />
+    </root>
+
+</configuration>

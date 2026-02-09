@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 /**
  * Main HTTP proxy handler (IMPL-004-02, FR-004-01 through FR-004-06a,
@@ -101,166 +102,180 @@ public final class ProxyHandler implements Handler {
         }
         ctx.header(REQUEST_ID_HEADER, requestId);
 
-        // --- Step 0a: Request body size enforcement (FR-004-13, T-004-29) ---
-        if (maxBodyBytes > 0) {
-            long contentLength = ctx.contentLength();
-            if (contentLength > maxBodyBytes) {
-                LOG.warn("Request body too large: {} bytes (limit {})", contentLength, maxBodyBytes);
+        // --- MDC structured log fields (T-004-50, NFR-004-07) ---
+        MDC.put("requestId", requestId);
+        MDC.put("method", ctx.method().name());
+        MDC.put("path", ctx.path());
+        try {
+
+            // --- Step 0a: Request body size enforcement (FR-004-13, T-004-29) ---
+            if (maxBodyBytes > 0) {
+                long contentLength = ctx.contentLength();
+                if (contentLength > maxBodyBytes) {
+                    LOG.warn("Request body too large: {} bytes (limit {})", contentLength, maxBodyBytes);
+                    writeProblemResponse(
+                            ctx,
+                            413,
+                            ProblemDetail.bodyTooLarge(
+                                    "Request body exceeds " + maxBodyBytes + " bytes", 413, ctx.path()));
+                    return;
+                }
+                // For chunked requests without Content-Length, check after reading
+                String body = ctx.body();
+                if (body.length() > maxBodyBytes) {
+                    LOG.warn("Request body too large: {} bytes (limit {})", body.length(), maxBodyBytes);
+                    writeProblemResponse(
+                            ctx,
+                            413,
+                            ProblemDetail.bodyTooLarge(
+                                    "Request body exceeds " + maxBodyBytes + " bytes", 413, ctx.path()));
+                    return;
+                }
+            }
+
+            // --- Step 1: Build TransformContext from request (cookies, query params) ---
+            TransformContext transformContext = adapter.buildTransformContext(ctx);
+
+            // --- Step 2: Wrap the inbound request → Message ---
+            // JSON parse may fail if the body is non-JSON or malformed.
+            // FR-004-26: profile-matched routes reject non-JSON; unmatched
+            // routes pass through without body parsing.
+            Message requestMessage;
+            boolean parseError = false;
+            try {
+                requestMessage = adapter.wrapRequest(ctx);
+            } catch (IllegalArgumentException e) {
+                // Build a minimal Message (NullNode body) for profile matching only.
+                // If the engine returns PASSTHROUGH, forward raw.
+                // If a profile would match (SUCCESS/ERROR), return 400.
+                parseError = true;
+                requestMessage = adapter.wrapRequestRaw(ctx);
+            }
+
+            // --- Step 3: Transform the request ---
+            TransformResult requestResult = engine.transform(requestMessage, Direction.REQUEST, transformContext);
+
+            // If parse failed, check if a profile matched → 400 Bad Request (FR-004-26)
+            if (parseError && !requestResult.isPassthrough()) {
+                LOG.warn("Non-JSON body on profile-matched route: {}", ctx.path());
+                writeProblemResponse(ctx, 400, ProblemDetail.badRequest("Request body is not valid JSON", ctx.path()));
+                return;
+            }
+
+            // --- Step 4: Dispatch on request TransformResult (FR-004-35) ---
+            String forwardMethod;
+            String forwardPath;
+            String forwardBody;
+            Map<String, String> forwardHeaders;
+
+            switch (requestResult.type()) {
+                case SUCCESS -> {
+                    // Forward the transformed message to backend
+                    Message transformed = requestResult.message();
+                    forwardMethod = transformed.requestMethod();
+                    forwardPath = buildForwardPath(transformed.requestPath(), transformed.queryString());
+                    forwardBody =
+                            transformed.body() != null && !transformed.body().isNull()
+                                    ? transformed.body().toString()
+                                    : null;
+                    forwardHeaders = transformed.headers();
+                }
+                case PASSTHROUGH -> {
+                    // Forward the raw request unmodified — no JSON parse round-trip
+                    forwardMethod = ctx.method().name();
+                    forwardPath = buildForwardPath(ctx.path(), ctx.queryString());
+                    forwardBody = ctx.body();
+                    // Use already-constructed requestMessage headers (avoids re-parsing body)
+                    forwardHeaders = requestMessage.headers();
+                }
+                case ERROR -> {
+                    // Return error to client immediately — do NOT forward to backend
+                    writeErrorResponse(ctx, requestResult);
+                    return;
+                }
+                default -> throw new IllegalStateException("Unknown TransformResult type: " + requestResult.type());
+            }
+
+            // --- Step 4b: Inject X-Forwarded-* headers (FR-004-36, T-004-31) ---
+            if (forwardedHeadersEnabled) {
+                forwardHeaders = injectForwardedHeaders(forwardHeaders, ctx);
+            }
+
+            // --- Step 5: Forward to backend ---
+            UpstreamResponse upstreamResponse;
+            try {
+                upstreamResponse = upstreamClient.forward(forwardMethod, forwardPath, forwardBody, forwardHeaders);
+            } catch (UpstreamTimeoutException e) {
+                LOG.warn("Backend timeout: {}", e.getMessage(), e);
+                writeProblemResponse(ctx, 504, ProblemDetail.gatewayTimeout(e.getMessage(), ctx.path()));
+                return;
+            } catch (UpstreamResponseTooLargeException e) {
+                LOG.warn("Backend response too large: {}", e.getMessage());
+                writeProblemResponse(ctx, 502, ProblemDetail.bodyTooLarge(e.getMessage(), 502, ctx.path()));
+                return;
+            } catch (UpstreamConnectException e) {
+                LOG.warn("Backend unreachable: {}", e.getMessage(), e);
+                writeProblemResponse(ctx, 502, ProblemDetail.backendUnreachable(e.getMessage(), ctx.path()));
+                return;
+            }
+
+            // --- Step 6: Populate Javalin context with upstream response (FR-004-06a) ---
+            ctx.result(upstreamResponse.body());
+            ctx.status(upstreamResponse.statusCode());
+            // Forward response headers, but skip framing headers (content-length,
+            // transfer-encoding) — Javalin/Jetty manages these based on the actual
+            // body written to ctx.result(). If we forwarded them, a response
+            // transformation that changes the body size would cause truncation.
+            upstreamResponse.headers().forEach((name, value) -> {
+                if (!"content-length".equalsIgnoreCase(name) && !"transfer-encoding".equalsIgnoreCase(name)) {
+                    ctx.header(name, value);
+                }
+            });
+
+            // --- Step 7: Wrap the response → Message ---
+            // Response body may not be JSON (e.g., passthrough text/plain backend).
+            // Same pattern as request: if parse fails and no profile matches
+            // (PASSTHROUGH), the response is already written in step 6.
+            Message responseMessage;
+            boolean responseParseError = false;
+            try {
+                responseMessage = adapter.wrapResponse(ctx);
+            } catch (IllegalArgumentException e) {
+                responseParseError = true;
+                responseMessage = adapter.wrapResponseRaw(ctx);
+            }
+
+            // --- Step 8: Transform the response ---
+            TransformResult responseResult = engine.transform(responseMessage, Direction.RESPONSE, transformContext);
+
+            // If response parse failed and a profile matched → 502 (can't transform)
+            if (responseParseError && !responseResult.isPassthrough()) {
+                LOG.warn("Non-JSON response body on profile-matched route: {}", ctx.path());
                 writeProblemResponse(
                         ctx,
-                        413,
-                        ProblemDetail.bodyTooLarge("Request body exceeds " + maxBodyBytes + " bytes", 413, ctx.path()));
+                        502,
+                        ProblemDetail.backendUnreachable("Backend returned non-JSON response body", ctx.path()));
                 return;
             }
-            // For chunked requests without Content-Length, check after reading
-            String body = ctx.body();
-            if (body.length() > maxBodyBytes) {
-                LOG.warn("Request body too large: {} bytes (limit {})", body.length(), maxBodyBytes);
-                writeProblemResponse(
-                        ctx,
-                        413,
-                        ProblemDetail.bodyTooLarge("Request body exceeds " + maxBodyBytes + " bytes", 413, ctx.path()));
-                return;
+
+            // --- Step 9: Dispatch on response TransformResult (FR-004-35) ---
+            switch (responseResult.type()) {
+                case SUCCESS -> {
+                    // Write transformed response to client via applyChanges
+                    adapter.applyChanges(responseResult.message(), ctx);
+                }
+                case PASSTHROUGH -> {
+                    // Response already written in step 6 — nothing to do.
+                    // Javalin will send the ctx.result() / ctx.status() / headers
+                    // that we set from the upstream response.
+                }
+                case ERROR -> {
+                    // Return error to client
+                    writeErrorResponse(ctx, responseResult);
+                }
             }
-        }
-
-        // --- Step 1: Build TransformContext from request (cookies, query params) ---
-        TransformContext transformContext = adapter.buildTransformContext(ctx);
-
-        // --- Step 2: Wrap the inbound request → Message ---
-        // JSON parse may fail if the body is non-JSON or malformed.
-        // FR-004-26: profile-matched routes reject non-JSON; unmatched
-        // routes pass through without body parsing.
-        Message requestMessage;
-        boolean parseError = false;
-        try {
-            requestMessage = adapter.wrapRequest(ctx);
-        } catch (IllegalArgumentException e) {
-            // Build a minimal Message (NullNode body) for profile matching only.
-            // If the engine returns PASSTHROUGH, forward raw.
-            // If a profile would match (SUCCESS/ERROR), return 400.
-            parseError = true;
-            requestMessage = adapter.wrapRequestRaw(ctx);
-        }
-
-        // --- Step 3: Transform the request ---
-        TransformResult requestResult = engine.transform(requestMessage, Direction.REQUEST, transformContext);
-
-        // If parse failed, check if a profile matched → 400 Bad Request (FR-004-26)
-        if (parseError && !requestResult.isPassthrough()) {
-            LOG.warn("Non-JSON body on profile-matched route: {}", ctx.path());
-            writeProblemResponse(ctx, 400, ProblemDetail.badRequest("Request body is not valid JSON", ctx.path()));
-            return;
-        }
-
-        // --- Step 4: Dispatch on request TransformResult (FR-004-35) ---
-        String forwardMethod;
-        String forwardPath;
-        String forwardBody;
-        Map<String, String> forwardHeaders;
-
-        switch (requestResult.type()) {
-            case SUCCESS -> {
-                // Forward the transformed message to backend
-                Message transformed = requestResult.message();
-                forwardMethod = transformed.requestMethod();
-                forwardPath = buildForwardPath(transformed.requestPath(), transformed.queryString());
-                forwardBody = transformed.body() != null && !transformed.body().isNull()
-                        ? transformed.body().toString()
-                        : null;
-                forwardHeaders = transformed.headers();
-            }
-            case PASSTHROUGH -> {
-                // Forward the raw request unmodified — no JSON parse round-trip
-                forwardMethod = ctx.method().name();
-                forwardPath = buildForwardPath(ctx.path(), ctx.queryString());
-                forwardBody = ctx.body();
-                // Use already-constructed requestMessage headers (avoids re-parsing body)
-                forwardHeaders = requestMessage.headers();
-            }
-            case ERROR -> {
-                // Return error to client immediately — do NOT forward to backend
-                writeErrorResponse(ctx, requestResult);
-                return;
-            }
-            default -> throw new IllegalStateException("Unknown TransformResult type: " + requestResult.type());
-        }
-
-        // --- Step 4b: Inject X-Forwarded-* headers (FR-004-36, T-004-31) ---
-        if (forwardedHeadersEnabled) {
-            forwardHeaders = injectForwardedHeaders(forwardHeaders, ctx);
-        }
-
-        // --- Step 5: Forward to backend ---
-        UpstreamResponse upstreamResponse;
-        try {
-            upstreamResponse = upstreamClient.forward(forwardMethod, forwardPath, forwardBody, forwardHeaders);
-        } catch (UpstreamTimeoutException e) {
-            LOG.warn("Backend timeout: {}", e.getMessage(), e);
-            writeProblemResponse(ctx, 504, ProblemDetail.gatewayTimeout(e.getMessage(), ctx.path()));
-            return;
-        } catch (UpstreamResponseTooLargeException e) {
-            LOG.warn("Backend response too large: {}", e.getMessage());
-            writeProblemResponse(ctx, 502, ProblemDetail.bodyTooLarge(e.getMessage(), 502, ctx.path()));
-            return;
-        } catch (UpstreamConnectException e) {
-            LOG.warn("Backend unreachable: {}", e.getMessage(), e);
-            writeProblemResponse(ctx, 502, ProblemDetail.backendUnreachable(e.getMessage(), ctx.path()));
-            return;
-        }
-
-        // --- Step 6: Populate Javalin context with upstream response (FR-004-06a) ---
-        ctx.result(upstreamResponse.body());
-        ctx.status(upstreamResponse.statusCode());
-        // Forward response headers, but skip framing headers (content-length,
-        // transfer-encoding) — Javalin/Jetty manages these based on the actual
-        // body written to ctx.result(). If we forwarded them, a response
-        // transformation that changes the body size would cause truncation.
-        upstreamResponse.headers().forEach((name, value) -> {
-            if (!"content-length".equalsIgnoreCase(name) && !"transfer-encoding".equalsIgnoreCase(name)) {
-                ctx.header(name, value);
-            }
-        });
-
-        // --- Step 7: Wrap the response → Message ---
-        // Response body may not be JSON (e.g., passthrough text/plain backend).
-        // Same pattern as request: if parse fails and no profile matches
-        // (PASSTHROUGH), the response is already written in step 6.
-        Message responseMessage;
-        boolean responseParseError = false;
-        try {
-            responseMessage = adapter.wrapResponse(ctx);
-        } catch (IllegalArgumentException e) {
-            responseParseError = true;
-            responseMessage = adapter.wrapResponseRaw(ctx);
-        }
-
-        // --- Step 8: Transform the response ---
-        TransformResult responseResult = engine.transform(responseMessage, Direction.RESPONSE, transformContext);
-
-        // If response parse failed and a profile matched → 502 (can't transform)
-        if (responseParseError && !responseResult.isPassthrough()) {
-            LOG.warn("Non-JSON response body on profile-matched route: {}", ctx.path());
-            writeProblemResponse(
-                    ctx, 502, ProblemDetail.backendUnreachable("Backend returned non-JSON response body", ctx.path()));
-            return;
-        }
-
-        // --- Step 9: Dispatch on response TransformResult (FR-004-35) ---
-        switch (responseResult.type()) {
-            case SUCCESS -> {
-                // Write transformed response to client via applyChanges
-                adapter.applyChanges(responseResult.message(), ctx);
-            }
-            case PASSTHROUGH -> {
-                // Response already written in step 6 — nothing to do.
-                // Javalin will send the ctx.result() / ctx.status() / headers
-                // that we set from the upstream response.
-            }
-            case ERROR -> {
-                // Return error to client
-                writeErrorResponse(ctx, responseResult);
-            }
+        } finally {
+            MDC.clear();
         }
     }
 

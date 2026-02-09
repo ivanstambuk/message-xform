@@ -19,7 +19,7 @@ dependencies {
 
     // Logging — SLF4J binding for production
     implementation(catalog.findLibrary("slf4j-api").get())
-    runtimeOnly(catalog.findLibrary("logback-classic").get())
+    implementation(catalog.findLibrary("logback-classic").get())
 
     // Test
     testImplementation(catalog.findLibrary("mockito-core").get())

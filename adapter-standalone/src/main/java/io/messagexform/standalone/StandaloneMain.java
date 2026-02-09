@@ -1,14 +1,20 @@
 package io.messagexform.standalone;
 
+import io.messagexform.standalone.proxy.ProxyApp;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Entry point for the standalone HTTP proxy (FR-004-26, FR-004-27).
  *
  * <p>
- * This class bootstraps the proxy by loading configuration, initializing
- * the core {@code TransformEngine}, and starting the Javalin HTTP server.
- * Implementation will be added incrementally across Phase 3–7 tasks.
+ * Delegates to {@link ProxyApp#start(String[])} for the full startup
+ * sequence. On failure, logs the error and exits with a non-zero status
+ * code (T-004-47, S-004-45).
  */
 public final class StandaloneMain {
+
+    private static final Logger LOG = LoggerFactory.getLogger(StandaloneMain.class);
 
     private StandaloneMain() {
         // utility class
@@ -20,8 +26,13 @@ public final class StandaloneMain {
      * @param args command-line arguments (e.g.
      *             {@code --config path/to/config.yaml})
      */
+    @SuppressWarnings("SystemExitOutsideMain")
     public static void main(String[] args) {
-        // Placeholder — implementation starts in T-004-08 (ProxyApp bootstrap)
-        System.out.println("message-xform-proxy starting…");
+        try {
+            ProxyApp.start(args);
+        } catch (Exception e) {
+            LOG.error("Startup failed: {}", e.getMessage(), e);
+            System.exit(1);
+        }
     }
 }
