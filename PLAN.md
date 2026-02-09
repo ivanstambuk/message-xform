@@ -258,6 +258,18 @@ which it should be picked up.
   first 3-5 toolchain decisions needed for Feature 001 implementation, then expand
   incrementally as new toolchain questions arise.
 
+**Trigger: Before first release — Artifact Publishing**
+
+- [ ] **Artifact publishing (FR-009-16, FR-009-17)** — User-driven CI publishing via
+  GitHub Actions (`workflow_dispatch` + `release` events). Two targets:
+  1. **Maven Central** — Gateway adapter JARs as individual artifacts (`message-xform-core`,
+     `message-xform-<gateway>`), standalone proxy as a shadow JAR. GPG-signed. Uses
+     `org.danilopianini.publish-on-central` plugin (same as `openauth-sim`).
+  2. **Docker Hub** — Standalone proxy Docker image (`ivanstambuk/message-xform-proxy`),
+     tagged with `latest` + release version. Smoke-tested before push.
+  Reference: `openauth-sim/.github/workflows/publish-standalone.yml`.
+  Spec: `docs/architecture/features/009/spec.md` (FR-009-16, FR-009-17).
+
 ### Research: Kong Transformer Plugins
 
 Study how Kong implements request/response transformation to inform a generalized, gateway-agnostic design.

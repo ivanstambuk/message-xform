@@ -2,7 +2,7 @@
 
 | Field | Value |
 |-------|-------|
-| Status | Ready |
+| Status | Amended — FR-009-16/17 (artifact publishing) added, implementation pending |
 | Last updated | 2026-02-09 |
 | Owners | Ivan |
 | Linked plan | `docs/architecture/features/009/plan.md` |
@@ -367,6 +367,59 @@ version catalog. No range expressions (e.g., `[2.0,3.0)`) or dynamic versions
 | Status | ✅ Satisfied |
 | Source | Build reproducibility |
 
+### FR-009-16: Artifact Publishing (Maven Central)
+
+**Requirement:** The project MUST provide a GitHub Actions workflow that publishes
+releasable artifacts to **Maven Central** (via Central Portal). Publishing MUST be
+**user-driven** — triggered by `workflow_dispatch` (manual) or a GitHub `release`
+event — never on automatic push.
+
+Artifact matrix:
+
+| Module | Artifact ID | Packaging | Notes |
+|--------|-------------|-----------|-------|
+| `core` | `message-xform-core` | JAR | Gateway-agnostic engine — the primary library artifact |
+| `adapter-standalone` | `message-xform-proxy` | Shadow JAR | Standalone proxy — fat JAR with all dependencies |
+| Future adapters | `message-xform-<gateway>` | JAR | One artifact per gateway adapter (PingAccess, PingGateway, etc.) |
+
+The workflow MUST:
+1. Run `spotlessCheck check` before publishing (quality gate).
+2. Sign all artifacts with GPG (in-memory key from secrets).
+3. Use `org.danilopianini.publish-on-central` or equivalent Gradle plugin.
+4. Publish POM with correct dependency metadata (shadow JAR omits bundled deps).
+5. Use secrets: `MAVEN_CENTRAL_PORTAL_USERNAME`, `MAVEN_CENTRAL_PORTAL_PASSWORD`,
+   `SIGNING_KEY`, `SIGNING_PASSWORD`.
+
+Reference: `openauth-sim/.github/workflows/publish-standalone.yml`.
+
+| Aspect | Detail |
+|--------|--------|
+| Success path | `workflow_dispatch` → quality gate → sign → publish → artifact visible on Maven Central |
+| Failure path | Quality gate fails → publish aborted, no partial upload |
+| Status | ⬜ Not yet implemented |
+| Source | openauth-sim parity, distribution strategy |
+
+### FR-009-17: Docker Image Publishing (Docker Hub)
+
+**Requirement:** The project MUST provide a GitHub Actions workflow (or a job within
+the publish workflow) that builds and pushes the standalone proxy Docker image to
+**Docker Hub**. Publishing MUST be **user-driven** — triggered by `workflow_dispatch`
+or a GitHub `release` event.
+
+The workflow MUST:
+1. Build the Docker image using the existing multi-stage `Dockerfile`.
+2. Tag the image with `latest` and the release version (e.g., `1.0.0`).
+3. Push to Docker Hub under `ivanstambuk/message-xform-proxy` (or equivalent).
+4. Run a health-check smoke test before pushing (same as CI).
+5. Use secrets: `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`.
+
+| Aspect | Detail |
+|--------|--------|
+| Success path | `workflow_dispatch` → build → smoke test → push → image visible on Docker Hub |
+| Failure path | Smoke test fails → push aborted |
+| Status | ⬜ Not yet implemented |
+| Source | Distribution strategy, Feature 004 |
+
 ---
 
 ## Non-Functional Requirements
@@ -394,6 +447,9 @@ version catalog. No range expressions (e.g., `[2.0,3.0)`) or dynamic versions
 | S-009-08 | **Gradle upgrade:** Wrapper updated → `--warning-mode=all clean check` passes. |
 | S-009-09 | **EditorConfig applied:** Java file opened in IDE → 4-space indent, 120 column guide visible. |
 | S-009-10 | **SpotBugs clean:** `./gradlew spotbugsMain` reports zero findings. |
+| S-009-11 | **Maven Central publish:** `workflow_dispatch` on `publish.yml` → quality gate passes → artifacts signed and published to Maven Central Portal. |
+| S-009-12 | **Docker Hub publish:** `workflow_dispatch` on `publish.yml` → Docker image built, smoke-tested, tagged, pushed to Docker Hub. |
+| S-009-13 | **Publish gate failure:** Quality gate fails during publish workflow → publish aborted, no artifacts uploaded. |
 
 ---
 
@@ -427,6 +483,9 @@ version catalog. No range expressions (e.g., `[2.0,3.0)`) or dynamic versions
 | CLI-009-07 | `./gradlew --configuration-cache help` | Configuration cache validation |
 | CLI-009-08 | `./gradlew wrapper --gradle-version <ver> --distribution-type bin` | Wrapper upgrade |
 | CLI-009-09 | `./gradlew spotbugsMain spotbugsTest` | Static analysis (once configured) |
+| CLI-009-10 | `./gradlew :core:publish...` | Publish core JAR to Maven Central (via publish-on-central) |
+| CLI-009-11 | `./gradlew :adapter-standalone:publish...` | Publish standalone proxy shadow JAR to Maven Central |
+| CLI-009-12 | `docker build -t message-xform-proxy . && docker push` | Build and push Docker image (CI workflow) |
 
 ### Configuration Files
 
@@ -441,6 +500,7 @@ version catalog. No range expressions (e.g., `[2.0,3.0)`) or dynamic versions
 | CFG-009-07 | `.gitlint` | Commit message rules (reference) |
 | CFG-009-08 | `.editorconfig` | IDE formatting rules (to be created) |
 | CFG-009-09 | `config/spotbugs/include-filter.xml` | SpotBugs detector config (to be created) |
+| CFG-009-10 | `.github/workflows/publish.yml` | Artifact + Docker publish workflow (to be created) |
 
 ### Fixtures & Sample Data
 
@@ -502,6 +562,13 @@ version catalog. No range expressions (e.g., `[2.0,3.0)`) or dynamic versions
                     │   → commit-msg lint (PRs)    │
                     │   → Docker build + smoke     │
                     └─────────────────────────────┘
+
+           ┌─────────────────────────────────────────┐
+           │  Publish (manual / release event only)   │
+           │  → spotlessCheck check (quality gate)    │
+           │  → GPG sign + Maven Central publish      │
+           │  → Docker build + smoke + Docker Hub push │
+           └─────────────────────────────────────────┘
 ```
 
 ### C. ArchUnit Rule Map

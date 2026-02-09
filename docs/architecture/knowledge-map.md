@@ -140,6 +140,8 @@ ADR-0030 (Session Context)   governs ── FR-001-13, references ADR-0021, ADR-
 | FR-009-12 (ArchUnit) | — | NFR-009-02 |
 | FR-009-13 (SpotBugs) | — | NFR-009-01 |
 | FR-009-14 (Gradle upgrade) | — | — |
+| FR-009-16 (Maven Central publish) | — | — |
+| FR-009-17 (Docker Hub publish) | — | NFR-009-03 |
 
 ## Research Documents
 
