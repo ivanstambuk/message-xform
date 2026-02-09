@@ -86,3 +86,6 @@ adapter-standalone/src/main/java/io/messagexform/standalone/proxy/AdminReloadHan
 adapter-standalone/src/main/java/io/messagexform/standalone/proxy/ProblemDetail.java
 adapter-standalone/src/main/java/io/messagexform/standalone/proxy/TlsConfigurator.java
 adapter-standalone/src/main/java/io/messagexform/standalone/proxy/TlsConfigValidator.java
+adapter-standalone/src/main/java/io/messagexform/standalone/proxy/ProxyApp.java
+adapter-standalone/src/main/java/io/messagexform/standalone/proxy/LogbackConfigurator.java
+adapter-standalone/src/main/java/io/messagexform/standalone/StandaloneMain.java

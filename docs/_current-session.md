@@ -1,40 +1,38 @@
-# Current Session — 2026-02-09 (Session 4)
+# Current Session — Feature 004 Phase 7→8 Transition
 
-**Feature**: 004 — Standalone HTTP Proxy Mode
-**Phase**: 6 — TLS (COMPLETE)
-**Increment**: I9 — Inbound + outbound TLS (COMPLETE)
+_Updated:_ 2026-02-09T02:35+01:00
 
-## Session Status
+## Completed This Session
 
-### Completed Tasks (this session)
-- [x] **T-004-40** — Generate test certificates (4 PKCS12 keystores via `generate-certs.sh`)
-- [x] **T-004-41** — Inbound TLS: HTTPS server (3 tests) — `TlsConfigurator`, `InboundTlsTest`
-- [x] **T-004-42** — Inbound mTLS: client-auth need/want (4 tests) — `InboundMtlsTest`
-- [x] **T-004-43** — Outbound TLS: HTTPS to backend (3 tests) — `OutboundTlsTest`
-- [x] **T-004-44** — Outbound mTLS: client cert to backend (2 tests) — `OutboundMtlsTest`
-- [x] **T-004-45** — TLS config validation at startup (11 tests) — `TlsConfigValidator`, `TlsConfigValidationTest`
+### I10 — Startup, Shutdown, Logging (T-004-46..50) ✅
 
-### Housekeeping
-- Added `TlsConfigurator`, `TlsConfigValidator`, `mTLS` entries to terminology.md
-- Added `TlsConfigurator.java`, `TlsConfigValidator.java` to llms.txt
-- Added TLS pitfalls to AGENTS.md (Javalin addConnector, JDK hostname verification, jakarta.servlet)
-- Added TLS row to knowledge-map.md traceability table
+- **T-004-46**: `ProxyApp` orchestrates full startup: config → engines → TLS →
+  specs → profile → HttpClient → Logback → Javalin → FileWatcher.
+  `StandaloneMain` delegates to `ProxyApp.start()` with try/catch + exit(1).
+  `StartupSequenceTest`: 2 integration tests (start + timing < 3s).
+- **T-004-47**: `StartupFailureTest`: 7 tests covering missing config,
+  malformed YAML, missing fields, invalid enums, broken specs, bad args,
+  negative port. `ConfigLoader` relaxed: port 0 = ephemeral.
+- **T-004-48**: `GracefulShutdownTest`: 3 tests — clean stop, in-flight
+  request completion, double-stop idempotency.
+- **T-004-49**: `LogbackConfigurator` programmatically switches JSON/text mode.
+  `logback.xml` defaults to text; `ProxyApp` calls configure() after config load.
+  logback-classic promoted from runtimeOnly to implementation.
+- **T-004-50**: MDC fields (requestId, method, path) in ProxyHandler.handle()
+  with finally-block cleanup.
 
-### I9 Complete
-All 6 tasks done. 23 new integration tests, `./gradlew check` green.
+### Commits
 
-## Key Decisions
-- **Direct Jetty TLS, not Javalin SSL plugin**: Used `config.jetty.addConnector()` with
-  `SslContextFactory.Server` for full control over mTLS, truststores, and client-auth modes.
-- **Outbound TLS in UpstreamClient**: `buildSslContext()` constructs `SSLContext` from
-  `BackendTlsConfig` with `TrustManagerFactory` + `KeyManagerFactory`.
-- **Hostname verification**: Uses `jdk.internal.httpclient.disableHostnameVerification`
-  system property (internal API, only reliable way for JDK 21 HttpClient).
-- **TLS validation not yet wired to startup**: `TlsConfigValidator` exists but is not
-  called from `StandaloneMain` — wire it up in T-004-46/47.
+- `fae3c78` — Implementation (11 files, 1187 insertions)
+- `66d7010` — Documentation updates (tasks.md, plan.md)
 
-## Commits
-- `3e397f2` — Phase 6 TLS (T-004-40..45, 23 tests)
+## Current State
+
+- **Feature 004**: Phase 8 — I11 (Docker Packaging + Shadow JAR)
+- All tests pass (`./gradlew :adapter-standalone:test`)
+- Spotless clean
+- Open questions: empty
 
 ## Next Steps
-- Phase 7 (I10) — Startup, Shutdown, Logging: T-004-46..T-004-50
+
+Phase 8 — I11: Docker Packaging + Shadow JAR (T-004-51..54)
