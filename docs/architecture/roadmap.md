@@ -4,7 +4,7 @@
 
 | # | Feature | Status | Spec | Dependencies | Language |
 |---|---------|--------|------|--------------|----------|
-| 001 | Message Transformation Engine (core) | ✅ Complete | `features/001/spec.md` | Research complete | Java 21 |
+| 001 | Message Transformation Engine (core) | 🔨 In Progress | `features/001/spec.md` | Research complete | Java 21 |
 | 002 | PingAccess Adapter | 🔲 Not Started | `features/002/spec.md` | Feature 001 | Java (SDK) |
 | 003 | PingGateway Adapter | 🔲 Not Started | `features/003/spec.md` | Feature 001 | Java / Groovy |
 | 004 | Standalone HTTP Proxy Mode | ✅ Complete | `features/004/spec.md` | Feature 001 | Java |
