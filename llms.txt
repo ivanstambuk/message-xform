@@ -15,6 +15,7 @@ docs/architecture/features/001/scenarios.md
 docs/architecture/features/004/spec.md
 docs/architecture/features/004/plan.md
 docs/architecture/features/004/tasks.md
+docs/architecture/features/004/scenarios.md
 
 # Architecture decisions (newest first)
 docs/decisions/ADR-0021-query-params-and-cookies-in-context.md
