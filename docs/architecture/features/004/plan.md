@@ -2,8 +2,8 @@
 
 _Linked specification:_ `docs/architecture/features/004/spec.md`
 _Linked tasks:_ `docs/architecture/features/004/tasks.md`
-_Status:_ In Progress (Phase 8 — I11)
-_Last updated:_ 2026-02-09T02:41+01:00
+_Status:_ In Progress (Phase 8 — I12)
+_Last updated:_ 2026-02-09T02:55+01:00
 
 > Guardrail: Keep this plan traceable back to the governing spec. Reference
 > FR/NFR/Scenario IDs from `spec.md` where relevant, log any new high- or
@@ -372,6 +372,7 @@ _To be completed after implementation._
     - _Requirements covered:_ FR-004-29 through FR-004-32, NFR-004-04, FX-004-09.
     - _Commands:_ `./gradlew :adapter-standalone:shadowJar`, `docker build`, `docker run`
     - _Exit:_ Docker image builds. Container starts. Health check passes.
+    - _Result:_ T-004-51 (Shadow plugin, fat JAR manifest, SPI merge), T-004-52 (3-stage Dockerfile with jlink custom JRE), T-004-53 (image size 80.8 MB < 150 MB), T-004-54 (container starts, health/ready 200, volume mount loads specs, HEALTHCHECK healthy) done. ✅ I11 complete.
 
 12. **I12 — Full integration test sweep + scenario coverage matrix** (≤90 min)
     - _Goal:_ Ensure all 77 scenarios pass. Fill in coverage matrix.

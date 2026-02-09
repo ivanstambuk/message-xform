@@ -59,14 +59,17 @@ WORKDIR /app
 # Copy shadow JAR from builder
 COPY --from=builder /build/adapter-standalone/build/libs/adapter-standalone-*-SNAPSHOT.jar proxy.jar
 
+# Copy default configuration
+COPY adapter-standalone/docker/config.yaml /app/config.yaml
+
 # Volume mount points for specs and profiles (FR-004-31, FR-004-32)
 # K8s ConfigMaps mount here; docker run -v ./my-specs:/specs also works.
 RUN mkdir -p /specs /profiles && chown -R proxy:proxy /specs /profiles
 VOLUME ["/specs", "/profiles"]
 
-# Default config directory env vars — override per deployment
-ENV MXFORM_SPECS_DIR=/specs \
-    MXFORM_PROFILES_DIR=/profiles
+# Default env vars — ConfigLoader reads SPECS_DIR, PROFILES_DIR, BACKEND_HOST, etc.
+ENV SPECS_DIR=/specs \
+    PROFILES_DIR=/profiles
 
 # Expose default proxy port
 EXPOSE 9090

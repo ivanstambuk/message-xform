@@ -1057,7 +1057,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `docker images message-xform-proxy`
   _Verification log:_ ✅ Image size: **80.8 MB** (target: < 150 MB). Layers: Alpine 8.4 MB + CA certs 0.5 MB + custom JRE 61.3 MB + proxy JAR 10.5 MB = 80.8 MB.
 
-- [ ] **T-004-54** — Docker smoke test (S-004-49/50/51)
+- [x] **T-004-54** — Docker smoke test (S-004-49/50/51) ✅
   _Intent:_ Container starts, serves health check, loads specs from volume mount.
   _Test:_
   - `docker run` with env vars → container starts (S-004-49).
@@ -1066,9 +1066,18 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - Shadow JAR starts cleanly (S-004-51).
   _Verify:_ Docker run + health check.
   _Verification commands:_
-  - `docker run -d --name proxy-test -p 9090:9090 -e BACKEND_HOST=httpbin.org message-xform-proxy`
+  - `docker run -d --name proxy-test -p 9090:9090 -e BACKEND_HOST=httpbin.org -e BACKEND_PORT=80 -v /tmp/test-specs:/specs message-xform-proxy`
   - `curl http://localhost:9090/health`
+  - `docker inspect proxy-test --format '{{.State.Health.Status}}'`
   - `docker stop proxy-test && docker rm proxy-test`
+  _Verification log:_ ✅ All Docker smoke tests pass:
+  - S-004-49: Container starts with `BACKEND_HOST` / `BACKEND_PORT` env vars, Javalin listening on 9090, startup 419ms.
+  - `/health` → 200 `{"status":"UP"}`, `/ready` → 200 `{"status":"READY","engine":"loaded","backend":"reachable"}`.
+  - S-004-50: Volume mount `/tmp/test-specs:/specs` → spec `echo-test` loaded, `specs=1` in startup log.
+  - S-004-51: Shadow JAR starts cleanly, JSLT engine discovered via SPI.
+  - Docker HEALTHCHECK → `healthy` status via `wget --spider /health`.
+  - Default config (`docker/config.yaml`) baked into image at `/app/config.yaml`.
+
 
 #### I12 — Full integration test sweep + scenario coverage matrix
 

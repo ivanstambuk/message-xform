@@ -1,0 +1,18 @@
+# Default configuration for Docker deployments.
+# All values can be overridden via environment variables.
+# See spec.md § Environment Variable Overrides for the full mapping.
+
+# Backend upstream — override with BACKEND_HOST and BACKEND_PORT env vars
+backend:
+  host: backend.local
+  port: 80
+
+# Proxy listener
+proxy:
+  port: 9090
+
+# Engine — spec and profile directories
+# These match the VOLUME mount points in the Dockerfile.
+engine:
+  specs-dir: /specs
+  profiles-dir: /profiles
