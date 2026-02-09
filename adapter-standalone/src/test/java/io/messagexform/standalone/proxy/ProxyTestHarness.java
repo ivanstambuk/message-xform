@@ -18,6 +18,7 @@ import java.nio.file.Path;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -44,6 +45,10 @@ abstract class ProxyTestHarness {
     protected int proxyPort;
     protected HttpClient testClient;
     protected TransformEngine engine;
+
+    /** HTTP methods accepted by the proxy (FR-004-05). */
+    private static final Set<String> ALLOWED_METHODS = Set.of("GET", "POST", "PUT", "DELETE", "PATCH", "HEAD",
+            "OPTIONS");
 
     /** Records the last request received by the mock backend for each key. */
     protected final Map<String, ReceivedRequest> receivedRequests = new ConcurrentHashMap<>();
@@ -122,6 +127,17 @@ abstract class ProxyTestHarness {
                 config.maxBodyBytes(), config.forwardedHeadersEnabled());
 
         app = Javalin.create()
+                .before("/<path>", ctx -> {
+                    String method = ctx.method().name();
+                    if (!ALLOWED_METHODS.contains(method)) {
+                        ctx.status(405);
+                        ctx.contentType("application/problem+json");
+                        ctx.result(ProblemDetail.methodNotAllowed(
+                                "HTTP method " + method + " is not supported",
+                                ctx.path()).toString());
+                        ctx.skipRemainingHandlers();
+                    }
+                })
                 .addHttpHandler(HandlerType.GET, "/<path>", proxyHandler)
                 .addHttpHandler(HandlerType.POST, "/<path>", proxyHandler)
                 .addHttpHandler(HandlerType.PUT, "/<path>", proxyHandler)

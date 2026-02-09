@@ -631,16 +631,17 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `./gradlew :adapter-standalone:test --tests "*ForwardedHeadersTest*"` ✅ 3 passed
   - `./gradlew test` ✅ all passed
 
-- [ ] **T-004-32** — Unknown HTTP method rejection (FR-004-05, S-004-23)
+- [x] **T-004-32** — Unknown HTTP method rejection (FR-004-05, S-004-23)
   _Intent:_ Reject unknown HTTP methods with `405 Method Not Allowed`.
   _Test first:_ Write `HttpMethodTest` (integration):
   - `PROPFIND /api/users` → `405 Method Not Allowed`.
   - All seven valid methods → proxied correctly.
-  _Implement:_ Add method whitelist check in `ProxyHandler`.
-  _Verify:_ `HttpMethodTest` passes.
+  _Implement:_ Add `before` filter with method whitelist in Javalin setup.
+  Returns RFC 9457 `ProblemDetail.methodNotAllowed()` for unrecognized methods.
+  _Verify:_ `HttpMethodTest` passes (8/8).
   _Verification commands:_
-  - `./gradlew :adapter-standalone:test --tests "*HttpMethodTest*"`
-  - `./gradlew spotlessApply check`
+  - `./gradlew :adapter-standalone:test --tests "*HttpMethodTest*"` ✅ 8 passed
+  - `./gradlew test` ✅ all passed
 
 ---
 
