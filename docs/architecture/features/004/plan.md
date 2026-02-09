@@ -2,8 +2,8 @@
 
 _Linked specification:_ `docs/architecture/features/004/spec.md`
 _Linked tasks:_ `docs/architecture/features/004/tasks.md`
-_Status:_ In Progress (Phase 3 — I5)
-_Last updated:_ 2026-02-08T23:20+01:00
+_Status:_ In Progress (Phase 5 — I7)
+_Last updated:_ 2026-02-09T01:19+01:00
 
 > Guardrail: Keep this plan traceable back to the governing spec. Reference
 > FR/NFR/Scenario IDs from `spec.md` where relevant, log any new high- or
@@ -220,7 +220,7 @@ _To be completed after implementation._
 
 ### Phase 4 — Error Handling + Body Size + Forwarded Headers (≤90 min)
 
-6. **I6 — Error handling, body size, X-Forwarded-* headers** (≤90 min)
+6. **I6 — Error handling, body size, X-Forwarded-* headers** (≤90 min) ✅ DONE
    - _Goal:_ Implement RFC 9457 error responses, body size enforcement, forwarded
      headers, and `X-Request-ID` generation for error paths.
    - _Preconditions:_ I5 complete (ProxyHandler works).
@@ -250,6 +250,7 @@ _To be completed after implementation._
      S-004-62.
    - _Commands:_ `./gradlew :adapter-standalone:test`, `./gradlew spotlessApply check`
    - _Exit:_ All error paths produce RFC 9457 responses. Body size enforced. Headers forwarded.
+   - _Result:_ T-004-26 (RFC 9457, 5 tests), T-004-27 (backend errors, 3 tests), T-004-28 (non-JSON body, 4 tests), T-004-29 (request body size, 4 tests), T-004-30 (response body size, 2 tests), T-004-31 (X-Forwarded-*, 3 tests), T-004-32 (method rejection, 8 tests) done. I6 complete.
 
 ### Phase 5 — Health, Readiness, Hot Reload, Admin (≤2 × 90 min)
 

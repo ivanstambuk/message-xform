@@ -1,7 +1,7 @@
 # Feature 004 — Standalone HTTP Proxy Mode — Tasks
 
-_Status:_ In Progress (Phase 3 — I5)
-_Last updated:_ 2026-02-08T23:25+01:00
+_Status:_ In Progress (Phase 5 — I7)
+_Last updated:_ 2026-02-09T01:19+01:00
 
 **Governing spec:** `docs/architecture/features/004/spec.md`
 **Implementation plan:** `docs/architecture/features/004/plan.md`
