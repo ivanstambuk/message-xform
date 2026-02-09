@@ -183,6 +183,10 @@ public final class ProxyHandler implements Handler {
             LOG.warn("Backend timeout: {}", e.getMessage(), e);
             writeProblemResponse(ctx, 504, ProblemDetail.gatewayTimeout(e.getMessage(), ctx.path()));
             return;
+        } catch (UpstreamResponseTooLargeException e) {
+            LOG.warn("Backend response too large: {}", e.getMessage());
+            writeProblemResponse(ctx, 502, ProblemDetail.bodyTooLarge(e.getMessage(), 502, ctx.path()));
+            return;
         } catch (UpstreamConnectException e) {
             LOG.warn("Backend unreachable: {}", e.getMessage(), e);
             writeProblemResponse(ctx, 502, ProblemDetail.backendUnreachable(e.getMessage(), ctx.path()));

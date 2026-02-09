@@ -603,16 +603,18 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `./gradlew :adapter-standalone:test --tests "*RequestBodySizeTest*"` ✅ 4 passed
   - `./gradlew test` ✅ all passed
 
-- [ ] **T-004-30** — Response body size enforcement (FR-004-13, S-004-56)
+- [x] **T-004-30** — Response body size enforcement (FR-004-13, S-004-56)
   _Intent:_ Backend responses exceeding `proxy.max-body-bytes` produce `502`.
   _Test first:_ Write `ResponseBodySizeTest` (integration):
   - Backend response within limit → accepted.
   - Backend response exceeding limit → `502 Bad Gateway` RFC 9457 (S-004-56).
-  _Implement:_ Check response body size after reading in `UpstreamClient`.
-  _Verify:_ `ResponseBodySizeTest` passes.
+  _Implement:_ Check response body size in `UpstreamClient.forward()` after
+  reading. Throw `UpstreamResponseTooLargeException` → `ProxyHandler` catches
+  and returns 502 with `ProblemDetail.bodyTooLarge()`.
+  _Verify:_ `ResponseBodySizeTest` passes (2/2).
   _Verification commands:_
-  - `./gradlew :adapter-standalone:test --tests "*ResponseBodySizeTest*"`
-  - `./gradlew spotlessApply check`
+  - `./gradlew :adapter-standalone:test --tests "*ResponseBodySizeTest*"` ✅ 2 passed
+  - `./gradlew test` ✅ all passed
 
 - [ ] **T-004-31** — X-Forwarded-* headers (FR-004-36, S-004-57/58/59)
   _Intent:_ Add `X-Forwarded-For`, `X-Forwarded-Proto`, `X-Forwarded-Host`
