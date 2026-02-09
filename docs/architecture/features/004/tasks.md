@@ -701,7 +701,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
 
 #### I8 — FileWatcher + admin reload
 
-- [ ] **T-004-36** — FileWatcher: spec file change detection (FR-004-19, S-004-29)
+- [x] **T-004-36** — FileWatcher: spec file change detection (FR-004-19, S-004-29)
   _Intent:_ `WatchService`-based hot reload trigger with configurable debounce.
   _Test first:_ Write `FileWatcherTest`:
   - Save new spec file to watched directory → watcher detects → callback fired
@@ -713,8 +713,19 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   _Verification commands:_
   - `./gradlew :adapter-standalone:test --tests "*FileWatcherTest*"`
   - `./gradlew spotlessApply check`
+  _Verification log:_
+  ```
+  FileWatcherTest — 6 tests PASSED
+    fileCreation_triggersCallback() PASSED
+    rapidSaves_debounced_singleCallback() PASSED
+    fileModification_triggersCallback() PASSED
+    fileDeletion_triggersCallback() PASSED
+    stop_preventsCallbacks() PASSED
+    multipleDirectories_bothWatched() PASSED
+  ./gradlew check — BUILD SUCCESSFUL
+  ```
 
-- [ ] **T-004-37** — Admin reload endpoint (FR-004-20, S-004-30/31)
+- [x] **T-004-37** — Admin reload endpoint (FR-004-20, S-004-30/31)
   _Intent:_ `POST /admin/reload` triggers engine reload manually.
   _Test first:_ Write `AdminReloadTest` (integration):
   - `POST /admin/reload` → engine reloads → `200 {"status": "reloaded",
@@ -728,8 +739,18 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   _Verification commands:_
   - `./gradlew :adapter-standalone:test --tests "*AdminReloadTest*"`
   - `./gradlew spotlessApply check`
+  _Verification log:_
+  ```
+  AdminReloadTest — 5 tests PASSED
+    postAdminReload_reloadsEngine_returns200() PASSED
+    postAdminReload_withProfile_returnsProfileId() PASSED
+    postAdminReload_brokenSpec_returns500_preservesOldRegistry() PASSED
+    postAdminReload_zeroSpecs_succeeds() PASSED
+    postAdminReload_newSpecAfterStartup_available() PASSED
+  ./gradlew check — BUILD SUCCESSFUL
+  ```
 
-- [ ] **T-004-38** — Hot reload integration: FileWatcher → engine reload (FR-004-19, S-004-30)
+- [x] **T-004-38** — Hot reload integration: FileWatcher → engine reload (FR-004-19, S-004-30)
   _Intent:_ End-to-end: file change → watcher fires → `TransformEngine.reload()`
   → new spec available for subsequent requests.
   _Test first:_ Write `HotReloadIntegrationTest` (integration):
@@ -741,8 +762,15 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   _Verification commands:_
   - `./gradlew :adapter-standalone:test --tests "*HotReloadIntegrationTest*"`
   - `./gradlew spotlessApply check`
+  _Verification log:_
+  ```
+  HotReloadIntegrationTest — 2 tests PASSED
+    fileWatcher_detectsNewSpec_reloadsEngine() PASSED
+    reloadFailure_oldRegistryPreserved() PASSED
+  ./gradlew check — BUILD SUCCESSFUL
+  ```
 
-- [ ] **T-004-39** — Zero-downtime reload under traffic (NFR-004-05, S-004-33/66)
+- [x] **T-004-39** — Zero-downtime reload under traffic (NFR-004-05, S-004-33/66)
   _Intent:_ In-flight requests complete with the old registry; new requests
   use the new registry. No mixed results.
   _Test first:_ Write `ZeroDowntimeReloadTest` (integration):
@@ -755,6 +783,13 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   _Verification commands:_
   - `./gradlew :adapter-standalone:test --tests "*ZeroDowntimeReloadTest*"`
   - `./gradlew spotlessApply check`
+  _Verification log:_
+  ```
+  ZeroDowntimeReloadTest — 2 tests PASSED
+    concurrentRequests_duringReload_noFailures() PASSED
+    inFlightRequest_duringReload_consistentResponse() PASSED
+  ./gradlew check — BUILD SUCCESSFUL
+  ```
 
 ---
 

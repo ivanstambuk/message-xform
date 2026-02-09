@@ -39,6 +39,7 @@ public final class ProblemDetail {
     static final String URN_BODY_TOO_LARGE = "urn:message-xform:proxy:body-too-large";
     static final String URN_BAD_REQUEST = "urn:message-xform:proxy:bad-request";
     static final String URN_METHOD_NOT_ALLOWED = "urn:message-xform:proxy:method-not-allowed";
+    static final String URN_INTERNAL_ERROR = "urn:message-xform:proxy:internal-error";
 
     private ProblemDetail() {
         // utility class
@@ -100,6 +101,17 @@ public final class ProblemDetail {
      */
     public static JsonNode methodNotAllowed(String detail, String instancePath) {
         return build(URN_METHOD_NOT_ALLOWED, "Method Not Allowed", 405, detail, instancePath);
+    }
+
+    /**
+     * Internal server error for admin operations (reload failure).
+     *
+     * @param detail       human-readable description
+     * @param instancePath the request path
+     * @return RFC 9457 JSON
+     */
+    public static JsonNode internalError(String detail, String instancePath) {
+        return build(URN_INTERNAL_ERROR, "Internal Server Error", 500, detail, instancePath);
     }
 
     /**
