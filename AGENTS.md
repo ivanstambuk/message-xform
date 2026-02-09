@@ -217,6 +217,17 @@ See `docs/operations/quality-gate.md` for full pipeline documentation.
     - **Tooling/process pitfalls** → `AGENTS.md` (this file), under "Known Pitfalls" below.
     - **Conventions** → `AGENTS.md` operational rules.
 18. **No Cascading Renumber**: When inserting new increments, tasks, scenarios, or requirements between existing ones, use **letter suffixes** (e.g., I11a, T-001-36a, S-001-74a, FR-001-12a) instead of renumbering all downstream IDs. This avoids churn across cross-referencing documents (spec, plan, tasks, scenarios, knowledge-map). A dedicated cleanup pass may renumber IDs at the end of a feature when the structure is stable — never during active refinement.
+19. **Spec Amendment Cascade** ⚡ **(NON-NEGOTIABLE)**: When a feature spec is modified — new FRs added, interfaces changed, scenarios extended, or contracts altered — the agent MUST immediately cascade status and implementation changes through all dependent documents. Do **not** leave a spec amended while surrounding documents still claim "Complete".
+    - **Cascade checklist** (complete ALL steps in the same commit or increment):
+      1. ☐ **`spec.md`**: Set Status to `Amended — <reason>, implementation pending`. It is NOT `Ready` when new requirements are pending implementation.
+      2. ☐ **`plan.md`**: Add a new Phase/Increment for the new work. Update Status to reflect pending work. Update Exit Criteria (add unchecked items for new work).
+      3. ☐ **`tasks.md`**: Add **new tasks** (never modify completed tasks). New tasks implement the new behaviour. Update Status and Completion Criteria.
+      4. ☐ **`scenarios.md`**: Add scenarios for new behaviour (mandatory per Rule 9). Update coverage matrix.
+      5. ☐ **`roadmap.md`**: If feature was `✅ Complete`, change to `🔨 In Progress`. Feature is not complete until all new tasks are done.
+      6. ☐ **`AGENTS.md`**: Sync the roadmap mirror table to match `roadmap.md`.
+      7. ☐ **`knowledge-map.md`** / **`llms.txt`**: Update if new ADRs or cross-cutting references were added.
+    - **Key principle**: New tasks are always **additive**. Never modify completed tasks to absorb new work — add new task IDs that implement the delta. This preserves audit trail and keeps verification logs intact.
+    - **Immediate actionability**: After the cascade, the feature MUST be in a state where the next agent session can pick up the new tasks and start implementing immediately — no ambiguity about what "In Progress" means.
 
 ### Known Pitfalls
 
