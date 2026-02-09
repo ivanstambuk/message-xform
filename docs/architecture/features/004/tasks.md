@@ -1035,24 +1035,27 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `./gradlew spotlessApply check`
   _Verification log:_ ✅ Shadow JAR builds (10 MB). Manifest: `Main-Class: io.messagexform.standalone.StandaloneMain`, `Implementation-Title: message-xform-proxy`. SPI services merged (ExpressionEngine, Jackson, Jetty). `java -jar` with `--config` starts proxy — Javalin listening on port 9090, JSLT engine registered. Full test suite GREEN. `spotlessApply check` GREEN.
 
-- [ ] **T-004-52** — Dockerfile: multi-stage build (FR-004-29, FX-004-09)
+- [x] **T-004-52** — Dockerfile: multi-stage build (FR-004-29, FX-004-09) ✅
   _Intent:_ Create multi-stage `Dockerfile` — JDK 21 build + JRE Alpine runtime.
   _Implement:_ Create `adapter-standalone/Dockerfile`:
-  - Stage 1: `eclipse-temurin:21-jdk-alpine` — build with Gradle.
-  - Stage 2: `eclipse-temurin:21-jre-alpine` — copy shadow JAR, expose port,
-    set entrypoint.
-  - Volume mount points for `/specs` and `/profiles`.
+  - Stage 1: `eclipse-temurin:21-jdk-alpine` — Gradle build → shadow JAR.
+  - Stage 2: `eclipse-temurin:21-jdk-alpine` — `jlink` custom JRE (8 modules).
+  - Stage 3: `alpine:3.23` — custom JRE + shadow JAR, non-root user, healthcheck.
+  - Volume mount points for `/specs` and `/profiles` (FR-004-31, FR-004-32).
+  - `.dockerignore` to exclude build artifacts from context.
   _Verify:_ `docker build -t message-xform-proxy .` succeeds.
   _Verification commands:_
   - `docker build -t message-xform-proxy -f adapter-standalone/Dockerfile .`
+  _Verification log:_ ✅ 3-stage Docker build succeeds. `jlink` produces custom JRE with `java.base,java.desktop,java.instrument,java.management,java.naming,java.net.http,java.security.jgss,java.sql`. Non-root `proxy` user, HEALTHCHECK via wget, VOLUME `/specs` + `/profiles`, JVM container flags.
 
-- [ ] **T-004-53** — Docker image size verification (NFR-004-04, S-004-48)
+- [x] **T-004-53** — Docker image size verification (NFR-004-04, S-004-48) ✅
   _Intent:_ Docker image must be < 150 MB compressed.
   _Test:_
   - `docker images message-xform-proxy --format '{{.Size}}'` → < 150 MB.
   _Verify:_ Image size assertion.
   _Verification commands:_
   - `docker images message-xform-proxy`
+  _Verification log:_ ✅ Image size: **80.8 MB** (target: < 150 MB). Layers: Alpine 8.4 MB + CA certs 0.5 MB + custom JRE 61.3 MB + proxy JAR 10.5 MB = 80.8 MB.
 
 - [ ] **T-004-54** — Docker smoke test (S-004-49/50/51)
   _Intent:_ Container starts, serves health check, loads specs from volume mount.

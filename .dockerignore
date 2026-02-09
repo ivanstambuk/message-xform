@@ -1,0 +1,26 @@
+# Ignore build artifacts — the Dockerfile builds from source
+**/build/
+**/.gradle/
+
+# IDE / editor files
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# Git
+.git/
+.gitignore
+
+# Documentation (not needed in Docker build)
+docs/
+*.md
+!README.md
+
+# Agent session files
+.agent/
+
+# OS artifacts
+.DS_Store
+Thumbs.db
