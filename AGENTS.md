@@ -113,7 +113,7 @@ Update both `docs/architecture/roadmap.md` and the Roadmap table above when stat
 ./gradlew --no-daemon :adapter-standalone:shadowJar
 
 # Docker image build (from adapter-standalone/):
-docker build -t message-xform-proxy adapter-standalone/
+docker build -t message-xform-proxy -f adapter-standalone/Dockerfile .
 ```
 
 See `docs/operations/quality-gate.md` for full pipeline documentation.
