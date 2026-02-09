@@ -1,7 +1,7 @@
 # Feature 004 — Standalone HTTP Proxy Mode — Tasks
 
 _Status:_ In Progress (Phase 8 — I11)
-_Last updated:_ 2026-02-09T02:35+01:00
+_Last updated:_ 2026-02-09T02:41+01:00
 
 **Governing spec:** `docs/architecture/features/004/spec.md`
 **Implementation plan:** `docs/architecture/features/004/plan.md`
@@ -1021,17 +1021,19 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
 
 #### I11 — Dockerfile + shadow JAR
 
-- [ ] **T-004-51** — Shadow plugin + fat JAR (FR-004-30)
+- [x] **T-004-51** — Shadow plugin + fat JAR (FR-004-30) ✅
   _Intent:_ Add Shadow plugin to produce a single executable JAR.
   _Implement:_
-  1. Add Shadow plugin to `adapter-standalone/build.gradle.kts`.
-  2. Configure main class in JAR manifest.
-  3. `./gradlew :adapter-standalone:shadowJar` → produces fat JAR.
-  4. `java -jar proxy.jar --config minimal-config.yaml` → starts proxy.
+  1. Configure Shadow plugin in `adapter-standalone/build.gradle.kts`.
+  2. Set `Main-Class` manifest to `io.messagexform.standalone.StandaloneMain`.
+  3. `mergeServiceFiles()` for SPI (ExpressionEngine discovery).
+  4. Shadow JAR as primary artifact (empty classifier), thin JAR demoted.
   _Verify:_ Fat JAR starts the proxy.
   _Verification commands:_
   - `./gradlew :adapter-standalone:shadowJar`
-  - `ls -la adapter-standalone/build/libs/*-all.jar`
+  - `java -jar adapter-standalone/build/libs/adapter-standalone-0.1.0-SNAPSHOT.jar`
+  - `./gradlew spotlessApply check`
+  _Verification log:_ ✅ Shadow JAR builds (10 MB). Manifest: `Main-Class: io.messagexform.standalone.StandaloneMain`, `Implementation-Title: message-xform-proxy`. SPI services merged (ExpressionEngine, Jackson, Jetty). `java -jar` with `--config` starts proxy — Javalin listening on port 9090, JSLT engine registered. Full test suite GREEN. `spotlessApply check` GREEN.
 
 - [ ] **T-004-52** — Dockerfile: multi-stage build (FR-004-29, FX-004-09)
   _Intent:_ Create multi-stage `Dockerfile` — JDK 21 build + JRE Alpine runtime.

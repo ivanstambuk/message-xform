@@ -1,3 +1,5 @@
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+
 plugins {
     `java-library`
     alias(libs.plugins.shadow)
@@ -25,4 +27,23 @@ dependencies {
     testImplementation(catalog.findLibrary("mockito-core").get())
     testImplementation(catalog.findLibrary("mockito-junit-jupiter").get())
     testImplementation(catalog.findLibrary("logback-classic").get())
+}
+
+// --- Shadow JAR configuration (FR-004-30, T-004-51) ---
+
+tasks.withType<ShadowJar>().configureEach {
+    archiveClassifier.set("")          // shadow JAR = primary artifact (no -all suffix)
+    mergeServiceFiles()                // merge META-INF/services (SPI: ExpressionEngine, etc.)
+    manifest {
+        attributes(
+            "Main-Class" to "io.messagexform.standalone.StandaloneMain",
+            "Implementation-Title" to "message-xform-proxy",
+            "Implementation-Version" to project.version,
+        )
+    }
+}
+
+// Disable the default thin JAR so only the shadow JAR is produced
+tasks.named<Jar>("jar") {
+    archiveClassifier.set("thin")      // keep for reference but not the default
 }

@@ -3,7 +3,7 @@
 _Linked specification:_ `docs/architecture/features/004/spec.md`
 _Linked tasks:_ `docs/architecture/features/004/tasks.md`
 _Status:_ In Progress (Phase 8 — I11)
-_Last updated:_ 2026-02-09T02:19+01:00
+_Last updated:_ 2026-02-09T02:41+01:00
 
 > Guardrail: Keep this plan traceable back to the governing spec. Reference
 > FR/NFR/Scenario IDs from `spec.md` where relevant, log any new high- or
