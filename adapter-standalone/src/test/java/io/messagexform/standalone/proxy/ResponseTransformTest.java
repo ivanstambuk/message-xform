@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.net.URI;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -14,7 +15,7 @@ import org.junit.jupiter.api.Test;
  * Integration test for response transformation (T-004-22, FR-004-03).
  *
  * <p>
- * Covers scenarios: S-004-11, S-004-12.
+ * Covers scenarios: S-004-11, S-004-12, S-004-13, S-004-54.
  */
 @DisplayName("ProxyHandler — response transformation")
 class ResponseTransformTest extends ProxyTestHarness {
@@ -24,13 +25,17 @@ class ResponseTransformTest extends ProxyTestHarness {
     @BeforeAll
     static void startInfrastructure() throws Exception {
         INSTANCE.startWithSpecs(
-                new String[] {"test-specs/response-body-transform.yaml", "test-specs/response-header-transform.yaml"},
+                new String[] {
+                    "test-specs/response-body-transform.yaml",
+                    "test-specs/response-header-transform.yaml",
+                    "test-specs/response-status-override.yaml"
+                },
                 "test-profiles/response-transform-profile.yaml");
 
         // Register backend handlers with predictable JSON responses
         INSTANCE.registerBackendHandler("/api/items", 200, "application/json", "{\"name\":\"Widget\",\"value\":42}");
-
         INSTANCE.registerBackendHandler("/api/headers", 200, "application/json", "{\"data\":\"test\"}");
+        INSTANCE.registerBackendHandler("/api/status-override", 200, "application/json", "{\"created\":true}");
     }
 
     @AfterAll
@@ -58,6 +63,11 @@ class ResponseTransformTest extends ProxyTestHarness {
         assertThat(response.body()).contains("\"data\":");
         assertThat(response.body()).contains("\"name\":\"Widget\"");
         assertThat(response.body()).contains("\"value\":42");
+
+        // S-004-54: Content-Length matches the transformed body size
+        int transformedBodyLength = response.body().getBytes(StandardCharsets.UTF_8).length;
+        response.headers().firstValueAsLong("content-length").ifPresent(cl -> assertThat(cl)
+                .isEqualTo(transformedBodyLength));
     }
 
     // ---------------------------------------------------------------
@@ -79,5 +89,24 @@ class ResponseTransformTest extends ProxyTestHarness {
         // Added headers should be present in client response
         assertThat(response.headers().firstValue("x-api-version")).isPresent().hasValue("2.0");
         assertThat(response.headers().firstValue("x-processed")).isPresent().hasValue("true");
+    }
+
+    // ---------------------------------------------------------------
+    // S-004-13 — Response status override (200 → 201)
+    // ---------------------------------------------------------------
+
+    @Test
+    @DisplayName("S-004-13: GET /api/status-override — response status overridden from 200 to 201")
+    void responseStatusOverride_statusChanged() throws Exception {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("http://127.0.0.1:" + INSTANCE.proxyPort + "/api/status-override"))
+                .GET()
+                .build();
+
+        HttpResponse<String> response = INSTANCE.testClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+        // Backend returns 200, but the spec overrides to 201
+        assertThat(response.statusCode()).isEqualTo(201);
+        assertThat(response.body()).contains("\"created\":true");
     }
 }

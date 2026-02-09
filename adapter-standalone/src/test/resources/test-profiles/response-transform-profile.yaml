@@ -15,3 +15,9 @@ transforms:
     match:
       path: "/api/headers"
       method: GET
+
+  - spec: response-status-override@1.0.0
+    direction: response
+    match:
+      path: "/api/status-override"
+      method: GET

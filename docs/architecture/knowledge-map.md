@@ -21,7 +21,12 @@ message-xform/
 ├── engine-jolt/                   # JOLT expression engine plugin (future)
 ├── adapter-pingaccess/            # PingAccess gateway adapter
 ├── adapter-pinggateway/           # PingGateway adapter (future)
-├── adapter-standalone/            # Standalone HTTP proxy mode (Feature 004, In Progress)
+├── adapter-standalone/            # Standalone HTTP proxy mode (Feature 004, Complete)
+│   ├── adapter/                   # StandaloneAdapter — GatewayAdapter SPI impl
+│   ├── config/                    # ConfigLoader, ProxyConfig, EnvVarOverlay
+│   ├── proxy/                     # ProxyHandler, UpstreamClient, FileWatcher
+│   ├── tls/                       # TlsConfigurator — inbound/outbound TLS/mTLS
+│   └── docker/                    # Dockerfile, config.yaml
 └── docs/                          # Specifications, ADRs, research
 ```
 
@@ -122,8 +127,12 @@ ADR-0029 (Javalin Proxy)     governs ── FR-004-01, references ADR-0025, ADR-
 | NFR-001-03 (Latency) | ADR-0028 | NFR-001-03 |
 | Hot Reload | — | NFR-001-05 |
 | FR-004-01 (Standalone Proxy) | ADR-0029 | NFR-004-01 through NFR-004-07 |
+| FR-004-02..13 (Transform) | ADR-0029, ADR-0025, ADR-0013 | — |
 | FR-004-14..17 (TLS/mTLS) | — | NFR-004-05 |
-| Feature 004 Docker/K8s | — | NFR-004-04 |
+| FR-004-18..22 (Health/Admin) | — | — |
+| FR-004-29..32 (Docker/K8s) | — | NFR-004-04 |
+| FR-004-33..34 (Protocol) | ADR-0029 | — |
+| FR-004-36..39 (Context) | ADR-0021, ADR-0029 | — |
 
 ## Research Documents
 

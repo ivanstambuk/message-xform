@@ -25,7 +25,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Integration tests for graceful shutdown (T-004-48, FR-004-28).
+ * Integration tests for graceful shutdown (T-004-48, FR-004-28, S-004-46/47).
  *
  * <p>
  * Verifies that:
@@ -54,7 +54,7 @@ class GracefulShutdownTest {
     }
 
     @Test
-    @DisplayName("FR-004-28: stop() cleanly shuts down proxy — no exceptions")
+    @DisplayName("S-004-46: stop() cleanly shuts down proxy — no exceptions")
     void stop_cleansUpCleanly() throws Exception {
         proxyApp = startMinimalProxy();
 
@@ -86,7 +86,7 @@ class GracefulShutdownTest {
     }
 
     @Test
-    @DisplayName("FR-004-28: in-flight request completes before shutdown")
+    @DisplayName("S-004-47: in-flight request completes before shutdown")
     void inFlightRequest_completesBeforeShutdown() throws Exception {
         // Backend that responds slowly (500ms delay)
         CountDownLatch backendHit = new CountDownLatch(1);
@@ -168,17 +168,17 @@ class GracefulShutdownTest {
 
         Path configFile = tempDir.resolve("config.yaml");
         Files.writeString(configFile, """
-                        proxy:
-                          host: "127.0.0.1"
-                          port: 0
-                        backend:
-                          host: "127.0.0.1"
-                          port: 8080
-                        engine:
-                          specs-dir: "%s"
-                        reload:
-                          enabled: false
-                        """.formatted(specsDir.toString().replace("\\", "/")));
+                proxy:
+                  host: "127.0.0.1"
+                  port: 0
+                backend:
+                  host: "127.0.0.1"
+                  port: 8080
+                engine:
+                  specs-dir: "%s"
+                reload:
+                  enabled: false
+                """.formatted(specsDir.toString().replace("\\", "/")));
 
         return ProxyApp.start(new String[] {"--config", configFile.toString()});
     }

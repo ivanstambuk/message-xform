@@ -1,0 +1,20 @@
+# Response status override spec for S-004-13
+# Overrides response status code from 200 → 201.
+id: response-status-override
+version: "1.0.0"
+description: "Override response status code to 201 Created"
+
+input:
+  schema:
+    type: object
+output:
+  schema:
+    type: object
+
+transform:
+  lang: jslt
+  expr: |
+    .
+
+status:
+  set: 201
