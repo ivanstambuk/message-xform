@@ -1,36 +1,40 @@
-# Current Session — 2026-02-09 (Session 3)
+# Current Session — 2026-02-09 (Session 4)
 
 **Feature**: 004 — Standalone HTTP Proxy Mode
-**Phase**: 5 — Health, Readiness, Hot Reload, Admin
-**Increment**: I8 — FileWatcher + admin reload (COMPLETE)
+**Phase**: 6 — TLS (COMPLETE)
+**Increment**: I9 — Inbound + outbound TLS (COMPLETE)
 
 ## Session Status
 
 ### Completed Tasks (this session)
-- [x] **T-004-36** — FileWatcher (6 tests) — `FileWatcher`, `FileWatcherTest`
-- [x] **T-004-37** — Admin reload endpoint (5 tests) — `AdminReloadHandler`, `AdminReloadTest`
-- [x] **T-004-38** — Hot reload integration (2 tests) — `HotReloadIntegrationTest`
-- [x] **T-004-39** — Zero-downtime reload (2 tests) — `ZeroDowntimeReloadTest`
+- [x] **T-004-40** — Generate test certificates (4 PKCS12 keystores via `generate-certs.sh`)
+- [x] **T-004-41** — Inbound TLS: HTTPS server (3 tests) — `TlsConfigurator`, `InboundTlsTest`
+- [x] **T-004-42** — Inbound mTLS: client-auth need/want (4 tests) — `InboundMtlsTest`
+- [x] **T-004-43** — Outbound TLS: HTTPS to backend (3 tests) — `OutboundTlsTest`
+- [x] **T-004-44** — Outbound mTLS: client cert to backend (2 tests) — `OutboundMtlsTest`
+- [x] **T-004-45** — TLS config validation at startup (11 tests) — `TlsConfigValidator`, `TlsConfigValidationTest`
 
 ### Housekeeping
-- Added `ProblemDetail.internalError()` for 500 responses
-- Added `AdminReloadHandler` to terminology.md
-- Added `FileWatcher.java`, `AdminReloadHandler.java`, `ProblemDetail.java` to llms.txt
-- Added `specCount()` pitfall to AGENTS.md
+- Added `TlsConfigurator`, `TlsConfigValidator`, `mTLS` entries to terminology.md
+- Added `TlsConfigurator.java`, `TlsConfigValidator.java` to llms.txt
+- Added TLS pitfalls to AGENTS.md (Javalin addConnector, JDK hostname verification, jakarta.servlet)
+- Added TLS row to knowledge-map.md traceability table
 
-### I8 Complete
-All 4 tasks done. 15 new tests, `./gradlew check` green.
+### I9 Complete
+All 6 tasks done. 23 new integration tests, `./gradlew check` green.
 
 ## Key Decisions
-- **specCount() pitfall**: `TransformRegistry.specCount()` returns 2× unique specs
-  (both `id` and `id@version` keys). Admin reload response uses `specPaths.size()`.
-- **AdminReloadHandler constructor**: Removed `SpecParser` parameter — the engine
-  creates its own parser internally via `TransformEngine.reload()`.
-- **FileWatcher**: Daemon threads for polling + debounce scheduling. Supports
-  watching multiple directories (specs + profiles).
+- **Direct Jetty TLS, not Javalin SSL plugin**: Used `config.jetty.addConnector()` with
+  `SslContextFactory.Server` for full control over mTLS, truststores, and client-auth modes.
+- **Outbound TLS in UpstreamClient**: `buildSslContext()` constructs `SSLContext` from
+  `BackendTlsConfig` with `TrustManagerFactory` + `KeyManagerFactory`.
+- **Hostname verification**: Uses `jdk.internal.httpclient.disableHostnameVerification`
+  system property (internal API, only reliable way for JDK 21 HttpClient).
+- **TLS validation not yet wired to startup**: `TlsConfigValidator` exists but is not
+  called from `StandaloneMain` — wire it up in T-004-46/47.
 
 ## Commits
-- `84b230c` — I8: FileWatcher + admin reload + hot reload integration (15 tests)
+- `3e397f2` — Phase 6 TLS (T-004-40..45, 23 tests)
 
 ## Next Steps
-- Phase 6 (I9) — TLS: inbound + outbound (T-004-40..T-004-45)
+- Phase 7 (I10) — Startup, Shutdown, Logging: T-004-46..T-004-50

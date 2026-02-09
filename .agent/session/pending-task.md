@@ -1,26 +1,22 @@
 # Pending Task
 
-**Focus**: Feature 004 — Standalone HTTP Proxy Mode, Phase 6: TLS
-**Status**: I8 (FileWatcher + admin reload) complete. Moving to I9 (TLS).
-**Next Step**: T-004-40 — Generate self-signed test certificates (server, client, truststore)
+**Focus**: Feature 004 — Phase 7 (I10): Startup, Shutdown, Logging
+**Status**: Phase 6 (TLS) complete — 45/60 tasks done (75%)
+**Next Step**: T-004-46 — StandaloneMain startup sequence
 
 ## Context Notes
-- All hot reload infrastructure is implemented and tested (15 tests).
-- `TransformRegistry.specCount()` returns 2× unique specs — use
-  `specPaths.size()` for user-facing counts (documented in AGENTS.md pitfalls).
-- `AdminReloadHandler` takes 3 args: `(engine, specsDir, profilePath)`. No
-  `SpecParser` needed — engine creates its own internally.
-- `FileWatcher` supports multi-directory watching (specs + profiles).
-- `ProblemDetail.internalError()` was added for reload failures (500 + RFC 9457).
+- Phase 6 (TLS) completed in full: T-004-40 through T-004-45 (6 tasks, 23 tests)
+- New production classes: `TlsConfigurator`, `TlsConfigValidator`, modified `UpstreamClient`
+- Test certificates in `adapter-standalone/src/test/resources/tls/` (regenerable via `generate-certs.sh`)
+- TLS validation (`TlsConfigValidator`) is not yet wired into the startup sequence — T-004-46 should integrate it into `StandaloneMain`
+- Hostname verification disable uses `jdk.internal.httpclient.disableHostnameVerification` system property (internal API)
 
-## Phase 6 Plan (I9 — TLS)
-Tasks T-004-40 through T-004-45:
-1. T-004-40: Generate self-signed certs (keytool → server.p12, client.p12, truststore.p12)
-2. T-004-41: Inbound TLS (HTTPS server via Jetty SslContextFactory)
-3. T-004-42: Inbound mTLS (client cert verification)
-4. T-004-43: Outbound TLS (HTTPS to backend, truststore validation)
-5. T-004-44: Outbound mTLS (client cert to backend)
-6. T-004-45: TLS config validation at startup
+## Phase 7 Tasks (I10)
+- T-004-46: StandaloneMain startup sequence (FR-004-27, IMPL-004-05)
+- T-004-47: Startup failure handling (S-004-45)
+- T-004-48: Graceful shutdown (FR-004-28, S-004-46/47)
+- T-004-49: Logback structured JSON logging (NFR-004-07)
+- T-004-50: Request logging middleware (NFR-004-07)
 
 ## SDD Gaps
-None — all gaps from retro were fixed and committed.
+- None — all checks passed, findings ledger resolved

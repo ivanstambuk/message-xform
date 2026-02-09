@@ -344,6 +344,28 @@ terminology agreements must be captured here immediately.
     (→ 504 Gateway Timeout). `ProxyHandler` catches these and converts them
     to RFC 9457 problem details via `ProblemDetail`.
 
+- **TLS configurator** (`TlsConfigurator`)
+  - Configures Javalin's embedded Jetty for inbound TLS (HTTPS) serving
+    (FR-004-14, FR-004-15). Uses Jetty 11's `SslContextFactory.Server` to
+    terminate TLS, supporting server keystore, client-auth modes (`none`,
+    `want`, `need`), and truststore for mTLS client certificate validation.
+    Added via `config.jetty.addConnector()`.
+
+- **TLS config validator** (`TlsConfigValidator`)
+  - Startup-time validation of TLS settings (S-004-43). Checks keystore and
+    truststore file existence, readability, correct passwords, and mTLS
+    requirements (e.g., `client-auth=need` requires a truststore). Called
+    before the server starts to provide descriptive errors instead of cryptic
+    runtime failures.
+
+- **Mutual TLS (mTLS)**
+  - Two-way TLS authentication. **Inbound mTLS** (FR-004-15): the proxy
+    requires connecting clients to present a certificate verified against a
+    configured truststore. **Outbound mTLS** (FR-004-17): the proxy presents
+    a client certificate from a configured keystore when connecting to the
+    backend. Both rely on `SSLContext` with `KeyManagerFactory` and/or
+    `TrustManagerFactory`.
+
 - **Shadow JAR**
   - A single fat JAR containing the `core`, `adapter-standalone`, and all
     transitive dependencies. Produced by the Gradle Shadow plugin. The Docker
