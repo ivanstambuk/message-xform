@@ -2,8 +2,8 @@
 
 _Linked specification:_ `docs/architecture/features/004/spec.md`
 _Linked tasks:_ `docs/architecture/features/004/tasks.md`
-_Status:_ In Progress (Phase 5 — I8)
-_Last updated:_ 2026-02-09T01:29+01:00
+_Status:_ In Progress (Phase 7 — I10)
+_Last updated:_ 2026-02-09T02:19+01:00
 
 > Guardrail: Keep this plan traceable back to the governing spec. Reference
 > FR/NFR/Scenario IDs from `spec.md` where relevant, log any new high- or
@@ -299,7 +299,7 @@ _To be completed after implementation._
 
 ### Phase 6 — TLS (≤90 min)
 
-9. **I9 — Inbound + outbound TLS** (≤90 min)
+9. **I9 — Inbound + outbound TLS** (≤90 min) ✅ DONE
    - _Goal:_ Implement inbound HTTPS, inbound mTLS, outbound TLS, and outbound mTLS.
    - _Preconditions:_ I5 complete (server running), I4 complete (UpstreamClient).
    - _Steps:_
@@ -324,6 +324,7 @@ _To be completed after implementation._
      CFG-004-10, CFG-004-20 through CFG-004-26, S-004-45 through S-004-58.
    - _Commands:_ `./gradlew :adapter-standalone:test`, `./gradlew spotlessApply check`
    - _Exit:_ All four TLS modes work. Validation errors caught at startup.
+   - _Result:_ T-004-40 (certs), T-004-41 (inbound TLS, 3 tests), T-004-42 (inbound mTLS, 4 tests), T-004-43 (outbound TLS, 3 tests), T-004-44 (outbound mTLS, 2 tests), T-004-45 (TLS validation, 11 tests) done. 23 tests total. Commit `3e397f2`. I9 complete.
 
 ### Phase 7 — Startup, Shutdown, Logging (≤90 min)
 
