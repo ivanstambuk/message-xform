@@ -1,7 +1,7 @@
 # Feature 001 — Message Transformation Engine — Tasks
 
-_Status:_ Complete
-_Last updated:_ 2026-02-08
+_Status:_ Complete (Phases 1–9); Phase 10 (session context) pending
+_Last updated:_ 2026-02-09
 
 **Governing spec:** `docs/architecture/features/001/spec.md`
 **Implementation plan:** `docs/architecture/features/001/plan.md`
@@ -1003,6 +1003,81 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
 
 ---
 
+### Phase 10 — Session Context Binding (FR-001-13, ADR-0030)
+
+> **Scope:** Core engine contract + JSLT binding. Adapter-side population
+> (PingAccess, PingGateway, standalone) is deferred to Features 002/003/004.
+
+#### I17 — Session context: contract + core binding
+
+- [ ] **T-001-54** — Add `sessionContext` field to Message (FR-001-04, FR-001-13, ADR-0030)
+  _Intent:_ Extend the `Message` interface with `getSessionContext()` /
+  `setSessionContext(JsonNode)`. Default implementation returns `null`.
+  _Test first:_ Write `SessionContextMessageTest`:
+  - Construct Message without session context → `getSessionContext()` returns `null`.
+  - Construct Message with session context → `getSessionContext()` returns the
+    provided JsonNode.
+  - Verify `setSessionContext()` updates the value.
+  _Implement:_ Add methods to `Message` interface. Update `DefaultMessage` (or
+  equivalent record/class) with the new field. Update builders/factories.
+  _Verify:_ `SessionContextMessageTest` passes. All existing tests pass.
+  _Verification commands:_
+  - `./gradlew :core:test --tests "*SessionContextMessageTest*"`
+  - `./gradlew spotlessApply check`
+
+- [ ] **T-001-55** — Add `sessionContext` to TransformContext + JSLT binding (DO-001-07, FR-001-13)
+  _Intent:_ Extend `TransformContext` with `getSessionContext()` and bind as
+  `$session` in JSLT. Follows the exact mechanism used for `$queryParams` / `$cookies`
+  (ADR-0021).
+  _Test first:_ Write `SessionContextBindingTest`:
+  - JSLT expression `$session.sub` with session context `{"sub": "bjensen"}` →
+    returns `"bjensen"` (S-001-82 pattern).
+  - JSLT expression `$session.roles` with session context
+    `{"roles": ["admin", "user"]}` → returns array (S-001-83 pattern).
+  - Null session context → `$session.sub` evaluates to `null` (S-001-84 pattern).
+  - Session context available in both request and response transforms.
+  _Implement:_ Add `sessionContext` field to `TransformContext`. Update
+  `TransformContextBuilder`. Add `$session` to JSLT external variables map
+  in `JsltExpressionEngine.evaluate()`.
+  _Verify:_ `SessionContextBindingTest` passes. All existing tests pass.
+  _Verification commands:_
+  - `./gradlew :core:test --tests "*SessionContextBindingTest*"`
+  - `./gradlew spotlessApply check`
+
+- [ ] **T-001-56** — Engine capability validation: JOLT + `$session` rejected (FR-001-02, S-001-85)
+  _Intent:_ Ensure that specs declaring `lang: jolt` cannot reference `$session`.
+  This is covered by the existing engine capability check (ADR-0004) but must be
+  verified for the new variable.
+  _Test first:_ Write `SessionContextJoltRejectionTest`:
+  - Spec with `lang: jolt` + `$session` reference → rejected at load time with
+    appropriate error message.
+  _Implement:_ Verify existing capability check covers `$session`. If not, extend
+  the context variable detection logic.
+  _Verify:_ `SessionContextJoltRejectionTest` passes.
+  _Verification commands:_
+  - `./gradlew :core:test --tests "*SessionContextJoltRejectionTest*"`
+  - `./gradlew spotlessApply check`
+
+- [ ] **T-001-57** — Wire session context from Message into TransformContext (FR-001-13)
+  _Intent:_ Complete the data flow: `Message.getSessionContext()` →
+  `TransformContext.getSessionContext()` → `$session` in JSLT. This wiring
+  should happen in `TransformEngine.transformWithSpec()` alongside the existing
+  context-building code for headers, status, queryParams, and cookies.
+  _Test first:_ Write `SessionContextE2ETest`:
+  - Load a spec with `$session.sub` in the expression.
+  - Create a Message with session context containing `{"sub": "bjensen"}`.
+  - Call `engine.transform(message, REQUEST)` → verify output contains `"bjensen"`.
+  - Same test with null session context → verify null-safe behavior.
+  _Implement:_ Update `TransformContext` builder in `TransformEngine.transformWithSpec()`
+  to read `message.getSessionContext()` and pass to context.
+  _Verify:_ `SessionContextE2ETest` passes. Full test suite passes.
+  _Verification commands:_
+  - `./gradlew :core:test --tests "*SessionContextE2ETest*"`
+  - `./gradlew :core:test`
+  - `./gradlew spotlessApply check`
+
+---
+
 ## Verification Log
 
 Track long-running or shared commands with timestamps to avoid duplicate work.
@@ -1035,8 +1110,10 @@ Track long-running or shared commands with timestamps to avoid duplicate work.
 
 - [x] All 52 Phase 1–8 tasks checked off
 - [x] T-001-53 (Phase 9 — performance benchmark) checked off
+- [ ] T-001-54..57 (Phase 10 — session context binding) checked off
 - [x] Quality gate passes (`./gradlew spotlessApply check`)
 - [x] All 84 scenarios verified — 20 in parameterized suite, 58 in dedicated test classes, 4 skipped (JOLT/jq stubs), 2 no-test (dynamic/placeholder)
+- [ ] S-001-82..85 (session context scenarios) verified
 - [x] Coverage matrix in `scenarios.md` has no uncovered FRs/NFRs
 - [x] Implementation Drift Gate report attached to plan
 - [x] Open questions resolved and removed from `open-questions.md`

@@ -2,8 +2,8 @@
 
 _Linked specification:_ `docs/architecture/features/001/spec.md`
 _Linked tasks:_ `docs/architecture/features/001/tasks.md`
-_Status:_ Complete
-_Last updated:_ 2026-02-08
+_Status:_ Complete (core); FR-001-13 session context contract defined, implementation pending
+_Last updated:_ 2026-02-09
 
 > Guardrail: Keep this plan traceable back to the governing spec. Reference
 > FR/NFR/Scenario IDs from `spec.md` where relevant, log any new high- or
@@ -29,7 +29,7 @@ containing the transformed message, an error response, or a passthrough signal.
 
 ## Scope Alignment
 
-- **In scope:** All FRs (FR-001-01 through FR-001-11), all NFRs (NFR-001-01
+- **In scope:** All FRs (FR-001-01 through FR-001-13), all NFRs (NFR-001-01
   through NFR-001-10), all domain objects (DO-001-01 through DO-001-08), core
   engine API (API-001-01 through API-001-05), Expression Engine SPI
   (SPI-001-01 through SPI-001-03), Gateway Adapter SPI interface definitions
@@ -500,6 +500,7 @@ verify scenario coverage matrix, confirm spec ↔ code alignment for each FR/NFR
 | S-001-57 through S-001-60 | I13 (observability) | Logging, telemetry, sensitive fields |
 | S-001-61 through S-001-65 | I14 (hot reload) | Reload + concurrent scenarios |
 | S-001-66 through S-001-73 | I16 (sweep) | Edge cases + multi-engine |
+| S-001-82 through S-001-85 | I17 (session context) | Session context binding (ADR-0030) |
 
 ## Analysis Gate
 
@@ -543,3 +544,30 @@ Record key prompts, decisions, and validation commands per increment:
   Enables E2E testing with real HTTP traffic.
 - **Feature 009** (Toolchain) — formalize Gradle/formatter/CI decisions made
   during I1 into a lightweight spec.
+
+---
+
+### Phase 10 — Session Context Binding (FR-001-13, ADR-0030)
+
+> **Scope:** Core engine changes only. Adapter-side population (PingAccess SDK,
+> PingGateway, standalone proxy) is deferred to Features 002/003/004.
+
+17. **I17 — Session context: contract + core binding** (≤90 min)
+    - _Goal:_ Add `$session` as a nullable `JsonNode` context variable, following
+      the ADR-0021 precedent for `$queryParams`/`$cookies`.
+    - _Preconditions:_ Feature 001 core complete (Phases 1–9).
+    - _Steps:_
+      1. **Test first:** Write `SessionContextTest` — construct `TransformContext`
+         with `sessionContext` field, verify it binds as `$session` in JSLT.
+      2. Add `getSessionContext()` / `setSessionContext(JsonNode)` to `Message`
+         (default `null`).
+      3. Add `getSessionContext()` to `TransformContext`. Wire into
+         `TransformContextBuilder` alongside `$queryParams`/`$cookies`.
+      4. Bind `$session` as external variable in `JsltExpressionEngine.evaluate()`.
+      5. Parameterized test: JSLT accesses `$session.sub`, `$session.roles`,
+         null session → null-safe (S-001-82, S-001-83, S-001-84).
+      6. Load-time validation: JOLT + `$session` → rejected (S-001-85).
+    - _Requirements covered:_ FR-001-13, ADR-0030, S-001-82..85.
+    - _Commands:_ `./gradlew :core:test --tests "*SessionContext*"`,
+      `./gradlew spotlessApply check`
+    - _Exit:_ `$session` bindable, null-safe, JOLT rejected. All existing tests pass.
