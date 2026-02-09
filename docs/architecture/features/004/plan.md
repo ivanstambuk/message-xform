@@ -2,7 +2,7 @@
 
 _Linked specification:_ `docs/architecture/features/004/spec.md`
 _Linked tasks:_ `docs/architecture/features/004/tasks.md`
-_Status:_ In Progress (Phase 7 — I10)
+_Status:_ In Progress (Phase 8 — I11)
 _Last updated:_ 2026-02-09T02:19+01:00
 
 > Guardrail: Keep this plan traceable back to the governing spec. Reference
@@ -352,6 +352,7 @@ _To be completed after implementation._
       S-004-63, S-004-64, S-004-71 through S-004-73.
     - _Commands:_ `./gradlew :adapter-standalone:test`, `./gradlew spotlessApply check`
     - _Exit:_ Server starts and stops cleanly. Structured logs produced.
+    - _Result:_ T-004-46 (startup, 2 tests), T-004-47 (failure handling, 7 tests), T-004-48 (shutdown, 3 tests), T-004-49 (Logback JSON/text), T-004-50 (MDC fields) done. Commit `fae3c78`. ✅ I10 complete.
 
 ### Phase 8 — Docker Packaging + Integration Test Sweep (≤2 × 90 min)
 

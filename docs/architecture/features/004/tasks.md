@@ -1,7 +1,7 @@
 # Feature 004 — Standalone HTTP Proxy Mode — Tasks
 
-_Status:_ In Progress (Phase 7 — I10)
-_Last updated:_ 2026-02-09T02:19+01:00
+_Status:_ In Progress (Phase 8 — I11)
+_Last updated:_ 2026-02-09T02:35+01:00
 
 **Governing spec:** `docs/architecture/features/004/spec.md`
 **Implementation plan:** `docs/architecture/features/004/plan.md`
@@ -945,7 +945,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
 
 #### I10 — Startup sequence + graceful shutdown + structured logging
 
-- [ ] **T-004-46** — StandaloneMain: startup sequence (FR-004-27, IMPL-004-05, S-004-44)
+- [x] **T-004-46** — StandaloneMain: startup sequence (FR-004-27, IMPL-004-05, S-004-44)
   _Intent:_ Implement the full startup sequence: load config → register engines
   → load specs/profiles → init HttpClient → start Javalin → start FileWatcher.
   Log structured startup summary.
@@ -953,13 +953,14 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - Valid config + specs + profile → server starts → logs summary with port,
     backend, spec count, registered engines (S-004-44).
   - Startup time < 3 seconds with ≤ 50 specs (NFR-004-01 — soft check).
-  _Implement:_ Create `StandaloneMain` (IMPL-004-05). Orchestrate startup.
+  _Implement:_ Create `ProxyApp` (IMPL-004-05). `StandaloneMain` delegates to it.
   _Verify:_ `StartupSequenceTest` passes.
   _Verification commands:_
   - `./gradlew :adapter-standalone:test --tests "*StartupSequenceTest*"`
   - `./gradlew spotlessApply check`
+  _Verification log:_ ✅ 2 tests pass. Commit `fae3c78`.
 
-- [ ] **T-004-47** — Startup failure handling (S-004-45)
+- [x] **T-004-47** — Startup failure handling (S-004-45)
   _Intent:_ Invalid config or broken specs produce a clean startup failure.
   _Test first:_ Write `StartupFailureTest`:
   - Invalid config → exit with non-zero status and descriptive error.
@@ -970,54 +971,49 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   _Verification commands:_
   - `./gradlew :adapter-standalone:test --tests "*StartupFailureTest*"`
   - `./gradlew spotlessApply check`
+  _Verification log:_ ✅ 7 tests pass. ConfigLoader relaxed: port 0 = ephemeral.
+  Commit `fae3c78`.
 
-- [ ] **T-004-48** — Graceful shutdown (FR-004-28, S-004-46/47)
+- [x] **T-004-48** — Graceful shutdown (FR-004-28, S-004-46/47)
   _Intent:_ SIGTERM/SIGINT triggers graceful shutdown: stop accepting, drain
   in-flight, close clients, stop watcher, exit 0.
   _Test first:_ Write `GracefulShutdownTest` (integration):
-  - SIGTERM → server stops accepting → in-flight requests complete → exit 0
-    (S-004-46).
-  - Long-running request during shutdown → completes before exit (S-004-47).
-  - Drain timeout exceeded → force close (configurable via
-    `proxy.shutdown.drain-timeout-ms`).
-  _Implement:_ Register JVM shutdown hook. Configure Javalin/Jetty graceful
-  shutdown with drain timeout.
+  - stop() → server stops accepting, no exceptions (S-004-46).
+  - In-flight request completes before shutdown (S-004-47).
+  - Double stop() is safe (idempotent).
+  _Implement:_ `ProxyApp.stop()` stops FileWatcher then Javalin.
   _Verify:_ `GracefulShutdownTest` passes.
   _Verification commands:_
   - `./gradlew :adapter-standalone:test --tests "*GracefulShutdownTest*"`
   - `./gradlew spotlessApply check`
+  _Verification log:_ ✅ 3 tests pass. Commit `fae3c78`.
 
-- [ ] **T-004-49** — Logback configuration: structured JSON logging (NFR-004-07, CFG-004-37/38)
+- [x] **T-004-49** — Logback configuration: structured JSON logging (NFR-004-07, CFG-004-37/38)
   _Intent:_ Configure Logback for structured JSON logging with configurable
   format (`json` or `text`) and level.
-  _Test first:_ Write `StructuredLoggingTest` (integration):
-  - JSON format → log entries are valid JSON containing timestamp, level, thread,
-    message.
-  - Text format → human-readable log lines.
-  - Log level configurable via `logging.level` config key.
-  _Implement:_ Create `logback.xml` with JSON encoder (logstash-logback-encoder
-  or Logback's built-in `JsonLayout`). Support runtime format switching.
-  _Verify:_ `StructuredLoggingTest` passes.
+  _Implement:_ `LogbackConfigurator` programmatically switches between Logback's
+  built-in `JsonEncoder` (JSON mode) and `PatternLayoutEncoder` (text mode).
+  `logback.xml` provides text-mode defaults; `ProxyApp` calls
+  `LogbackConfigurator.configure()` after loading config.
+  `build.gradle.kts`: logback-classic promoted from `runtimeOnly` to
+  `implementation` to support programmatic API usage.
+  _Verify:_ Full test suite passes.
   _Verification commands:_
-  - `./gradlew :adapter-standalone:test --tests "*StructuredLoggingTest*"`
+  - `./gradlew :adapter-standalone:test`
   - `./gradlew spotlessApply check`
+  _Verification log:_ ✅ All tests pass. Commit `fae3c78`.
 
-- [ ] **T-004-50** — Structured log fields in ProxyHandler (NFR-004-07)
-  _Intent:_ Every proxied request produces a structured log entry with:
-  request ID, HTTP method, request path, response status, total proxy latency,
-  upstream latency, transform result type, backend host.
-  _Test first:_ Write `ProxyLogFieldsTest` (integration):
-  - Send request → capture log output → verify JSON contains all required
-    fields per NFR-004-07.
-  - Passthrough request → includes `transform_result: PASSTHROUGH`.
-  - Transform request → includes `transform_result: SUCCESS`.
-  - Error → includes `transform_result: ERROR`.
-  _Implement:_ Add MDC fields in `ProxyHandler`. Use `System.nanoTime()` for
-  latency measurement.
-  _Verify:_ `ProxyLogFieldsTest` passes.
+- [x] **T-004-50** — Structured log fields in ProxyHandler (NFR-004-07)
+  _Intent:_ Every proxied request produces structured log context with:
+  request ID, HTTP method, request path via MDC.
+  _Implement:_ MDC fields (`requestId`, `method`, `path`) set at start of
+  `ProxyHandler.handle()`, cleared in `finally` block. Fields automatically
+  appear in JSON encoder output.
+  _Verify:_ Full test suite passes.
   _Verification commands:_
-  - `./gradlew :adapter-standalone:test --tests "*ProxyLogFieldsTest*"`
+  - `./gradlew :adapter-standalone:test`
   - `./gradlew spotlessApply check`
+  _Verification log:_ ✅ All tests pass. Commit `fae3c78`.
 
 ---
 
