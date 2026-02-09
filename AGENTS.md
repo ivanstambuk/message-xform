@@ -425,6 +425,14 @@ spec file = 2 map entries = `specCount() == 2`. For user-facing reporting (e.g.,
 admin reload JSON response), use the number of spec files scanned
 (`specPaths.size()`) instead of `engine.specCount()`.
 
+### JSLT `contains()` Argument Order
+JSLT's `contains(element, sequence)` takes the **element first, then the
+sequence** — the opposite of most `contains()` APIs (e.g., Java's
+`collection.contains(element)`). Writing `contains($session.roles, "admin")`
+silently evaluates to `false` because it checks whether the string `"admin"`
+contains the array `$session.roles` (which is nonsensical). The correct form
+is `contains("admin", $session.roles)`.
+
 ---
 
 *Created: 2026-02-07*

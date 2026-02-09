@@ -1,20 +1,20 @@
 # Pending Task
 
-**Focus**: Feature 009 — Toolchain & Quality Platform
-**Status**: Spec complete (`docs/architecture/features/009/spec.md`). Plan and tasks not yet created.
-**Next Step**: Create `plan.md` and `tasks.md` for Feature 009, then begin implementation.
+**Focus**: Feature 001 — Session Context Binding (Phase 10)
+**Status**: ✅ Complete — all 4 tasks (T-001-54..57) implemented, tested, documented, committed.
+**Next Step**: No pending implementation work for Feature 001. Feature is fully complete.
 
 ## Context Notes
-- Spec captures 15 FRs: 10 already satisfied (baseline), 4 new (EditorConfig, ArchUnit, SpotBugs, Gradle runbook), 1 passive (version pinning).
-- ArchUnit (FR-009-12) is the most impactful new item — 4 rules: module boundaries, core isolation, no-reflection, SPI layering.
-- SpotBugs (FR-009-13) is a SHOULD, not MUST — can be deferred.
-- EditorConfig (FR-009-11) is the quickest win.
-- Modeled on openauth-sim Feature 013 and journeyforge Feature 009.
-- README.md now exists with infographics — no further docs work needed before implementation.
+- Feature 001 is now ✅ Complete across all 10 phases (57 tasks, 84+ scenarios).
+- JSLT `contains()` gotcha documented in AGENTS.md Known Pitfalls.
+- Rule 19 (Spec Amendment Cascade) codified as a new governance rule.
+- `git filter-branch` was running in background during this session (email rewrite).
 
-## SDD Gaps
-- None. All checks passed in retro.
+## Suggested Next Session Options
+1. **Feature 009 (Toolchain & Quality)** — spec is ready, could begin planning/implementation.
+2. **Feature 002 or 003** — PingAccess/PingGateway adapters now unblocked by Feature 001 completion.
+3. **Feature 004 follow-up** — session context adapter-side population for standalone proxy.
+4. **Documentation polish** — README, architecture diagrams, or other user-facing docs.
 
-## Alternative Next Steps
-- Tier 2 features (002 PingAccess / 003 PingGateway adapters)
-- Cross-language portability audit (PLAN.md backlog)
+## SDD Gaps (if any)
+- None — all retro findings resolved.

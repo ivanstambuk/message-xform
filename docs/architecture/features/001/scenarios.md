@@ -3927,6 +3927,7 @@ assert:
 | FR-001-10 (Header Transforms) | S-001-33, S-001-34, S-001-35, S-001-57, S-001-69, S-001-70, S-001-71, S-001-72 |
 | FR-001-11 (Status Code Transforms) | S-001-36, S-001-37, S-001-38, S-001-38i, S-001-61, S-001-63 |
 | FR-001-12 (URL Rewriting) | S-001-38a, S-001-38b, S-001-38c, S-001-38d, S-001-38e, S-001-38f, S-001-38g |
+| FR-001-13 (Session Context Binding) | S-001-82, S-001-83, S-001-84, S-001-85 |
 | NFR-001-01 (Stateless) | All — implicit in test harness design |
 | NFR-001-03 (Latency <5ms) | S-001-23, S-001-79, S-001-80, S-001-81 |
 | NFR-001-04 (Open-world) | S-001-07, S-001-20 |
@@ -4032,10 +4033,10 @@ assert:
 | S-001-79 | `TransformEngineBenchmark` | Identity 1KB — p95 < 5ms (opt-in) |
 | S-001-80 | `TransformEngineBenchmark` | Field-mapping 10KB — p95 < 5ms (opt-in) |
 | S-001-81 | `TransformEngineBenchmark` | Complex 50KB — p95 < 5ms (opt-in) |
-| S-001-82 | — | `$session.sub` in request body (ADR-0030) |
-| S-001-83 | — | `$session.roles` conditional response (ADR-0030) |
-| S-001-84 | — | `$session` null — null-safe access (ADR-0030) |
-| S-001-85 | — | JOLT + `$session` → rejected at load time (ADR-0030) |
+| S-001-82 | `ScenarioSuiteTest`, `SessionContextBindingTest`, `SessionContextE2ETest` | `$session.sub` in request body (FR-001-13, ADR-0030) |
+| S-001-83 | `ScenarioSuiteTest`, `SessionContextBindingTest` | `$session.roles` conditional response (FR-001-13, ADR-0030) |
+| S-001-84 | `ScenarioSuiteTest`, `SessionContextBindingTest`, `SessionContextE2ETest` | `$session` null — null-safe access (FR-001-13, ADR-0030) |
+| S-001-85 | `SessionContextJoltRejectionTest` | JOLT + `$session` → rejected at load time (FR-001-13, ADR-0030) |
 
 
 ---
