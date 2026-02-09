@@ -81,3 +81,6 @@ adapter-standalone/src/main/java/io/messagexform/standalone/adapter/StandaloneAd
 adapter-standalone/src/main/java/io/messagexform/standalone/proxy/ProxyHandler.java
 adapter-standalone/src/main/java/io/messagexform/standalone/proxy/UpstreamClient.java
 adapter-standalone/src/main/java/io/messagexform/standalone/proxy/UpstreamException.java
+adapter-standalone/src/main/java/io/messagexform/standalone/proxy/FileWatcher.java
+adapter-standalone/src/main/java/io/messagexform/standalone/proxy/AdminReloadHandler.java
+adapter-standalone/src/main/java/io/messagexform/standalone/proxy/ProblemDetail.java

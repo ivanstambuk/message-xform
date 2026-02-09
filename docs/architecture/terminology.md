@@ -300,6 +300,14 @@ terminology agreements must be captured here immediately.
     and triggers `TransformEngine.reload()` with configurable debounce. Provides
     zero-downtime hot reload (NFR-004-05). Can be disabled via `reload.enabled: false`.
 
+- **Admin reload handler** (`AdminReloadHandler`)
+  - Javalin handler for `POST /admin/reload` (FR-004-20). Scans the specs directory
+    for `*.yaml`/`*.yml` files, calls `TransformEngine.reload()`, and returns a JSON
+    summary (`{"status": "reloaded", "specs": N, "profile": "id-or-none"}`). On failure,
+    returns `500` with RFC 9457 problem detail; the previous registry stays active.
+    Registered as a dedicated route before the wildcard proxy handler — not subject to
+    profile matching.
+
 - **Sidecar pattern**
   - A Kubernetes deployment model where the standalone proxy runs as a container
     alongside the backend application in the same pod. Traffic flows through the

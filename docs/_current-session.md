@@ -1,36 +1,36 @@
-# Current Session — 2026-02-09 (Session 2)
+# Current Session — 2026-02-09 (Session 3)
 
 **Feature**: 004 — Standalone HTTP Proxy Mode
 **Phase**: 5 — Health, Readiness, Hot Reload, Admin
-**Increment**: I7 — Health + readiness endpoints (COMPLETE)
+**Increment**: I8 — FileWatcher + admin reload (COMPLETE)
 
 ## Session Status
 
 ### Completed Tasks (this session)
-- [x] **T-004-33** — Health endpoint (3 tests) — `HealthHandler`, `HealthEndpointTest`
-- [x] **T-004-34** — Readiness endpoint (4 tests) — `ReadinessHandler`, `ReadinessEndpointTest`
-- [x] **T-004-35** — Endpoint priority (5 tests) — `EndpointPriorityTest`
+- [x] **T-004-36** — FileWatcher (6 tests) — `FileWatcher`, `FileWatcherTest`
+- [x] **T-004-37** — Admin reload endpoint (5 tests) — `AdminReloadHandler`, `AdminReloadTest`
+- [x] **T-004-38** — Hot reload integration (2 tests) — `HotReloadIntegrationTest`
+- [x] **T-004-39** — Zero-downtime reload (2 tests) — `ZeroDowntimeReloadTest`
 
 ### Housekeeping
-- Fixed `cloc-report.sh` to scan all modules (core + adapter-standalone)
-- Fixed SDD drift: plan.md/tasks.md headers updated Phase 3→Phase 5/I7
-- Added pitfall: `HttpServer.stop(0)` port release unreliable for tests
+- Added `ProblemDetail.internalError()` for 500 responses
+- Added `AdminReloadHandler` to terminology.md
+- Added `FileWatcher.java`, `AdminReloadHandler.java`, `ProblemDetail.java` to llms.txt
+- Added `specCount()` pitfall to AGENTS.md
 
-### I7 Complete
-All 3 tasks done. 12 new tests, `./gradlew check` green.
+### I8 Complete
+All 4 tasks done. 15 new tests, `./gradlew check` green.
 
 ## Key Decisions
-- **Endpoint priority**: Handled via Javalin route resolution — exact-match
-  routes (`/health`, `/ready`) registered before wildcard (`/<path>`). No
-  guard logic in ProxyHandler needed.
-- **ReadinessHandler**: Uses `BooleanSupplier` for engine state (testable),
-  TCP `Socket.connect()` for backend reachability with configurable timeout.
-- **Test fixtures**: `identity-transform.yaml` + `wildcard-profile.yaml` for
-  endpoint priority tests.
+- **specCount() pitfall**: `TransformRegistry.specCount()` returns 2× unique specs
+  (both `id` and `id@version` keys). Admin reload response uses `specPaths.size()`.
+- **AdminReloadHandler constructor**: Removed `SpecParser` parameter — the engine
+  creates its own parser internally via `TransformEngine.reload()`.
+- **FileWatcher**: Daemon threads for polling + debounce scheduling. Supports
+  watching multiple directories (specs + profiles).
 
 ## Commits
-- `a0674f9` — cloc-report.sh fix + SDD drift fix
-- `399ee55` — I7: health & readiness endpoints (T-004-33/34/35, 12 tests)
+- `84b230c` — I8: FileWatcher + admin reload + hot reload integration (15 tests)
 
 ## Next Steps
-- Phase 5 (I8) — FileWatcher + admin reload (T-004-36, T-004-37, T-004-38)
+- Phase 6 (I9) — TLS: inbound + outbound (T-004-40..T-004-45)

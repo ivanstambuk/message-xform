@@ -382,6 +382,13 @@ because no route matches. To produce a proper `405` with an RFC 9457 body,
 add a `before("/<path>", ...)` filter with a method whitelist check that
 calls `ctx.skipRemainingHandlers()` after writing the 405 response.
 
+### TransformRegistry.specCount() Returns 2× Unique Specs
+`TransformRegistry.specCount()` returns the internal map size, which stores each
+spec under **both** its `id` key and its `id@version` key. This means 1 unique
+spec file = 2 map entries = `specCount() == 2`. For user-facing reporting (e.g.,
+admin reload JSON response), use the number of spec files scanned
+(`specPaths.size()`) instead of `engine.specCount()`.
+
 ---
 
 *Created: 2026-02-07*
