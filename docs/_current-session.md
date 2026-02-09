@@ -1,35 +1,28 @@
 # Current Session State
 
 **Date:** 2026-02-09
-**Focus:** Governance cleanup + Feature 009 spec
+**Focus:** README.md + Git identity fix
 
 ## Completed This Session
 
-1. **Governance cleanup** (`e1bd1e5`)
-   - Created `githooks/pre-commit` (quality gate) and `githooks/commit-msg` (conventional commits)
-   - Created `.github/workflows/ci.yml` (CI pipeline)
-   - Created `docs/operations/quality-gate.md`
-   - Updated `AGENTS.md` with build commands and formatter policy
-   - Created `.gitlint` reference config
+1. **Git identity rewrite** (force-push)
+   - Rewrote all 307 commits: `ivan.stambuk@gmail.com` → `65509372+ivanstambuk@users.noreply.github.com`
+   - Set global git config to use GitHub noreply email
+   - Force-pushed to link all commits to the `ivanstambuk` GitHub profile
 
-2. **ReadMe.LLM** (`55ddd2e`)
-   - LLM-oriented project overview with module layout, entry points, build commands
-
-3. **Feature 009 — Toolchain & Quality Platform spec** (`bbb34b1`)
-   - 15 functional requirements (10 already satisfied, 4 new, 1 passive)
-   - 4 non-functional requirements
-   - 10 scenarios
-   - New items: EditorConfig, ArchUnit, SpotBugs, Gradle upgrade runbook
-
-4. **Feature 004 closure** (`0a93d58`)
-   - Marked ✅ Complete across roadmap, plan, AGENTS.md
+2. **README.md** (`65d6d31`)
+   - Human-oriented project overview (vs. ReadMe.LLM for AI agents)
+   - Two deployment modes: standalone proxy + gateway plugin
+   - Gateway support matrix with integration models and statuses
+   - Transformation capabilities with YAML examples
+   - Quick start, project structure, tech stack
+   - Two generated infographics with prompts saved in `docs/images/README.md`
 
 ## Key Decisions
 
-- Feature 009 captures both existing toolchain and planned additions
-- ArchUnit is the key new addition (4 rules: module boundaries, core isolation, no-reflect, SPI)
-- SpotBugs is SHOULD, not MUST — proportional to current scope
-- JaCoCo and mutation testing are explicitly non-goals
+- README uses generated images instead of ASCII art for architecture diagrams
+- Image prompts stored alongside images for future regeneration
+- Light background chosen for infographics (better GitHub rendering)
 
 ## What's Next
 

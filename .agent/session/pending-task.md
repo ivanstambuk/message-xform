@@ -10,9 +10,10 @@
 - SpotBugs (FR-009-13) is a SHOULD, not MUST — can be deferred.
 - EditorConfig (FR-009-11) is the quickest win.
 - Modeled on openauth-sim Feature 013 and journeyforge Feature 009.
+- README.md now exists with infographics — no further docs work needed before implementation.
 
 ## SDD Gaps
-- None. Retro completed: terminology updated, knowledge map synced, llms.txt updated.
+- None. All checks passed in retro.
 
 ## Alternative Next Steps
 - Tier 2 features (002 PingAccess / 003 PingGateway adapters)
