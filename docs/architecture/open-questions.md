@@ -21,6 +21,7 @@ Hard rules:
 
 | ID | Owner | Question | Options (A preferred) | Status | Asked | Notes |
 |----|-------|----------|------------------------|--------|-------|-------|
+| Q-044 | Ivan | How should gateway session context be exposed to transform expressions? | A: `$session` on TransformContext + `sessionContext()` on Message; B: Generic `$extensions` map on TransformContext; C: Separate parameter on `TransformEngine.transform()` | Open | 2026-02-09 | severity: medium, Feature 001 |
 
 
 
