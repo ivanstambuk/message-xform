@@ -1,35 +1,36 @@
-# Current Session — 2026-02-09
+# Current Session — 2026-02-09 (Session 2)
 
 **Feature**: 004 — Standalone HTTP Proxy Mode
-**Phase**: 4 — Error Handling + Body Size + Forwarded Headers (COMPLETE)
-**Increment**: I6 — Body size limits, X-Forwarded-*, method rejection (COMPLETE)
+**Phase**: 5 — Health, Readiness, Hot Reload, Admin
+**Increment**: I7 — Health + readiness endpoints (COMPLETE)
 
 ## Session Status
 
 ### Completed Tasks (this session)
-- [x] **T-004-29** — Request body size enforcement (4/4 tests)
-- [x] **T-004-30** — Response body size enforcement (2/2 tests)
-- [x] **T-004-31** — X-Forwarded-* headers (3/3 tests)
-- [x] **T-004-32** — Unknown HTTP method rejection (8/8 tests)
+- [x] **T-004-33** — Health endpoint (3 tests) — `HealthHandler`, `HealthEndpointTest`
+- [x] **T-004-34** — Readiness endpoint (4 tests) — `ReadinessHandler`, `ReadinessEndpointTest`
+- [x] **T-004-35** — Endpoint priority (5 tests) — `EndpointPriorityTest`
 
-### Phase 4 Complete
-All I6 tasks done. Phase 4 (I5 + I6) is fully complete.
+### Housekeeping
+- Fixed `cloc-report.sh` to scan all modules (core + adapter-standalone)
+- Fixed SDD drift: plan.md/tasks.md headers updated Phase 3→Phase 5/I7
+- Added pitfall: `HttpServer.stop(0)` port release unreliable for tests
+
+### I7 Complete
+All 3 tasks done. 12 new tests, `./gradlew check` green.
 
 ## Key Decisions
-- Response body size: checked in `UpstreamClient.forward()` after reading
-  response, throws `UpstreamResponseTooLargeException` → ProxyHandler catches
-  and returns 502 with ProblemDetail.
-- X-Forwarded-*: injected via `injectForwardedHeaders()` in ProxyHandler
-  between dispatch and forward steps. Appends to existing X-Forwarded-For.
-- Method rejection: Javalin `before` filter with ALLOWED_METHODS whitelist
-  instead of ProxyHandler check (Javalin returns 404 for unregistered methods,
-  not 405).
+- **Endpoint priority**: Handled via Javalin route resolution — exact-match
+  routes (`/health`, `/ready`) registered before wildcard (`/<path>`). No
+  guard logic in ProxyHandler needed.
+- **ReadinessHandler**: Uses `BooleanSupplier` for engine state (testable),
+  TCP `Socket.connect()` for backend reachability with configurable timeout.
+- **Test fixtures**: `identity-transform.yaml` + `wildcard-profile.yaml` for
+  endpoint priority tests.
 
 ## Commits
-- `75dfcbb` — T-004-29: request body size enforcement
-- `ac23ad5` — T-004-30: response body size enforcement
-- `e412403` — T-004-31: X-Forwarded-* headers
-- `d554c05` — T-004-32: unknown HTTP method rejection
+- `a0674f9` — cloc-report.sh fix + SDD drift fix
+- `399ee55` — I7: health & readiness endpoints (T-004-33/34/35, 12 tests)
 
 ## Next Steps
-- Phase 5 (I7) — Health + readiness endpoints (T-004-33, T-004-34, T-004-35)
+- Phase 5 (I8) — FileWatcher + admin reload (T-004-36, T-004-37, T-004-38)

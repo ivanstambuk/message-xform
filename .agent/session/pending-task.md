@@ -1,22 +1,22 @@
 # Pending Task
 
-**Focus**: Feature 004 — Phase 5 (Health, Readiness, Hot Reload, Admin)
-**Status**: Phase 4 complete; Phase 5 not started
-**Next Step**: Begin T-004-33 — Health endpoint test + implementation
+**Focus**: Feature 004 — Phase 5, Increment I8: FileWatcher + admin reload
+**Status**: I7 complete (health/readiness endpoints). I8 not started.
+**Next Step**: Begin T-004-36 (FileWatcher spec file change detection)
 
 ## Context Notes
-- Phase 4 (I5 + I6) is fully complete: error handling, body size limits,
-  X-Forwarded-* headers, and method rejection are all implemented and tested.
-- ProxyHandler constructor now takes 5 args: engine, adapter, upstreamClient,
-  maxBodyBytes, forwardedHeadersEnabled. All test files have been updated.
-- Method rejection uses a Javalin `before` filter (not ProxyHandler) because
-  Javalin returns 404 for unregistered methods — see AGENTS.md Known Pitfalls.
-- `UpstreamResponseTooLargeException` added to exception hierarchy.
+- HealthHandler and ReadinessHandler are implemented and tested (12 tests)
+- Endpoint priority proven via Javalin exact-match routing
+- ReadinessHandler uses BooleanSupplier for engine state — this will connect
+  to TransformEngine.isLoaded() (or equivalent) when ProxyApp bootstrap is
+  implemented
+- Test fixtures: identity-transform.yaml + wildcard-profile.yaml exist in
+  test resources for priority tests
 
-## Upcoming Tasks (I7)
-- T-004-33 — Health endpoint (`/healthz`)
-- T-004-34 — Readiness endpoint (`/readyz`)
-- T-004-35 — Health/readiness path exclusion from proxy routing
+## I8 Tasks
+- T-004-36: FileWatcher — WatchService-based hot reload with debounce
+- T-004-37: Admin reload endpoint — POST /admin/reload
+- T-004-38: Admin endpoint not subject to transforms
 
 ## SDD Gaps
-- None identified. All scenarios, terminology, and ADRs are current.
+- None — all checks passed in retro audit
