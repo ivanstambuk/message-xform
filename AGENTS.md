@@ -39,7 +39,7 @@ constitution in `docs/decisions/project-constitution.md` before acting.
 | 001 | Message Transformation Engine (core) | ✅ Complete |
 | 002 | PingAccess Adapter | 🔲 Not Started |
 | 003 | PingGateway Adapter | 🔲 Not Started |
-| 004 | Standalone HTTP Proxy Mode | ✅ Spec Ready |
+| 004 | Standalone HTTP Proxy Mode | 🔨 In Progress |
 | 005 | WSO2 API Manager Adapter | 🔲 Not Started |
 | 006 | Apache APISIX Adapter | 🔲 Not Started |
 | 007 | Kong Gateway Adapter | 🔲 Not Started |

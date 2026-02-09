@@ -7,7 +7,7 @@
 | 001 | Message Transformation Engine (core) | ✅ Complete | `features/001/spec.md` | Research complete | Java 21 |
 | 002 | PingAccess Adapter | 🔲 Not Started | `features/002/spec.md` | Feature 001 | Java (SDK) |
 | 003 | PingGateway Adapter | 🔲 Not Started | `features/003/spec.md` | Feature 001 | Java / Groovy |
-| 004 | Standalone HTTP Proxy Mode | ✅ Spec Ready | `features/004/spec.md` | Feature 001 | Java |
+| 004 | Standalone HTTP Proxy Mode | 🔨 In Progress | `features/004/spec.md` | Feature 001 | Java |
 | 005 | WSO2 API Manager Adapter | 🔲 Not Started | `features/005/spec.md` | Feature 001 | Java |
 | 006 | Apache APISIX Adapter | 🔲 Not Started | `features/006/spec.md` | Feature 001 | Java (Plugin Runner) |
 | 007 | Kong Gateway Adapter | 🔲 Not Started | `features/007/spec.md` | Feature 001 | Lua or sidecar |
