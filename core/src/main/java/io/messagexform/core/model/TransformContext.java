@@ -8,19 +8,29 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Read-only context passed to expression engines during evaluation (DO-001-07). Provides access to
- * HTTP metadata (headers, status, query params, cookies) so that JSLT expressions can reference
- * {@code $headers}, {@code $headers_all}, {@code $status}, {@code $queryParams}, and {@code
- * $cookies}.
+ * Read-only context passed to expression engines during evaluation (DO-001-07).
+ * Provides access to
+ * HTTP metadata (headers, status, query params, cookies) and optional session
+ * context so that JSLT
+ * expressions can reference {@code $headers}, {@code $headers_all},
+ * {@code $status},
+ * {@code $queryParams}, {@code $cookies}, and {@code $session}.
  *
- * <p>{@code $status} is {@code null} for request transforms (ADR-0017).
+ * <p>
+ * {@code $status} is {@code null} for request transforms (ADR-0017).
+ *
+ * <p>
+ * {@code $session} is {@code null} when no gateway session context is available
+ * (FR-001-13,
+ * ADR-0030).
  */
 public record TransformContext(
         Map<String, String> headers,
         Map<String, List<String>> headersAll,
         Integer status,
         Map<String, String> queryParams,
-        Map<String, String> cookies) {
+        Map<String, String> cookies,
+        JsonNode sessionContext) {
 
     /** Canonical constructor with defensive copies. */
     public TransformContext {
@@ -31,8 +41,23 @@ public record TransformContext(
     }
 
     /**
-     * Converts the header map to a JsonNode for binding as {@code $headers} in expression engines.
-     * Returns an ObjectNode with header names as keys and first-values as string values.
+     * Convenience constructor without session context (backward compatibility).
+     * All existing call sites use this form.
+     */
+    public TransformContext(
+            Map<String, String> headers,
+            Map<String, List<String>> headersAll,
+            Integer status,
+            Map<String, String> queryParams,
+            Map<String, String> cookies) {
+        this(headers, headersAll, status, queryParams, cookies, null);
+    }
+
+    /**
+     * Converts the header map to a JsonNode for binding as {@code $headers} in
+     * expression engines.
+     * Returns an ObjectNode with header names as keys and first-values as string
+     * values.
      */
     public JsonNode headersAsJson() {
         ObjectNode node = JsonNodeFactory.instance.objectNode();
@@ -41,7 +66,8 @@ public record TransformContext(
     }
 
     /**
-     * Converts the multi-value header map to a JsonNode for binding as {@code $headers_all}. Each
+     * Converts the multi-value header map to a JsonNode for binding as
+     * {@code $headers_all}. Each
      * key maps to an array of string values (ADR-0026).
      */
     public JsonNode headersAllAsJson() {
@@ -54,7 +80,8 @@ public record TransformContext(
     }
 
     /**
-     * Returns the status as a JsonNode. Returns NullNode for request transforms (ADR-0017).
+     * Returns the status as a JsonNode. Returns NullNode for request transforms
+     * (ADR-0017).
      */
     public JsonNode statusAsJson() {
         return status != null ? JsonNodeFactory.instance.numberNode(status) : JsonNodeFactory.instance.nullNode();
@@ -74,8 +101,16 @@ public record TransformContext(
         return node;
     }
 
+    /**
+     * Returns the session context as a JsonNode for binding as {@code $session}.
+     * Returns NullNode when no session context is available (FR-001-13, ADR-0030).
+     */
+    public JsonNode sessionContextAsJson() {
+        return sessionContext != null ? sessionContext : JsonNodeFactory.instance.nullNode();
+    }
+
     /** Creates an empty context (useful for tests and simple transforms). */
     public static TransformContext empty() {
-        return new TransformContext(null, null, null, null, null);
+        return new TransformContext(null, null, null, null, null, null);
     }
 }

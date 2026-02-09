@@ -13,11 +13,15 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * JSLT expression engine implementation (FR-001-02, SPI-001-01/02/03). Uses the Schibsted JSLT
+ * JSLT expression engine implementation (FR-001-02, SPI-001-01/02/03). Uses the
+ * Schibsted JSLT
  * library to compile and evaluate JSON-to-JSON transforms.
  *
- * <p>Context variables ({@code $headers}, {@code $headers_all}, {@code $status}, {@code
- * $queryParams}, {@code $cookies}) are injected as external JSLT variables.
+ * <p>
+ * Context variables ({@code $headers}, {@code $headers_all}, {@code $status},
+ * {@code
+ * $queryParams}, {@code $cookies}, {@code $session}) are injected as external
+ * JSLT variables.
  */
 public final class JsltExpressionEngine implements ExpressionEngine {
 
@@ -59,7 +63,8 @@ public final class JsltExpressionEngine implements ExpressionEngine {
         }
 
         /**
-         * Builds the JSLT external variable map from the transform context. Variables are named to
+         * Builds the JSLT external variable map from the transform context. Variables
+         * are named to
          * match the spec-defined context variable names.
          */
         private static Map<String, JsonNode> buildVariables(TransformContext context) {
@@ -69,6 +74,7 @@ public final class JsltExpressionEngine implements ExpressionEngine {
             vars.put("status", context.statusAsJson());
             vars.put("queryParams", context.queryParamsAsJson());
             vars.put("cookies", context.cookiesAsJson());
+            vars.put("session", context.sessionContextAsJson());
             return vars;
         }
     }

@@ -307,7 +307,10 @@ class ScenarioSuiteTest {
             });
         }
 
-        return new Message(body, headers, headersAll, statusCode, contentType, path, method);
+        // Session context (FR-001-13, ADR-0030)
+        JsonNode sessionContext = scenario.sessionContext();
+
+        return new Message(body, headers, headersAll, statusCode, contentType, path, method, null, sessionContext);
     }
 
     private Direction parseDirection(ScenarioDefinition scenario) {

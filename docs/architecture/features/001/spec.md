@@ -2,7 +2,7 @@
 
 | Field | Value |
 |-------|-------|
-| Status | Amended — FR-001-13 added, implementation pending |
+| Status | Ready |
 | Last updated | 2026-02-09 |
 | Owners | Ivan |
 | Linked plan | `docs/architecture/features/001/plan.md` |

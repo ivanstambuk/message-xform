@@ -294,8 +294,10 @@ public final class TransformEngine {
 
         // Build context from message metadata (backward-compatible path).
         // For REQUEST transforms, $status is null (ADR-0017).
+        // Session context is passed through from the message (FR-001-13, ADR-0030).
         Integer status = direction == Direction.RESPONSE ? message.statusCode() : null;
-        TransformContext context = new TransformContext(message.headers(), message.headersAll(), status, null, null);
+        TransformContext context = new TransformContext(
+                message.headers(), message.headersAll(), status, null, null, message.sessionContext());
 
         return transform(message, direction, context);
     }

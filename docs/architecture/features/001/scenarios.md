@@ -4106,7 +4106,7 @@ transform:
       "id": .id,
       "name": .name,
       "email": .email,
-      "adminPanel": if (contains($session.roles, "admin")) .adminData else null
+      "adminPanel": if (contains("admin", $session.roles)) .adminData else null
     }
 
 session_context:

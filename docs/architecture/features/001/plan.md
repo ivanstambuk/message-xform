@@ -515,14 +515,14 @@ engine working) and Phase 8 completion (all scenarios pass).
 
 - [x] All 16 increments (Phase 1–8) completed and checked off
 - [x] Phase 9 (T-001-53 — performance benchmark) completed
-- [ ] Phase 10 (I17 — session context binding) completed
+- [x] Phase 10 (I17 — session context binding) completed
 - [x] Quality gate passes (`./gradlew spotlessApply check`)
 - [x] All 84 scenarios verified — 20 in parameterized suite, 58 in dedicated test classes, 4 skipped (JOLT/jq not implemented), 2 no-test (dynamic/placeholder)
-- [ ] S-001-82..85 (session context scenarios) verified
+- [x] S-001-82..85 (session context scenarios) verified
 - [x] Coverage matrix in `scenarios.md` has no uncovered FRs/NFRs
 - [x] Implementation Drift Gate report attached
 - [x] Open questions resolved and removed from `open-questions.md`
-- [ ] Documentation synced: roadmap status → ✅ Complete (currently 🔨 In Progress)
+- [x] Documentation synced: roadmap status → ✅ Complete, AGENTS.md mirror synced, spec status → Ready
 
 ## Intent Log
 

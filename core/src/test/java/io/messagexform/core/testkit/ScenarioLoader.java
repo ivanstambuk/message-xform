@@ -101,6 +101,9 @@ public final class ScenarioLoader {
         // Direction
         String direction = root.has("direction") ? root.path("direction").asText() : null;
 
+        // Session context for scenarios that test $session (FR-001-13, ADR-0030)
+        JsonNode sessionContext = root.has("session_context") ? root.get("session_context") : null;
+
         return new ScenarioDefinition(
                 id,
                 name,
@@ -118,6 +121,7 @@ public final class ScenarioLoader {
                 requestPath,
                 requestMethod,
                 direction,
+                sessionContext,
                 rawYaml);
     }
 
@@ -141,6 +145,7 @@ public final class ScenarioLoader {
             String requestPath,
             String requestMethod,
             String direction,
+            JsonNode sessionContext,
             String rawYaml) {
 
         /**
