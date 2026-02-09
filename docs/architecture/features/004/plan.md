@@ -2,8 +2,8 @@
 
 _Linked specification:_ `docs/architecture/features/004/spec.md`
 _Linked tasks:_ `docs/architecture/features/004/tasks.md`
-_Status:_ In Progress (Phase 8 — I12)
-_Last updated:_ 2026-02-09T02:55+01:00
+_Status:_ ✅ Complete
+_Last updated:_ 2026-02-09T03:19+01:00
 
 > Guardrail: Keep this plan traceable back to the governing spec. Reference
 > FR/NFR/Scenario IDs from `spec.md` where relevant, log any new high- or
@@ -500,9 +500,9 @@ _Result:_ ✅ **PASS** — no drift detected.
 - [x] All 77 scenarios verified — mapped to test classes in coverage matrix
 - [x] Coverage matrix in `scenarios.md` has no uncovered FRs/NFRs
 - [x] Implementation Drift Gate report attached
-- [ ] Open questions resolved and removed from `open-questions.md`
+- [x] Open questions resolved and removed from `open-questions.md`
 - [x] Docker image builds and passes smoke test
-- [ ] Documentation synced: roadmap status → ✅ Complete
+- [x] Documentation synced: roadmap status → ✅ Complete
 
 ## Intent Log
 
