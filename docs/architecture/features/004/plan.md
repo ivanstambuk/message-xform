@@ -2,8 +2,8 @@
 
 _Linked specification:_ `docs/architecture/features/004/spec.md`
 _Linked tasks:_ `docs/architecture/features/004/tasks.md`
-_Status:_ In Progress (Phase 5 — I7)
-_Last updated:_ 2026-02-09T01:19+01:00
+_Status:_ In Progress (Phase 5 — I8)
+_Last updated:_ 2026-02-09T01:29+01:00
 
 > Guardrail: Keep this plan traceable back to the governing spec. Reference
 > FR/NFR/Scenario IDs from `spec.md` where relevant, log any new high- or
@@ -274,6 +274,7 @@ _To be completed after implementation._
      S-004-70.
    - _Commands:_ `./gradlew :adapter-standalone:test`, `./gradlew spotlessApply check`
    - _Exit:_ Health and readiness endpoints work. Not subject to transforms.
+   - _Result:_ T-004-33 (health endpoint, 3 tests), T-004-34 (readiness endpoint, 4 tests), T-004-35 (endpoint priority, 5 tests) done. I7 complete — 12 tests total.
 
 8. **I8 — FileWatcher + admin reload** (≤90 min)
    - _Goal:_ Implement file-system watching for hot reload and `POST /admin/reload`.

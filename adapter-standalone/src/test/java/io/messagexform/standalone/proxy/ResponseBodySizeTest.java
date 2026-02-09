@@ -88,9 +88,8 @@ class ResponseBodySizeTest extends ProxyTestHarness {
         assertThat(response.statusCode()).isEqualTo(502);
 
         // --- Content-Type ---
-        assertThat(response.headers().firstValue("content-type"))
-                .isPresent()
-                .hasValueSatisfying(ct -> assertThat(ct).contains("application/problem+json"));
+        assertThat(response.headers().firstValue("content-type")).isPresent().hasValueSatisfying(ct -> assertThat(ct)
+                .contains("application/problem+json"));
 
         // --- RFC 9457 body structure ---
         JsonNode body = MAPPER.readTree(response.body());

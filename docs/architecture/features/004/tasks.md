@@ -1,7 +1,7 @@
 # Feature 004 — Standalone HTTP Proxy Mode — Tasks
 
-_Status:_ In Progress (Phase 5 — I7)
-_Last updated:_ 2026-02-09T01:19+01:00
+_Status:_ In Progress (Phase 5 — I8)
+_Last updated:_ 2026-02-09T01:29+01:00
 
 **Governing spec:** `docs/architecture/features/004/spec.md`
 **Implementation plan:** `docs/architecture/features/004/plan.md`
@@ -649,18 +649,20 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
 
 #### I7 — Health + readiness endpoints
 
-- [ ] **T-004-33** — Health endpoint (FR-004-21, S-004-34)
+- [x] **T-004-33** — Health endpoint (FR-004-21, S-004-34) ✅
   _Intent:_ `GET /health` returns `200 {"status": "UP"}` when server is running.
   _Test first:_ Write `HealthEndpointTest` (integration):
   - `GET /health` → `200 {"status": "UP"}` (S-004-34).
   - Custom health path via `health.path` config.
   _Implement:_ Register Javalin handler for health endpoint.
-  _Verify:_ `HealthEndpointTest` passes.
-  _Verification commands:_
-  - `./gradlew :adapter-standalone:test --tests "*HealthEndpointTest*"`
-  - `./gradlew spotlessApply check`
+  _Verify:_ `HealthEndpointTest` passes (3 tests).
+  _Verification log:_
+  ```
+  HealthEndpointTest — 3 tests PASSED
+  ./gradlew check — BUILD SUCCESSFUL
+  ```
 
-- [ ] **T-004-34** — Readiness endpoint (FR-004-22, S-004-35/36/37)
+- [x] **T-004-34** — Readiness endpoint (FR-004-22, S-004-35/36/37) ✅
   _Intent:_ `GET /ready` checks engine and backend status.
   _Test first:_ Write `ReadinessEndpointTest` (integration):
   - Engine loaded + backend reachable → `200 {"status": "READY", "engine":
@@ -671,12 +673,14 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - Custom ready path via `health.ready-path` config.
   _Implement:_ Register Javalin handler. Backend check via TCP connect with
   `backend.connect-timeout-ms` timeout.
-  _Verify:_ `ReadinessEndpointTest` passes.
-  _Verification commands:_
-  - `./gradlew :adapter-standalone:test --tests "*ReadinessEndpointTest*"`
-  - `./gradlew spotlessApply check`
+  _Verify:_ `ReadinessEndpointTest` passes (4 tests).
+  _Verification log:_
+  ```
+  ReadinessEndpointTest — 4 tests PASSED
+  ./gradlew check — BUILD SUCCESSFUL
+  ```
 
-- [ ] **T-004-35** — Health/readiness not subject to transforms (S-004-38, S-004-70)
+- [x] **T-004-35** — Health/readiness not subject to transforms (S-004-38, S-004-70) ✅
   _Intent:_ Admin and health endpoints must NOT be subject to profile matching,
   even if a wildcard profile would match.
   _Test first:_ Write `EndpointPriorityTest` (integration):
@@ -685,11 +689,15 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - Profile with `path: /health` exists → health endpoint still wins
     (S-004-70).
   - Profile with `path: /admin/reload` exists → admin endpoint still wins.
-  _Implement:_ Check for admin/health paths before entering transform pipeline.
-  _Verify:_ `EndpointPriorityTest` passes.
-  _Verification commands:_
-  - `./gradlew :adapter-standalone:test --tests "*EndpointPriorityTest*"`
-  - `./gradlew spotlessApply check`
+  _Implement:_ Health/readiness handlers registered as dedicated Javalin routes
+  before the proxy wildcard — Javalin's routing precedence ensures exact-match
+  routes win over `/<path>` wildcards.
+  _Verify:_ `EndpointPriorityTest` passes (5 tests).
+  _Verification log:_
+  ```
+  EndpointPriorityTest — 5 tests PASSED
+  ./gradlew check — BUILD SUCCESSFUL
+  ```
 
 #### I8 — FileWatcher + admin reload
 

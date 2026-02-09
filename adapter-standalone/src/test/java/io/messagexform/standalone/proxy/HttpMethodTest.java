@@ -59,7 +59,7 @@ class HttpMethodTest extends ProxyTestHarness {
     // ---------------------------------------------------------------
 
     @ParameterizedTest(name = "{0} → proxied successfully")
-    @ValueSource(strings = { "GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS" })
+    @ValueSource(strings = {"GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"})
     @DisplayName("Standard methods → proxied successfully")
     void standardMethods_proxiedSuccessfully(String method) throws Exception {
         String body = "GET".equals(method) || "OPTIONS".equals(method) ? null : "{\"test\":true}";

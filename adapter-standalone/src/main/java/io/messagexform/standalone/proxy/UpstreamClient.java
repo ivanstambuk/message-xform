@@ -143,9 +143,8 @@ public final class UpstreamClient {
 
         // Response body size enforcement (FR-004-13, T-004-30)
         if (maxBodyBytes > 0 && responseBody.length() > maxBodyBytes) {
-            throw new UpstreamResponseTooLargeException(
-                    "Response body from " + targetUri + " exceeds " + maxBodyBytes
-                            + " bytes (" + responseBody.length() + " received)");
+            throw new UpstreamResponseTooLargeException("Response body from " + targetUri + " exceeds " + maxBodyBytes
+                    + " bytes (" + responseBody.length() + " received)");
         }
 
         LOG.debug("Backend responded: {} {} → {}", method, path, response.statusCode());

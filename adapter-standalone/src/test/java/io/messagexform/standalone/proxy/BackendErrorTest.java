@@ -55,7 +55,8 @@ class BackendErrorTest {
         int proxyPort = app.port();
 
         try {
-            HttpClient client = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
+            HttpClient client =
+                    HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create("http://127.0.0.1:" + proxyPort + "/api/test"))
@@ -106,7 +107,8 @@ class BackendErrorTest {
         int proxyPort = app.port();
 
         try {
-            HttpClient client = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
+            HttpClient client =
+                    HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create("http://127.0.0.1:" + proxyPort + "/api/slow"))
@@ -149,7 +151,8 @@ class BackendErrorTest {
         int proxyPort = app.port();
 
         try {
-            HttpClient client = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
+            HttpClient client =
+                    HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create("http://127.0.0.1:" + proxyPort + "/api/unreachable"))

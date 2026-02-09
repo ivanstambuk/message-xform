@@ -84,9 +84,8 @@ class RequestBodySizeTest extends ProxyTestHarness {
         assertThat(response.statusCode()).isEqualTo(413);
 
         // --- Content-Type ---
-        assertThat(response.headers().firstValue("content-type"))
-                .isPresent()
-                .hasValueSatisfying(ct -> assertThat(ct).contains("application/problem+json"));
+        assertThat(response.headers().firstValue("content-type")).isPresent().hasValueSatisfying(ct -> assertThat(ct)
+                .contains("application/problem+json"));
 
         // --- RFC 9457 body structure ---
         JsonNode body = MAPPER.readTree(response.body());
@@ -112,8 +111,7 @@ class RequestBodySizeTest extends ProxyTestHarness {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create("http://127.0.0.1:" + INSTANCE.proxyPort + "/api/size/chunked"))
                 .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofByteArrays(
-                        java.util.List.of(largePayload)))
+                .POST(HttpRequest.BodyPublishers.ofByteArrays(java.util.List.of(largePayload)))
                 .build();
 
         HttpResponse<String> response = INSTANCE.testClient.send(request, HttpResponse.BodyHandlers.ofString());

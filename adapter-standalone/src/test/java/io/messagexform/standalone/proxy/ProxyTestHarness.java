@@ -47,14 +47,13 @@ abstract class ProxyTestHarness {
     protected TransformEngine engine;
 
     /** HTTP methods accepted by the proxy (FR-004-05). */
-    private static final Set<String> ALLOWED_METHODS = Set.of("GET", "POST", "PUT", "DELETE", "PATCH", "HEAD",
-            "OPTIONS");
+    private static final Set<String> ALLOWED_METHODS =
+            Set.of("GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS");
 
     /** Records the last request received by the mock backend for each key. */
     protected final Map<String, ReceivedRequest> receivedRequests = new ConcurrentHashMap<>();
 
-    record ReceivedRequest(String method, String path, String query, Map<String, List<String>> headers, String body) {
-    }
+    record ReceivedRequest(String method, String path, String query, Map<String, List<String>> headers, String body) {}
 
     /**
      * Starts mock backend + Javalin proxy with the given specs and profile.
@@ -86,8 +85,9 @@ abstract class ProxyTestHarness {
      * Starts mock backend + Javalin proxy with the given specs, profile, max
      * body bytes, and forwarded headers setting.
      */
-    protected void startWithSpecs(String[] specResourcePaths, String profileResourcePath, int maxBodyBytes,
-            boolean forwardedHeadersEnabled) throws IOException {
+    protected void startWithSpecs(
+            String[] specResourcePaths, String profileResourcePath, int maxBodyBytes, boolean forwardedHeadersEnabled)
+            throws IOException {
         startMockBackend();
 
         ProxyConfig.Builder configBuilder = ProxyConfig.builder()
@@ -123,8 +123,8 @@ abstract class ProxyTestHarness {
 
         StandaloneAdapter adapter = new StandaloneAdapter();
         UpstreamClient upstreamClient = new UpstreamClient(config);
-        ProxyHandler proxyHandler = new ProxyHandler(engine, adapter, upstreamClient,
-                config.maxBodyBytes(), config.forwardedHeadersEnabled());
+        ProxyHandler proxyHandler = new ProxyHandler(
+                engine, adapter, upstreamClient, config.maxBodyBytes(), config.forwardedHeadersEnabled());
 
         app = Javalin.create()
                 .before("/<path>", ctx -> {
@@ -133,8 +133,8 @@ abstract class ProxyTestHarness {
                         ctx.status(405);
                         ctx.contentType("application/problem+json");
                         ctx.result(ProblemDetail.methodNotAllowed(
-                                "HTTP method " + method + " is not supported",
-                                ctx.path()).toString());
+                                        "HTTP method " + method + " is not supported", ctx.path())
+                                .toString());
                         ctx.skipRemainingHandlers();
                     }
                 })
@@ -149,7 +149,8 @@ abstract class ProxyTestHarness {
 
         proxyPort = app.port();
 
-        testClient = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
+        testClient =
+                HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
     }
 
     /** Starts infrastructure with no specs/profile (passthrough mode). */
@@ -265,16 +266,13 @@ abstract class ProxyTestHarness {
     }
 
     private static String capitalize(String s) {
-        if (s == null || s.isEmpty())
-            return s;
+        if (s == null || s.isEmpty()) return s;
         // Capitalize each segment after '-'
         StringBuilder sb = new StringBuilder();
         for (String part : s.split("-")) {
-            if (!sb.isEmpty())
-                sb.append("-");
+            if (!sb.isEmpty()) sb.append("-");
             sb.append(Character.toUpperCase(part.charAt(0)));
-            if (part.length() > 1)
-                sb.append(part.substring(1));
+            if (part.length() > 1) sb.append(part.substring(1));
         }
         return sb.toString();
     }

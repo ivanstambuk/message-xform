@@ -1,0 +1,18 @@
+# Wildcard profile for T-004-35 (endpoint priority test).
+# Matches ALL GET requests on ALL paths — exercises S-004-38, S-004-70.
+profile: wildcard-profile
+description: "Matches all paths and methods for priority testing"
+version: "1.0.0"
+
+transforms:
+  - spec: identity-transform@1.0.0
+    direction: request
+    match:
+      path: "/*"
+      method: GET
+
+  - spec: identity-transform@1.0.0
+    direction: request
+    match:
+      path: "/*"
+      method: POST

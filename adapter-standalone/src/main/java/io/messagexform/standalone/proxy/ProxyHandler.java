@@ -77,8 +77,12 @@ public final class ProxyHandler implements Handler {
      * @param forwardedHeadersEnabled whether to inject X-Forwarded-* headers
      *                                (FR-004-36)
      */
-    public ProxyHandler(TransformEngine engine, StandaloneAdapter adapter, UpstreamClient upstreamClient,
-            int maxBodyBytes, boolean forwardedHeadersEnabled) {
+    public ProxyHandler(
+            TransformEngine engine,
+            StandaloneAdapter adapter,
+            UpstreamClient upstreamClient,
+            int maxBodyBytes,
+            boolean forwardedHeadersEnabled) {
         this.engine = engine;
         this.adapter = adapter;
         this.upstreamClient = upstreamClient;
@@ -102,20 +106,20 @@ public final class ProxyHandler implements Handler {
             long contentLength = ctx.contentLength();
             if (contentLength > maxBodyBytes) {
                 LOG.warn("Request body too large: {} bytes (limit {})", contentLength, maxBodyBytes);
-                writeProblemResponse(ctx, 413,
-                        ProblemDetail.bodyTooLarge(
-                                "Request body exceeds " + maxBodyBytes + " bytes",
-                                413, ctx.path()));
+                writeProblemResponse(
+                        ctx,
+                        413,
+                        ProblemDetail.bodyTooLarge("Request body exceeds " + maxBodyBytes + " bytes", 413, ctx.path()));
                 return;
             }
             // For chunked requests without Content-Length, check after reading
             String body = ctx.body();
             if (body.length() > maxBodyBytes) {
                 LOG.warn("Request body too large: {} bytes (limit {})", body.length(), maxBodyBytes);
-                writeProblemResponse(ctx, 413,
-                        ProblemDetail.bodyTooLarge(
-                                "Request body exceeds " + maxBodyBytes + " bytes",
-                                413, ctx.path()));
+                writeProblemResponse(
+                        ctx,
+                        413,
+                        ProblemDetail.bodyTooLarge("Request body exceeds " + maxBodyBytes + " bytes", 413, ctx.path()));
                 return;
             }
         }

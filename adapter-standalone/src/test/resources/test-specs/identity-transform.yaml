@@ -1,0 +1,16 @@
+# Identity transform spec for T-004-35 (endpoint priority test).
+# Body passes through unchanged — the JSLT expression "." returns the input.
+id: identity-transform
+version: "1.0.0"
+description: "Identity transform: body passes through unchanged"
+
+input:
+  schema:
+    type: object
+output:
+  schema:
+    type: object
+
+transform:
+  lang: jslt
+  expr: .

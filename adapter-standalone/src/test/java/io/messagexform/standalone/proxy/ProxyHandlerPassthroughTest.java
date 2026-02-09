@@ -63,8 +63,7 @@ class ProxyHandlerPassthroughTest {
      */
     private static final Map<String, ReceivedRequest> receivedRequests = new ConcurrentHashMap<>();
 
-    record ReceivedRequest(String method, String path, String query, Map<String, List<String>> headers, String body) {
-    }
+    record ReceivedRequest(String method, String path, String query, Map<String, List<String>> headers, String body) {}
 
     @BeforeAll
     static void startInfrastructure() throws IOException {
@@ -139,7 +138,8 @@ class ProxyHandlerPassthroughTest {
 
         proxyPort = app.port();
 
-        testClient = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
+        testClient =
+                HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
     }
 
     @AfterAll
@@ -198,12 +198,12 @@ class ProxyHandlerPassthroughTest {
     // ---------------------------------------------------------------
 
     @ParameterizedTest(name = "S-004-03: {0} method proxied correctly")
-    @ValueSource(strings = { "GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS" })
+    @ValueSource(strings = {"GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"})
     @DisplayName("S-004-03: HTTP method proxied correctly")
     void allMethods_proxiedCorrectly(String method) throws Exception {
         String body = "GET".equals(method) || "OPTIONS".equals(method) ? null : "{\"test\":true}";
-        HttpRequest.Builder builder = HttpRequest.newBuilder()
-                .uri(URI.create("http://127.0.0.1:" + proxyPort + "/api/method-test"));
+        HttpRequest.Builder builder =
+                HttpRequest.newBuilder().uri(URI.create("http://127.0.0.1:" + proxyPort + "/api/method-test"));
 
         if (body != null) {
             builder.method(method, HttpRequest.BodyPublishers.ofString(body));
@@ -256,18 +256,18 @@ class ProxyHandlerPassthroughTest {
         ReceivedRequest received = receivedRequests.get("/api/header-test");
         assertThat(received).isNotNull();
         assertThat(received.headers()
-                .getOrDefault(
-                        "X-custom-header",
-                        received.headers()
-                                .getOrDefault(
-                                        "X-Custom-Header",
-                                        received.headers()
-                                                .getOrDefault("x-custom-header", Collections.emptyList()))))
+                        .getOrDefault(
+                                "X-custom-header",
+                                received.headers()
+                                        .getOrDefault(
+                                                "X-Custom-Header",
+                                                received.headers()
+                                                        .getOrDefault("x-custom-header", Collections.emptyList()))))
                 .contains("test-value-123");
         assertThat(received.headers()
-                .getOrDefault(
-                        "Authorization",
-                        received.headers().getOrDefault("authorization", Collections.emptyList())))
+                        .getOrDefault(
+                                "Authorization",
+                                received.headers().getOrDefault("authorization", Collections.emptyList())))
                 .contains("Bearer my-token");
     }
 
