@@ -1,15 +1,24 @@
 package io.messagexform.standalone.proxy;
 
+import io.messagexform.standalone.config.BackendTlsConfig;
 import io.messagexform.standalone.config.PoolConfig;
 import io.messagexform.standalone.config.ProxyConfig;
+import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.GeneralSecurityException;
+import java.security.KeyStore;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManagerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,11 +71,26 @@ public final class UpstreamClient {
         // Configure connection pool via JVM system properties (T-004-14, FR-004-18)
         configurePoolProperties(config.pool());
 
-        this.httpClient = HttpClient.newBuilder()
+        HttpClient.Builder clientBuilder = HttpClient.newBuilder()
                 .version(HttpClient.Version.HTTP_1_1)
                 .connectTimeout(Duration.ofMillis(config.backendConnectTimeoutMs()))
-                .followRedirects(HttpClient.Redirect.NEVER)
-                .build();
+                .followRedirects(HttpClient.Redirect.NEVER);
+
+        // Outbound TLS configuration (FR-004-16, FR-004-17)
+        BackendTlsConfig backendTls = config.backendTls();
+        if ("https".equalsIgnoreCase(config.backendScheme())) {
+            SSLContext sslContext = buildSslContext(backendTls);
+            if (sslContext != null) {
+                clientBuilder.sslContext(sslContext);
+            }
+            if (!backendTls.verifyHostname()) {
+                // Disable hostname verification for JDK HttpClient
+                System.setProperty("jdk.internal.httpclient.disableHostnameVerification", "true");
+                LOG.info("Outbound TLS hostname verification DISABLED");
+            }
+        }
+
+        this.httpClient = clientBuilder.build();
 
         LOG.debug("UpstreamClient initialized: backend={}", backendBaseUrl);
     }
@@ -194,5 +218,66 @@ public final class UpstreamClient {
                 pool.maxConnections(),
                 pool.keepAlive(),
                 keepAliveSeconds);
+    }
+
+    /**
+     * Builds an {@link SSLContext} for outbound TLS connections
+     * (FR-004-16, FR-004-17).
+     *
+     * <p>
+     * Loads truststore for server cert validation and/or keystore for
+     * outbound mTLS client authentication. Returns {@code null} if neither
+     * is configured.
+     */
+    private static SSLContext buildSslContext(BackendTlsConfig backendTls) {
+        try {
+            TrustManagerFactory tmf = null;
+            KeyManagerFactory kmf = null;
+
+            // Truststore for validating backend server cert (FR-004-16)
+            if (backendTls.truststore() != null) {
+                KeyStore ts = KeyStore.getInstance(backendTls.truststoreType());
+                try (var fis = Files.newInputStream(Path.of(backendTls.truststore()))) {
+                    ts.load(
+                            fis,
+                            backendTls.truststorePassword() != null
+                                    ? backendTls.truststorePassword().toCharArray()
+                                    : null);
+                }
+                tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+                tmf.init(ts);
+                LOG.debug("Outbound TLS truststore loaded: {}", backendTls.truststore());
+            }
+
+            // Client keystore for outbound mTLS (FR-004-17)
+            if (backendTls.keystore() != null) {
+                KeyStore ks = KeyStore.getInstance(backendTls.keystoreType());
+                try (var fis = Files.newInputStream(Path.of(backendTls.keystore()))) {
+                    ks.load(
+                            fis,
+                            backendTls.keystorePassword() != null
+                                    ? backendTls.keystorePassword().toCharArray()
+                                    : null);
+                }
+                kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+                kmf.init(
+                        ks,
+                        backendTls.keystorePassword() != null
+                                ? backendTls.keystorePassword().toCharArray()
+                                : null);
+                LOG.debug("Outbound mTLS client keystore loaded: {}", backendTls.keystore());
+            }
+
+            if (tmf == null && kmf == null) {
+                return null;
+            }
+
+            SSLContext sslContext = SSLContext.getInstance("TLS");
+            sslContext.init(
+                    kmf != null ? kmf.getKeyManagers() : null, tmf != null ? tmf.getTrustManagers() : null, null);
+            return sslContext;
+        } catch (GeneralSecurityException | IOException e) {
+            throw new IllegalStateException("Failed to build outbound TLS SSLContext", e);
+        }
     }
 }

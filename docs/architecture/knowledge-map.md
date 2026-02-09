@@ -122,6 +122,7 @@ ADR-0029 (Javalin Proxy)     governs ── FR-004-01, references ADR-0025, ADR-
 | NFR-001-03 (Latency) | ADR-0028 | NFR-001-03 |
 | Hot Reload | — | NFR-001-05 |
 | FR-004-01 (Standalone Proxy) | ADR-0029 | NFR-004-01 through NFR-004-07 |
+| FR-004-14..17 (TLS/mTLS) | — | NFR-004-05 |
 | Feature 004 Docker/K8s | — | NFR-004-04 |
 
 ## Research Documents

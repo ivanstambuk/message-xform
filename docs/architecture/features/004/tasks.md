@@ -1,7 +1,7 @@
 # Feature 004 — Standalone HTTP Proxy Mode — Tasks
 
-_Status:_ In Progress (Phase 5 — I8)
-_Last updated:_ 2026-02-09T01:29+01:00
+_Status:_ In Progress (Phase 6 — I9)
+_Last updated:_ 2026-02-09T02:30+01:00
 
 **Governing spec:** `docs/architecture/features/004/spec.md`
 **Implementation plan:** `docs/architecture/features/004/plan.md`
@@ -797,81 +797,147 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
 
 #### I9 — Inbound + outbound TLS
 
-- [ ] **T-004-40** — Generate self-signed test certificates (FX-004-06/07/08)
+- [x] **T-004-40** — Generate self-signed test certificates (FX-004-06/07/08) ✅
   _Intent:_ Create TLS test fixtures: server keystore, client keystore, CA
   truststore in PKCS12 format.
   _Implement:_ Use `keytool` commands to generate:
   - `server.p12` — server cert + key (FX-004-06).
   - `client.p12` — client cert + key for mTLS (FX-004-07).
   - `truststore.p12` — CA trust entries (FX-004-08).
+  - `ca.p12` — CA keystore (for re-signing).
   Place in `adapter-standalone/src/test/resources/tls/`.
-  _Verify:_ Files exist, keystores are loadable.
+  Script: `generate-certs.sh` (reproducible generation).
+  _Verify:_ Files exist, keystores are loadable via `keytool -list`.
   _Verification commands:_
-  - N/A — file creation only.
+  - `keytool -list -keystore server.p12 -storetype PKCS12 -storepass changeit`
+  - `keytool -list -keystore client.p12 -storetype PKCS12 -storepass changeit`
+  - `keytool -list -keystore truststore.p12 -storetype PKCS12 -storepass changeit`
+  _Verification log:_ ✅ All 4 keystores generated and loadable (server: 2 entries, client: 2 entries, truststore: 1 CA entry). Password: `changeit`.
 
-- [ ] **T-004-41** — Inbound TLS: HTTPS server (FR-004-14, S-004-39)
+- [x] **T-004-41** — Inbound TLS: HTTPS server (FR-004-14, S-004-39) ✅
   _Intent:_ Proxy serves HTTPS when `proxy.tls.enabled: true`.
   _Test first:_ Write `InboundTlsTest` (integration):
   - `proxy.tls.enabled: true` + valid keystore → client connects via HTTPS
     (S-004-39).
-  - HTTP connection to HTTPS port → connection rejected.
-  _Implement:_ Configure Jetty `SslContextFactory.Server` with keystore from
-  config. Create HTTPS-only `ServerConnector`.
-  _Verify:_ `InboundTlsTest` passes.
+  - Response headers forwarded correctly over HTTPS.
+  - Untrusted client (default JVM certs) → SSL handshake fails.
+  _Implement:_ Created `TlsConfigurator` — configures Javalin's embedded Jetty
+  with `SslContextFactory.Server` via `config.jetty.addConnector()`. Adds
+  HTTPS-only `ServerConnector` with `SslConnectionFactory`.
+  _Verify:_ `InboundTlsTest` passes (3/3).
   _Verification commands:_
   - `./gradlew :adapter-standalone:test --tests "*InboundTlsTest*"`
   - `./gradlew spotlessApply check`
+  _Verification log:_
+  ```
+  S-004-39: proxy.tls.enabled=true → client connects via HTTPS PASSED
+  S-004-39: HTTPS → response headers forwarded correctly PASSED
+  Untrusted client → SSL handshake fails PASSED
+  BUILD SUCCESSFUL — 3/3 tests passed
+  ```
 
-- [ ] **T-004-42** — Inbound mTLS: client certificate verification (FR-004-15, S-004-40)
+- [x] **T-004-42** — Inbound mTLS: client certificate verification (FR-004-15, S-004-40) ✅
   _Intent:_ When `proxy.tls.client-auth: need`, clients must present valid cert.
   _Test first:_ Write `InboundMtlsTest` (integration):
   - `client-auth: need` + client presents valid cert → connection accepted
     (S-004-40).
   - `client-auth: need` + no client cert → TLS handshake rejected.
   - `client-auth: want` + no client cert → connection accepted (S-004-40 variant).
-  _Implement:_ Configure `SslContextFactory.Server.setNeedClientAuth()` /
-  `setWantClientAuth()`. Set truststore.
-  _Verify:_ `InboundMtlsTest` passes.
+  - `client-auth: want` + valid client cert → connection accepted.
+  _Implement:_ `TlsConfigurator.configureInboundTls()` handles `need`/`want`/`none`
+  client-auth modes via `SslContextFactory.Server.setNeedClientAuth()` /
+  `setWantClientAuth()`. Truststore configured when mTLS is active.
+  _Verify:_ `InboundMtlsTest` passes (4/4).
   _Verification commands:_
   - `./gradlew :adapter-standalone:test --tests "*InboundMtlsTest*"`
   - `./gradlew spotlessApply check`
+  _Verification log:_
+  ```
+  S-004-40: client-auth=need + valid client cert → accepted PASSED
+  S-004-40: client-auth=need + no client cert → handshake rejected PASSED
+  S-004-40: client-auth=want + no client cert → accepted PASSED
+  S-004-40: client-auth=want + valid client cert → accepted PASSED
+  BUILD SUCCESSFUL — 4/4 tests passed
+  ```
 
-- [ ] **T-004-43** — Outbound TLS: HTTPS to backend (FR-004-16, S-004-41)
+- [x] **T-004-43** — Outbound TLS: HTTPS to backend (FR-004-16, S-004-41) ✅
   _Intent:_ Proxy validates backend cert against configured truststore.
   _Test first:_ Write `OutboundTlsTest` (integration with HTTPS mock backend):
   - `backend.scheme: https` → proxy connects via TLS → validates backend cert
     (S-004-41).
-  - Backend cert not in truststore → `502 Bad Gateway`.
+  - Backend cert not in truststore → `502 Backend Unreachable`.
   - `verify-hostname: false` → hostname validation skipped.
-  _Implement:_ Build `SSLContext` for `HttpClient` with truststore from config.
-  _Verify:_ `OutboundTlsTest` passes.
+  _Implement:_ Added `buildSslContext()` to `UpstreamClient` — constructs
+  `SSLContext` from `BackendTlsConfig` truststore. Uses `TrustManagerFactory`.
+  Hostname verification disabled via `jdk.internal.httpclient.disableHostnameVerification`
+  system property when `verify-hostname: false`.
+  Mock backend: embedded Jetty HTTPS server with `SslContextFactory.Server`.
+  _Verify:_ `OutboundTlsTest` passes (3/3).
   _Verification commands:_
   - `./gradlew :adapter-standalone:test --tests "*OutboundTlsTest*"`
   - `./gradlew spotlessApply check`
+  _Verification log:_
+  ```
+  S-004-41: backend.scheme=https → proxy validates backend cert via truststore PASSED
+  Backend cert not in truststore → 502 Bad Gateway PASSED
+  verify-hostname=false → hostname validation skipped PASSED
+  BUILD SUCCESSFUL — 3/3 tests passed
+  ```
 
-- [ ] **T-004-44** — Outbound mTLS: client cert to backend (FR-004-17, S-004-42)
+- [x] **T-004-44** — Outbound mTLS: client cert to backend (FR-004-17, S-004-42) ✅
   _Intent:_ Proxy presents client certificate when `backend.tls.keystore` set.
   _Test first:_ Write `OutboundMtlsTest` (integration with mTLS mock backend):
   - `backend.tls.keystore` configured → proxy presents client cert → backend
     accepts (S-004-42).
-  _Implement:_ Add key material to `SSLContext` for `HttpClient`.
-  _Verify:_ `OutboundMtlsTest` passes.
+  - No client keystore → backend rejects → 502.
+  _Implement:_ `UpstreamClient.buildSslContext()` loads both `TrustManagerFactory`
+  (truststore) and `KeyManagerFactory` (client keystore) into a single `SSLContext`.
+  Mock backend: embedded Jetty with `setNeedClientAuth(true)`, verifies client
+  cert via `jakarta.servlet.request.X509Certificate` attribute.
+  _Verify:_ `OutboundMtlsTest` passes (2/2).
   _Verification commands:_
   - `./gradlew :adapter-standalone:test --tests "*OutboundMtlsTest*"`
   - `./gradlew spotlessApply check`
+  _Verification log:_
+  ```
+  S-004-42: backend.tls.keystore configured → proxy presents client cert → backend accepts PASSED
+  No client keystore → backend rejects → 502 PASSED
+  BUILD SUCCESSFUL — 2/2 tests passed
+  ```
 
-- [ ] **T-004-45** — TLS config validation at startup (S-004-43)
+- [x] **T-004-45** — TLS config validation at startup (S-004-43) ✅
   _Intent:_ Invalid keystore paths, wrong passwords, or missing files produce
   descriptive startup errors.
   _Test first:_ Write `TlsConfigValidationTest`:
-  - Invalid keystore path → startup fails with descriptive error (S-004-43).
-  - Wrong keystore password → startup fails.
-  - Missing truststore for mTLS → startup fails.
-  _Implement:_ Add TLS validation to startup sequence.
-  _Verify:_ `TlsConfigValidationTest` passes.
+  - Valid inbound/outbound TLS → no error.
+  - Invalid keystore path → descriptive error with file path (S-004-43).
+  - Wrong keystore/truststore password → descriptive error.
+  - `client-auth=need/want` but no truststore → descriptive error.
+  - TLS disabled / HTTP scheme → no validation needed.
+  - Enabled but no keystore → descriptive error.
+  - Invalid client keystore path (outbound mTLS) → descriptive error.
+  _Implement:_ Created `TlsConfigValidator` — validates keystores/truststores
+  at startup by loading them with `KeyStore.getInstance().load()`. Checks file
+  existence, readability, and password correctness. Called before server starts.
+  _Verify:_ `TlsConfigValidationTest` passes (11/11).
   _Verification commands:_
   - `./gradlew :adapter-standalone:test --tests "*TlsConfigValidationTest*"`
   - `./gradlew spotlessApply check`
+  _Verification log:_
+  ```
+  Inbound: Valid config → no error PASSED
+  Inbound: Invalid keystore path → descriptive error PASSED
+  Inbound: Wrong keystore password → descriptive error PASSED
+  Inbound: client-auth=need no truststore → error PASSED
+  Inbound: client-auth=want no truststore → error PASSED
+  Inbound: TLS disabled → no validation PASSED
+  Inbound: Enabled no keystore → error PASSED
+  Outbound: Valid config → no error PASSED
+  Outbound: Invalid truststore path → error PASSED
+  Outbound: Invalid client keystore path → error PASSED
+  Outbound: Wrong truststore password → error PASSED
+  BUILD SUCCESSFUL — 11/11 tests passed
+  ```
 
 ---
 
