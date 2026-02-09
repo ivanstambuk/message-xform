@@ -9,6 +9,7 @@ import io.messagexform.core.model.Message;
 import io.messagexform.core.model.TransformContext;
 import io.messagexform.core.model.TransformResult;
 import io.messagexform.standalone.adapter.StandaloneAdapter;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -62,21 +63,27 @@ public final class ProxyHandler implements Handler {
     private final StandaloneAdapter adapter;
     private final UpstreamClient upstreamClient;
     private final int maxBodyBytes;
+    private final boolean forwardedHeadersEnabled;
 
     /**
      * Creates a new handler wiring up the engine, adapter, and upstream client.
      *
-     * @param engine         the transform engine (no profile loaded → PASSTHROUGH)
-     * @param adapter        the Javalin-to-Message adapter
-     * @param upstreamClient the upstream HTTP client
-     * @param maxBodyBytes   max request body size in bytes (≤ 0 for no limit)
+     * @param engine                  the transform engine (no profile loaded →
+     *                                PASSTHROUGH)
+     * @param adapter                 the Javalin-to-Message adapter
+     * @param upstreamClient          the upstream HTTP client
+     * @param maxBodyBytes            max request body size in bytes (≤ 0 for no
+     *                                limit)
+     * @param forwardedHeadersEnabled whether to inject X-Forwarded-* headers
+     *                                (FR-004-36)
      */
     public ProxyHandler(TransformEngine engine, StandaloneAdapter adapter, UpstreamClient upstreamClient,
-            int maxBodyBytes) {
+            int maxBodyBytes, boolean forwardedHeadersEnabled) {
         this.engine = engine;
         this.adapter = adapter;
         this.upstreamClient = upstreamClient;
         this.maxBodyBytes = maxBodyBytes;
+        this.forwardedHeadersEnabled = forwardedHeadersEnabled;
     }
 
     private static final String REQUEST_ID_HEADER = "x-request-id";
@@ -173,6 +180,11 @@ public final class ProxyHandler implements Handler {
                 return;
             }
             default -> throw new IllegalStateException("Unknown TransformResult type: " + requestResult.type());
+        }
+
+        // --- Step 4b: Inject X-Forwarded-* headers (FR-004-36, T-004-31) ---
+        if (forwardedHeadersEnabled) {
+            forwardHeaders = injectForwardedHeaders(forwardHeaders, ctx);
         }
 
         // --- Step 5: Forward to backend ---
@@ -291,5 +303,41 @@ public final class ProxyHandler implements Handler {
         ctx.status(statusCode);
         ctx.contentType("application/problem+json");
         ctx.result(problem.toString());
+    }
+
+    /**
+     * Injects {@code X-Forwarded-For}, {@code X-Forwarded-Proto}, and
+     * {@code X-Forwarded-Host} into the forwarded headers map (FR-004-36).
+     *
+     * <p>
+     * If {@code X-Forwarded-For} already exists, the client IP is
+     * <b>appended</b> (comma-separated) per RFC 7239.
+     *
+     * @param headers the current headers map (may be immutable)
+     * @param ctx     the Javalin context (source of client IP, scheme, host)
+     * @return a mutable map with forwarded headers injected
+     */
+    private static Map<String, String> injectForwardedHeaders(Map<String, String> headers, Context ctx) {
+        Map<String, String> mutable = new LinkedHashMap<>(headers != null ? headers : Map.of());
+
+        // X-Forwarded-For: append client IP
+        String clientIp = ctx.ip();
+        String existingXff = mutable.get("x-forwarded-for");
+        if (existingXff != null && !existingXff.isEmpty()) {
+            mutable.put("x-forwarded-for", existingXff + ", " + clientIp);
+        } else {
+            mutable.put("x-forwarded-for", clientIp);
+        }
+
+        // X-Forwarded-Proto: inbound scheme
+        mutable.put("x-forwarded-proto", ctx.scheme());
+
+        // X-Forwarded-Host: original Host header
+        String host = ctx.header("Host");
+        if (host != null && !host.isEmpty()) {
+            mutable.put("x-forwarded-host", host);
+        }
+
+        return mutable;
     }
 }

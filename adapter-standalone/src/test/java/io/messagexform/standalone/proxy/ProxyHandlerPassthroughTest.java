@@ -125,7 +125,7 @@ class ProxyHandlerPassthroughTest {
         TransformEngine engine = new TransformEngine(specParser);
         StandaloneAdapter adapter = new StandaloneAdapter();
         UpstreamClient upstreamClient = new UpstreamClient(config);
-        ProxyHandler proxyHandler = new ProxyHandler(engine, adapter, upstreamClient, -1);
+        ProxyHandler proxyHandler = new ProxyHandler(engine, adapter, upstreamClient, -1, true);
 
         app = Javalin.create()
                 .addHttpHandler(HandlerType.GET, "/<path>", proxyHandler)

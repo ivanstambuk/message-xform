@@ -616,7 +616,7 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   - `./gradlew :adapter-standalone:test --tests "*ResponseBodySizeTest*"` ✅ 2 passed
   - `./gradlew test` ✅ all passed
 
-- [ ] **T-004-31** — X-Forwarded-* headers (FR-004-36, S-004-57/58/59)
+- [x] **T-004-31** — X-Forwarded-* headers (FR-004-36, S-004-57/58/59)
   _Intent:_ Add `X-Forwarded-For`, `X-Forwarded-Proto`, `X-Forwarded-Host`
   when enabled. Append to existing `X-Forwarded-For`.
   _Test first:_ Write `ForwardedHeadersTest` (integration):
@@ -624,12 +624,12 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
     `X-Forwarded-Proto`, `X-Forwarded-Host` (S-004-57).
   - Disabled → no forwarded headers added (S-004-58).
   - Existing `X-Forwarded-For` → client IP appended (S-004-59).
-  _Implement:_ Add forwarded header injection in `ProxyHandler` before
-  upstream forwarding.
-  _Verify:_ `ForwardedHeadersTest` passes.
+  _Implement:_ Add `forwardedHeadersEnabled` to `ProxyHandler`. Inject
+  headers via `injectForwardedHeaders()` before upstream forwarding.
+  _Verify:_ `ForwardedHeadersTest` passes (3/3).
   _Verification commands:_
-  - `./gradlew :adapter-standalone:test --tests "*ForwardedHeadersTest*"`
-  - `./gradlew spotlessApply check`
+  - `./gradlew :adapter-standalone:test --tests "*ForwardedHeadersTest*"` ✅ 3 passed
+  - `./gradlew test` ✅ all passed
 
 - [ ] **T-004-32** — Unknown HTTP method rejection (FR-004-05, S-004-23)
   _Intent:_ Reject unknown HTTP methods with `405 Method Not Allowed`.

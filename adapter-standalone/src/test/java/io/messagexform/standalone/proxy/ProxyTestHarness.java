@@ -74,6 +74,15 @@ abstract class ProxyTestHarness {
      */
     protected void startWithSpecs(String[] specResourcePaths, String profileResourcePath, int maxBodyBytes)
             throws IOException {
+        startWithSpecs(specResourcePaths, profileResourcePath, maxBodyBytes, true);
+    }
+
+    /**
+     * Starts mock backend + Javalin proxy with the given specs, profile, max
+     * body bytes, and forwarded headers setting.
+     */
+    protected void startWithSpecs(String[] specResourcePaths, String profileResourcePath, int maxBodyBytes,
+            boolean forwardedHeadersEnabled) throws IOException {
         startMockBackend();
 
         ProxyConfig.Builder configBuilder = ProxyConfig.builder()
@@ -81,7 +90,8 @@ abstract class ProxyTestHarness {
                 .backendHost("127.0.0.1")
                 .backendPort(backendPort)
                 .backendConnectTimeoutMs(5000)
-                .backendReadTimeoutMs(5000);
+                .backendReadTimeoutMs(5000)
+                .forwardedHeadersEnabled(forwardedHeadersEnabled);
         if (maxBodyBytes > 0) {
             configBuilder.maxBodyBytes(maxBodyBytes);
         }
@@ -108,7 +118,8 @@ abstract class ProxyTestHarness {
 
         StandaloneAdapter adapter = new StandaloneAdapter();
         UpstreamClient upstreamClient = new UpstreamClient(config);
-        ProxyHandler proxyHandler = new ProxyHandler(engine, adapter, upstreamClient, config.maxBodyBytes());
+        ProxyHandler proxyHandler = new ProxyHandler(engine, adapter, upstreamClient,
+                config.maxBodyBytes(), config.forwardedHeadersEnabled());
 
         app = Javalin.create()
                 .addHttpHandler(HandlerType.GET, "/<path>", proxyHandler)
@@ -133,6 +144,11 @@ abstract class ProxyTestHarness {
     /** Starts infrastructure in passthrough mode with a max body size limit. */
     protected void startPassthroughWithMaxBodyBytes(int maxBodyBytes) throws IOException {
         startWithSpecs(new String[0], null, maxBodyBytes);
+    }
+
+    /** Starts infrastructure in passthrough mode with forwarded headers config. */
+    protected void startWithForwardedHeaders(boolean enabled) throws IOException {
+        startWithSpecs(new String[0], null, -1, enabled);
     }
 
     private void startMockBackend() throws IOException {

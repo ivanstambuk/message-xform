@@ -196,7 +196,7 @@ class BackendErrorTest {
 
         StandaloneAdapter adapter = new StandaloneAdapter();
         UpstreamClient upstreamClient = new UpstreamClient(config);
-        ProxyHandler proxyHandler = new ProxyHandler(engine, adapter, upstreamClient, -1);
+        ProxyHandler proxyHandler = new ProxyHandler(engine, adapter, upstreamClient, -1, true);
 
         return Javalin.create()
                 .addHttpHandler(HandlerType.GET, "/<path>", proxyHandler)
