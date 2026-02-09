@@ -1,0 +1,85 @@
+# message-xform — LLM Guide
+
+## What This Project Does
+
+message-xform is a **standalone payload & header transformation engine** for API
+gateways. It transforms HTTP request/response bodies (JSON), headers, status codes,
+and URLs based on declarative YAML configuration. The engine is gateway-agnostic —
+gateway-specific adapters bind it to products like PingAccess, Kong, or NGINX.
+
+## Module Layout
+
+```
+message-xform/
+├── core/                          # Transform engine — zero gateway deps
+│   └── src/main/java/io/messagexform/core/
+│       ├── engine/                # TransformEngine, TransformRegistry
+│       ├── model/                 # TransformSpec, TransformProfile, Message
+│       ├── spec/                  # SpecParser (YAML → domain objects)
+│       ├── spi/                   # ExpressionEngine, TelemetryListener
+│       └── schema/                # JSON Schema validation
+├── adapter-standalone/            # Standalone HTTP reverse proxy (Feature 004)
+│   └── src/main/java/io/messagexform/standalone/
+│       ├── adapter/               # StandaloneAdapter (GatewayAdapter impl)
+│       ├── config/                # ConfigLoader, ProxyConfig, EnvVarOverlay
+│       └── proxy/                 # ProxyHandler, UpstreamClient, FileWatcher
+└── docs/                          # SDD artifacts
+    ├── architecture/features/     # Feature specs, plans, tasks, scenarios
+    ├── decisions/                 # Architecture Decision Records (ADRs)
+    ├── operations/                # Quality gate, analysis checklists
+    └── research/                  # Gateway research, API analysis
+```
+
+## Key Entry Points
+
+| Class | Purpose |
+|-------|---------|
+| `TransformEngine` | Core engine — load specs, match profiles, evaluate transforms |
+| `TransformRegistry` | Immutable snapshot of loaded specs + active profile |
+| `Message` | Domain object for HTTP request/response (body, headers, status, URL) |
+| `TransformContext` | Read-only context passed to expressions ($headers, $queryParams, etc.) |
+| `GatewayAdapter<T>` | SPI — adapters implement this to bridge gateway-native messages |
+| `ExpressionEngine` | SPI — pluggable evaluation (JSLT baseline, JOLT, jq future) |
+| `StandaloneMain` | Entry point for standalone proxy mode |
+| `ProxyHandler` | Orchestrates proxy cycle: receive → transform → forward → transform → return |
+
+## Build & Run
+
+```bash
+# Quality gate (format + compile + test):
+./gradlew --no-daemon spotlessApply check
+
+# Core tests only:
+./gradlew --no-daemon :core:test
+
+# Standalone proxy tests:
+./gradlew --no-daemon :adapter-standalone:test
+
+# Build fat JAR:
+./gradlew --no-daemon :adapter-standalone:shadowJar
+
+# Run standalone proxy:
+java -jar adapter-standalone/build/libs/adapter-standalone-0.1.0-SNAPSHOT.jar --config config.yaml
+```
+
+## Configuration (YAML)
+
+Transform specs are pure functions (`input JSON → output JSON`) using JSLT.
+Transform profiles bind specs to URL patterns for a deployment context. The
+standalone proxy reads a YAML config for server settings, backend, TLS, and
+hot reload. All config keys have environment variable overrides.
+
+## How to Navigate the Docs
+
+1. **Start with** `AGENTS.md` — project rules, conventions, build commands
+2. **Architecture** → `docs/architecture/features/001/spec.md` (core engine spec)
+3. **Terminology** → `docs/architecture/terminology.md` (canonical definitions)
+4. **Decisions** → `docs/decisions/ADR-*.md` (29 ADRs, all Accepted)
+5. **What's available** → `llms.txt` (high-signal file manifest for context windows)
+6. **Current state** → `docs/_current-session.md` (live session snapshot)
+
+## Project Status
+
+- **Feature 001** (Core Engine): ✅ Complete — 84 scenarios, 53 test files
+- **Feature 004** (Standalone Proxy): ✅ Complete — 77 scenarios, 258 tests, 80.8 MB Docker image
+- **Next**: Tier 2 adapters (PingAccess, PingGateway)

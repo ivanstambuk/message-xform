@@ -239,9 +239,8 @@ which it should be picked up.
   `/init` workflow already covers most of this, but a standalone runbook adds resilience.
 - [ ] **Session Quick Reference** — Create `docs/operations/session-quick-reference.md`
   with session kickoff checklist and handoff prompt template.
-- [ ] **`ReadMe.LLM`** — Create an LLM-oriented project overview (distinct from `llms.txt`
-  which is a file manifest). Covers: what the project does, key entry points, module layout,
-  and how to navigate the docs. Model on `openauth-sim/ReadMe.LLM`.
+- [x] **`ReadMe.LLM`** — Created LLM-oriented project overview. Covers: what the project
+  does, module layout, key entry points, build commands, and docs navigation guide.
 - [ ] **`CONTRIBUTING.md`** — External contributor guide. Low priority for solo project,
   but good practice if the project becomes multi-contributor.
 
