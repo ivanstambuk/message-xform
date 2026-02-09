@@ -44,7 +44,7 @@ constitution in `docs/decisions/project-constitution.md` before acting.
 | 006 | Apache APISIX Adapter | 🔲 Not Started |
 | 007 | Kong Gateway Adapter | 🔲 Not Started |
 | 008 | NGINX Adapter | 🔲 Not Started |
-| 009 | Toolchain & Quality Platform | 🔲 Not Started |
+| 009 | Toolchain & Quality Platform | 📋 Spec Ready |
 
 **Priority:** Tier 1 (001+004+009) → Tier 2 (002+003) → Tier 3 (005+006) → Tier 4 (007+008)
 

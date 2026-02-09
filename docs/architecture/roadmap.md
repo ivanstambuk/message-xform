@@ -12,7 +12,7 @@
 | 006 | Apache APISIX Adapter | 🔲 Not Started | `features/006/spec.md` | Feature 001 | Java (Plugin Runner) |
 | 007 | Kong Gateway Adapter | 🔲 Not Started | `features/007/spec.md` | Feature 001 | Lua or sidecar |
 | 008 | NGINX Adapter | 🔲 Not Started | `features/008/spec.md` | Feature 001 | njs / sidecar |
-| 009 | Toolchain & Quality Platform | 🔲 Not Started | `features/009/spec.md` | Feature 001 (co-created) | Java / Gradle |
+| 009 | Toolchain & Quality Platform | 📋 Spec Ready | `features/009/spec.md` | Feature 001 (co-created) | Java / Gradle |
 
 ## Feature Overview
 

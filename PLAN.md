@@ -246,7 +246,7 @@ which it should be picked up.
 
 **Trigger: When Gradle project is initialized — Meta-Feature**
 
-- [ ] **Feature 009 — Toolchain & Quality Platform** — Create a lightweight feature spec
+- [x] **Feature 009 — Toolchain & Quality Platform** — Create a lightweight feature spec
   covering: build toolchain decisions (Gradle version, Java version, dependency management),
   code quality gates (Spotless formatter, static analysis, ArchUnit architectural tests),
   test infrastructure (JUnit 5, AssertJ, WireMock), and CI pipeline. Model on
