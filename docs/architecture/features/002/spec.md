@@ -237,6 +237,9 @@ String      getRealm();      // OAuth realm
 // HeaderField: (HeaderName name, String value)
 // HeaderName: case-insensitive name wrapper
 // ResponseBuilder: factory for constructing Response objects (see § Error Handling)
+// AccessException: thrown to abort pipeline (triggers ErrorHandlingCallback)
+// ServiceFactory: SPI discovery utility — bodyFactory(), headersFactory(), configurationModelAccessorFactory()
+//   Useful in tests for creating mock-compatible Body/Headers objects.
 ```
 
 ### Plugin Configuration & UI
@@ -694,11 +697,24 @@ bundling a second SLF4J API would cause a classpath conflict
 dependency only.
 
 **Jackson relocation:** PingAccess uses Jackson internally (e.g. `Identity.
-getAttributes()` returns `JsonNode`). To avoid version conflicts, the shadow
-JAR SHOULD use Gradle Shadow's `relocate` feature to shade Jackson classes
-into a private package (e.g. `io.messagexform.shaded.jackson`). If Jackson
-version alignment with PA is confirmed (same major.minor), relocation can be
-skipped — but this must be verified at build time.
+getAttributes()` returns `JsonNode`, `SessionStateSupport.setAttribute()` takes
+`JsonNode`). The shadow JAR **MUST** use Gradle Shadow's `relocate` feature to
+shade Jackson classes into a private package (e.g.
+`io.messagexform.shaded.jackson`).
+
+> **Why mandatory (GAP-14):** If the adapter bundles an un-relocated Jackson
+> version, PA's `Identity.getAttributes()` returns a `JsonNode` from PA's
+> classloader, while the adapter's code expects a `JsonNode` from its own
+> bundled Jackson. These are **different classes** from different classloaders,
+> causing `ClassCastException` at runtime. This is a silent deployment failure
+> that only manifests when processing requests with identity context.
+>
+> **Boundary conversion:** At the adapter boundary (where PA's `JsonNode` meets
+> our shaded `JsonNode`), the adapter must convert via serialization:
+> `byte[] raw = paObjectMapper.writeValueAsBytes(identity.getAttributes()); `
+> `JsonNode shadedNode = ourObjectMapper.readTree(raw);`
+> This conversion is done once per request in `buildSessionContext()` and is
+> negligible in cost (< 1ms for typical OIDC claim payloads).
 
 **TelemetryListener:** The PA adapter does NOT register a custom
 `TelemetryListener` implementation. The core engine's built-in SLF4J logging
@@ -930,7 +946,7 @@ TransformContext buildTransformContext(Exchange exchange, Direction direction) {
 |----|-------------|--------|-------------|--------------|--------|
 | NFR-002-01 | Adapter transform latency MUST add < 10 ms overhead beyond the core engine transform time for a typical JSON body (< 64 KB). | Gateway SLA | Measure via `ExchangeProperty` timestamps (creation time vs. transform completion). | Core engine performance. | Spec. |
 | NFR-002-02 | Shadow JAR size MUST be < 20 MB (excludes PA SDK). | Deployment ergonomics | `ls -lh adapter-pingaccess-*.jar` | Shadow plugin, dependency management. | Spec. |
-| NFR-002-03 | Adapter MUST be thread-safe — no mutable shared state. All state MUST be method-local or immutable (engine is already thread-safe). | PA runtime constraint | Code review, ArchUnit rule (FR-009-12). | Core engine thread safety. | SDK docs. |
+| NFR-002-03 | Adapter MUST be thread-safe — no mutable **per-request** state. Framework-injected fields (`@Inject`-set `ObjectMapper`, `TemplateRenderer`, `HttpClient`) and `configuration` are set once during initialization and are safe for concurrent read access. All per-request state (adapted messages, transform results, error bodies) MUST be method-local. | PA runtime constraint | Code review, ArchUnit rule (FR-009-12). | Core engine thread safety. | SDK docs. |
 | NFR-002-04 | Adapter MUST NOT use reflection — same no-reflection policy as core (FR-009-12 Rule 3). | AOT compatibility | ArchUnit test. | ArchUnit (FR-009-12). | Project constitution. |
 | NFR-002-05 | Adapter MUST compile with Java 21 toolchain and `-Xlint:all -Werror`. | Build consistency | `./gradlew :adapter-pingaccess:compileJava` | FR-009-02, FR-009-03. | FR-009-03. |
 
@@ -964,6 +980,8 @@ TransformContext buildTransformContext(Exchange exchange, Direction direction) {
 | S-002-22 | **Cookie access in JSLT:** JSLT expression uses `$cookies` → resolves from PA request cookies via `TransformContext.cookiesAsJson()`. |
 | S-002-23 | **Query param access in JSLT:** JSLT expression uses `$queryParams` → resolves from PA query string via `TransformContext.queryParamsAsJson()`. |
 | S-002-24 | **Shadow JAR correctness:** Deploy shadow JAR → no `ClassNotFoundException` at runtime (all deps bundled, PA SDK excluded). |
+| S-002-25 | **OAuth context in JSLT:** JSLT expression uses `$session.oauth.clientId` and `$session.oauth.scopes` → resolves from `OAuthTokenMetadata`. |
+| S-002-26 | **Session state in JSLT:** JSLT expression uses `$session.sessionState.authzCache` → resolves from `SessionStateSupport`. |
 
 ---
 
@@ -1092,8 +1110,12 @@ assertThat(responseCaptor.getValue().getStatusCode()).isEqualTo(502);
 3. **Response immutability (PA 6.1+):** Modifying *request* fields during
    `handleResponse()` processing is ignored (logged as warning by PA). The
    adapter MUST NOT attempt to modify request data in the response phase.
-4. **Thread safety:** Plugin instances may be shared across threads. All
-   adapter state must be method-local or immutable.
+4. **Thread safety:** Plugin instances may be shared across threads.
+   Framework-injected fields (`@Inject` setters for `ObjectMapper`,
+   `TemplateRenderer`, `HttpClient`) and `configuration` are set once during
+   initialization and are safe for concurrent read access (effectively immutable
+   after `configure()` completes). All per-request state (wrapped messages,
+   transform results, error bodies) must be method-local.
 5. **Body.read() may be deferred:** The `Body.getContent()` call may trigger
    a lazy read. The adapter MUST call `body.read()` if `!body.isRead()`
    before accessing content. **On failure** (`AccessException` or `IOException`
@@ -1104,6 +1126,13 @@ assertThat(responseCaptor.getValue().getStatusCode()).isEqualTo(502);
    `CompletionStage<Void>`, not `Outcome`. The adapter cannot prevent
    response delivery — it can only rewrite the response body/status.
    This affects DENY error mode semantics (FR-002-11).
+7. **Body.isInMemory():** `body.isInMemory()` can be `false` for large
+   bodies (streamed from backend). `body.getContent()` reads the entire body
+   into memory. The adapter does not impose additional limits beyond the
+   core engine's `maxOutputSizeBytes` (NFR-001-07).
+8. **Identity may be null:** For unauthenticated/anonymous resources,
+   `exchange.getIdentity()` returns `null`. The adapter MUST check for null
+   before accessing identity fields. See FR-002-06 null-identity handling.
 
 ---
 
