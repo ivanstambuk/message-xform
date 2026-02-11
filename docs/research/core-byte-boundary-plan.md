@@ -1,11 +1,12 @@
 # Core Byte-Boundary Refactor — Implementation Plan
 
-Status: **📋 Planned** | Created: 2026-02-11 | ADR: 0032
+Status: **📋 Planned** | Created: 2026-02-11 | ADRs: 0032, 0033
 
 > **Goal:** Remove all third-party types (Jackson, SLF4J 2.x-only APIs) from
-> core's public API. Core becomes a self-contained engine that accepts
-> `byte[]` / `Map` / `String` and returns the same. Gateway adapters convert
-> between their SDK-specific types and core's opaque boundary.
+> core's public API. Core defines its own port value objects (`MessageBody`,
+> `HttpHeaders`, `SessionContext`) that accept only plain Java types. Gateway
+> adapters convert between their SDK-specific types and core's opaque port
+> boundary. Core bundles and relocates its own Jackson internally.
 
 ## Architecture Before / After
 
@@ -14,142 +15,297 @@ Status: **📋 Planned** | Created: 2026-02-11 | ADR: 0032
 ```
 Adapter  ──JsonNode──►  Core Engine  ──JsonNode──►  Adapter
            shared                        shared
+
+Message(JsonNode body, Map<String,String> headers, JsonNode sessionContext)
+         ^^^^^^^                                    ^^^^^^^^
+         Jackson type (shared boundary)             Jackson type
 ```
 
 Jackson `JsonNode` is a **shared boundary type**. All adapters and core
 MUST use the same Jackson version at runtime.
 
-### After (ADR-0032 — target)
+### After (ADR-0032 + ADR-0033 — target)
 
 ```
-Adapter  ──byte[]──►  Core Engine  ──byte[]──►  Adapter
-         opaque       (own Jackson,    opaque
-                       relocated)
+Adapter  ──MessageBody──►  Core Engine  ──MessageBody──►  Adapter
+           (byte[] inside)  (own Jackson,   (byte[] inside)
+                             relocated)
+
+Message(MessageBody body, HttpHeaders headers, SessionContext session)
+        ^^^^^^^^^^^       ^^^^^^^^^^           ^^^^^^^^^^^^^^
+        core-owned        core-owned           core-owned
+        (zero deps)       (zero deps)          (zero deps)
 ```
 
-Core hides Jackson behind `byte[]`. Each adapter uses its gateway's Jackson
-(or no Jackson at all) independently.
+Core hides Jackson behind port value objects. Each adapter uses its
+gateway's Jackson (or no Jackson at all) independently.
 
 ---
 
-## Phase 1: Core API Refactor (Feature 001)
+## Phase 1: Create Port Value Objects (Feature 001)
 
-> **Scope:** Core module only. No adapter changes yet.
+> **Scope:** New files in `core/src/main/java/io/messagexform/core/model/`.
+> Non-breaking — old types remain until Phase 2.
 
-### 1.1 — Change `Message.body` from `JsonNode` to `byte[]`
+### 1.1 — Create `MediaType` enum
 
-**File:** `core/src/main/java/io/messagexform/core/model/Message.java`
-
-```java
-// BEFORE
-public record Message(JsonNode body, ...)
-
-// AFTER
-public record Message(byte[] body, ...)
-```
-
-- `body` is raw JSON bytes (UTF-8).
-- Null/absent bodies represented as `null` or `new byte[0]`.
-- Remove `import com.fasterxml.jackson.databind.JsonNode` from `Message.java`.
-
-### 1.2 — Change `Message.sessionContext` from `JsonNode` to `Map<String, Object>`
+**File:** `core/src/main/java/io/messagexform/core/model/MediaType.java`
 
 ```java
-// BEFORE
-public record Message(..., JsonNode sessionContext)
+public enum MediaType {
+    JSON("application/json"),
+    XML("application/xml"),
+    FORM("application/x-www-form-urlencoded"),
+    TEXT("text/plain"),
+    BINARY("application/octet-stream"),
+    NONE(null);
 
-// AFTER
-public record Message(..., Map<String, Object> sessionContext)
-```
-
-- Session context becomes a nested `Map<String, Object>` structure.
-- Adapters convert from their gateway-specific types (PA's `JsonNode`,
-  Kong's `JsonObject`, etc.) into plain Java maps.
-- Core internally converts `Map<String, Object>` → `JsonNode` for JSLT
-  `$session` binding.
-
-### 1.3 — Change `TransformResult.errorResponse` from `JsonNode` to `byte[]`
-
-**File:** `core/src/main/java/io/messagexform/core/model/TransformResult.java`
-
-```java
-// BEFORE
-public JsonNode errorResponse();
-
-// AFTER
-public byte[] errorResponse();
-```
-
-### 1.4 — Change `TransformContext` helper methods
-
-**File:** `core/src/main/java/io/messagexform/core/model/TransformContext.java`
-
-The `headersAsJson()`, `statusAsJson()`, etc. methods become **internal** to
-`TransformEngine`. They should not be in the public model class.
-
-```java
-// BEFORE (public API)
-public record TransformContext(..., JsonNode sessionContext) {
-    public JsonNode headersAsJson() { ... }
-    public JsonNode sessionContextAsJson() { ... }
+    public String value() { ... }
+    public static MediaType fromContentType(String contentType) { ... }
 }
+```
 
-// AFTER (public API — clean, no Jackson)
+**Dependency:** None (pure Java enum).
+
+### 1.2 — Create `MessageBody` record
+
+**File:** `core/src/main/java/io/messagexform/core/model/MessageBody.java`
+
+```java
+public record MessageBody(byte[] content, MediaType mediaType) {
+    public boolean isEmpty() { ... }
+    public String asString() { ... }
+    public int size() { ... }
+
+    // Factory methods
+    public static MessageBody json(byte[] content) { ... }
+    public static MessageBody json(String content) { ... }
+    public static MessageBody empty() { ... }
+    public static MessageBody of(byte[] content, MediaType mediaType) { ... }
+}
+```
+
+**Key design:** Custom `equals`/`hashCode` that uses `Arrays.equals()` for
+the `byte[]` field (records don't do this by default).
+
+### 1.3 — Create `HttpHeaders` class
+
+**File:** `core/src/main/java/io/messagexform/core/model/HttpHeaders.java`
+
+```java
+public final class HttpHeaders {
+    public String first(String name) { ... }       // case-insensitive
+    public List<String> all(String name) { ... }   // all values
+    public boolean contains(String name) { ... }
+    public Map<String, String> toSingleValueMap() { ... }
+    public Map<String, List<String>> toMultiValueMap() { ... }
+
+    // Factory methods
+    public static HttpHeaders of(Map<String, String> singleValue) { ... }
+    public static HttpHeaders ofMulti(Map<String, List<String>> multiValue) { ... }
+    public static HttpHeaders empty() { ... }
+}
+```
+
+**Key design:** All keys normalized to lowercase in constructors. Internal
+storage uses `TreeMap` for consistent ordering.
+
+### 1.4 — Create `SessionContext` class
+
+**File:** `core/src/main/java/io/messagexform/core/model/SessionContext.java`
+
+```java
+public final class SessionContext {
+    public Object get(String key) { ... }
+    public String getString(String key) { ... }
+    public boolean has(String key) { ... }
+    public boolean isEmpty() { ... }
+    public Map<String, Object> toMap() { ... }
+
+    // Factory methods
+    public static SessionContext of(Map<String, Object> attributes) { ... }
+    public static SessionContext empty() { ... }
+}
+```
+
+**Key design:** `toString()` prints only key names (not values) to avoid
+leaking sensitive session data in logs.
+
+### 1.5 — Write unit tests for all port types
+
+**Files:**
+- `core/src/test/java/io/messagexform/core/model/MessageBodyTest.java`
+- `core/src/test/java/io/messagexform/core/model/HttpHeadersTest.java`
+- `core/src/test/java/io/messagexform/core/model/SessionContextTest.java`
+- `core/src/test/java/io/messagexform/core/model/MediaTypeTest.java`
+
+Test coverage:
+- Factory methods produce correct instances
+- `HttpHeaders` is case-insensitive
+- `MessageBody.equals()` uses `Arrays.equals()` on byte[]
+- `SessionContext.empty()` singleton behavior
+- Null-safety: all factories handle null gracefully
+
+---
+
+## Phase 2: Migrate Core API to Port Types
+
+> **Scope:** Modify existing `Message`, `TransformResult`, `TransformContext`
+> to use the new port types. This is the breaking change.
+
+### 2.1 — Rewrite `Message.java`
+
+**Before:**
+```java
+public record Message(
+    JsonNode body,
+    Map<String, String> headers,
+    Map<String, List<String>> headersAll,
+    Integer statusCode,
+    String contentType,
+    String requestPath,
+    String requestMethod,
+    String queryString,
+    JsonNode sessionContext
+)
+```
+
+**After:**
+```java
+public record Message(
+    MessageBody body,
+    HttpHeaders headers,
+    Integer statusCode,
+    String requestPath,
+    String requestMethod,
+    String queryString,
+    SessionContext session
+) {
+    public Message withBody(MessageBody newBody) { ... }
+    public Message withHeaders(HttpHeaders newHeaders) { ... }
+    public Message withStatusCode(Integer newStatusCode) { ... }
+    public MediaType mediaType() { return body.mediaType(); }
+    public String contentType() { return body.mediaType().value(); }
+}
+```
+
+**Fields removed:** `headersAll` (merged into `HttpHeaders`), `contentType`
+(derived from `MessageBody.mediaType()`).
+
+**Fields renamed:** `sessionContext` → `session` (cleaner).
+
+### 2.2 — Rewrite `TransformResult.java`
+
+**Before:**
+```java
+private final JsonNode errorResponse;
+public static TransformResult error(JsonNode errorResponse, int statusCode) { ... }
+public JsonNode errorResponse() { ... }
+```
+
+**After:**
+```java
+private final MessageBody errorResponse;
+public static TransformResult error(MessageBody errorBody, int statusCode) { ... }
+public MessageBody errorResponse() { ... }
+```
+
+### 2.3 — Rewrite `TransformContext.java`
+
+**Before:**
+```java
 public record TransformContext(
     Map<String, String> headers,
     Map<String, List<String>> headersAll,
     Integer status,
     Map<String, String> queryParams,
     Map<String, String> cookies,
-    Map<String, Object> sessionContext  // plain Java types
-)
-
-// JsonNode conversion moves to TransformEngine (internal)
-```
-
-### 1.5 — Update `TransformEngine` internals
-
-**File:** `core/src/main/java/io/messagexform/core/engine/TransformEngine.java`
-
-```java
-public TransformResult transform(Message message, Direction direction, TransformContext ctx) {
-    // 1. Parse body bytes → internal JsonNode
-    JsonNode bodyNode;
-    if (message.body() == null || message.body().length == 0) {
-        bodyNode = NullNode.getInstance();
-    } else {
-        bodyNode = internalMapper.readTree(message.body());
-    }
-
-    // 2. Build internal context bindings (headersAsJson, etc.)
-    ObjectNode contextBindings = buildContextBindings(ctx);
-
-    // 3. Run JSLT transform
-    JsonNode result = jsltTransform.apply(bodyNode);
-
-    // 4. Serialize back to byte[]
-    byte[] outputBytes = internalMapper.writeValueAsBytes(result);
-
-    return TransformResult.success(
-        message.withBody(outputBytes).withHeaders(transformedHeaders)
-    );
+    JsonNode sessionContext
+) {
+    public JsonNode headersAsJson() { ... }
+    public JsonNode statusAsJson() { ... }
+    public JsonNode queryParamsAsJson() { ... }
+    public JsonNode cookiesAsJson() { ... }
+    public JsonNode sessionContextAsJson() { ... }
 }
 ```
 
-### 1.6 — Add `Message.withBody()` convenience method
-
+**After:**
 ```java
-public Message withBody(byte[] newBody) {
-    return new Message(newBody, headers, headersAll, statusCode,
-        contentType, requestPath, requestMethod, queryString, sessionContext);
+public record TransformContext(
+    HttpHeaders headers,
+    Integer status,
+    Map<String, String> queryParams,
+    Map<String, String> cookies,
+    SessionContext session
+) {
+    public static TransformContext empty() { ... }
 }
 ```
+
+**Removed:** All `*AsJson()` methods — these move to `TransformEngine`
+as internal conversion logic (they need Jackson, which is now internal).
+
+### 2.4 — Update `TransformEngine.java` internals
+
+The engine absorbs the context-to-JsonNode conversion methods:
+
+```java
+// INTERNAL — uses core's relocated Jackson
+private JsonNode toJsonNode(MessageBody body) {
+    if (body.isEmpty()) return NullNode.getInstance();
+    return internalMapper.readTree(body.content());
+}
+
+private JsonNode toJsonNode(HttpHeaders headers) {
+    ObjectNode node = internalMapper.createObjectNode();
+    headers.toSingleValueMap().forEach(node::put);
+    return node;
+}
+
+private JsonNode toJsonNode(SessionContext session) {
+    if (session.isEmpty()) return NullNode.getInstance();
+    return internalMapper.valueToTree(session.toMap());
+}
+
+private MessageBody toMessageBody(JsonNode node) {
+    return MessageBody.json(internalMapper.writeValueAsBytes(node));
+}
+```
+
+### 2.5 — Update `HeaderTransformer`, `StatusTransformer`, `UrlTransformer`
+
+These transformers currently work with `JsonNode` / `Map` internally. They
+need to accept the new port types and perform internal conversion.
+
+### 2.6 — Update all core tests
+
+Every test that constructs a `Message` changes from:
+
+```java
+// BEFORE
+JsonNode body = objectMapper.readTree("{\"key\": \"value\"}");
+Message msg = new Message(body, headers, headersAll, 200, "application/json", "/path", "GET");
+
+// AFTER
+Message msg = new Message(
+    MessageBody.json("{\"key\": \"value\"}"),
+    HttpHeaders.of(Map.of("content-type", "application/json")),
+    200, "/path", "GET", null, SessionContext.empty()
+);
+```
+
+**Estimated test files impacted:** 15-20 (all test classes that construct
+`Message` or check `TransformResult`).
 
 ---
 
-## Phase 2: Jackson Relocation in Core (Build System)
+## Phase 3: Jackson Relocation in Core (Build System)
 
-### 2.1 — Add Shadow plugin to core module
+> **Scope:** Build configuration changes to bundle and relocate Jackson
+> inside core's shadow JAR.
+
+### 3.1 — Add Shadow plugin to core module
 
 **File:** `core/build.gradle.kts`
 
@@ -159,100 +315,61 @@ plugins {
     id("com.gradleup.shadow") version "9.0.0-beta12"
 }
 
+dependencies {
+    // Jackson — bundled and relocated (internal only)
+    implementation(libs.jackson.databind)
+
+    // JSLT — bundled and relocated (depends on Jackson)
+    implementation(libs.jslt)
+
+    // JSON Schema Validator — bundled and relocated
+    implementation(libs.json.schema.validator)
+
+    // SnakeYAML — bundled and relocated
+    implementation(libs.snakeyaml)
+
+    // SLF4J API — NOT bundled (gateway-provided or standalone-provided)
+    compileOnly(libs.slf4j.api)
+}
+
 shadowJar {
     archiveClassifier.set("")  // replace main JAR
 
-    // Relocate Jackson — hidden from adapters
+    // Relocate all internal dependencies
     relocate("com.fasterxml.jackson", "io.messagexform.internal.jackson")
-
-    // Relocate JSLT (it depends on Jackson)
     relocate("com.schibsted.spt.data.jslt", "io.messagexform.internal.jslt")
-
-    // Relocate JSON Schema Validator
     relocate("com.networknt", "io.messagexform.internal.networknt")
-
-    // SnakeYAML
     relocate("org.yaml.snakeyaml", "io.messagexform.internal.snakeyaml")
+
+    // Exclude SLF4J — provided by gateway or standalone
+    exclude("org/slf4j/**")
 }
 
-// Make the shadow JAR the published artifact
+// Publish shadow JAR as the main artifact
 configurations {
     apiElements { outgoing.artifact(tasks.shadowJar) }
     runtimeElements { outgoing.artifact(tasks.shadowJar) }
 }
 ```
 
-### 2.2 — Update `libs.versions.toml`
+### 3.2 — Update `libs.versions.toml`
 
 ```toml
 [versions]
 jackson = "2.18.4"    # REVERT to latest — core bundles its own
-slf4j = "1.7.36"      # Downgrade — compile-time enforcement of 1.x API
+slf4j = "1.7.36"      # Compile against 1.x — prevents 2.x-only API usage
 ```
 
-### 2.3 — Core's Jackson version is now independent
+### 3.3 — Verify relocation
 
-Core uses the latest Jackson (bundled + relocated). Each gateway adapter
-uses its gateway's Jackson version via `compileOnly`. No version coupling.
+```bash
+# Check that core's JAR contains relocated Jackson
+jar tf core/build/libs/core-*.jar | grep io/messagexform/internal/jackson
 
----
-
-## Phase 3: Update Adapters
-
-### 3.1 — Update `adapter-standalone`
-
-**File:** `adapter-standalone/src/main/java/.../StandaloneAdapter.java`
-
-The standalone adapter parses HTTP request body to `byte[]` and constructs
-a `Message`:
-
-```java
-// BEFORE
-JsonNode body = objectMapper.readTree(ctx.bodyInputStream());
-Message msg = new Message(body, headers, ...);
-
-// AFTER
-byte[] body = ctx.bodyAsBytes();  // Javalin gives us raw bytes
-Message msg = new Message(body, headers, ...);
+# Check that core's JAR does NOT contain unrelocated Jackson
+jar tf core/build/libs/core-*.jar | grep com/fasterxml/jackson
+# expected: no output
 ```
-
-And writes the response:
-
-```java
-// BEFORE
-ctx.json(result.message().body());  // writes JsonNode
-
-// AFTER
-ctx.result(result.message().body()); // writes byte[]
-ctx.contentType("application/json");
-```
-
-### 3.2 — Update `adapter-pingaccess` (Feature 002)
-
-```java
-// PA adapter — convert PA SDK types to core's byte[]
-Exchange exchange = ...;
-byte[] body = exchange.getRequest().getBody().getContent();  // raw bytes
-Map<String, String> headers = extractHeaders(exchange);
-
-// Session context: PA's JsonNode → Map<String, Object>
-Map<String, Object> session = paObjectMapper.convertValue(
-    identity.getAttributes(),
-    new TypeReference<Map<String, Object>>() {}
-);
-
-Message msg = new Message(body, headers, ..., session);
-TransformResult result = engine.transform(msg, REQUEST, ctx);
-
-// Write back
-exchange.getResponse().getBody().setContent(result.message().body());
-```
-
-### 3.3 — Update `StandaloneDependencyTest`
-
-The allowed dependency groups will change — `com.fasterxml.jackson.core` etc.
-will no longer appear in the standalone adapter's compile classpath (Jackson
-is relocated inside core's shadow JAR).
 
 ---
 
@@ -264,132 +381,218 @@ is relocated inside core's shadow JAR).
 slf4j = "1.7.36"
 ```
 
-This ensures the **compiler** prevents use of SLF4J 2.x-only APIs in core's
-`src/main`. The fluent API (`LOG.atInfo()`, `LOG.atWarn()`) simply won't
-compile.
+Core compiles against SLF4J 1.7.x API. The compiler prevents use of 2.x-only
+methods (`LOG.atInfo()`, `LOG.atWarn()`, `LOG.isEnabledForLevel()`).
 
 ### 4.2 — Test classpath keeps SLF4J 2.x
 
 ```kotlin
 // core/build.gradle.kts
 testImplementation("ch.qos.logback:logback-classic:1.5.6")
-// Logback 1.5.x transitively brings SLF4J 2.x into the test classpath.
-// Tests that use KeyValuePair or fluent API still work in tests.
+// Logback 1.5.x transitively brings SLF4J 2.x into test classpath.
+// Tests that use KeyValuePair or fluent API still compile.
 ```
 
-### 4.3 — StructuredLoggingTest adjustment
+### 4.3 — `StructuredLoggingTest` adjustment
 
-`StructuredLoggingTest.java` imports `org.slf4j.event.KeyValuePair` (SLF4J
-2.x-only). Since this is a **test**, it compiles against the test classpath
-(SLF4J 2.x via Logback). No changes needed — tests are not deployed.
+This test imports `org.slf4j.event.KeyValuePair` (SLF4J 2.x). It compiles
+against the test classpath (SLF4J 2.x via Logback). No changes needed.
 
 ---
 
-## Phase 5: Update Specifications
+## Phase 5: Update Adapters
 
-### 5.1 — Feature 001 spec updates
+### 5.1 — Update `adapter-standalone`
 
-- **FR-001-01** (or equivalent): `TransformEngine.transform()` accepts
-  `Message` with `byte[] body`, returns `TransformResult` with `byte[] body`.
-- **NFR-001-xx**: Add non-functional requirement for "no third-party types
-  in core's public API".
+```java
+// BEFORE
+JsonNode body = objectMapper.readTree(ctx.bodyInputStream());
+Message msg = new Message(body, headerMap, headerMapAll, null, contentType, ...);
 
-### 5.2 — Feature 002 spec updates
+// AFTER
+Message msg = new Message(
+    MessageBody.json(ctx.bodyAsBytes()),
+    HttpHeaders.of(ctx.headerMap()),
+    null,
+    ctx.path(),
+    ctx.method().name(),
+    ctx.queryString(),
+    SessionContext.empty()
+);
+```
 
-- **FR-002-09**: Remove "core Jackson version must match PA". Adapter uses
-  PA's Jackson for SDK calls only; core is independent.
-- **FR-002-06**: Session context binding uses `Map<String, Object>`, not
-  `JsonNode`. PA adapter converts via `ObjectMapper.convertValue()`.
+Response writing:
+```java
+// BEFORE
+ctx.json(result.message().body());  // writes JsonNode directly
 
-### 5.3 — Knowledge map updates
+// AFTER
+ctx.result(result.message().body().content());  // writes raw bytes
+ctx.contentType(result.message().contentType());
+```
 
-- Add ADR-0032 to relevant feature rows.
+### 5.2 — Update `adapter-pingaccess` (Feature 002)
 
-### 5.4 — SDK guide updates
+```java
+// PA adapter
+byte[] body = exchange.getRequest().getBody().getContent();
+Map<String, String> headers = extractHeaders(exchange);
 
-- `pingaccess-sdk-guide.md`: Update §6 to show `Map<String, Object>`
-  session context pattern instead of direct `JsonNode` passing.
+// Convert PA's JsonNode → Map using PA's own ObjectMapper
+Map<String, Object> sessionAttrs = paObjectMapper.convertValue(
+    identity.getAttributes(), new TypeReference<Map<String, Object>>() {});
+
+Message msg = new Message(
+    MessageBody.json(body),
+    HttpHeaders.of(headers),
+    null,
+    exchange.getRequest().getUrl().getPath(),
+    exchange.getRequest().getMethod(),
+    exchange.getRequest().getUrl().getQuery(),
+    SessionContext.of(sessionAttrs)
+);
+
+TransformResult result = engine.transform(msg, Direction.REQUEST);
+
+if (result.isSuccess()) {
+    exchange.getRequest().getBody()
+        .setContent(result.message().body().content());
+}
+```
+
+### 5.3 — Update `StandaloneDependencyTest`
+
+Jackson groups (`com.fasterxml.jackson.core`, etc.) will no longer appear in
+standalone's compile classpath — they're relocated inside core's shadow JAR.
+Update allowed groups accordingly.
 
 ---
 
-## Phase 6: Cleanup
+## Phase 6: Update Specifications and Documentation
 
-### 6.1 — Revert Jackson version in `libs.versions.toml`
+### 6.1 — Feature 001 spec
 
-Jackson reverts to latest (`2.18.4` or newer). Core bundles its own copy.
+- Add non-functional requirement: "Core's public API must not reference any
+  third-party types. All port types are core-owned value objects
+  (ADR-0032, ADR-0033)."
+- Update `Message`, `TransformResult`, `TransformContext` definitions.
 
-### 6.2 — Remove `net.bytebuddy` from `StandaloneDependencyTest`
+### 6.2 — Feature 002 spec
 
-Byte Buddy was added as an allowed group because Jackson 2.17.0 pulls it
-transitively. With core relocating Jackson, it's no longer on the standalone
-adapter's classpath.
+- Remove Jackson version coupling constraints.
+- Update session context binding to use `SessionContext.of(Map)`.
+- Update FR-002-06 to reflect `MessageBody` boundary.
 
-### 6.3 — Update ADR-0031
+### 6.3 — Knowledge map
 
-Add a note at the top:
+- Add ADR-0032 and ADR-0033 to relevant feature rows.
 
-```markdown
-> **Partially superseded by [ADR-0032](ADR-0032-core-anti-corruption-layer.md).**
-> Core engine no longer compiles against PA's Jackson version. Core uses its
-> own Jackson (bundled + relocated). ADR-0031 remains valid for the PA adapter's
-> `compileOnly` SLF4J, Jakarta APIs, PA SDK, and the version-locked release
-> strategy.
-```
+### 6.4 — SDK guide
 
-### 6.4 — Update PLAN.md
+- `pingaccess-sdk-guide.md`: Update section on session context to show
+  `Map<String, Object>` conversion pattern.
 
-Add the byte-boundary refactor as a new planned task under Feature 001.
+---
+
+## Phase 7: Cleanup
+
+### 7.1 — Revert Jackson version
+
+`libs.versions.toml` Jackson reverts to latest (e.g., `2.18.4`).
+
+### 7.2 — Remove `net.bytebuddy` from `StandaloneDependencyTest`
+
+No longer needed — Jackson is relocated inside core.
+
+### 7.3 — Update ADR-0031
+
+Supersession notes already added. Verify accuracy after refactor.
+
+### 7.4 — Update PLAN.md
+
+Mark "Core byte-boundary refactor" as complete.
 
 ---
 
 ## File Impact Assessment
 
-| File | Change Type | Complexity |
-|------|------------|------------|
-| `core/model/Message.java` | API change: `JsonNode` → `byte[]`, `Map` | Medium |
-| `core/model/TransformResult.java` | API change: `JsonNode` → `byte[]` | Low |
-| `core/model/TransformContext.java` | API change: remove `JsonNode`, remove helper methods | Medium |
-| `core/engine/TransformEngine.java` | Internal: add parse/serialize, absorb context helpers | High |
-| `core/engine/HeaderTransformer.java` | Internal: may need byte[] handling | Medium |
-| `core/engine/StatusTransformer.java` | Internal: may need byte[] handling | Medium |
-| `core/engine/UrlTransformer.java` | Internal: may need byte[] handling | Low |
-| `core/build.gradle.kts` | Add Shadow plugin, relocation config | Medium |
-| `adapter-standalone/**` | Update Message construction, response writing | Medium |
-| `adapter-standalone/StandaloneDependencyTest.java` | Update allowed groups | Low |
-| `core/src/test/**` | Update all test Message/TransformResult construction | High (volume) |
-| `gradle/libs.versions.toml` | Revert Jackson, downgrade SLF4J | Low |
-| `docs/decisions/ADR-0031-*.md` | Add supersession note | Low |
-| `docs/decisions/ADR-0032-*.md` | Already created | Done |
-| `docs/architecture/features/001/spec.md` | Add byte-boundary requirements | Medium |
-| `docs/architecture/features/002/spec.md` | Remove Jackson version coupling | Medium |
-| `PLAN.md` | Add refactor task | Low |
+### New Files (Phase 1)
 
-**Estimated files changed:** 20-30
-**Estimated effort:** 2-3 focused sessions
+| File | Description |
+|------|-------------|
+| `core/src/main/java/.../model/MediaType.java` | Content type enum |
+| `core/src/main/java/.../model/MessageBody.java` | Body value object |
+| `core/src/main/java/.../model/HttpHeaders.java` | Header collection |
+| `core/src/main/java/.../model/SessionContext.java` | Session value object |
+| `core/src/test/java/.../model/MediaTypeTest.java` | Tests |
+| `core/src/test/java/.../model/MessageBodyTest.java` | Tests |
+| `core/src/test/java/.../model/HttpHeadersTest.java` | Tests |
+| `core/src/test/java/.../model/SessionContextTest.java` | Tests |
+
+### Modified Files (Phases 2-7)
+
+| File | Change | Complexity |
+|------|--------|------------|
+| `core/model/Message.java` | Full rewrite: port types | Medium |
+| `core/model/TransformResult.java` | `JsonNode` → `MessageBody` | Low |
+| `core/model/TransformContext.java` | Full rewrite: port types, remove *AsJson() | Medium |
+| `core/engine/TransformEngine.java` | Absorb *AsJson(), add parse/serialize | High |
+| `core/engine/HeaderTransformer.java` | Port type adaptation | Medium |
+| `core/engine/StatusTransformer.java` | Port type adaptation | Medium |
+| `core/engine/UrlTransformer.java` | Port type adaptation | Low |
+| `core/engine/ErrorResponseBuilder.java` | `JsonNode` → `MessageBody` | Low |
+| `core/build.gradle.kts` | Shadow plugin, relocation | Medium |
+| `adapter-standalone/**` | Message construction, response writing | Medium |
+| `adapter-standalone/StandaloneDependencyTest.java` | Update allowed groups | Low |
+| `core/src/test/**` (~15-20 files) | Update Message/TransformResult construction | High (volume) |
+| `gradle/libs.versions.toml` | Revert Jackson, downgrade SLF4J | Low |
+| `docs/decisions/ADR-0031-*.md` | Verify supersession notes | Low |
+| `docs/architecture/features/001/spec.md` | Port type requirements | Medium |
+| `docs/architecture/features/002/spec.md` | Remove Jackson coupling | Medium |
+| `PLAN.md` | Mark complete | Low |
+| `llms.txt` | Add ADR-0033 | Low |
+
+**Estimated files changed:** 25-35
+**Estimated effort:** 3-4 focused sessions
+
+---
+
+## Execution Order
+
+```
+Phase 1 ──► Phase 2 ──► Phase 4 ──► Phase 3 ──► Phase 5 ──► Phase 6 ──► Phase 7
+(new types)  (migrate)   (SLF4J)    (shadow)    (adapters)  (specs)     (cleanup)
+```
+
+**Rationale:**
+1. **Phase 1** (new types) is additive — creates files, breaks nothing.
+2. **Phase 2** (migrate API) is the big break — changes core's contract.
+3. **Phase 4** (SLF4J) can be done alongside Phase 2 — independent change.
+4. **Phase 3** (shadow/relocate) builds on Phase 2 — needs the new API first.
+5. **Phase 5** (adapters) adapts to the new core API.
+6. **Phase 6** (specs) documents the completed state.
+7. **Phase 7** (cleanup) finalizes versions and markers.
 
 ---
 
 ## Verification Checklist
 
+- [ ] All 4 port types created with full test coverage
 - [ ] Core's public API (`Message`, `TransformResult`, `TransformContext`)
-      has zero Jackson imports
+      has **zero** Jackson imports
 - [ ] Core's shadow JAR contains relocated Jackson classes under
       `io.messagexform.internal.jackson`
 - [ ] `./gradlew :core:dependencies --configuration apiElements` shows NO
       Jackson in the API configuration
 - [ ] `./gradlew :adapter-standalone:dependencies` shows NO
       `com.fasterxml.jackson` (all relocated inside core's JAR)
-- [ ] All existing tests pass
+- [ ] All existing tests pass (258+)
 - [ ] `libs.versions.toml` has Jackson at latest (e.g., 2.18.4)
-- [ ] SLF4J compiles at 1.7.x — `LOG.atInfo()` fails to compile in core src/main
-- [ ] Shadow JAR size < 5 MB (NFR-002-02)
+- [ ] SLF4J compiles at 1.7.x — `LOG.atInfo()` fails to compile in
+      core src/main
+- [ ] New port type tests pass
+- [ ] Shadow JAR size < 5 MB
 - [ ] Performance benchmark: < 1ms overhead for parse/serialize at boundary
-
----
-
-*Implementation order: Phase 1 → Phase 4 → Phase 2 → Phase 3 → Phase 5 → Phase 6*
-
-*Phase 1 (API change) and Phase 4 (SLF4J) can be done first because they
-don't require the Shadow plugin. Phase 2 (relocation) is the build system
-change. Phase 3 (adapters) follows naturally. Phase 5 and 6 are documentation
-and cleanup.*
+- [ ] `MessageBody.equals()` uses `Arrays.equals()` (not reference equality)
+- [ ] `HttpHeaders.of(Map.of("Content-Type", "json")).first("content-type")`
+      returns `"json"` (case-insensitive verified)
