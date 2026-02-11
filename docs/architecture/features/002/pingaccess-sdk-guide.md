@@ -33,6 +33,7 @@
 | 13 | [SSL & Network Types](#13-ssl--network-types) | SslData, TargetHost, SetCookie | `SSL`, `TLS`, `cookie`, `network` |
 | 14 | [OAuth SDK](#14-oauth-sdk) | OAuthConstants, OAuthUtilities, WWW-Authenticate building | `OAuth`, `DPoP`, `RFC6750`, `constants` |
 | 15 | [Other Extension Points](#15-other-extension-points) | IdentityMapping, SiteAuthenticator, LoadBalancing, LocaleOverride, MasterKeyEncryptor | `extension`, `plugin`, `identity`, `encryption`, `locale` |
+| 16 | [Vendor-Built Plugin Analysis](#16-vendor-built-plugin-analysis) | Decompiled patterns from PA engine's internal plugins | `decompile`, `vendor`, `internal`, `engine` |
 
 ---
 
@@ -1021,6 +1022,39 @@ ConfigurationOption(Option option);                      // from @Option annotat
 
 String getLabel();     void setLabel(String);
 String getValue();     void setValue(String);
+```
+
+### DependantFieldAccessor (dynamic dependent options)
+
+For parent-child SELECT relationships where the child options are loaded
+dynamically at runtime (not statically via `@DependentFieldOption`):
+
+```java
+// com.pingidentity.pa.sdk.accessor.DependantFieldAccessor (interface)
+List<ConfigurationDependentFieldOption> dependentOptions();
+
+// com.pingidentity.pa.sdk.accessor.DependantFieldAccessorFactory (interface)
+<T extends DependantFieldAccessor> T getDependantFieldAccessor(Class<T> clazz);
+// Factory loaded via ServiceLoader; engine provides DependantFieldAccessorFactoryImpl.
+
+// com.pingidentity.pa.sdk.ui.ConfigurationDependentFieldOption
+public final String value;
+public final List<ConfigurationOption> options;
+ConfigurationDependentFieldOption(String value, List<ConfigurationOption> options);
+
+// com.pingidentity.pa.sdk.ui.DynamicConfigurationParentField extends ConfigurationParentField
+DynamicConfigurationParentField(String fieldName, Class<? extends DependantFieldAccessor> accessor);
+```
+
+### DynamicOptionsConfigurationField
+
+A `ConfigurationField` subclass that resolves its options dynamically at
+runtime using a `ConfigurationModelAccessor`:
+
+```java
+// com.pingidentity.pa.sdk.ui.DynamicOptionsConfigurationField extends ConfigurationField
+DynamicOptionsConfigurationField(ConfigurationField field, Class<? extends ConfigurationModelAccessor> accessor);
+// The admin UI calls the accessor to populate the dropdown at render time.
 ```
 
 > **Warning from Javadoc:** "You must provide a `configurationField` to perform
@@ -2110,6 +2144,107 @@ Each extension type requires its own `META-INF/services/` file:
 
 ---
 
+## 16. Vendor-Built Plugin Analysis
+
+> **Tags:** `decompile`, `vendor`, `internal`, `engine`, `built-in`
+>
+> These findings come from CFR decompilation of `pingaccess-engine-9.0.1.0.jar`.
+> They document implementation patterns used by PingIdentity's own built-in
+> plugins. While these plugins use some engine-internal APIs not available in
+> the SDK, they also use many SDK-public APIs and reveal best practices.
+
+### Built-in Plugin Inventory (from engine SPI files)
+
+| Extension Type | Count | Notable Implementations |
+|---------------|-------|------------------------|
+| Sync Rules | 28 | OAuthPolicyInterceptor, CIDRPolicy, RateLimiting, CORS, Rewrite |
+| Async Rules | 4 | PingAuthorizePolicyDecision, PingDataGovernance |
+| Identity Mappings | 5 | HeaderMapping, JWT, ClientCertificate, WebSessionAccessToken |
+| Site Authenticators | 4 | BasicAuth, MutualTLS, TokenMediator, SAMLTokenMediator |
+| Load Balancing | 2 | CookieBasedRoundRobin, HeaderBased |
+| Availability | 1 | OnDemandAvailability |
+| HSM Providers | 2 | AwsCloudHSM, PKCS11 |
+| Risk Policy | 1 | PingOneRiskPolicy |
+| Rejection Handlers | 2 | ErrorTemplate, Redirect |
+| Token Providers | 1 | AzureTokenProvider |
+
+### Key Patterns from Vendor Plugins
+
+**1. PingAuthorizePolicyDecisionAccessControl** (async, extends `AsyncRuleInterceptorBase`)
+
+The closest vendor plugin to our adapter. Key observations:
+
+- Extends `AsyncRuleInterceptorBase` (the SDK base class), confirming this is
+  the correct base for async rules.
+- Uses `@UIElement` with `modelAccessor = ThirdPartyServiceAccessor.class` for
+  the service target dropdown — **not** `@Inject @OAuthAuthorizationServer`.
+- Uses `ConfigurationBuilder.from(Configuration.class).toConfigurationFields()`
+  — the annotation-driven auto-discovery pattern.
+- Validates config in `configure()` using `CustomViolation` / `CustomViolationException`
+  (engine-internal) for cross-field validation.
+- `ObjectMapper` is injected via `@Inject`/setter, NOT created per-request.
+- Request body is sent as `byte[]` via `objectMapper.writeValueAsBytes()`.
+- Response body parsed via `objectMapper.readValue(clientResponse.getBody(), ...)` (byte[]).
+- Error handling: `handleFailure()` returns `Outcome.RETURN` on `CompletionException`.
+- `getConfiguration().getName()` used for error logging (admin-configured rule name).
+
+**2. OutboundContentRewriteInterceptor** (sync, body rewriting)
+
+- Extends internal `PolicyRuleInterceptorBase` (sync base, not available in SDK).
+- Implements response body rewriting with gzip support and chunked encoding.
+- Uses `@JsonIgnore` on `getErrorHandlingCallback()` to prevent serialization.
+- Returns `new LocalizedInternalServerErrorCallback(localizedMessageResolver)`
+  as the error callback.
+
+**3. OutboundHeaderRewriteInterceptor** (sync, header rewriting)
+
+- `@Rule(destination = {RuleInterceptorSupportedDestination.Site})` — Site-only.
+- `ConfigurationBuilder.from()` + `ConfigurationFieldUtil.setHelpFromBundle()`
+  — vendor pattern for externalized help text from ResourceBundle.
+- `getConfigurationFields()` returns fields generated from annotation scan.
+
+### Vendor Configuration Patterns (from decompiled Configuration classes)
+
+```java
+// Vendor pattern: full @UIElement usage with modelAccessor for dynamic dropdowns
+@UIElement(label = "Third-Party Service", type = SELECT, order = 0,
+           required = true, modelAccessor = ThirdPartyServiceAccessor.class)
+@NotNull
+private ThirdPartyServiceModel thirdPartyService;
+
+// Vendor pattern: CONCEALED + advanced for secrets
+@UIElement(label = "Shared Secret", type = CONCEALED, order = 20)
+private String sharedSecret;
+
+// Vendor pattern: CHECKBOX with defaultValue
+@UIElement(label = "Include Request Body", type = CHECKBOX,
+           order = 65, defaultValue = "true")
+private boolean includeRequestBody = true;
+
+// Vendor pattern: TABLE with subFieldClass and @Valid/@NotNull
+@UIElement(label = "Mapped Attributes", type = TABLE, order = 70,
+           subFieldClass = MappedAttributeTableEntry.class)
+@Valid @NotNull
+private List<MappedAttributeTableEntry> mappedPayloadAttributes;
+```
+
+### Internal-Only APIs (NOT available in SDK)
+
+The following are used by vendor plugins but are **not** part of the public SDK:
+
+| Internal Class | Purpose | SDK Alternative |
+|---------------|---------|----------------|
+| `PolicyRuleInterceptorBase` | Sync rule base class | `RuleInterceptorBase` |
+| `ExchangeImpl` | Concrete exchange | `Exchange` (interface) |
+| `CustomViolation`/`Exception` | Cross-field validation | `ValidationException` |
+| `ConfigurationFieldUtil` | Help text from ResourceBundle | `ConfigurationBuilder.helpContent()` |
+| `RejectionHandlerModel` | Rejection handler reference | `ErrorHandlerConfigurationImpl` |
+| `RejectionHandlerAccessor` | Rejection handler dropdown | N/A |
+| `BundleSupport` | ResourceBundle for plugin | `TemplateRenderer.getLocalizedMessageResolver()` |
+| `ConflictAwareRuleInterceptor` | Rule conflict detection | N/A |
+
+---
+
 ## Java Version Compatibility
 
 PingAccess 9.0 officially supports **Java 17 and 21** (Amazon Corretto, OpenJDK,
@@ -2117,6 +2252,18 @@ Oracle JDK — all 64-bit). The adapter module compiles with **Java 21**, matchi
 the core module. No cross-compilation needed.
 
 > Source: PingAccess 9.0 docs § "Java runtime environments" (page 78)
+
+---
+
+## SDK Class Coverage
+
+Total SDK classes (excluding inner): **112** • Documented: **112** (100%)
+
+All publicly exported classes in `pingaccess-sdk-9.0.1.0.jar` are documented in
+this guide. The 5 previously undocumented classes were added in this revision:
+`DependantFieldAccessor`, `DependantFieldAccessorFactory`,
+`ConfigurationDependentFieldOption`, `DynamicConfigurationParentField`,
+`DynamicOptionsConfigurationField`.
 
 ---
 
@@ -2128,3 +2275,4 @@ the core module. No cross-compilation needed.
 | SDK Javadoc (HTML) | `binaries/pingaccess-9.0.1/sdk/apidocs/` |
 | SDK sample rules | `binaries/pingaccess-9.0.1/sdk/samples/` |
 | Local SDK JAR copy | `docs/reference/pingaccess-sdk/pingaccess-sdk-9.0.1.0.jar` |
+| Engine JAR (vendor plugins) | `binaries/pingaccess-9.0.1.zip → lib/pingaccess-engine-9.0.1.0.jar` |
