@@ -84,18 +84,18 @@ signatures, usage notes, and code examples.
 | `AsyncRuleInterceptorBase<T>` | Plugin base class — provides `handleRequest`, `handleResponse`, lifecycle | §1 |
 | `Exchange` | Request/response envelope — holds identity, properties, routing info | §2 |
 | `Message` / `Request` / `Response` | HTTP message types with body, headers, status | §3 |
-| `Identity` | Authenticated user context — subject, claims, OAuth metadata, session state | §4 |
-| `SessionStateSupport` | Persistent session key-value store (read/write `Map<String, JsonNode>`) | §4 |
-| `OAuthTokenMetadata` | OAuth client context — clientId, scopes, tokenType, realm, expiry | §4 |
-| `ResponseBuilder` | Factory for constructing `Response` objects (critical for DENY mode) | §6 |
-| `@Rule` / `@UIElement` | Plugin registration and admin UI configuration annotations | §5 |
-| `ExchangeProperty<T>` | Typed cross-rule state on the exchange | §10 |
+| `Identity` | Authenticated user context — subject, claims, OAuth metadata, session state | §6 |
+| `SessionStateSupport` | Persistent session key-value store (read/write `Map<String, JsonNode>`) | §6 |
+| `OAuthTokenMetadata` | OAuth client context — clientId, scopes, tokenType, realm, expiry | §6 |
+| `ResponseBuilder` | Factory for constructing `Response` objects (critical for DENY mode) | §8 |
+| `@Rule` / `@UIElement` | Plugin registration and admin UI configuration annotations | §7 |
+| `ExchangeProperty<T>` | Typed cross-rule state on the exchange | §12 |
 
 **Key constraints from SDK analysis:**
-- `exchange.getResponse()` is **null** during `handleRequest()` — see guide §6
+- `exchange.getResponse()` is **null** during `handleRequest()` — see guide §8
 - `exchange.getIdentity()` may be **null** for unauthenticated resources
 - `Identity.getTokenExpiration()` returns `java.time.Instant` (not `Date`)
-- Jackson relocation is **mandatory** — see guide §7
+- Jackson relocation is **mandatory** — see guide §9
 
 **Java version:** PingAccess 9.0 supports Java 17 and 21. The adapter compiles
 with Java 21, matching the core module.
@@ -399,7 +399,7 @@ override earlier layers on key collision:
 > like `subject` are convenience wrappers that may already be in the claims as `sub`.
 
 > **Implementation pattern:** See
-> [`docs/architecture/features/002/pingaccess-sdk-guide.md` §4 "Building $session"](pingaccess-sdk-guide.md#building-session--flat-merge-pattern)
+> [`docs/architecture/features/002/pingaccess-sdk-guide.md` §6 "Building $session"](pingaccess-sdk-guide.md#building-session--flat-merge-pattern)
 > for the complete `buildSessionContext()` implementation including boundary
 > conversion for Jackson relocation.
 
@@ -519,7 +519,7 @@ shade Jackson classes into a private package (e.g.
 
 > **Why mandatory:** Bundling un-relocated Jackson causes `ClassCastException`
 > at runtime due to classloader isolation. See
-> [SDK guide §7](pingaccess-sdk-guide.md#7-deployment--classloading)
+> [SDK guide §9](pingaccess-sdk-guide.md#9-deployment--classloading)
 > for the full explanation and boundary conversion pattern.
 
 **TelemetryListener:** The PA adapter does NOT register a custom
@@ -573,7 +573,7 @@ spec parse errors at runtime, eval budget exceeded, and output size exceeded.
 
 **Key constraint:** During `handleRequest()`, `exchange.getResponse()` is
 **null** — the adapter MUST use `ResponseBuilder` to construct a new `Response`.
-See [SDK guide §6](pingaccess-sdk-guide.md#6-responsebuilder--error-handling)
+See [SDK guide §8](pingaccess-sdk-guide.md#8-responsebuilder--error-handling)
 for complete code patterns and the rationale for rejecting `AccessException`.
 
 The adapter MUST NOT throw `AccessException` for transform failures — transform
@@ -733,7 +733,7 @@ response phase). This avoids re-parsing cookies/query params in `handleResponse(
     Validation). This avoids Spring test context dependency.
 
 > **Mock patterns, config validation code, and dependency alignment table:**
-> See [SDK guide §9](pingaccess-sdk-guide.md#9-testing-patterns)
+> See [SDK guide §11](pingaccess-sdk-guide.md#11-testing-patterns)
 > for the complete Mockito mock chain, `ArgumentCaptor` verification pattern,
 > standalone `Validator` setup, and SDK dependency versions.
 
@@ -879,6 +879,6 @@ Client                    PingAccess                        Backend
 
 > Full configuration patterns (annotation-driven, programmatic, `@UIElement`
 > attributes, JSR-380 validation) are documented in
-> [SDK guide §5](pingaccess-sdk-guide.md#5-plugin-configuration--ui).
+> [SDK guide §7](pingaccess-sdk-guide.md#7-plugin-configuration--ui).
 
 
