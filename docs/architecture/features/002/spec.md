@@ -177,11 +177,43 @@ MediaType getContentType();      void setContentType(String);
 
 ```java
 String getSubject();             // authenticated user principal
-String getMappedSubject();       // mapped identity
+String getMappedSubject();       // mapped identity (set by IdentityMapping plugins)
+void   setMappedSubject(String); // used by IdentityMapping — adapter should NOT call this
 String getTrackingId();          // PA tracking ID
 String getTokenId();             // OAuth token ID
-Date getTokenExpiration();
-JsonNode getAttributes();        // identity attributes as Jackson JsonNode
+Date   getTokenExpiration();
+JsonNode getAttributes();        // identity attributes as Jackson JsonNode (OIDC/token claims)
+SessionStateSupport getSessionStateSupport();  // persistent session key-value store
+OAuthTokenMetadata  getOAuthTokenMetadata();   // OAuth token metadata
+```
+
+### SessionStateSupport
+
+> Provides persistent key-value session storage. Attributes survive across
+> requests within the same PingAccess session. Used by `ExternalAuthorizationRule`
+> sample to cache authorization decisions.
+
+```java
+// com.pingidentity.pa.sdk.identity.SessionStateSupport
+Map<String, JsonNode> getAttributes();            // all session attributes
+JsonNode getAttribute(String name);               // single attribute by name
+JsonNode getAttributeValue(String name);           // alias for getAttribute
+void     setAttribute(String name, JsonNode value); // store/update a session attribute
+void     removeAttribute(String name);             // remove a session attribute
+```
+
+> **Adapter usage:** The adapter reads session attributes as context for JSLT
+> transforms (§ FR-002-06). Writing to session state is out of scope for v1 —
+> transforms are pure read-only operations on identity context.
+
+### OAuthTokenMetadata
+
+```java
+// com.pingidentity.pa.sdk.identity.OAuthTokenMetadata
+String      getClientId();   // OAuth client that obtained the token
+Set<String> getScopes();     // granted OAuth scopes
+String      getTokenType();  // e.g., "Bearer"
+String      getRealm();      // OAuth realm
 ```
 
 ### Supporting Types
@@ -193,6 +225,7 @@ JsonNode getAttributes();        // identity attributes as Jackson JsonNode
 // ExchangeProperty<T>: namespaced typed property for cross-rule state
 // HeaderField: (HeaderName name, String value)
 // HeaderName: case-insensitive name wrapper
+// ResponseBuilder: factory for constructing Response objects (see § Error Handling)
 ```
 
 ### Plugin Configuration & UI
@@ -494,7 +527,10 @@ the PingAccess plugin lifecycle:
 ### FR-002-06: Session Context Binding (Identity)
 
 **Requirement:** The adapter MUST populate the `sessionContext` field of the
-`Message` record from the PingAccess `Identity` object (ADR-0030, FR-001-13):
+`Message` record from the PingAccess `Identity` object (ADR-0030, FR-001-13).
+
+The `$session` JsonNode includes identity fields, OAuth metadata, OIDC/token
+claims, and optionally session state attributes:
 
 ```java
 // Build sessionContext JsonNode from Exchange.getIdentity()
@@ -508,22 +544,74 @@ if (identity.getTokenExpiration() != null) {
     session.put("tokenExpiration", identity.getTokenExpiration().toInstant().toString());
 }
 if (identity.getAttributes() != null) {
-    session.set("attributes", identity.getAttributes());
+    session.set("attributes", identity.getAttributes());  // OIDC claims / token introspection
+}
+
+// OAuth metadata (GAP-03)
+OAuthTokenMetadata oauth = identity.getOAuthTokenMetadata();
+if (oauth != null) {
+    ObjectNode oauthNode = objectMapper.createObjectNode();
+    oauthNode.put("clientId", oauth.getClientId());
+    oauthNode.put("tokenType", oauth.getTokenType());
+    oauthNode.put("realm", oauth.getRealm());
+    ArrayNode scopesNode = objectMapper.createArrayNode();
+    if (oauth.getScopes() != null) {
+        oauth.getScopes().forEach(scopesNode::add);
+    }
+    oauthNode.set("scopes", scopesNode);
+    session.set("oauth", oauthNode);
+}
+
+// Session state attributes (read-only snapshot)
+SessionStateSupport sss = identity.getSessionStateSupport();
+if (sss != null && sss.getAttributes() != null) {
+    ObjectNode stateNode = objectMapper.createObjectNode();
+    sss.getAttributes().forEach(stateNode::set);
+    session.set("sessionState", stateNode);
 }
 ```
+
+#### `$session` Schema
+
+| Path | Type | Source | Notes |
+|------|------|--------|-------|
+| `$session.subject` | string | `Identity.getSubject()` | Authenticated principal |
+| `$session.mappedSubject` | string | `Identity.getMappedSubject()` | Mapped by IdentityMapping plugin |
+| `$session.trackingId` | string | `Identity.getTrackingId()` | PA-generated tracking ID |
+| `$session.tokenId` | string | `Identity.getTokenId()` | OAuth token ID |
+| `$session.tokenExpiration` | string (ISO 8601) | `Identity.getTokenExpiration()` | Omitted if no expiration |
+| `$session.attributes` | object | `Identity.getAttributes()` | OIDC claims / token introspection claims |
+| `$session.attributes.sub` | string | (typical OIDC claim) | OIDC subject |
+| `$session.attributes.email` | string | (typical OIDC claim) | User email |
+| `$session.attributes.roles` | array | (typical OIDC claim, nested path) | Navigate with dot-path in JSLT |
+| `$session.oauth.clientId` | string | `OAuthTokenMetadata.getClientId()` | OAuth client ID |
+| `$session.oauth.scopes` | array | `OAuthTokenMetadata.getScopes()` | Granted OAuth scopes |
+| `$session.oauth.tokenType` | string | `OAuthTokenMetadata.getTokenType()` | e.g., "Bearer" |
+| `$session.oauth.realm` | string | `OAuthTokenMetadata.getRealm()` | OAuth realm |
+| `$session.sessionState` | object | `SessionStateSupport.getAttributes()` | Read-only snapshot of PA session state |
 
 **`tokenExpiration` note:** `Identity.getTokenExpiration()` returns a `java.util.Date`.
 The adapter formats it as an ISO 8601 string (`Instant.toString()` format, e.g.
 `"2026-02-11T12:30:00Z"`). JSLT can compare this as a string for basic expiry
 checks. If the token has no expiration, the field is omitted.
 
-This enables JSLT expressions to use `$session.subject`, `$session.trackingId`,
-etc. in transform specs.
+**OAuth metadata note:** `OAuthTokenMetadata` provides the OAuth client context
+(client ID, scopes, token type, realm). This enables scope-based JSLT transforms
+(e.g., `if (contains($session.oauth.scopes, "admin")) ...`). If `getOAuthTokenMetadata()`
+returns `null`, the `oauth` sub-object is omitted.
+
+**Session state note:** `SessionStateSupport` provides persistent key-value
+storage across requests within a PA session. The adapter reads these attributes
+as a **read-only snapshot** — the adapter does NOT write to session state.
+Session state attributes set by other PA rules (e.g., `ExternalAuthorizationRule`'s
+cached authorization responses) are available to JSLT transforms via
+`$session.sessionState.<key>`.
 
 | Aspect | Detail |
 |--------|--------|
-| Success path | JSLT expression `$session.subject` resolves to the authenticated user |
+| Success path | JSLT `$session.subject` resolves to authenticated user, `$session.oauth.clientId` to OAuth client |
 | Failure path | No identity (unauthenticated) → `sessionContext = null` → `$session` is `null` in JSLT |
+| Failure path (OAuth) | No OAuth metadata → `$session.oauth` missing → `$session.oauth.clientId` evaluates to `null` |
 | Status | ⬜ Not yet implemented |
 | Source | ADR-0030, FR-001-13, G-002-01 |
 
