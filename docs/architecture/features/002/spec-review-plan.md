@@ -23,14 +23,14 @@
 | 12 | `wrapRequest` deep copy body clarification | 🟡 Moderate | 3 | ✅ Done |
 | 13 | Header diff strategy missing capitalization note | 🟡 Moderate | 3 | ✅ Done |
 | 14 | `TransformResultSummary` field sourcing gap | 🟡 Moderate | 3 | ✅ Done |
-| 15 | Cosmetic: triple blank lines around L957–959 | 🔵 Minor | 4 | ⬜ Not started |
-| 16 | Missing scenario: concurrent reload + request race | 🔵 Minor | 4 | ⬜ Not started |
-| 17 | Missing scenario: non-JSON response body | 🔵 Minor | 4 | ⬜ Not started |
-| 18 | `jakarta.validation-api` version mismatch risk | 🔵 Minor | 4 | ⬜ Not started |
+| 15 | Cosmetic: triple blank lines around L957–959 | 🔵 Minor | 4 | ✅ Done |
+| 16 | Missing scenario: concurrent reload + request race | 🔵 Minor | 4 | ✅ Done |
+| 17 | Missing scenario: non-JSON response body | 🔵 Minor | 4 | ✅ Done |
+| 18 | `jakarta.validation-api` version mismatch risk | 🔵 Minor | 4 | ✅ Done |
 | 19 | No metrics/counters for transform operations | 🔵 Minor | 5 | ⬜ Not started |
 | 20 | Ping Maven repo URL — HTTP vs HTTPS | 🔵 Minor | 5 | ⬜ Not started |
 
-**Progress: 14 / 20 complete**
+**Progress: 18 / 20 complete**
 
 ---
 

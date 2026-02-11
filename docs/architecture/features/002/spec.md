@@ -887,6 +887,14 @@ Gradle subproject with:
 2. Dependency on `com.pingidentity.pingaccess:pingaccess-sdk:9.0.1.0`
    (**compileOnly** — provided by PA runtime).
 3. Dependency on `jakarta.validation:jakarta.validation-api:3.1.1` (compileOnly).
+
+   > **Version compatibility note:** PA 9.0 uses `jakarta.validation`
+   > (confirmed from SDK bytecode: `jakarta.validation.ValidationException`).
+   > The 3.1.1 API is backwards-compatible with 3.0.x. If the PA runtime ships
+   > an older `validation-api` (e.g., 3.0.0 with Hibernate Validator 7.0.5),
+   > the `compileOnly` scope ensures only PA’s bundled version is used at
+   > runtime. Verify by checking `<PA_HOME>/lib/` for the actual
+   > `jakarta.validation-api-*.jar` version.
 4. Dependency on `jakarta.inject:jakarta.inject-api:2.0.1` (compileOnly).
 5. Shadow JAR plugin configured to exclude the `compileOnly` dependencies.
 6. Java 21 toolchain (same as core).
@@ -1028,9 +1036,6 @@ in `handleRequest()` and pass them to `handleResponse()` via an `ExchangePropert
 Alternatively, re-parsing is acceptable (cost is negligible for typical request
 sizes).
 
-
-
-
 | Aspect | Detail |
 |--------|--------|
 | Success path | `TransformContext` populated with headers, cookies, query params, session → JSLT `$cookies.sessionToken` resolves correctly |
@@ -1087,6 +1092,8 @@ sizes).
 | S-002-28 | **DENY + handleResponse interaction:** `handleRequest()` returns `Outcome.RETURN` with DENY error body → `handleResponse()` is called (SDK contract) → adapter checks `TRANSFORM_DENIED` ExchangeProperty → skips response processing → client receives original DENY error (GAP-4 fix). |
 | S-002-29 | **Spec hot-reload (success):** `reloadIntervalSec=30` → spec YAML modified on disk → next poll reloads specs → new spec matches next request → transform uses updated spec. |
 | S-002-30 | **Spec hot-reload (failure):** `reloadIntervalSec=30` → malformed spec written to disk → reload fails with warning log → previous specs remain active → existing transforms unaffected. |
+| S-002-31 | **Concurrent reload during active transform:** Reload swaps `AtomicReference<TransformRegistry>` while a transform is in flight → in-flight transform completes using its snapshot of the old registry (Java reference semantics guarantee this) → next request uses the new registry. Outcome: no data corruption, no locking, no request failure. Test: trigger reload in a background thread while a slow transform is executing. |
+| S-002-32 | **Non-JSON response body:** Backend returns `text/html` response body → `wrapResponse()` attempts JSON parse, fails, falls back to `NullNode` body → response-direction transforms can still operate on headers and status code → body passthrough unmodified. Outcome: PASSTHROUGH for body transforms, SUCCESS for header-only transforms. |
 
 ---
 
