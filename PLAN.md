@@ -139,7 +139,7 @@ operations:
 
 - [x] **PingAccess plugin API** — Extension points fully documented (`docs/research/pingaccess-plugin-api.md`, `docs/research/pingaccess-docker-and-sdk.md`). Docker image (9.0.1) pulled, SDK JAR decompiled, installer SDK samples analyzed. Key finding: `RuleInterceptor` SPI with `handleRequest`/`handleResponse` is the primary integration point; must use Site rules for body access.
 - [x] **Spike A: PA classloader model discovery** — ✅ Resolved via static analysis (decompiling `run.sh` + `javap` bytecode). PA uses a **flat classpath** with no classloader isolation. `lib/*` and `deploy/*` share the same `AppClassLoader`. Jackson relocation is unnecessary. Full findings: `docs/research/spike-pa-classloader-model.md`.
-- [ ] **Spike B: PA dependency version extraction** — Create a script to extract all library versions from a PA Docker image. Design a version-locked build strategy where the adapter pins its `compileOnly` dependencies to PA's exact versions. Full plan: `docs/research/spike-pa-dependency-extraction.md`.
+- [x] **Spike B: PA dependency version extraction** — ✅ Resolved. Created `scripts/pa-extract-deps.sh` (Docker-based extraction → TOML + Markdown). Generated `gradle/pa-provided.versions.toml` with all 146 PA library versions. Downgraded core Jackson to 2.17.0 (PA-aligned). Designed version guard (runtime mismatch detection) and version-locked release strategy. Full findings: `docs/research/spike-pa-dependency-extraction.md`.
 - [ ] **PingAM response format** — Document structure, explore transformation needs
 - [ ] **Stateless flow patterns** — Research stateless transformation chain patterns from prior art
 - [ ] **Kong plugin development** — Lua vs. Go plugin SDK

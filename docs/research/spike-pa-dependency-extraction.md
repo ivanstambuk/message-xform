@@ -1,6 +1,6 @@
 # Spike B: PingAccess Dependency Version Extraction & Build Alignment
 
-Status: **🔄 In Progress** | Created: 2026-02-11 | Feature: 002
+Status: **✅ Resolved** | Created: 2026-02-11 | Feature: 002
 
 > **Spike A resolved.** Classloader model confirmed (flat classpath, no isolation).
 > PA ships Jackson 2.17.0, SLF4J 1.7.36, Log4j2 2.24.3. SnakeYAML not shipped.
@@ -10,15 +10,15 @@ Status: **🔄 In Progress** | Created: 2026-02-11 | Feature: 002
 
 | Step | Description | Status | Notes |
 |------|-------------|--------|-------|
-| B-1 | Create extraction script (`scripts/pa-extract-deps.sh`) | 🔲 | Docker-based, outputs structured list |
-| B-2 | Run against PA 9.0.1 Docker image | ✅ Manual | Versions confirmed from Spike A extraction |
+| B-1 | Create extraction script (`scripts/pa-extract-deps.sh`) | ✅ | Docker-based; outputs TOML + Markdown |
+| B-2 | Run against PA 9.0.1 Docker image | ✅ | 146 JARs extracted via `pom.properties` |
 | B-3 | Analyze extracted dependencies | ✅ | 146 JARs categorized; see Spike A findings |
-| B-4 | Design build integration strategy | 🔲 | Gradle platform, compileOnly, version catalog |
-| B-5 | Create Gradle platform module or TOML overlay | 🔲 | `pa-platform-9.0/` or `gradle/pa-provided.toml` |
-| B-6 | Prototype adapter build with `compileOnly` Jackson | 🔲 | Validate compilation, test execution |
-| B-7 | Implement runtime version guard | 🔲 | `configure()` check, warn on mismatch |
-| B-8 | Document version-locked release strategy | 🔲 | Plugin version = PA version contract |
-| B-9 | Update spec, SDK guide, and PLAN.md | 🔲 | Reflect new dependency strategy |
+| B-4 | Design build integration strategy | ✅ | Separate `pa-provided.versions.toml` catalog |
+| B-5 | Create Gradle version catalog for PA deps | ✅ | `gradle/pa-provided.versions.toml` generated |
+| B-6 | Downgrade core to PA-aligned Jackson | ✅ | 2.18.4 → 2.17.0; all 258 tests pass |
+| B-7 | Design runtime version guard | ✅ | Design documented below — impl in Feature 002 |
+| B-8 | Document version-locked release strategy | ✅ | See §Release Strategy below |
+| B-9 | Update spec, SDK guide, and PLAN.md | 🔲 | Deferred to Feature 002 implementation |
 
 ---
 
@@ -736,6 +736,276 @@ When both spikes are complete, we will have:
 1. **Current relocation design stands** — no spec changes needed
 2. **Document why** in an ADR — future contributors don't re-explore
 3. **Classloader model is still documented** — valuable regardless
+
+---
+
+## Runtime Version Guard Design (B-7)
+
+### Purpose
+
+The adapter compiles against specific PA-provided library versions (e.g.,
+Jackson 2.17.0). If PA upgrades its bundled libraries between releases, the
+adapter may encounter binary incompatibilities at runtime. The version guard
+detects this at plugin initialization time, before any request processing.
+
+### Location
+
+The guard runs once during `configure()` (PA plugin lifecycle — called during
+admin UI configuration save and engine startup). It does NOT block plugin
+loading but logs a clear warning.
+
+### Implementation Design
+
+```java
+/**
+ * Checks that PA-provided library versions at runtime match the versions
+ * this adapter was compiled against. Logs warnings on mismatch.
+ *
+ * Called once from configure(). Does not throw — mismatches are warnings,
+ * not fatal errors, because minor version differences are usually safe.
+ */
+private void checkDependencyVersionAlignment() {
+    // 1. Read compiled-against versions from build-time resource
+    Properties buildVersions = new Properties();
+    try (InputStream is = getClass().getResourceAsStream(
+            "/META-INF/message-xform/pa-compiled-versions.properties")) {
+        if (is != null) buildVersions.load(is);
+    } catch (IOException e) {
+        LOG.warn("Cannot read compiled dependency versions — skipping version guard");
+        return;
+    }
+
+    String compiledJackson = buildVersions.getProperty("jackson.version", "unknown");
+    String compiledSlf4j = buildVersions.getProperty("slf4j.version", "unknown");
+
+    // 2. Detect runtime Jackson version
+    String runtimeJackson;
+    try {
+        com.fasterxml.jackson.core.Version v =
+            new com.fasterxml.jackson.databind.ObjectMapper().version();
+        runtimeJackson = v.getMajorVersion() + "." + v.getMinorVersion() + "." + v.getPatchLevel();
+    } catch (Throwable t) {
+        runtimeJackson = "unavailable";
+    }
+
+    // 3. Detect runtime SLF4J version
+    String runtimeSlf4j;
+    try {
+        Package p = org.slf4j.LoggerFactory.class.getPackage();
+        runtimeSlf4j = p != null ? p.getImplementationVersion() : "unavailable";
+        if (runtimeSlf4j == null) runtimeSlf4j = "unavailable";
+    } catch (Throwable t) {
+        runtimeSlf4j = "unavailable";
+    }
+
+    // 4. Compare and log
+    LOG.info("Version guard: compiled against Jackson={}, SLF4J={}",
+             compiledJackson, compiledSlf4j);
+    LOG.info("Version guard: runtime provides  Jackson={}, SLF4J={}",
+             runtimeJackson, runtimeSlf4j);
+
+    if (!compiledJackson.equals(runtimeJackson) && !"unavailable".equals(runtimeJackson)) {
+        LOG.warn("⚠️  Jackson version mismatch: compiled={}, runtime={}. "
+                 + "The adapter was tested against {}. If you see ClassCastException "
+                 + "or NoSuchMethodError, upgrade the adapter to match PA's version.",
+                 compiledJackson, runtimeJackson, compiledJackson);
+    }
+}
+```
+
+### Build-Time Version Injection
+
+The compiled-against versions are injected at build time via Gradle's
+`processResources` task:
+
+```kotlin
+// adapter-pingaccess/build.gradle.kts
+tasks.named<ProcessResources>("processResources") {
+    val paVersions = extensions.getByType<VersionCatalogsExtension>()
+        .named("paProvided")
+
+    filesMatching("META-INF/message-xform/pa-compiled-versions.properties") {
+        expand(
+            "jacksonVersion" to paVersions.findVersion("pa-jackson").get().toString(),
+            "slf4jVersion" to paVersions.findVersion("pa-slf4j").get().toString(),
+            "paVersion" to paVersions.findVersion("pa-sdk").get().toString(),
+        )
+    }
+}
+```
+
+With a template resource:
+
+```properties
+# META-INF/message-xform/pa-compiled-versions.properties
+# Build-time generated — do not edit manually
+jackson.version=${jacksonVersion}
+slf4j.version=${slf4jVersion}
+pa.version=${paVersion}
+```
+
+### Mismatch Severity Matrix
+
+| Mismatch Type | Example | Risk | Action |
+|--------------|---------|------|--------|
+| Patch (x.y.Z) | 2.17.0 → 2.17.2 | Low | INFO log, continue |
+| Minor (x.Y.z) | 2.17.0 → 2.18.0 | Medium | WARN log, continue |
+| Major (X.y.z) | 2.17.0 → 3.0.0 | High | WARN log, recommend upgrade |
+| SLF4J 1.x→2.x | 1.7.36 → 2.0.x | Low | INFO log (expected — Option B) |
+
+---
+
+## Release Strategy (B-8)
+
+### Version-Locked Releases
+
+The adapter is **version-locked** to specific PingAccess releases:
+
+```
+message-xform-adapter-pingaccess-9.0.x     →  PA 9.0.*
+message-xform-adapter-pingaccess-9.1.x     →  PA 9.1.*  (future)
+message-xform-adapter-pingaccess-10.0.x    →  PA 10.0.* (future)
+```
+
+**Naming convention:** `adapter-pingaccess-<PA_MAJOR>.<PA_MINOR>.<adapter_patch>`
+
+The adapter's patch version is independent of PA's patch version. PA patch
+updates (e.g., 9.0.1 → 9.0.2) typically don't change library versions, so
+the same adapter patch should work. The version guard catches any drift.
+
+### PA Upgrade Workflow
+
+When PingAccess releases a new version:
+
+```
+1. Pull new Docker image
+   docker pull pingidentity/pingaccess:<new-version>
+
+2. Run extraction script
+   ./scripts/pa-extract-deps.sh pingidentity/pingaccess:<new-version>
+
+3. Review version alignment output
+   - If Jackson version unchanged → adapter compatible, no code changes
+   - If Jackson minor version changed → update libs.versions.toml, re-test
+   - If Jackson major version changed → full adapter review required
+
+4. Update libs.versions.toml (if needed)
+   jackson = "<new-version>"
+
+5. Run full test suite
+   ./gradlew clean check
+
+6. Update pa-provided.versions.toml
+   - Generated automatically by step 2
+   - Commit the updated file
+
+7. Tag release
+   git tag adapter-pingaccess-<PA_MAJOR>.<PA_MINOR>.<patch>
+```
+
+### Dual Version Catalog Architecture
+
+The project uses **two version catalogs**:
+
+| Catalog | File | Purpose | Who Controls |
+|---------|------|---------|-------------|
+| `libs` | `gradle/libs.versions.toml` | Core engine + standalone adapter deps | Developer chooses latest stable |
+| `paProvided` | `gradle/pa-provided.versions.toml` | PA-provided deps (compileOnly) | Script-generated from Docker image |
+
+To register the second catalog in `settings.gradle.kts`:
+
+```kotlin
+dependencyResolutionManagement {
+    versionCatalogs {
+        create("paProvided") {
+            from(files("gradle/pa-provided.versions.toml"))
+        }
+    }
+}
+```
+
+Then in `adapter-pingaccess/build.gradle.kts`:
+
+```kotlin
+dependencies {
+    // Core engine (all classes merged into shadow JAR)
+    implementation(project(":core"))
+
+    // PA-provided: compile against, but DO NOT bundle
+    compileOnly(paProvided.pa.jackson.databind)
+    compileOnly(paProvided.pa.jackson.annotations)
+    compileOnly(paProvided.pa.slf4j.api)
+    compileOnly(paProvided.pa.jakarta.validation)
+    compileOnly(paProvided.pa.jakarta.inject)
+
+    // PA SDK (local JAR — not in Maven Central)
+    compileOnly(files("libs/pingaccess-sdk-9.0.1.0.jar"))
+}
+```
+
+### Jackson Version: Core vs PA Adapter
+
+```
+┌──────────────────────────────┐
+│         libs.versions.toml   │  jackson = "2.17.0"  ← MUST match PA
+│                              │  slf4j = "2.0.16"    ← standalone uses 2.x
+│  Used by: core,              │
+│           adapter-standalone │
+└──────────────┬───────────────┘
+               │ api(jackson-databind)
+               │ implementation(slf4j-api)
+               ▼
+┌──────────────────────────────┐
+│          core module         │  Compiles against Jackson 2.17.0
+│                              │  Classes unpacked into shadow JARs
+└──────┬───────────────┬───────┘
+       │               │
+       ▼               ▼
+┌─────────────┐  ┌──────────────────┐
+│ adapter-    │  │ adapter-         │
+│ standalone  │  │ pingaccess       │
+│             │  │                  │
+│ Bundles ALL │  │ Shadow excludes: │
+│ (fat JAR)   │  │  - Jackson       │
+│ SLF4J 2.x + │  │  - SLF4J        │
+│ Logback     │  │  - Jakarta       │
+│             │  │                  │
+│ Self-       │  │ PA provides at   │
+│ contained   │  │ runtime via flat │
+│             │  │ classpath        │
+└─────────────┘  └──────────────────┘
+```
+
+**Key constraint:** `libs.versions.toml` Jackson version MUST equal
+`pa-provided.versions.toml` `pa-jackson` version. The extraction script's
+Step 7 (version alignment check) validates this automatically.
+
+### CI Enforcement (Future)
+
+```yaml
+# .github/workflows/pa-version-check.yml
+- name: Verify PA dependency alignment
+  run: |
+    LIBS_JACKSON=$(grep '^jackson = ' gradle/libs.versions.toml | cut -d'"' -f2)
+    PA_JACKSON=$(grep '^pa-jackson = ' gradle/pa-provided.versions.toml | cut -d'"' -f2)
+    if [ "$LIBS_JACKSON" != "$PA_JACKSON" ]; then
+      echo "❌ Jackson version mismatch: libs=$LIBS_JACKSON pa=$PA_JACKSON"
+      exit 1
+    fi
+```
+
+---
+
+## Artifacts Produced
+
+| Artifact | Path |
+|----------|------|
+| Extraction script | `scripts/pa-extract-deps.sh` |
+| PA version catalog | `gradle/pa-provided.versions.toml` |
+| PA dependency summary | `docs/reference/pa-provided-deps.md` |
+| Jackson downgrade | `gradle/libs.versions.toml` (2.18.4 → 2.17.0) |
+| Byte Buddy allowlist | `StandaloneDependencyTest.java` (transitive of Jackson 2.17) |
+| This spike document | `docs/research/spike-pa-dependency-extraction.md` |
 
 ---
 

@@ -54,7 +54,8 @@ class StandaloneDependencyTest {
             "com.networknt", // JSON Schema Validator (core transitive)
             "org.jetbrains.kotlin", // Kotlin stdlib (Javalin transitive)
             "org.jetbrains", // JetBrains annotations (Kotlin transitive)
-            "ch.qos.logback" // Logback (runtime)
+            "ch.qos.logback", // Logback (runtime)
+            "net.bytebuddy" // Byte Buddy (Jackson 2.17 transitive)
             );
 
     @Test
