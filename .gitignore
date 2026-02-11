@@ -39,3 +39,4 @@ binaries/
 
 # Docker
 docker-compose.override.yml
+.sdk-decompile/
