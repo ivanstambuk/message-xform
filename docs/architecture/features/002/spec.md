@@ -565,19 +565,20 @@ the PingAccess plugin lifecycle (official 7-step sequence from SDK guide §1):
    > This affects the PA admin REST API contract: when creating/updating the
    > rule, all config fields must be present in the JSON payload.
 
-5. **`configure()` call:** `configure(MessageTransformConfig)` is called. At
-   this point, the plugin MUST:
+5. **Bean Validation:** `Validator.validate()` is invoked on the
+   `MessageTransformConfig`. Since PA 5.0+, Bean Validation runs **before**
+   `configure()` is called — `@NotNull`, `@Size`, and other constraint
+   annotations on config fields are guaranteed to be enforced before the
+   plugin receives them.
+6. **`configure()` call:** `configure(MessageTransformConfig)` is called. At
+   this point, all config fields have already passed Bean Validation. The
+   plugin MUST:
    - Initialize `SpecParser` with JSLT expression engine.
    - Initialize `TransformEngine`.
    - Load all specs from `specsDir`.
    - Optionally load profiles from `profilesDir`.
-6. **Bean Validation:** `Validator.validate()` is invoked on the
-   `MessageTransformConfig`. Since PA 5.0+, validation runs **before**
-   `configure()` was called in the old model — PingAccess now validates
-   **before** `configure()` is called, so `@NotNull`, `@Size`, and other
-   constraint annotations on config fields are guaranteed to be enforced
-   before the plugin receives them. The adapter SHOULD NOT duplicate
-   constraint checks in `configure()` that are already covered by annotations.
+   The adapter SHOULD NOT duplicate constraint checks in `configure()` that
+   are already covered by Bean Validation annotations.
 7. **Available:** The instance is made available to service end-user requests
    via `handleRequest(Exchange)` and `handleResponse(Exchange)`.
 
@@ -595,8 +596,9 @@ thread flag provides a fallback safety net. See SDK guide §1.
 > | 2 | `ThirdPartyServiceModel` | Handle to a third-party service |
 > | 3 | `HttpClient` | Async HTTP client for third-party calls |
 >
-> No other PA-internal classes can be injected. Use `javax.inject.Inject`
+> No other PA-internal classes can be injected. Use `jakarta.inject.Inject`
 > — **NOT** Spring's `@Autowired` — to protect against PA internal changes.
+> (Verified: PA SDK 9.0.1.0 bytecode uses `jakarta.inject.Inject`.)
 > `AsyncRuleInterceptorBase` already pre-wires `HttpClient` and
 > `TemplateRenderer` via setter injection, so explicit `@Inject` is only
 > needed if implementing the raw SPI interface without using the base class.
@@ -641,6 +643,15 @@ override earlier layers on key collision:
 > [`docs/architecture/features/002/pingaccess-sdk-guide.md` §6 "Building $session"](pingaccess-sdk-guide.md#building-session--flat-merge-pattern)
 > for the complete `buildSessionContext()` implementation including boundary
 > conversion for Jackson relocation.
+>
+> ⚠️ **Critical — Jackson boundary conversion (Issues 4 & 5 from review):**
+> Layers 3 and 4 return `JsonNode` values from PA's classloader. After Jackson
+> relocation, these are **different classes** from the adapter's shaded
+> `JsonNode`. Directly setting PA `JsonNode` values into the shaded `ObjectNode`
+> via `session.set(key, value)` causes `ClassCastException` at runtime. **All
+> PA-sourced `JsonNode` values MUST be boundary-converted** via
+> `paObjectMapper.writeValueAsBytes()` → `ourObjectMapper.readTree()` before
+> merging into the session object. See FR-002-09 Constraint 8.
 
 #### `$session` Schema (flat)
 

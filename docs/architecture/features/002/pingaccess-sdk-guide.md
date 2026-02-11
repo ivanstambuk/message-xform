@@ -161,13 +161,13 @@ as the example (identical for other plugin types):
    > ⚠️ **Critical:** The JSON plugin configuration **must contain a JSON member
    > for each field**, regardless of implied value. Failure to include a field in
    > the JSON — even if the field has a default value in Java — can lead to errors.
-5. **`configure()` call:** `ConfigurablePlugin.configure(PluginConfiguration)` is
-   called, giving the plugin a chance to post-process configuration.
-6. **Validation:** `Validator.validate(Object, Class[])` is invoked on the
-   `PluginConfiguration`. Since PA 5.0, validation runs **before** `configure()`
-   was called in the old model. PingAccess now validates **before** `configure()`
-   is called, so constraint annotations on PluginConfiguration fields are
-   guaranteed to be enforced before the plugin receives them.
+5. **Validation:** `Validator.validate(Object, Class[])` is invoked on the
+   `PluginConfiguration`. Since PA 5.0+, Bean Validation runs **before**
+   `configure()` is called — constraint annotations on PluginConfiguration
+   fields are guaranteed to be enforced before the plugin receives them.
+6. **`configure()` call:** `ConfigurablePlugin.configure(PluginConfiguration)` is
+   called, giving the plugin a chance to post-process configuration. At this
+   point, all config fields have already passed Bean Validation.
 7. **Available:** The instance is made available to service end-user requests via
    `handleRequest(Exchange)` and `handleResponse(Exchange)`.
 
@@ -186,7 +186,7 @@ initialization (see Lifecycle step 2 above).
 
 > ⚠️ **Future-proofing:** To protect your code against changes in PingAccess
 > internals, **do not use Spring as a direct dependency**. Use the annotation
-> `javax.inject.Inject` for any injection instead of Spring-specific annotations
+> `jakarta.inject.Inject` for any injection instead of Spring-specific annotations
 > like `@Autowired`.
 
 **Injectable classes (definitive, closed list):**
@@ -766,19 +766,32 @@ private JsonNode buildSessionContext(Identity identity) {
     }
 
     // Layer 3: OIDC claims / token attributes (SPREAD into flat object)
-    JsonNode attributes = identity.getAttributes();
-    if (attributes != null && attributes.isObject()) {
-        attributes.fields().forEachRemaining(entry ->
+    // ⚠️ BOUNDARY CONVERSION: identity.getAttributes() returns a PA-classloader
+    // JsonNode. After Jackson relocation, PA's JsonNode and our shaded JsonNode
+    // are different classes. We MUST serialize → deserialize at the boundary.
+    JsonNode paAttributes = identity.getAttributes();
+    if (paAttributes != null && paAttributes.isObject()) {
+        byte[] attrBytes = paObjectMapper.writeValueAsBytes(paAttributes);
+        JsonNode shadedAttributes = ourObjectMapper.readTree(attrBytes);
+        shadedAttributes.fields().forEachRemaining(entry ->
             session.set(entry.getKey(), entry.getValue())  // overrides layers 1-2 on collision
         );
     }
 
     // Layer 4: Session state (SPREAD into flat object — highest precedence)
+    // ⚠️ BOUNDARY CONVERSION: sss.getAttributes() returns Map<String, JsonNode>
+    // where each JsonNode is from PA's classloader. Convert each value.
     SessionStateSupport sss = identity.getSessionStateSupport();
     if (sss != null && sss.getAttributes() != null) {
-        sss.getAttributes().forEach((key, value) ->
-            session.set(key, value)  // overrides all previous layers on collision
-        );
+        sss.getAttributes().forEach((key, paValue) -> {
+            try {
+                byte[] valBytes = paObjectMapper.writeValueAsBytes(paValue);
+                JsonNode shadedValue = ourObjectMapper.readTree(valBytes);
+                session.set(key, shadedValue);  // overrides all previous layers
+            } catch (IOException e) {
+                LOG.warn("Failed to boundary-convert session attribute '{}'", key, e);
+            }
+        });
     }
 
     return session;
@@ -1280,7 +1293,7 @@ backend has not yet responded. You MUST use `ResponseBuilder` to construct a new
 
 ```java
 // DENY mode — handleRequest error path
-byte[] errorBody = result.errorResponse().getBytes(StandardCharsets.UTF_8);
+byte[] errorBody = objectMapper.writeValueAsBytes(result.errorResponse()); // errorResponse() returns JsonNode
 Response errorResponse = ResponseBuilder.newInstance(HttpStatus.BAD_GATEWAY)
     .header("Content-Type", "application/problem+json")
     .body(errorBody)
@@ -1303,7 +1316,7 @@ During `handleResponse()`, the response object already exists. Rewrite in-place:
 
 ```java
 // DENY mode — handleResponse error path
-byte[] errorBody = result.errorResponse().getBytes(StandardCharsets.UTF_8);
+byte[] errorBody = objectMapper.writeValueAsBytes(result.errorResponse()); // errorResponse() returns JsonNode
 exchange.getResponse().setBodyContent(errorBody);  // auto-updates Content-Length
 exchange.getResponse().setStatus(HttpStatus.BAD_GATEWAY);
 exchange.getResponse().getHeaders().setContentType("application/problem+json");
