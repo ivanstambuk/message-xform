@@ -857,7 +857,7 @@ be declared `compileOnly` and **not** bundled in the shadow JAR:
 >
 > **Evidence:** Verified via static analysis of PA 9.0.1 (`run.sh` classpath
 > construction, `javap` decompilation of `ServiceFactory`, `Bootstrap`,
-> `ConfigurablePluginPostProcessor`). See `docs/research/spike-pa-classloader-model.md`.
+> `ConfigurablePluginPostProcessor`). See ADR-0031.
 
 **SnakeYAML:** Not shipped by PA — MUST be bundled in the shadow JAR as an
 `implementation` dependency.

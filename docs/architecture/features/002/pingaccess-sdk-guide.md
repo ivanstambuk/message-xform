@@ -1486,7 +1486,7 @@ Plugin discovery uses `ServiceLoader.load(Class)` (single-argument form) in
 both `ServiceFactory` and `ConfigurablePluginPostProcessor` — this uses the
 thread context classloader, which on a flat classpath is the AppClassLoader.
 
-Full analysis: `docs/research/spike-pa-classloader-model.md`.
+Full analysis: ADR-0031 (PA-Provided Dependencies).
 
 ### Shadow JAR Contents
 

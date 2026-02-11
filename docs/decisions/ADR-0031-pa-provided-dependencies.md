@@ -36,37 +36,57 @@ This assumption carried significant costs:
 | Increased JAR size | +2-3 MB of bundled Jackson |
 | Code complexity | 4 extra conversion paths in `buildSessionContext()` |
 
-### Investigation (Spike A)
+### Investigation
 
 We reverse-engineered PingAccess 9.0.1's classloading model through static
-analysis — without building a diagnostic plugin:
+analysis (bytecode decompilation and startup script inspection) — without
+building or deploying a diagnostic plugin.
 
-1. **Extracted `run.sh`** from the Docker image (`/opt/out/instance/bin/run.sh`).
-   Line 59 constructs the classpath:
+1. **Flat classpath** — `run.sh` (line 59) constructs the classpath:
    ```
    CLASSPATH="${CLASSPATH}:${SERVER_ROOT_DIR}/lib/*:${SERVER_ROOT_DIR}/deploy/*"
    ```
-   This is a **flat classpath** — `lib/*` (PA libraries) and `deploy/*`
-   (plugin JARs) share the same JVM application classloader.
+   PA places **all** JARs — platform libs (`lib/*`, 146 JARs) AND plugin
+   JARs (`deploy/*`) — on the same flat classpath. The JVM is launched with
+   a standard `-classpath` flag (`com.pingidentity.pa.cli.Starter`). There is
+   no OSGi, no module system, no custom classloader creation.
 
-2. **Decompiled bytecode** with `javap -c -p`:
+2. **Bytecode evidence** (decompiled with `javap -c -p`):
    - `Bootstrap.invokeMain()` uses `this.getClass().getClassLoader().loadClass()`
-     — no custom classloader.
-   - `ServiceFactory.getImplClasses()` and
-     `ConfigurablePluginPostProcessor.getClasses()` both call
-     `ServiceLoader.load(Class)` — single-argument form, uses the thread
-     context classloader (= application classloader on a flat classpath).
-   - No class in any PA JAR creates a `URLClassLoader` or custom classloader
-     for plugin isolation.
+     — no child classloader is created.
+   - `ServiceFactory.getImplClasses()` calls `ServiceLoader.load(Class)` —
+     the single-argument form, which uses the thread context classloader
+     (= the application classloader on a flat classpath).
+   - `ConfigurablePluginPostProcessor.getClasses()` uses the same
+     `ServiceLoader.load(Class)` pattern.
+   - Scanning all PA JARs (`grep -iE "classload|URLClass"`) found only
+     `LocalizationResourceClassLoaderUtils` — used solely for loading i18n
+     resource bundles (`.properties`), not for plugin isolation.
+   - Discovered plugin classes are registered as **Spring prototype beans**
+     via `BeanDefinitionBuilder.genericBeanDefinition(implClass).setScope("prototype")`
+     — no classloader boundary between PA and plugins.
 
-3. **Confirmed Jackson versions** in `/opt/server/lib/`:
-   - `jackson-databind-2.17.0.jar`
-   - `jackson-core-2.17.0.jar`
-   - `jackson-annotations-2.17.0.jar`
-   - `jackson-datatype-jdk8-2.17.0.jar`
-   - `jackson-datatype-jsr310-2.17.0.jar`
+3. **PA 9.0.1 library inventory** (extracted from `/opt/server/lib/`, 146 JARs):
 
-Full evidence: `docs/research/spike-pa-classloader-model.md`.
+   | Library | Version | Available to plugins? |
+   |---------|---------|----------------------|
+   | `jackson-databind` | 2.17.0 | ✅ Yes |
+   | `jackson-core` | 2.17.0 | ✅ Yes |
+   | `jackson-annotations` | 2.17.0 | ✅ Yes |
+   | `jackson-datatype-jdk8` | 2.17.0 | ✅ Yes |
+   | `jackson-datatype-jsr310` | 2.17.0 | ✅ Yes |
+   | `slf4j-api` | 1.7.36 | ✅ Yes (SLF4J 1.x, not 2.x) |
+   | `log4j-api` / `log4j-slf4j-impl` | 2.24.3 | ✅ Yes (Log4j2, **not** Logback) |
+   | `jakarta.validation-api` | 3.1.1 | ✅ Yes |
+   | `jakarta.inject-api` | 2.0.1 | ✅ Yes |
+   | `hibernate-validator` | 7.0.5.Final | ✅ Yes |
+   | `commons-lang3` | 3.14.0 | ✅ Yes |
+   | `guava` | 33.1.0-jre | ✅ Yes |
+   | `spring-context` / `spring-beans` | 6.2.11 | ✅ Yes |
+   | `netty-*` | 4.1.127.Final | ✅ Yes (PA uses Netty, not Jetty) |
+   | `third-party-jackson-core` | 2.17.131 | N/A — AWS SDK's own shaded copy (`software.amazon.awssdk.thirdparty.jackson`), irrelevant to plugins |
+   | SnakeYAML | — | ❌ **Not shipped** — must bundle |
+   | Logback | — | ❌ **Not shipped** — PA uses Log4j2 |
 
 ### Options Considered
 
@@ -148,14 +168,25 @@ We adopt **Option A – `compileOnly` Jackson, no relocation**.
 ```
 ┌─────────────────────────────────────────────────────────┐
 │              JVM Bootstrap Classloader                   │
+│    (java.base, java.lang, java.util, etc.)              │
 └───────────────────────┬─────────────────────────────────┘
                         │
 ┌───────────────────────▼─────────────────────────────────┐
 │     jdk.internal.loader.ClassLoaders$AppClassLoader      │
 │                                                          │
 │  Classpath:                                              │
+│    /opt/server/conf/                                     │
+│    /opt/server/resource/bc/non-fips/*    (BouncyCastle)  │
 │    /opt/server/lib/*                     (146 JARs)      │
 │    /opt/server/deploy/*                  (plugin JARs)   │
+│                                                          │
+│  ┌────────────────────┐  ┌──────────────────────┐       │
+│  │  PA Platform JARs  │  │  Plugin JARs         │       │
+│  │  (engine, admin,   │  │  (our adapter,       │       │
+│  │   sdk, jackson,    │  │   deployed to         │       │
+│  │   spring, netty,   │  │   /opt/server/deploy/) │       │
+│  │   log4j, ...)      │  │                       │       │
+│  └────────────────────┘  └──────────────────────┘       │
 │                                                          │
 │  SAME classloader → SAME Class objects → NO isolation   │
 └─────────────────────────────────────────────────────────┘
@@ -184,8 +215,10 @@ Negative / trade-offs:
   IntelliJ, Jenkins, Gradle).
 
 Validating evidence:
-- `docs/research/spike-pa-classloader-model.md` — full reverse-engineering log.
-- `docs/research/spike-pa-dependency-extraction.md` — dependency inventory.
+- Bytecode decompilation of `pingaccess-cli-9.0.1.0.jar` (Bootstrap, Starter),
+  `pingaccess-engine-9.0.1.0.jar` (PluginRegistry, ConfigurablePluginPostProcessor),
+  and `pingaccess-sdk-9.0.1.0.jar` (ServiceFactory) — all confirm flat classpath
+  with standard `ServiceLoader` discovery and no custom classloader creation.
 
 References:
 - Feature 002 spec: `docs/architecture/features/002/spec.md` (FR-002-06, FR-002-09)
