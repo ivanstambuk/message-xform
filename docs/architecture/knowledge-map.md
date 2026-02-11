@@ -1,6 +1,6 @@
 # Knowledge Map
 
-Status: Draft | Last updated: 2026-02-11
+Status: Draft | Last updated: 2026-02-12
 
 This document maps the architectural relationships between modules, specs, ADRs,
 and key concepts in message-xform. It serves as a navigational aid for agents and
@@ -108,6 +108,9 @@ ADR-0027 (URL Rewriting)     governs ── FR-001-12, references ADR-0002, ADR-
 ADR-0028 (Perf Strategy)     governs ── NFR-001-03, references Feature 009
 ADR-0029 (Javalin Proxy)     governs ── FR-004-01, references ADR-0025, ADR-0013
 ADR-0030 (Session Context)   governs ── FR-001-13, references ADR-0021, ADR-0020, ADR-0025
+ADR-0031 (PA-Provided Deps)  governs ── FR-002-06, FR-002-09 (partially superseded by ADR-0032)
+ADR-0032 (Core ACL)          governs ── FR-001-14, NFR-001-02, references ADR-0031, ADR-0033
+ADR-0033 (Port Value Objects) governs ── FR-001-14, references ADR-0032
 ```
 
 ## Feature → ADR → NFR Traceability
@@ -129,6 +132,7 @@ ADR-0030 (Session Context)   governs ── FR-001-13, references ADR-0021, ADR-
 | FR-001-09 (Schema Validation) | ADR-0001, ADR-0022 | — |
 | FR-001-12 (URL Rewriting) | ADR-0027 | — |
 | FR-001-13 (Session Context) | ADR-0030 | — |
+| FR-001-14 (Byte Boundary) | ADR-0032, ADR-0033 | NFR-001-02 |
 | NFR-001-03 (Latency) | ADR-0028 | NFR-001-03 |
 | Hot Reload | — | NFR-001-05 |
 | FR-002-01 (GatewayAdapter) | ADR-0013, ADR-0025 | — |
@@ -139,7 +143,7 @@ ADR-0030 (Session Context)   governs ── FR-001-13, references ADR-0021, ADR-
 | FR-002-06 (Session Context) | ADR-0030, ADR-0031 | — |
 | FR-002-07 (ExchangeProperty) | — | — |
 | FR-002-08 (SPI Registration) | — | — |
-| FR-002-09 (Deployment Packaging) | ADR-0031 | NFR-002-02 |
+| FR-002-09 (Deployment Packaging) | ADR-0031, ADR-0032 | NFR-002-02 |
 | FR-002-10 (Gradle Module) | — | NFR-002-05 |
 | FR-002-11 (Error Handling) | ADR-0022, ADR-0024 | — |
 | FR-002-12 (Docker E2E Test) | — | — |
@@ -172,3 +176,4 @@ ADR-0030 (Session Context)   governs ── FR-001-13, references ADR-0021, ADR-
 | `docs/architecture/features/002/pingaccess-sdk-guide.md` | Standalone PingAccess 9.0 SDK reference (19 sections, 112 classes) | Feature 002 spec, all adapter implementation |
 | `docs/research/spike-pa-classloader-model.md` | Spike A: Reverse-engineer PA classloader hierarchy, delegation model, library visibility | Feature 002 dependency strategy, ADR-0031 |
 | `docs/research/spike-pa-dependency-extraction.md` | Spike B: Extract PA library versions from Docker, design version-locked build alignment | Feature 002 dependency strategy, build system |
+| `docs/research/core-byte-boundary-plan.md` | Core byte-boundary refactor: Phases 0–7 plan for anti-corruption layer (ADR-0032, ADR-0033) | Feature 001 `MessageBody`/`HttpHeaders`/`SessionContext`, Feature 002 adapter migration |

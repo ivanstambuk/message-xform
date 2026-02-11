@@ -448,8 +448,8 @@ a regex, instead of using `KeyValuePair` (SLF4J 2.x-only class).
 | # | Task | Status | Task ID |
 |---|------|--------|---------|
 | 5.1 | Update `adapter-standalone` | ✅ Done | — |
-| 5.2 | Update `adapter-pingaccess` (Feature 002) | 🔲 | — |
-| 5.3 | Update `StandaloneDependencyTest` | 🔲 | — |
+| 5.2 | Update `adapter-pingaccess` (Feature 002) | 🔲 Deferred | — |
+| 5.3 | Update `StandaloneDependencyTest` | ✅ Not needed | — |
 
 ### 5.1 — Update `adapter-standalone`
 
@@ -511,9 +511,10 @@ if (result.isSuccess()) {
 
 ### 5.3 — Update `StandaloneDependencyTest`
 
-Jackson groups (`com.fasterxml.jackson.core`, etc.) will no longer appear in
-standalone's compile classpath — they're relocated inside core's shadow JAR.
-Update allowed groups accordingly.
+**Status: ✅ Not needed.** Jackson groups still appear in standalone's compile
+classpath because **Javalin** (not core) pulls them in transitively. The
+existing `ALLOWED_GROUPS` already include `com.fasterxml.jackson.*` and
+`net.bytebuddy`, so the test passes without changes.
 
 ---
 
@@ -554,14 +555,16 @@ Update allowed groups accordingly.
 
 ## Phase 7: Cleanup
 
-**Status: 🔲 Not started**
+**Status: 🔧 In progress**
 
 | # | Task | Status | Task ID |
 |---|------|--------|---------|
-| 7.1 | Revert Jackson version | 🔲 | — |
-| 7.2 | Remove `net.bytebuddy` from `StandaloneDependencyTest` | 🔲 | — |
-| 7.3 | Update ADR-0031 | 🔲 | — |
-| 7.4 | Update PLAN.md | 🔲 | — |
+| 7.1 | Revert Jackson version | 🔲 Deferred | — |
+| 7.2 | Remove `net.bytebuddy` from `StandaloneDependencyTest` | ✅ Not needed | — |
+| 7.3 | Update ADR-0031 | ✅ Done | — |
+| 7.4 | Update PLAN.md | ✅ Done | — |
+| 7.5 | Update knowledge-map.md | ✅ Done | — |
+| 7.6 | Update llms.txt | ✅ Done | — |
 
 ### 7.1 — Revert Jackson version
 
@@ -640,8 +643,8 @@ Phase 0  ──► Phase 1 ──► Phase 2 ──► Phase 4 ──► Phase 3
 | **Phase 2** (Migrate core API) | ✅ Complete (Message, TransformResult, TransformContext, Engine, all tests) | Implement |
 | **Phase 3** (Shadow/relocate) | ✅ Complete (1173 relocated Jackson classes, 3.6 MB JAR, 0 leakage) | Implement |
 | **Phase 4** (SLF4J enforcement) | ✅ Complete (source-scan guard in build.gradle.kts, fluent API removal) | Implement |
-| **Phase 5** (Adapters) | 🔧 5.1 Done (standalone), 5.2 pending (PA) | Implement |
-| **Phase 7** (Cleanup) | 🔲 Not started | Verify |
+| **Phase 5** (Adapters) | 🔧 5.1 Done (standalone), 5.2 deferred (PA), 5.3 not needed | Implement |
+| **Phase 7** (Cleanup) | 🔧 In progress (7.1 deferred, rest done) | Verify |
 
 **Rationale:**
 0. **Phase 0** (spec + tasks) MUST come first — SDD Principle 1 (Specifications Lead Execution).

@@ -71,6 +71,7 @@ docs/research/gateway-candidates.md
 docs/research/pingam-callback-api.md
 docs/research/t-001-12-jslt-context-variables.md
 docs/research/standalone-proxy-http-server.md
+docs/research/core-byte-boundary-plan.md
 
 # Implementation tracking
 docs/architecture/features/001/tasks.md
@@ -92,6 +93,15 @@ core/src/main/java/io/messagexform/core/spi/TelemetryListener.java
 # Core engine classes
 core/src/main/java/io/messagexform/core/engine/TransformEngine.java
 core/src/main/java/io/messagexform/core/engine/TransformRegistry.java
+
+# Core port value objects (ADR-0033 — byte boundary)
+core/src/main/java/io/messagexform/core/model/MessageBody.java
+core/src/main/java/io/messagexform/core/model/HttpHeaders.java
+core/src/main/java/io/messagexform/core/model/MediaType.java
+core/src/main/java/io/messagexform/core/model/SessionContext.java
+core/src/main/java/io/messagexform/core/model/Message.java
+core/src/main/java/io/messagexform/core/model/TransformContext.java
+core/src/main/java/io/messagexform/core/model/TransformResult.java
 
 # Plan
 PLAN.md
