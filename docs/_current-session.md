@@ -1,28 +1,35 @@
-# Current Session — 2026-02-11 (session 3)
+# Current Session State
 
-## Focus
-Cross-validation of Feature 002 `spec.md` against the enriched
-`pingaccess-sdk-guide.md`, followed by systematic spec alignment.
+**Date:** 2026-02-11
+**Focus:** Spec-002 review completion + JMX observability feature
 
-## Completed
-- Cross-validated spec against SDK guide — identified 14 gaps
-- Created batched alignment plan (5 batches, 10 actionable gaps)
-- Implemented all 5 batches:
-  - Batch 1: Plugin lifecycle (7-step) & injection constraints
-  - Batch 2: Configuration & UI enrichment (enum auto-discovery, @Help, ErrorHandlerUtil)
-  - Batch 3: Teardown & resource cleanup (@PreDestroy for ScheduledExecutorService)
-  - Batch 4: Test strategy (SPI registration test, ServiceFactory)
-  - Batch 5: Behavioral notes (TemplateRenderer non-usage, PA status codes)
-- Alignment plan self-deleted after completion
-- SDD audit: all checks passed (scenarios, terminology, ADRs, open questions, spec consistency)
+## Completed This Session
+
+### Spec Review (20/20 issues resolved)
+- Batches 1–5 completed across 5 commits
+- Fixed critical lifecycle ordering, error handling, boundary conditions
+- Added 6 new scenarios (S-002-29 through S-002-34)
+- Added precision notes for validation, deep-copy, thread safety
+
+### JMX Observability (FR-002-14) — New Feature
+- Promoted JMX MBeans from non-goal (N-002-05) to opt-in feature
+- Added `enableJmxMetrics` CHECKBOX config field (default: false)
+- Specified `MessageTransformMetricsMXBean` interface with counters, latency, reset
+- Documented PA's JMX monitoring ecosystem in SDK guide §19
+- Two-layer approach: SLF4J always-on + JMX opt-in
+
+### SDK Guide
+- Added §19: JMX Monitoring & Custom MBeans (245 lines)
+- Documents PA monitoring mechanisms, plugin MBean registration, JConsole patterns
 
 ## Key Decisions
-- ErrorHandlerUtil not used (RFC 9457 JSON vs PA HTML templates)
-- TemplateRenderer not used for error rendering
-- Belt-and-suspenders shutdown: @PreDestroy + daemon thread flag
-- Enum auto-discovery for SELECT config fields
+- JMX domain: `io.messagexform` (avoids PA internal collision)
+- LongAdder for counters (lock-free, contention-tolerant)
+- ObjectName.quote() for PA rule name safety
+- Zero overhead when disabled (no MBean registration, no counter allocation needed)
 
-## State
-- 6 unpushed commits on `main` (ahead of `origin/main`)
-- Working tree clean
-- Feature 002 spec now fully aligned with SDK guide
+## Spec State
+- 14 FRs (FR-002-01 through FR-002-14)
+- 34 scenarios (S-002-01 through S-002-34)
+- 4 NFRs, 10 constraints
+- SDK guide: 19 sections
