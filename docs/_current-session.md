@@ -1,37 +1,28 @@
-# Current Session State
+# Current Session — 2026-02-11 (session 3)
 
-**Date:** 2026-02-11
-**Focus:** SDK Guide Enrichment — incorporating official PingAccess documentation
+## Focus
+Cross-validation of Feature 002 `spec.md` against the enriched
+`pingaccess-sdk-guide.md`, followed by systematic spec alignment.
 
-## Completed This Session
-
-1. **SDK guide enrichment** (`7000942`)
-   - Incorporated all content from the official PingAccess 9.0.x SDK documentation
-     chapter "PingAccess Add-on SDK for Java" into `pingaccess-sdk-guide.md`
-   - 9 content batches completed (Batch 8 skipped — legacy migration content)
-   - Net change: +434 lines (2396 → 2803 lines), 18 sections, 112 SDK classes
-
-2. **Specific additions:**
-   - §1: Official 7-step lifecycle, injection guidance (3 injectable classes),
-     Agent vs Site rule differences, request immutability in handleResponse
-   - §9: Deploy directory semantics, mandatory restart requirement
-   - §15: Complete SPI reference matrix (5 extension points × sync/async)
-   - §17 (new): SDK directory structure, 7-step plugin creation, Maven/Gradle
-     adaptation, SDK prerequisites (Maven repo URL, offline fallback)
-   - §18 (new): Behavioral notes (request immutability, SLF4j logging)
-   - Header: Updated source attribution, added completeness marker
-   - Topic index: Updated with §17 and §18
-
-3. **Knowledge map updated** — added SDK guide as primary reference
+## Completed
+- Cross-validated spec against SDK guide — identified 14 gaps
+- Created batched alignment plan (5 batches, 10 actionable gaps)
+- Implemented all 5 batches:
+  - Batch 1: Plugin lifecycle (7-step) & injection constraints
+  - Batch 2: Configuration & UI enrichment (enum auto-discovery, @Help, ErrorHandlerUtil)
+  - Batch 3: Teardown & resource cleanup (@PreDestroy for ScheduledExecutorService)
+  - Batch 4: Test strategy (SPI registration test, ServiceFactory)
+  - Batch 5: Behavioral notes (TemplateRenderer non-usage, PA status codes)
+- Alignment plan self-deleted after completion
+- SDD audit: all checks passed (scenarios, terminology, ADRs, open questions, spec consistency)
 
 ## Key Decisions
+- ErrorHandlerUtil not used (RFC 9457 JSON vs PA HTML templates)
+- TemplateRenderer not used for error rendering
+- Belt-and-suspenders shutdown: @PreDestroy + daemon thread flag
+- Enum auto-discovery for SELECT config fields
 
-- Legacy migration content (pre-5.0/6.0 changes) excluded per user preference
-- SDK guide is now a fully standalone reference — no external documentation needed
-- Behavioral facts (request immutability, logging) kept; historical diffs removed
-
-## What's Next
-
-- Feature 002 implementation — spec and SDK guide are both reviewed and hardened
-- Feature 009 (Toolchain & Quality) — spec ready, could begin planning
-- Feature 004 follow-up — session context adapter-side population for proxy
+## State
+- 6 unpushed commits on `main` (ahead of `origin/main`)
+- Working tree clean
+- Feature 002 spec now fully aligned with SDK guide
