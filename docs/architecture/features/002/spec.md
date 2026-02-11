@@ -192,6 +192,11 @@ JSLT (returns `null` for property access on null).
 | `queryString` | From original request URI |
 | `sessionContext` | See FR-002-06 |
 
+> **Logging:** `wrapResponse()` SHOULD log the request path at DEBUG level:
+> `LOG.debug("wrapResponse: {} {} → status={}", requestMethod, requestPath, statusCode)`.
+> This aids correlation between request and response transforms in PingAccess
+> server logs, especially when multiple applications/rules process the same exchange.
+
 > **Header normalization pattern:** `Headers.asMap()` returns `Map<String, String[]>`.
 > The adapter produces two maps from this:
 > - **Single-value** (`headers`): iterate entries, `key.toLowerCase()` → `values[0]`.
@@ -302,6 +307,20 @@ before computing the diff. This prevents the transform spec from accidentally
 
 **Requirement:** The module MUST provide a class `MessageTransformRule` extending
 `AsyncRuleInterceptorBase<MessageTransformConfig>` with:
+
+> **Async vs Sync justification:** The SDK Javadoc recommends using
+> `AsyncRuleInterceptor` only when the rule requires `HttpClient`. This adapter
+> does not currently use `HttpClient`, making `RuleInterceptor` (sync) technically
+> sufficient. However, `AsyncRuleInterceptorBase` is chosen because:
+>
+> 1. Future features (e.g., external schema validation, remote spec fetching)
+>    may require HTTP callouts.
+> 2. The async lifecycle (`CompletionStage<Outcome>`) composes cleanly with the
+>    core engine's `TransformResult` type.
+> 3. The vendor's own plugins (e.g., `PingAuthorizePolicyDecisionAccessControl`)
+>    use `AsyncRuleInterceptorBase`, confirming it is the production-grade base.
+>
+> **Trade-off:** Slightly more complex lifecycle vs future extensibility.
 
 1. `handleRequest(Exchange)` → `CompletionStage<Outcome>`:
    - Builds `TransformContext` via `PingAccessAdapter.buildTransformContext(exchange, null)` (FR-002-13; `status = null` for request phase).
@@ -557,6 +576,22 @@ collisions:
 `sessionContext` is `null` → `$session` evaluates to `null` in JSLT.
 Transforms MUST gracefully handle null `$session` (e.g., `if ($session != null) ...`).
 
+**Trust model:** The `$session` variable exposes the full identity context
+(subject, claims, OAuth metadata, session state) to JSLT expressions. This is
+by design — the adapter acts as a **trusted bridge** between PingAccess's
+identity subsystem and the transform engine.
+
+**Implications:**
+- Transform spec authors are trusted actors. A malicious spec could leak
+  sensitive identity data (e.g., `$session.tokenId`) into the response body.
+- The core engine's `sensitive` list (ADR-0019) can redact specific output
+  paths, but cannot prevent JSLT from **reading** session data.
+- In production, restrict write access to `specsDir` to authorized operators.
+
+**Future consideration:** A `SessionContextFilter` that selectively exposes
+only whitelisted `$session` fields could be added as a follow-up feature if
+multi-tenant spec authoring becomes a requirement.
+
 | Aspect | Detail |
 |--------|--------|
 | Success path | `$session.email` resolves to OIDC claim, `$session.clientId` to OAuth client, `$session.authzCache` to dynamic state |
@@ -567,18 +602,44 @@ Transforms MUST gracefully handle null `$session` (e.g., `if ($session != null) 
 
 ### FR-002-07: ExchangeProperty State (cross-rule data)
 
-**Requirement:** The adapter MUST store the `TransformResult` (match status,
-spec id, transform duration) as an `ExchangeProperty` on the `Exchange`, enabling
-downstream rules or logging to inspect transform metadata.
+**Requirement:** The adapter MUST store a summary of the transform result
+(match status, spec id, transform duration) as an `ExchangeProperty` on the
+`Exchange`, enabling downstream rules or logging to inspect transform metadata.
 
 ```java
-private static final ExchangeProperty<Map<String, Object>> TRANSFORM_RESULT =
-    ExchangeProperty.create("io.messagexform", "transformResult", Map.class);
+private static final ExchangeProperty<TransformResultSummary> TRANSFORM_RESULT =
+    ExchangeProperty.create("io.messagexform", "transformResult",
+                            TransformResultSummary.class);
+```
+
+> **`TransformResultSummary` is an adapter-local record** (not the core
+> `TransformResult`) to avoid Jackson relocation issues at the ExchangeProperty
+> boundary. It contains only primitive/String fields that are safe to share
+> across classloaders.
+
+**`TransformResultSummary` schema:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `specId` | `String` | Matched spec ID (null if no match) |
+| `specVersion` | `String` | Matched spec version (null if no match) |
+| `direction` | `String` | `"REQUEST"` or `"RESPONSE"` |
+| `durationMs` | `long` | Transform duration in milliseconds |
+| `outcome` | `String` | `"SUCCESS"`, `"PASSTHROUGH"`, or `"ERROR"` |
+| `errorType` | `String` | Error type code (null if no error) |
+| `errorMessage` | `String` | Human-readable error message (null if no error) |
+
+**Usage by downstream rules:**
+```java
+exchange.getProperty(TRANSFORM_RESULT).ifPresent(summary -> {
+    LOG.info("Transform: spec={}, outcome={}, duration={}ms",
+             summary.specId(), summary.outcome(), summary.durationMs());
+});
 ```
 
 | Aspect | Detail |
 |--------|--------|
-| Success path | Downstream rule reads `exchange.getProperty(TRANSFORM_RESULT)` |
+| Success path | Downstream rule reads `exchange.getProperty(TRANSFORM_RESULT)` → `TransformResultSummary` with populated fields |
 | Status | ⬜ Not yet implemented |
 | Source | SDK ExchangeProperty pattern |
 

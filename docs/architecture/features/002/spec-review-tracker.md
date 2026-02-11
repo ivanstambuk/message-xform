@@ -6,7 +6,7 @@
 | Reviewer | Agent (deep dive analysis) |
 | Target | `docs/architecture/features/002/spec.md` |
 | Cross-ref | `docs/architecture/features/002/pingaccess-sdk-guide.md` |
-| Status | 🔨 In Progress (B1–B5 done) |
+| Status | ✅ Complete (all 6 batches done) |
 
 > This document tracks all findings from the spec deep-dive analysis and
 > organizes them into implementation batches. Each batch is a logical unit of
@@ -35,7 +35,7 @@
 | **B3** | Scenario matrix corrections | BUG-2, BUG-3, IMP-4 | 🟡 Medium | ✅ Done |
 | **B4** | Body handling & headers | GAP-2, GAP-5, IMP-1 | 🟡 Medium | ✅ Done |
 | **B5** | Configuration, reload & reliability | GAP-3, SEC-2, SEC-3, SEC-4 | 🟡 Medium | ✅ Done |
-| **B6** | Documentation, trust model & polish | SEC-1, BUG-7, IMP-2, IMP-3, IMP-5 | 💡 Low | ⬜ Not started |
+| **B6** | Documentation, trust model & polish | SEC-1, BUG-7, IMP-2, IMP-3, IMP-5 | 💡 Low | ✅ Done |
 
 ---
 
@@ -595,7 +595,7 @@ New:
 - [x] Apply SEC-2 fix (path validation note)
 - [x] Apply SEC-3 fix (daemon thread executor detail)
 - [x] Apply SEC-4 fix (body size constraint rewrite)
-- [ ] Commit: `fix(spec-002): hot-reload lifecycle, path validation, body size limits`
+- [x] Commit: `fix(spec-002): config, reload and reliability` (`d1632e0`)
 
 ---
 
@@ -610,7 +610,7 @@ New:
 |-------|-------|
 | ID | SEC-1 |
 | Severity | 🔐 Medium |
-| Status | ⬜ Not started |
+| Status | ✅ Done |
 | Affected lines | spec.md FR-002-06 (L372–458) |
 
 **Fix:**
@@ -641,7 +641,7 @@ Add a **Trust Model** note after the collision handling section (after L448):
 |-------|-------|
 | ID | BUG-7 |
 | Severity | 💡 Low |
-| Status | ⬜ Not started |
+| Status | ✅ Done |
 | Affected lines | spec.md FR-002-07 (L468–469) |
 
 **Fix:**
@@ -674,7 +674,7 @@ private static final ExchangeProperty<TransformResultSummary> TRANSFORM_RESULT =
 |-------|-------|
 | ID | IMP-5 |
 | Severity | 🟡 Medium |
-| Status | ⬜ Not started |
+| Status | ✅ Done |
 | Affected lines | spec.md FR-002-07 (L461–476) |
 
 **Fix:**
@@ -709,7 +709,7 @@ Add a schema definition after the ExchangeProperty declaration:
 |-------|-------|
 | ID | IMP-2 |
 | Severity | 💡 Low |
-| Status | ⬜ Not started |
+| Status | ✅ Done |
 | Affected lines | spec.md FR-002-02 (L245–248) |
 
 **Fix:**
@@ -738,7 +738,7 @@ Add a design-decision note after the FR-002-02 requirement statement:
 |-------|-------|
 | ID | IMP-3 |
 | Severity | 💡 Low |
-| Status | ⬜ Not started |
+| Status | ✅ Done |
 | Affected lines | spec.md FR-002-01 wrapResponse (L172–184) |
 
 **Fix:**
@@ -754,11 +754,11 @@ Add a logging note after the wrapResponse mapping table:
 
 ### B6 Commit Plan
 
-- [ ] Apply SEC-1 fix (trust model note)
-- [ ] Apply BUG-7 fix (ExchangeProperty type)
-- [ ] Apply IMP-5 fix (ExchangeProperty schema)
-- [ ] Apply IMP-2 fix (async justification)
-- [ ] Apply IMP-3 fix (logging note)
+- [x] Apply SEC-1 fix (trust model note)
+- [x] Apply BUG-7 fix (ExchangeProperty type)
+- [x] Apply IMP-5 fix (ExchangeProperty schema)
+- [x] Apply IMP-2 fix (async justification)
+- [x] Apply IMP-3 fix (logging note)
 - [ ] Commit: `fix(spec-002): trust model, ExchangeProperty schema, async justification, logging`
 
 ---
@@ -771,7 +771,7 @@ Add a logging note after the wrapResponse mapping table:
 | **B2** Lifecycle & control flow | GAP-4, IMP-6, BUG-6, BUG-4 | ✅ Done | `09d18a1` |
 | **B3** Scenario matrix | BUG-2, BUG-3, IMP-4 | ✅ Done | `fefa78e` |
 | **B4** Body handling & headers | GAP-2, GAP-5, IMP-1 | ✅ Done | `9dd0a8e` |
-| **B5** Config, reload & reliability | GAP-3, SEC-2, SEC-3, SEC-4 | ✅ Done | pending commit |
-| **B6** Documentation & polish | SEC-1, BUG-7, IMP-2, IMP-3, IMP-5 | ⬜ Not started | — |
+| **B5** Config, reload & reliability | GAP-3, SEC-2, SEC-3, SEC-4 | ✅ Done | `d1632e0` |
+| **B6** Documentation & polish | SEC-1, BUG-7, IMP-2, IMP-3, IMP-5 | ✅ Done | pending commit |
 
 **Total: 22 items across 6 batches.**
