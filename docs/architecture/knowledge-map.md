@@ -111,6 +111,7 @@ ADR-0030 (Session Context)   governs ── FR-001-13, references ADR-0021, ADR-
 ADR-0031 (PA-Provided Deps)  governs ── FR-002-06, FR-002-09 (partially superseded by ADR-0032)
 ADR-0032 (Core ACL)          governs ── FR-001-14, NFR-001-02, references ADR-0031, ADR-0033
 ADR-0033 (Port Value Objects) governs ── FR-001-14, references ADR-0032
+ADR-0034 (SLF4J Binding)     governs ── NFR-001-02, references ADR-0032, ADR-0033
 ```
 
 ## Feature → ADR → NFR Traceability
@@ -132,7 +133,7 @@ ADR-0033 (Port Value Objects) governs ── FR-001-14, references ADR-0032
 | FR-001-09 (Schema Validation) | ADR-0001, ADR-0022 | — |
 | FR-001-12 (URL Rewriting) | ADR-0027 | — |
 | FR-001-13 (Session Context) | ADR-0030 | — |
-| FR-001-14 (Byte Boundary) | ADR-0032, ADR-0033 | NFR-001-02 |
+| FR-001-14 (Byte Boundary) | ADR-0032, ADR-0033, ADR-0034 | NFR-001-02 |
 | NFR-001-03 (Latency) | ADR-0028 | NFR-001-03 |
 | Hot Reload | — | NFR-001-05 |
 | FR-002-01 (GatewayAdapter) | ADR-0013, ADR-0025 | — |
