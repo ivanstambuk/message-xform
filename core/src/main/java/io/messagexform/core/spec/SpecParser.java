@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -173,9 +172,7 @@ public final class SpecParser {
         Map<String, CompiledExpression> dynamicAdd = new LinkedHashMap<>();
         JsonNode addNode = headersNode.get("add");
         if (addNode != null && addNode.isObject()) {
-            Iterator<Map.Entry<String, JsonNode>> fields = addNode.fields();
-            while (fields.hasNext()) {
-                Map.Entry<String, JsonNode> field = fields.next();
+            for (Map.Entry<String, JsonNode> field : addNode.properties()) {
                 String headerName = field.getKey().toLowerCase();
                 JsonNode value = field.getValue();
                 if (value.isTextual()) {
@@ -204,9 +201,7 @@ public final class SpecParser {
         Map<String, String> rename = new LinkedHashMap<>();
         JsonNode renameNode = headersNode.get("rename");
         if (renameNode != null && renameNode.isObject()) {
-            Iterator<Map.Entry<String, JsonNode>> fields = renameNode.fields();
-            while (fields.hasNext()) {
-                Map.Entry<String, JsonNode> field = fields.next();
+            for (Map.Entry<String, JsonNode> field : renameNode.properties()) {
                 rename.put(
                         field.getKey().toLowerCase(), field.getValue().asText().toLowerCase());
             }
@@ -313,9 +308,7 @@ public final class SpecParser {
             // headers.add)
             JsonNode qAddNode = queryNode.get("add");
             if (qAddNode != null && qAddNode.isObject()) {
-                Iterator<Map.Entry<String, JsonNode>> fields = qAddNode.fields();
-                while (fields.hasNext()) {
-                    Map.Entry<String, JsonNode> field = fields.next();
+                for (Map.Entry<String, JsonNode> field : qAddNode.properties()) {
                     String paramName = field.getKey(); // NOT lowercased — query params are case-sensitive
                     JsonNode value = field.getValue();
                     if (value.isTextual()) {
@@ -381,9 +374,7 @@ public final class SpecParser {
         }
 
         Map<String, CompiledExpression> mappers = new LinkedHashMap<>();
-        Iterator<Map.Entry<String, JsonNode>> fields = mappersNode.fields();
-        while (fields.hasNext()) {
-            Map.Entry<String, JsonNode> entry = fields.next();
+        for (Map.Entry<String, JsonNode> entry : mappersNode.properties()) {
             String mapperId = entry.getKey();
             JsonNode mapperBlock = entry.getValue();
 

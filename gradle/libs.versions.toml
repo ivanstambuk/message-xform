@@ -1,5 +1,5 @@
 [versions]
-jackson = "2.17.0"
+jackson = "2.21.0"
 javalin = "6.7.0"
 jslt = "0.1.14"
 jsonSchemaValidator = "1.5.7"

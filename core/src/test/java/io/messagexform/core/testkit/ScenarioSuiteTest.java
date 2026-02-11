@@ -300,11 +300,11 @@ class ScenarioSuiteTest {
         Map<String, String> headers = new LinkedHashMap<>();
         Map<String, List<String>> headersAll = new LinkedHashMap<>();
         if (scenario.headers() != null && scenario.headers().isObject()) {
-            scenario.headers().fields().forEachRemaining(entry -> {
+            for (Map.Entry<String, JsonNode> entry : scenario.headers().properties()) {
                 String val = entry.getValue().asText();
                 headers.put(entry.getKey().toLowerCase(), val);
                 headersAll.put(entry.getKey().toLowerCase(), List.of(val));
-            });
+            }
         }
 
         // Session context (FR-001-13, ADR-0030)
