@@ -47,6 +47,7 @@ docs/decisions/ADR-0027-url-rewriting.md
 docs/decisions/ADR-0028-performance-testing-strategy.md
 docs/decisions/ADR-0029-javalin-for-standalone-proxy.md
 docs/decisions/ADR-0030-session-context-binding.md
+docs/decisions/ADR-0031-pa-provided-dependencies.md
 docs/decisions/ADR-0022-error-response-on-transform-failure.md
 docs/decisions/ADR-0006-profile-match-resolution.md
 docs/decisions/ADR-0005-profile-spec-version-pinning.md

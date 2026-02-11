@@ -29,7 +29,7 @@
 | 6 | [Identity & Session Context](#6-identity--session-context) | Authentication context: user, claims, OAuth, session state | `identity`, `session`, `OAuth`, `OIDC` |
 | 7 | [Plugin Configuration & UI](#7-plugin-configuration--ui) | @UIElement, ConfigurationBuilder, Bean Validation | `configuration`, `UIElement`, `admin`, `validation` |
 | 8 | [ResponseBuilder & Error Handling](#8-responsebuilder--error-handling) | Building responses, DENY mode, ErrorHandlingCallback | `response`, `error`, `DENY`, `ResponseBuilder` |
-| 9 | [Deployment & Classloading](#9-deployment--classloading) | Shadow JAR, Jackson relocation, SPI registration | `shadow`, `JAR`, `Jackson`, `relocation` |
+| 9 | [Deployment & Classloading](#9-deployment--classloading) | Shadow JAR, PA-provided deps, classloader model, SPI registration | `shadow`, `JAR`, `Jackson`, `compileOnly`, `ADR-0031` |
 | 10 | [Thread Safety](#10-thread-safety) | Init-time vs per-request state, concurrency model | `thread`, `concurrency`, `mutable` |
 | 11 | [Testing Patterns](#11-testing-patterns) | Mockito mock chains, config validation, dependency alignment | `test`, `Mockito`, `mock`, `Validator` |
 | 12 | [Supporting Types](#12-supporting-types) | Outcome, HttpStatus, Method, ExchangeProperty, ServiceFactory | `Outcome`, `HttpStatus`, `ServiceFactory` |
@@ -767,31 +767,23 @@ private JsonNode buildSessionContext(Identity identity) {
     }
 
     // Layer 3: OIDC claims / token attributes (SPREAD into flat object)
-    // ⚠️ BOUNDARY CONVERSION: identity.getAttributes() returns a PA-classloader
-    // JsonNode. After Jackson relocation, PA's JsonNode and our shaded JsonNode
-    // are different classes. We MUST serialize → deserialize at the boundary.
+    // PA and the adapter share the same Jackson classes (flat classpath, ADR-0031).
+    // No boundary conversion needed — Identity.getAttributes() returns the
+    // same JsonNode class we use.
     JsonNode paAttributes = identity.getAttributes();
     if (paAttributes != null && paAttributes.isObject()) {
-        byte[] attrBytes = paObjectMapper.writeValueAsBytes(paAttributes);
-        JsonNode shadedAttributes = ourObjectMapper.readTree(attrBytes);
-        shadedAttributes.fields().forEachRemaining(entry ->
+        paAttributes.fields().forEachRemaining(entry ->
             session.set(entry.getKey(), entry.getValue())  // overrides layers 1-2 on collision
         );
     }
 
     // Layer 4: Session state (SPREAD into flat object — highest precedence)
-    // ⚠️ BOUNDARY CONVERSION: sss.getAttributes() returns Map<String, JsonNode>
-    // where each JsonNode is from PA's classloader. Convert each value.
+    // Same flat classpath — SessionStateSupport.getAttributes() returns
+    // Map<String, JsonNode> using the same Jackson classes.
     SessionStateSupport sss = identity.getSessionStateSupport();
     if (sss != null && sss.getAttributes() != null) {
-        sss.getAttributes().forEach((key, paValue) -> {
-            try {
-                byte[] valBytes = paObjectMapper.writeValueAsBytes(paValue);
-                JsonNode shadedValue = ourObjectMapper.readTree(valBytes);
-                session.set(key, shadedValue);  // overrides all previous layers
-            } catch (IOException e) {
-                LOG.warn("Failed to boundary-convert session attribute '{}'", key, e);
-            }
+        sss.getAttributes().forEach((key, value) -> {
+            session.set(key, value);  // overrides all previous layers
         });
     }
 
@@ -799,20 +791,12 @@ private JsonNode buildSessionContext(Identity identity) {
 }
 ```
 
-### Boundary Conversion (Jackson relocation)
-
-When Jackson is relocated in the shadow JAR (which is mandatory — see §9),
-`Identity.getAttributes()` returns a PA-classloader `JsonNode` while the adapter
-uses a shaded `JsonNode`. These are different classes. Convert at the boundary:
-
-```java
-// Boundary conversion: PA JsonNode → shaded JsonNode
-byte[] raw = paObjectMapper.writeValueAsBytes(identity.getAttributes());
-JsonNode shadedNode = ourObjectMapper.readTree(raw);
-```
-
-This conversion is done once per request in `buildSessionContext()` and is
-negligible in cost (<1ms for typical OIDC claim payloads).
+> **No boundary conversion needed (ADR-0031).** PingAccess uses a flat classpath
+> — `lib/*` and `deploy/*` share the same `AppClassLoader`. Jackson is
+> PA-provided (`compileOnly`), so `Identity.getAttributes()` and
+> `SessionStateSupport.getAttributes()` return the exact same `JsonNode` class
+> the adapter uses. Direct `session.set(key, paNode)` works without any
+> serialization round-trip.
 
 ---
 
@@ -1472,7 +1456,37 @@ LocalizedInternalServerErrorCallback(LocalizedMessageResolver resolver);
 
 ## 9. Deployment & Classloading
 
-> **Tags:** `shadow`, `JAR`, `Jackson`, `relocation`, `classloader`, `SPI`, `SLF4J`, `ServiceLoader`
+> **Tags:** `shadow`, `JAR`, `Jackson`, `compileOnly`, `classloader`, `SPI`, `SLF4J`, `ServiceLoader`, `ADR-0031`
+
+### Classloader Model (Verified)
+
+PingAccess uses a **flat classpath** with **no classloader isolation**.
+
+**Evidence** (from `run.sh` line 59):
+```bash
+CLASSPATH="${CLASSPATH}:${SERVER_ROOT_DIR}/lib/*:${SERVER_ROOT_DIR}/deploy/*"
+```
+
+Both PA platform libraries (`lib/*`) and plugin JARs (`deploy/*`) are loaded
+by the same `jdk.internal.loader.ClassLoaders$AppClassLoader`. There is no
+custom classloader, no OSGi, no module isolation.
+
+```
+┌─────────────────────────────────────────────────────────┐
+│     jdk.internal.loader.ClassLoaders$AppClassLoader      │
+│                                                          │
+│  /opt/server/lib/*      (146 JARs — PA platform)         │
+│  /opt/server/deploy/*   (plugin JARs — our adapter)      │
+│                                                          │
+│  SAME classloader → SAME Class objects → NO isolation    │
+└─────────────────────────────────────────────────────────┘
+```
+
+Plugin discovery uses `ServiceLoader.load(Class)` (single-argument form) in
+both `ServiceFactory` and `ConfigurablePluginPostProcessor` — this uses the
+thread context classloader, which on a flat classpath is the AppClassLoader.
+
+Full analysis: `docs/research/spike-pa-classloader-model.md`.
 
 ### Shadow JAR Contents
 
@@ -1480,29 +1494,27 @@ The adapter shadow JAR must contain:
 - Adapter classes (`io.messagexform.pingaccess.*`)
 - Core engine (`io.messagexform.core.*`)
 - `META-INF/services/com.pingidentity.pa.sdk.policy.AsyncRuleInterceptor`
-- All runtime dependencies (Jackson, JSLT, SnakeYAML, JSON Schema Validator)
+- Runtime dependencies NOT provided by PA: JSLT, SnakeYAML, JSON Schema Validator
 
-**Excluded** (provided by PA runtime):
-- PingAccess SDK classes
-- SLF4J API (PA ships its own SLF4J provider — bundling a second causes classpath conflict)
+**Excluded** (PA-provided — `compileOnly`, per ADR-0031):
 
-### Jackson Relocation (MANDATORY)
+| Library | PA 9.0.1 Version | Notes |
+|---------|-----------------|-------|
+| `jackson-databind` | 2.17.0 | SDK returns `JsonNode` — shared class |
+| `jackson-core` | 2.17.0 | Transitive |
+| `jackson-annotations` | 2.17.0 | Config annotations |
+| `slf4j-api` | 1.7.36 | PA uses **Log4j2** (not Logback) as SLF4J backend |
+| `jakarta.validation-api` | 3.1.1 | Bean Validation |
+| `jakarta.inject-api` | 2.0.1 | CDI |
+| PingAccess SDK | 9.0.1.0 | Plugin API |
 
-PingAccess uses Jackson internally (`Identity.getAttributes()` returns `JsonNode`,
-`SessionStateSupport.setAttribute()` takes `JsonNode`). If the adapter bundles an
-un-relocated Jackson version:
-
-1. PA's `Identity.getAttributes()` returns a `JsonNode` from PA's classloader
-2. The adapter's code expects a `JsonNode` from its own bundled Jackson
-3. These are **different classes** from different classloaders
-4. **`ClassCastException` at runtime** — silent deployment failure that only
-   manifests when processing requests with identity context
-
-**Solution:** Use Gradle Shadow's `relocate` to shade Jackson into a private
-package (e.g., `io.messagexform.shaded.jackson`).
-
-See [§6 Boundary Conversion](#boundary-conversion-jackson-relocation) for the
-serialization-based conversion pattern at the PA/adapter boundary.
+> **Do NOT bundle or relocate Jackson.** PA provides Jackson 2.17.0 on the
+> flat classpath. `Identity.getAttributes()` returns the same `JsonNode`
+> class the adapter uses. Bundling Jackson (with or without relocation) is
+> incorrect:
+> - **With relocation:** `ClassCastException` — shaded `JsonNode` ≠ PA's `JsonNode`
+> - **Without relocation:** Version conflict — two copies of same classes on classpath
+> - **Correct:** `compileOnly` — PA provides it at runtime
 
 ### SPI Registration
 
@@ -2737,8 +2749,8 @@ analogous but differ in tooling:
 | Ping Maven repo in `<repositories>` | `maven { url = "http://maven.pingidentity.com/release" }` in `repositories {}` |
 | System-scope local JAR | `compileOnly(files("<PA_HOME>/lib/pingaccess-sdk-9.0.1.0.jar"))` |
 
-See [§9 Deployment](#9-deployment--classloading) for shadow JAR contents and
-Jackson relocation requirements.
+See [§9 Deployment](#9-deployment--classloading) for shadow JAR contents,
+PA-provided dependencies (ADR-0031), and classloader model details.
 
 ---
 

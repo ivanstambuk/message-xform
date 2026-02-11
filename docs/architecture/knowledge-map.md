@@ -136,10 +136,10 @@ ADR-0030 (Session Context)   governs ── FR-001-13, references ADR-0021, ADR-
 | FR-002-03 (@Rule Annotation) | — | — |
 | FR-002-04 (Plugin Config) | — | — |
 | FR-002-05 (Plugin Lifecycle) | ADR-0025 | — |
-| FR-002-06 (Session Context) | ADR-0030 | — |
+| FR-002-06 (Session Context) | ADR-0030, ADR-0031 | — |
 | FR-002-07 (ExchangeProperty) | — | — |
 | FR-002-08 (SPI Registration) | — | — |
-| FR-002-09 (Deployment Packaging) | — | NFR-002-02 |
+| FR-002-09 (Deployment Packaging) | ADR-0031 | NFR-002-02 |
 | FR-002-10 (Gradle Module) | — | NFR-002-05 |
 | FR-002-11 (Error Handling) | ADR-0022, ADR-0024 | — |
 | FR-002-12 (Docker E2E Test) | — | — |

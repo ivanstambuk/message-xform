@@ -101,7 +101,7 @@ signatures, usage notes, and code examples.
 - `exchange.getResponse()` is **null** during `handleRequest()` — see guide §8
 - `exchange.getIdentity()` may be **null** for unauthenticated resources
 - `Identity.getTokenExpiration()` returns `java.time.Instant` (not `Date`)
-- Jackson relocation is **mandatory** — see guide §9
+- Jackson is PA-provided (`compileOnly`) — do NOT bundle or relocate (ADR-0031, guide §9)
 
 **Java version:** PingAccess 9.0 supports Java 17 and 21. The adapter compiles
 with Java 21, matching the core module.
@@ -663,17 +663,13 @@ override earlier layers on key collision:
 
 > **Implementation pattern:** See
 > [`docs/architecture/features/002/pingaccess-sdk-guide.md` §6 "Building $session"](pingaccess-sdk-guide.md#building-session--flat-merge-pattern)
-> for the complete `buildSessionContext()` implementation including boundary
-> conversion for Jackson relocation.
+> for the complete `buildSessionContext()` implementation.
 >
-> ⚠️ **Critical — Jackson boundary conversion (Issues 4 & 5 from review):**
-> Layers 3 and 4 return `JsonNode` values from PA's classloader. After Jackson
-> relocation, these are **different classes** from the adapter's shaded
-> `JsonNode`. Directly setting PA `JsonNode` values into the shaded `ObjectNode`
-> via `session.set(key, value)` causes `ClassCastException` at runtime. **All
-> PA-sourced `JsonNode` values MUST be boundary-converted** via
-> `paObjectMapper.writeValueAsBytes()` → `ourObjectMapper.readTree()` before
-> merging into the session object. See FR-002-09 Constraint 8.
+> **No boundary conversion needed (ADR-0031):** PA uses a flat classpath —
+> `lib/*` and `deploy/*` share the same `AppClassLoader`. Jackson is
+> PA-provided (`compileOnly`), so `Identity.getAttributes()` returns the
+> same `JsonNode` class the adapter uses. Direct `session.set(key, paNode)`
+> works without serialization round-trips.
 
 #### `$session` Schema (flat)
 
@@ -759,9 +755,8 @@ private static final ExchangeProperty<TransformResultSummary> TRANSFORM_RESULT =
 ```
 
 > **`TransformResultSummary` is an adapter-local record** (not the core
-> `TransformResult`) to avoid Jackson relocation issues at the ExchangeProperty
-> boundary. It contains only primitive/String fields that are safe to share
-> across classloaders.
+> `TransformResult`) containing only primitive/String fields for simplicity
+> and zero-dependency cross-rule state sharing.
 >
 > ⚠️ **Namespace uniqueness:** Per SDK §2, `ExchangeProperty` equality is based
 > on namespace + identifier only (type parameter is ignored). All adapter-defined
@@ -832,44 +827,40 @@ This enables PingAccess's `ServiceLoader` discovery.
 The shadow JAR MUST **exclude** the PingAccess SDK classes — those are provided
 by the PA runtime (`/opt/server/lib/pingaccess-sdk-*.jar`).
 
-**SLF4J handling:** SLF4J API MUST be **excluded** from the shadow JAR
-(`compileOnly` scope). PingAccess ships its own SLF4J provider (Logback);
-bundling a second SLF4J API would cause a classpath conflict
-(`SLF4JServiceProvider` already loaded). The adapter uses SLF4J as a compile
-dependency only.
+**PA-provided dependencies (ADR-0031):** PingAccess uses a **flat classpath**
+— `lib/*` and `deploy/*` share the same JVM application classloader. Libraries
+in `/opt/server/lib/` are directly visible to plugin code. The following MUST
+be declared `compileOnly` and **not** bundled in the shadow JAR:
 
-**Jackson relocation:** PingAccess uses Jackson internally (e.g. `Identity.
-getAttributes()` returns `JsonNode`, `SessionStateSupport.setAttribute()` takes
-`JsonNode`). The shadow JAR **MUST** use Gradle Shadow's `relocate` feature to
-shade Jackson classes into a private package (e.g.
-`io.messagexform.shaded.jackson`).
+| Library | PA 9.0.1 Version | Notes |
+|---------|-----------------|-------|
+| `jackson-databind` | 2.17.0 | SDK API returns `JsonNode` — same class shared |
+| `jackson-core` | 2.17.0 | Transitive |
+| `jackson-annotations` | 2.17.0 | `@JsonProperty` on config classes |
+| `slf4j-api` | 1.7.36 | PA's SLF4J provider is **Log4j2** (not Logback) |
+| `jakarta.validation-api` | 3.1.1 | Bean Validation |
+| `jakarta.inject-api` | 2.0.1 | CDI |
+| PingAccess SDK | 9.0.1.0 | Plugin API |
 
-> **Why mandatory:** Bundling un-relocated Jackson causes `ClassCastException`
-> at runtime due to classloader isolation. See
-> [SDK guide §9](pingaccess-sdk-guide.md#9-deployment--classloading)
-> for the full explanation and boundary conversion pattern.
+> **No Jackson relocation.** Jackson is PA-provided and shared. Relocating
+> Jackson would cause `ClassCastException` because `Identity.getAttributes()`
+> returns `com.fasterxml.jackson.databind.JsonNode` but relocated code would
+> expect `io.messagexform.shaded.jackson.databind.JsonNode` — different
+> classes within the same classloader.
+>
+> **No boundary conversion.** Since PA and the adapter share the same Jackson
+> classes, `Identity.getAttributes()` returns the same `JsonNode` class.
+> Direct `session.set(key, paNode)` works. No serialization round-trip.
+>
+> **No dual ObjectMapper.** A single `ObjectMapper` instance handles all
+> adapter JSON operations.
+>
+> **Evidence:** Verified via static analysis of PA 9.0.1 (`run.sh` classpath
+> construction, `javap` decompilation of `ServiceFactory`, `Bootstrap`,
+> `ConfigurablePluginPostProcessor`). See `docs/research/spike-pa-classloader-model.md`.
 
-> **Dual ObjectMapper pattern (design decision):** Jackson relocation means
-> the adapter needs two `ObjectMapper` instances:
->
-> 1. **`shadedMapper`** — our relocated Jackson (created in `configure()`).
->    Used for all adapter-internal JSON operations (body parsing, session
->    context building, error response serialization).
-> 2. **`paMapper`** — PA's native `ObjectMapper`. Used **solely** for boundary
->    conversion in `buildSessionContext()` to serialize PA-classloader `JsonNode`
->    values into `byte[]` before deserializing into shaded `JsonNode`.
->
-> Since Jackson is relocated in the shadow JAR, `com.fasterxml.jackson.databind.
-> ObjectMapper` at compile time becomes `io.messagexform.shaded.jackson.databind.
-> ObjectMapper`. The PA-native ObjectMapper must be instantiated reflectively
-> or obtained via an unshaded utility class compiled separately.
->
-> **Alternative:** If reflective instantiation is too fragile, bypass Jackson
-> entirely at the boundary — use PA's `Body.getContent()` / `Response.
-> setBodyContent()` which use `byte[]` (no Jackson types cross the boundary).
-> This is the preferred approach for body data; the ObjectMapper boundary
-> conversion is only needed for `Identity.getAttributes()` and
-> `SessionStateSupport.getAttributes()` in `buildSessionContext()`.
+**SnakeYAML:** Not shipped by PA — MUST be bundled in the shadow JAR as an
+`implementation` dependency.
 
 **TelemetryListener:** The PA adapter does NOT register a custom
 `TelemetryListener` implementation. The core engine's built-in SLF4J logging
@@ -882,7 +873,7 @@ The JAR MUST be deployable by copying to `<PA_HOME>/deploy/` (Docker:
 | Aspect | Detail |
 |--------|--------|
 | Success path | `cp adapter-pingaccess-*.jar /opt/server/deploy/ && restart PA` → plugin visible in admin UI |
-| Validation path | `./gradlew :adapter-pingaccess:shadowJar` produces a single JAR < 20 MB |
+| Validation path | `./gradlew :adapter-pingaccess:shadowJar` produces a single JAR < 5 MB (no bundled Jackson/SLF4J) |
 | Status | ⬜ Not yet implemented |
 | Source | G-002-04 |
 
@@ -1165,7 +1156,7 @@ zero configuration.
 | ID | Requirement | Driver | Measurement | Dependencies | Source |
 |----|-------------|--------|-------------|--------------|--------|
 | NFR-002-01 | Adapter transform latency MUST add < 10 ms overhead beyond the core engine transform time for a typical JSON body (< 64 KB). | Gateway SLA | Measure via `ExchangeProperty` timestamps (creation time vs. transform completion). | Core engine performance. | Spec. |
-| NFR-002-02 | Shadow JAR size MUST be < 20 MB (excludes PA SDK). | Deployment ergonomics | `ls -lh adapter-pingaccess-*.jar` | Shadow plugin, dependency management. | Spec. |
+| NFR-002-02 | Shadow JAR size MUST be < 5 MB (Jackson, SLF4J, Jakarta excluded — PA-provided per ADR-0031). | Deployment ergonomics | `ls -lh adapter-pingaccess-*.jar` | Shadow plugin, dependency management. | ADR-0031. |
 | NFR-002-03 | Adapter MUST be thread-safe — no mutable **per-request** state. Framework-injected fields (`@Inject`-set `ObjectMapper`, `TemplateRenderer`, `HttpClient`) and `configuration` are set once during initialization and are safe for concurrent read access. All per-request state (adapted messages, transform results, error bodies) MUST be method-local. | PA runtime constraint | Code review, ArchUnit rule (FR-009-12). | Core engine thread safety. | SDK docs. |
 | NFR-002-04 | Adapter MUST NOT use reflection — same no-reflection policy as core (FR-009-12 Rule 3). | AOT compatibility | ArchUnit test. | ArchUnit (FR-009-12). | Project constitution. |
 | NFR-002-05 | Adapter MUST compile with Java 21 toolchain and `-Xlint:all -Werror`. | Build consistency | `./gradlew :adapter-pingaccess:compileJava` | FR-009-02, FR-009-03. | FR-009-03. |
