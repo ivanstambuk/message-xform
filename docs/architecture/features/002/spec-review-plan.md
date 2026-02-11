@@ -18,11 +18,11 @@
 | 7 | No `Content-Encoding` / compressed body handling | 🟠 Significant | 2 | ✅ Done |
 | 8 | Missing error response body for `handleResponse` DENY mode | 🟠 Significant | 2 | ✅ Done |
 | 9 | Two `ObjectMapper` instances not documented | 🟡 Moderate | 2 | ✅ Done |
-| 10 | `reloadIntervalSec` TEXT type — input validation gap | 🟡 Moderate | 3 | ⬜ Not started |
-| 11 | `ExchangeProperty` equality semantics trap | 🟡 Moderate | 3 | ⬜ Not started |
-| 12 | `wrapRequest` deep copy body clarification | 🟡 Moderate | 3 | ⬜ Not started |
-| 13 | Header diff strategy missing capitalization note | 🟡 Moderate | 3 | ⬜ Not started |
-| 14 | `TransformResultSummary` field sourcing gap | 🟡 Moderate | 3 | ⬜ Not started |
+| 10 | `reloadIntervalSec` TEXT type — input validation gap | 🟡 Moderate | 3 | ✅ Done |
+| 11 | `ExchangeProperty` equality semantics trap | 🟡 Moderate | 3 | ✅ Done |
+| 12 | `wrapRequest` deep copy body clarification | 🟡 Moderate | 3 | ✅ Done |
+| 13 | Header diff strategy missing capitalization note | 🟡 Moderate | 3 | ✅ Done |
+| 14 | `TransformResultSummary` field sourcing gap | 🟡 Moderate | 3 | ✅ Done |
 | 15 | Cosmetic: triple blank lines around L957–959 | 🔵 Minor | 4 | ⬜ Not started |
 | 16 | Missing scenario: concurrent reload + request race | 🔵 Minor | 4 | ⬜ Not started |
 | 17 | Missing scenario: non-JSON response body | 🔵 Minor | 4 | ⬜ Not started |
@@ -30,7 +30,7 @@
 | 19 | No metrics/counters for transform operations | 🔵 Minor | 5 | ⬜ Not started |
 | 20 | Ping Maven repo URL — HTTP vs HTTPS | 🔵 Minor | 5 | ⬜ Not started |
 
-**Progress: 9 / 20 complete**
+**Progress: 14 / 20 complete**
 
 ---
 

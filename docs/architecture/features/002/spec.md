@@ -113,7 +113,11 @@ with Java 21, matching the core module.
 2. `wrapResponse(Exchange)` → `Message`
 3. `applyChanges(Message, Exchange)`
 
-All wrap methods create **deep copies** of the native data (ADR-0013).
+All wrap methods create **deep copies** of the native data (ADR-0013). For body
+data, parsing via `objectMapper.readTree(body.getContent())` inherently produces a
+new, independent `JsonNode` tree — satisfying the deep-copy requirement without an
+explicit `deepCopy()` call. Header maps are deep-copied by creating new `HashMap`
+instances with lowercase-normalized keys.
 
 | Aspect | Detail |
 |--------|--------|
@@ -275,7 +279,10 @@ it must also **remove** pre-existing headers that were dropped by the transform.
 The adapter uses a **diff-based** approach:
 
 1. **Capture original headers** at wrap time (snapshot the header names from
-   the native `Request`/`Response` before passing to the engine).
+   the native `Request`/`Response` before passing to the engine). The original
+   header name snapshot is **normalized to lowercase** before diff comparison,
+   matching the `Message.headers()` key normalization. This ensures
+   case-insensitive diff correctness regardless of PA's original header casing.
 2. **After transformation**, compare the original header names with the
    transformed `Message.headers()` keyset.
 3. **Apply changes:**
@@ -428,7 +435,7 @@ private static final ExchangeProperty<Boolean> TRANSFORM_DENIED =
 | `profilesDir` | TEXT | Profiles Directory | No | `/profiles` | Path to directory of transform profiles |
 | `activeProfile` | TEXT | Active Profile | No | (empty) | Profile name to activate (empty = no profile) |
 | `errorMode` | SELECT (enum: `ErrorMode`) | Error Mode | Yes | `PASS_THROUGH` | `PASS_THROUGH` or `DENY` — behaviour on transform failure |
-| `reloadIntervalSec` | TEXT | Reload Interval (s) | No | `0` | **Spec YAML file** reload interval in seconds (0 = disabled). See note below. |
+| `reloadIntervalSec` | TEXT | Reload Interval (s) | No | `0` | **Spec YAML file** reload interval in seconds (0 = disabled, max 86400). Java type: `Integer`. See note below. |
 | `schemaValidation` | SELECT (enum: `SchemaValidation`) | Schema Validation | No | `LENIENT` | `STRICT` or `LENIENT` — schema validation mode |
 
 The configuration JSON maps directly to these fields via the PingAccess admin API.
@@ -467,7 +474,11 @@ The configuration JSON maps directly to these fields via the PingAccess admin AP
 > | `profilesDir` | "Absolute path to the directory containing transform profile files. Leave empty to use specs without profiles." |
 > | `activeProfile` | "Name of the profile to activate. Leave empty for no profile filtering." |
 > | `errorMode` | "PASS_THROUGH: log errors and continue with original message. DENY: reject the request/response with an RFC 9457 error." |
-> | `reloadIntervalSec` | "Interval in seconds for re-reading spec/profile files from disk. Set to 0 to disable (specs loaded only at startup)." |
+> | `reloadIntervalSec` | "Interval in seconds for re-reading spec/profile files from disk. 0 = disabled (specs loaded only at startup). Maximum 86400 (24 hours)." |
+>
+> **`reloadIntervalSec` validation:** The field MUST have `@Min(0) @Max(86400)`
+> constraints. Non-numeric input is rejected by Jakarta Bean Validation (surfaced
+> in the PA admin UI as a validation error). Negative values are rejected by `@Min(0)`.
 > | `schemaValidation` | "STRICT: reject specs failing JSON Schema validation. LENIENT: log warnings but accept specs." |
 
 **`reloadIntervalSec` clarification:** This controls periodic re-reading of
@@ -743,6 +754,12 @@ private static final ExchangeProperty<TransformResultSummary> TRANSFORM_RESULT =
 > `TransformResult`) to avoid Jackson relocation issues at the ExchangeProperty
 > boundary. It contains only primitive/String fields that are safe to share
 > across classloaders.
+>
+> ⚠️ **Namespace uniqueness:** Per SDK §2, `ExchangeProperty` equality is based
+> on namespace + identifier only (type parameter is ignored). All adapter-defined
+> properties use namespace `io.messagexform` with unique identifiers
+> (`transformDenied`, `transformResult`). Plugin authors extending this adapter
+> MUST NOT reuse these identifiers with different types.
 
 **`TransformResultSummary` schema:**
 
@@ -755,6 +772,13 @@ private static final ExchangeProperty<TransformResultSummary> TRANSFORM_RESULT =
 | `outcome` | `String` | `"SUCCESS"`, `"PASSTHROUGH"`, or `"ERROR"` |
 | `errorType` | `String` | Error type code (null if no error) |
 | `errorMessage` | `String` | Human-readable error message (null if no error) |
+
+> **Field sourcing:** `specId` and `specVersion` are populated from the
+> `TransformSpec` matched during profile resolution. The adapter tracks the
+> matched spec metadata from the `TransformRegistry` lookup (which returns
+> the matched spec alongside the result) and attaches it to the summary.
+> The core engine's `TransformResult` itself does not expose spec identification
+> — the adapter is responsible for correlating the result with its source spec.
 
 **Usage by downstream rules:**
 ```java
