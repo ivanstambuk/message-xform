@@ -360,3 +360,57 @@ interceptors fire in reverse order even on `RETURN`),
 **then** `TransformEngine.reload()` fails with a warning log,
 **and** the previous valid `TransformRegistry` remains active,
 **and** in-flight and subsequent requests continue to use the previously valid specs.
+
+---
+
+## S-002-31: Concurrent Reload During Active Transform
+
+**Given** `reloadIntervalSec = 30` in the plugin configuration,
+**and** a transform is currently in-flight (being processed by a request thread),
+**when** the reload timer fires and swaps the `AtomicReference<TransformRegistry>`,
+**then** the in-flight transform completes using its snapshot of the old registry
+(Java reference semantics guarantee this),
+**and** the next request uses the new registry,
+**and** no data corruption, locking, or request failure occurs.
+
+> **Test:** Trigger reload in a background thread while a slow transform is executing.
+
+---
+
+## S-002-32: Non-JSON Response Body
+
+**Given** a backend returns a `text/html` response body,
+**when** `wrapResponse()` attempts to parse the body as JSON,
+**then** the parse fails gracefully and falls back to `NullNode` body,
+**and** response-direction transforms can still operate on headers and status code,
+**and** the body is passed through unmodified.
+
+> **Outcome:** PASSTHROUGH for body transforms, SUCCESS for header-only transforms.
+
+---
+
+## S-002-33: JMX Metrics Opt-In
+
+**Given** an admin configures `enableJmxMetrics = true` in the plugin configuration,
+**when** `configure()` is called,
+**then** the adapter registers a JMX MBean at
+`io.messagexform:type=TransformMetrics,instance=<pluginName>`,
+**and** JConsole shows the MBean under the `io.messagexform` domain,
+**and** counters (successCount, errorCount, passthroughCount, etc.) increment
+per request,
+**and** the admin can invoke `resetMetrics()` via JConsole to zero all counters.
+
+**When** the admin later toggles `enableJmxMetrics = false` and reconfigures,
+**then** the MBean is unregistered,
+**and** JConsole no longer shows it.
+
+---
+
+## S-002-34: JMX Metrics Disabled (Default)
+
+**Given** `enableJmxMetrics` is not set (defaults to `false`),
+**when** the adapter is configured and processing requests,
+**then** no JMX MBean is registered,
+**and** there is zero JMX overhead,
+**and** SLF4J logging remains operational (INFO-level transform results),
+**and** `pingaccess_engine_audit.log` records per-transaction timing automatically.

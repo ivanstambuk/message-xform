@@ -1003,6 +1003,59 @@ code is complete. It is listed here for traceability.
 | Status | ⬜ Not yet implemented (planned, implementation deferred) |
 | Source | G-002-05 |
 
+### FR-002-13: TransformContext Construction
+
+**Requirement:** The adapter MUST build a `TransformContext` from the PingAccess
+`Exchange` and pass it to the 3-arg `TransformEngine.transform()` overload.
+Without this, JSLT variables `$cookies`, `$queryParams`, `$headers`, `$status`,
+and `$session` would be null/empty.
+
+The adapter MUST provide a `buildTransformContext(Exchange)` method (not part
+of the `GatewayAdapter` SPI — adapter-specific helper) that maps:
+
+| TransformContext Field | Source | Notes |
+|------------------------|--------|-------|
+| `headers` | `exchange.getRequest().getHeaders().asMap()` → flatten to single-value map (first value per name, lowercase keys) | Same normalization pattern as `wrapRequest` |
+| `headersAll` | `exchange.getRequest().getHeaders().asMap()` → convert to multi-value map | Same normalization pattern |
+| `status` | `null` for REQUEST direction, `exchange.getResponse().getStatusCode()` for RESPONSE | Set by the caller (`MessageTransformRule`) based on direction |
+| `queryParams` | `exchange.getRequest().getQueryStringParams()` → flatten `Map<String, String[]>` to `Map<String, String>` using first-value semantics | Values are URL-decoded by the PA SDK. On `URISyntaxException`: log warning, use empty map. |
+| `cookies` | `exchange.getRequest().getHeaders().getCookies()` → flatten `Map<String, String[]>` to `Map<String, String>` using first-value semantics | Cookie values are URL-decoded |
+| `sessionContext` | See FR-002-06 (`Exchange.getIdentity()` → build `JsonNode`) | `null` if no identity (unauthenticated) |
+
+**Query param multi-value handling:** PingAccess's `getQueryStringParams()` returns
+`Map<String, String[]>`. The adapter uses **first-value semantics** (take `values[0]`
+for each key), matching the `StandaloneAdapter` pattern (FR-004-39). Multi-value
+query params are available in full via `$headers_all` if the gateway transmits them
+as headers, but the `$queryParams` variable uses single-value.
+
+**`URISyntaxException` handling:** `Request.getQueryStringParams()` can throw
+`URISyntaxException` for malformed URIs. On this exception, the adapter logs a
+warning and returns an empty `queryParams` map. The transform proceeds with
+`$queryParams` as an empty object — JSLT expressions referencing query params
+evaluate to `null` gracefully.
+
+**Lifecycle note:** `TransformContext` is an immutable record (`public record
+TransformContext(...)`). Two instances are built per exchange:
+
+1. **Request phase:** `buildTransformContext(exchange, null)` — `status` is
+   `null` (no response yet).
+2. **Response phase:** `buildTransformContext(exchange, exchange.getResponse().getStatusCode())`
+   — `status` is the response status code.
+
+To avoid re-parsing cookies and query params in the response phase, the adapter
+MAY cache the parsed `cookies` and `queryParams` maps as method-local variables
+in `handleRequest()` and pass them to `handleResponse()` via an `ExchangeProperty`.
+Alternatively, re-parsing is acceptable (cost is negligible for typical request
+sizes).
+
+| Aspect | Detail |
+|--------|--------|
+| Success path | `TransformContext` populated with headers, cookies, query params, session → JSLT `$cookies.sessionToken` resolves correctly |
+| Failure path (URI) | Malformed query string → empty `queryParams` → JSLT `$queryParams.page` evaluates to `null` |
+| Failure path (no identity) | Unauthenticated → `sessionContext = null` → `$session` is `null` in JSLT |
+| Status | ⬜ Not yet implemented |
+| Source | G-002-01, FR-004-37 (StandaloneAdapter reference pattern) |
+
 ### FR-002-14: JMX Observability (Opt-in)
 
 **Requirement:** When `enableJmxMetrics = true`, the adapter MUST register a
@@ -1104,59 +1157,6 @@ zero configuration.
 | Success path | `enableJmxMetrics=true` → MBean visible in JConsole under `io.messagexform` → counters increment on each request |
 | Status | ⬜ Not yet implemented |
 | Source | PA Monitoring Guide (§Resource metrics), Issue 19 (spec review) |
-
-### FR-002-13: TransformContext Construction
-
-**Requirement:** The adapter MUST build a `TransformContext` from the PingAccess
-`Exchange` and pass it to the 3-arg `TransformEngine.transform()` overload.
-Without this, JSLT variables `$cookies`, `$queryParams`, `$headers`, `$status`,
-and `$session` would be null/empty.
-
-The adapter MUST provide a `buildTransformContext(Exchange)` method (not part
-of the `GatewayAdapter` SPI — adapter-specific helper) that maps:
-
-| TransformContext Field | Source | Notes |
-|------------------------|--------|-------|
-| `headers` | `exchange.getRequest().getHeaders().asMap()` → flatten to single-value map (first value per name, lowercase keys) | Same normalization pattern as `wrapRequest` |
-| `headersAll` | `exchange.getRequest().getHeaders().asMap()` → convert to multi-value map | Same normalization pattern |
-| `status` | `null` for REQUEST direction, `exchange.getResponse().getStatusCode()` for RESPONSE | Set by the caller (`MessageTransformRule`) based on direction |
-| `queryParams` | `exchange.getRequest().getQueryStringParams()` → flatten `Map<String, String[]>` to `Map<String, String>` using first-value semantics | Values are URL-decoded by the PA SDK. On `URISyntaxException`: log warning, use empty map. |
-| `cookies` | `exchange.getRequest().getHeaders().getCookies()` → flatten `Map<String, String[]>` to `Map<String, String>` using first-value semantics | Cookie values are URL-decoded |
-| `sessionContext` | See FR-002-06 (`Exchange.getIdentity()` → build `JsonNode`) | `null` if no identity (unauthenticated) |
-
-**Query param multi-value handling:** PingAccess's `getQueryStringParams()` returns
-`Map<String, String[]>`. The adapter uses **first-value semantics** (take `values[0]`
-for each key), matching the `StandaloneAdapter` pattern (FR-004-39). Multi-value
-query params are available in full via `$headers_all` if the gateway transmits them
-as headers, but the `$queryParams` variable uses single-value.
-
-**`URISyntaxException` handling:** `Request.getQueryStringParams()` can throw
-`URISyntaxException` for malformed URIs. On this exception, the adapter logs a
-warning and returns an empty `queryParams` map. The transform proceeds with
-`$queryParams` as an empty object — JSLT expressions referencing query params
-evaluate to `null` gracefully.
-
-**Lifecycle note:** `TransformContext` is an immutable record (`public record
-TransformContext(...)`). Two instances are built per exchange:
-
-1. **Request phase:** `buildTransformContext(exchange, null)` — `status` is
-   `null` (no response yet).
-2. **Response phase:** `buildTransformContext(exchange, exchange.getResponse().getStatusCode())`
-   — `status` is the response status code.
-
-To avoid re-parsing cookies and query params in the response phase, the adapter
-MAY cache the parsed `cookies` and `queryParams` maps as method-local variables
-in `handleRequest()` and pass them to `handleResponse()` via an `ExchangeProperty`.
-Alternatively, re-parsing is acceptable (cost is negligible for typical request
-sizes).
-
-| Aspect | Detail |
-|--------|--------|
-| Success path | `TransformContext` populated with headers, cookies, query params, session → JSLT `$cookies.sessionToken` resolves correctly |
-| Failure path (URI) | Malformed query string → empty `queryParams` → JSLT `$queryParams.page` evaluates to `null` |
-| Failure path (no identity) | Unauthenticated → `sessionContext = null` → `$session` is `null` in JSLT |
-| Status | ⬜ Not yet implemented |
-| Source | G-002-01, FR-004-37 (StandaloneAdapter reference pattern) |
 
 ---
 
