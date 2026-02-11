@@ -982,9 +982,66 @@ TransformContext buildTransformContext(Exchange exchange, Direction direction) {
   lifecycle with a real `TransformEngine` and mock `Exchange`.
   - Key verification: transform applied, changes written back, error modes,
     no-match pass-through, `ExchangeProperty` metadata set.
+  - For DENY mode request-phase: verify `ResponseBuilder` → `exchange.setResponse()` path.
 
 - **`MessageTransformConfigTest`** — Tests configuration validation
   (`@UIElement` constraints, required fields, defaults).
+  - Uses standalone `Validation.buildDefaultValidatorFactory()` (Jakarta Bean
+    Validation). This avoids Spring test context dependency.
+
+#### SDK-Grounded Mock Patterns
+
+> Source: `ExternalAuthorizationRuleTest.java` (`.sdk-decompile/.../sdk/samples/Rules/`)
+
+```java
+// Standard mock setup for PA Exchange (reused across all adapter tests)
+Exchange exchange = mock(Exchange.class);
+Request request = mock(Request.class);
+Body body = mock(Body.class);
+Headers headers = mock(Headers.class);
+Identity identity = mock(Identity.class);
+SessionStateSupport sss = mock(SessionStateSupport.class);
+OAuthTokenMetadata oauth = mock(OAuthTokenMetadata.class);
+
+when(exchange.getRequest()).thenReturn(request);
+when(exchange.getIdentity()).thenReturn(identity);
+when(request.getBody()).thenReturn(body);
+when(request.getHeaders()).thenReturn(headers);
+when(body.getContent()).thenReturn("{\"key\":\"value\"}".getBytes(UTF_8));
+when(body.isRead()).thenReturn(true);
+
+// Identity chain
+when(identity.getSubject()).thenReturn("joe");
+when(identity.getAttributes()).thenReturn(objectMapper.readTree("{\"sub\":\"joe\"}"));
+when(identity.getSessionStateSupport()).thenReturn(sss);
+when(identity.getOAuthTokenMetadata()).thenReturn(oauth);
+when(oauth.getClientId()).thenReturn("my-client");
+when(oauth.getScopes()).thenReturn(Set.of("openid", "profile"));
+
+// Verify response writing (request-phase DENY mode)
+ArgumentCaptor<Response> responseCaptor = ArgumentCaptor.forClass(Response.class);
+verify(exchange).setResponse(responseCaptor.capture());
+assertThat(responseCaptor.getValue().getStatusCode()).isEqualTo(502);
+```
+
+> **Config validation test pattern** (avoids Spring context):
+>
+> ```java
+> Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
+> MessageTransformConfig config = new MessageTransformConfig();
+> config.setSpecsDir(null);  // required field
+> Set<ConstraintViolation<MessageTransformConfig>> violations = validator.validate(config);
+> assertThat(violations).isNotEmpty();
+> ```
+
+#### Test Dependency Alignment
+
+| Dependency | SDK Samples | Our Project | Notes |
+|------------|-------------|-------------|-------|
+| JUnit | 4.13.2 | 5 (Jupiter) | Intentional — our project uses JUnit 5 |
+| Mockito | 5.15.2 | 5.x (inherited) | Compatible — verify alignment in `build.gradle.kts` |
+| Hibernate Validator | 7.0.5.Final | (add as testImplementation) | Needed for config validation tests |
+| Spring Test | 6.2.11 | (not used) | We use standalone `Validator` instead |
 
 ### Integration Tests
 
