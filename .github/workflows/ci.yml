@@ -90,8 +90,8 @@ jobs:
 
       - name: Smoke test
         run: |
-          docker run -d --name proxy-test -p 18080:8080 message-xform-proxy
-          sleep 3
+          docker run -d --name proxy-test -p 18080:9090 message-xform-proxy
+          sleep 5
           STATUS=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:18080/health || true)
           docker logs proxy-test
           docker rm -f proxy-test
