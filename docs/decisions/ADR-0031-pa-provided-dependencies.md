@@ -1,6 +1,13 @@
 # ADR-0031 – PA-Provided Dependencies (No Jackson Relocation)
 
-Date: 2026-02-11 | Status: Accepted
+Date: 2026-02-11 | Status: Accepted (partially superseded by ADR-0032)
+
+> **Note:** [ADR-0032](ADR-0032-core-anti-corruption-layer.md) supersedes the
+> Jackson version coupling aspect of this ADR. Core engine no longer compiles
+> against PA's Jackson — it bundles and relocates its own copy behind a
+> `byte[]` boundary. This ADR remains valid for: PA adapter's `compileOnly`
+> SLF4J/Jakarta/PA SDK declarations, the flat classpath model, the version-
+> locked release strategy, and the runtime version guard.
 
 ## Context
 
