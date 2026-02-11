@@ -6,7 +6,7 @@
 | Reviewer | Agent (deep dive analysis) |
 | Target | `docs/architecture/features/002/spec.md` |
 | Cross-ref | `docs/architecture/features/002/pingaccess-sdk-guide.md` |
-| Status | 🔨 In Progress (B1–B3 done) |
+| Status | 🔨 In Progress (B1–B4 done) |
 
 > This document tracks all findings from the spec deep-dive analysis and
 > organizes them into implementation batches. Each batch is a logical unit of
@@ -33,7 +33,7 @@
 | **B1** | SDK API corrections (won't compile) | BUG-1, GAP-1, BUG-5 | 🔴 Critical | ✅ Done |
 | **B2** | Lifecycle & control flow (runtime crashes) | GAP-4, IMP-6, BUG-6, BUG-4 | 🔴 Critical | ✅ Done |
 | **B3** | Scenario matrix corrections | BUG-2, BUG-3, IMP-4 | 🟡 Medium | ✅ Done |
-| **B4** | Body handling & headers | GAP-2, GAP-5, IMP-1 | 🟡 Medium | ⬜ Not started |
+| **B4** | Body handling & headers | GAP-2, GAP-5, IMP-1 | 🟡 Medium | ✅ Done |
 | **B5** | Configuration, reload & reliability | GAP-3, SEC-2, SEC-3, SEC-4 | 🟡 Medium | ⬜ Not started |
 | **B6** | Documentation, trust model & polish | SEC-1, BUG-7, IMP-2, IMP-3, IMP-5 | 💡 Low | ⬜ Not started |
 
@@ -370,7 +370,7 @@ Add two new scenarios after S-002-26:
 - [x] Apply BUG-2 fix (S-002-25 path)
 - [x] Apply BUG-3 fix (S-002-26 path)
 - [x] Apply IMP-4 fix (add S-002-27, S-002-28)
-- [ ] Commit: `fix(spec-002): correct scenario $session paths, add pipeline interaction scenarios`
+- [x] Commit: `fix(spec-002): scenario matrix corrections` (`fefa78e`)
 
 ---
 
@@ -385,7 +385,7 @@ Add two new scenarios after S-002-26:
 |-------|-------|
 | ID | GAP-2 |
 | Severity | 🟡 Medium |
-| Status | ⬜ Not started |
+| Status | ✅ Done |
 | Affected lines | spec.md FR-002-01 applyChanges (L211–218) |
 | Root cause | The spec says `setBodyContent(bytes)` but doesn't specify how to serialize `JsonNode` to `byte[]`, or what charset to use. |
 
@@ -412,7 +412,7 @@ Add a **Body Serialization** note after the applyChanges phase table (after L218
 |-------|-------|
 | ID | GAP-5 |
 | Severity | 🟡 Medium |
-| Status | ⬜ Not started |
+| Status | ✅ Done |
 | Affected lines | spec.md L221–243 (Header Application Strategy) |
 | Root cause | `setBodyContent(bytes)` auto-updates Content-Length. If the diff-based header strategy then applies a transformed Content-Length from the `Message`, it could overwrite the correct auto-set value. |
 
@@ -438,7 +438,7 @@ Add a note to the Header Application Strategy section (after L243):
 |-------|-------|
 | ID | IMP-1 |
 | Severity | 💡 Low |
-| Status | ⬜ Not started |
+| Status | ✅ Done |
 | Affected lines | spec.md FR-002-01 applyChanges section |
 | Root cause | When writing a transformed body via `setBodyContent(bytes)`, the body is no longer chunked. If the original response had `Transfer-Encoding: chunked`, it must be removed. |
 
@@ -455,9 +455,9 @@ Add to the "Protected headers" note from GAP-5:
 
 ### B4 Commit Plan
 
-- [ ] Apply GAP-2 fix (body serialization note)
-- [ ] Apply GAP-5 fix (protected headers note)
-- [ ] Apply IMP-1 fix (Transfer-Encoding handling)
+- [x] Apply GAP-2 fix (body serialization note)
+- [x] Apply GAP-5 fix (protected headers note)
+- [x] Apply IMP-1 fix (Transfer-Encoding handling)
 - [ ] Commit: `fix(spec-002): body serialization charset, protected headers, Transfer-Encoding`
 
 ---
@@ -769,8 +769,8 @@ Add a logging note after the wrapResponse mapping table:
 |-------|-------|--------|--------|
 | **B1** SDK API corrections | BUG-1, GAP-1, BUG-5 | ✅ Done | `0861a24` |
 | **B2** Lifecycle & control flow | GAP-4, IMP-6, BUG-6, BUG-4 | ✅ Done | `09d18a1` |
-| **B3** Scenario matrix | BUG-2, BUG-3, IMP-4 | ✅ Done | pending commit |
-| **B4** Body handling & headers | GAP-2, GAP-5, IMP-1 | ⬜ Not started | — |
+| **B3** Scenario matrix | BUG-2, BUG-3, IMP-4 | ✅ Done | `fefa78e` |
+| **B4** Body handling & headers | GAP-2, GAP-5, IMP-1 | ✅ Done | pending commit |
 | **B5** Config, reload & reliability | GAP-3, SEC-2, SEC-3, SEC-4 | ⬜ Not started | — |
 | **B6** Documentation & polish | SEC-1, BUG-7, IMP-2, IMP-3, IMP-5 | ⬜ Not started | — |
 

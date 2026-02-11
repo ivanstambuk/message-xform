@@ -246,6 +246,18 @@ The public SPI method `applyChanges(Message, Exchange)` delegates to
 > Attempting to write request fields during RESPONSE is silently ignored by
 > PingAccess (Constraint #3).
 
+**Body serialization:** The adapter serializes the transformed `JsonNode` to
+bytes via `objectMapper.writeValueAsBytes(transformedMessage.body())`. Jackson
+defaults to UTF-8 encoding. After calling `setBodyContent(bytes)` (which auto-
+updates `Content-Length`), the adapter MUST set the Content-Type header to
+`application/json; charset=utf-8` if the body was successfully transformed.
+If the original Content-Type had a charset parameter, it is replaced by the
+Jackson output charset (always UTF-8).
+
+For `NullNode` bodies (passthrough or non-JSON original), the adapter does NOT
+call `setBodyContent()` and does NOT modify Content-Type — the original response
+body and Content-Type are preserved unchanged.
+
 #### Header Application Strategy
 
 The core engine's `Message.headers()` contains the **final** header map after
@@ -269,6 +281,22 @@ result without leaking pre-existing headers that the spec intended to remove.
 > **Alternative considered:** Clear all headers then set new ones. Rejected
 > because PA may have internal/system headers that the adapter shouldn't
 > touch (e.g., hop-by-hop headers managed by the engine).
+
+**Protected headers:** The diff-based strategy MUST exclude the following
+headers from modification:
+
+- `content-length` — managed automatically by `setBodyContent()`. Allowing the
+  transform spec to override it would cause a body/length mismatch.
+- `transfer-encoding` — after `setBodyContent()`, the body is a complete byte
+  array with a known length. If the original response used chunked transfer
+  encoding, the adapter MUST remove `Transfer-Encoding` from the response
+  headers. `setBodyContent()` sets a fixed-length body — chunked encoding is
+  no longer applicable. PingAccess may handle this automatically, but the
+  adapter ensures correctness defensively.
+
+These headers are removed from both the "original" and "transformed" header sets
+before computing the diff. This prevents the transform spec from accidentally
+(or intentionally) setting incorrect content-length or transfer-encoding values.
 
 ### FR-002-02: AsyncRuleInterceptor Plugin
 
