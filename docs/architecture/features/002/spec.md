@@ -352,6 +352,14 @@ before computing the diff. This prevents the transform spec from accidentally
      using the SDK's provided implementation. This callback writes a PA-formatted
      error response when an unhandled exception escapes `handleRequest()`/`handleResponse()`.
 
+> **TemplateRenderer usage (design decision):** The adapter does NOT use
+> `TemplateRenderer` for error responses. Error bodies are generated as
+> RFC 9457 JSON (`application/problem+json`) directly, without PA's
+> Velocity template engine. `TemplateRenderer` is only referenced
+> indirectly via `RuleInterceptorErrorHandlingCallback` (which handles
+> unhandled exceptions — not transform failures). Transform failures are
+> handled by the adapter's own error-mode logic (FR-002-11).
+
 > **Override note:** `AsyncRuleInterceptorBase` provides a default no-op
 > implementation of `handleResponse()`. The adapter MUST override this to
 > implement response-phase transformations. Without the override, response
@@ -1159,6 +1167,12 @@ sizes).
 8. **Identity may be null:** For unauthenticated/anonymous resources,
    `exchange.getIdentity()` returns `null`. The adapter MUST check for null
    before accessing identity fields. See FR-002-06 null-identity handling.
+9. **PA-specific status codes:** PingAccess defines two non-standard HTTP
+   status codes: `HttpStatus.ALLOWED` (277) and `HttpStatus.REQUEST_BODY_REQUIRED`
+   (477). These are PA-internal codes used by the engine — the adapter MUST NOT
+   map to or from these codes. If the backend returns a non-standard status code,
+   the adapter passes it through unchanged. Transform specs targeting status codes
+   should only use standard HTTP status codes (100–599).
 
 ---
 
