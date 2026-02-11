@@ -114,10 +114,21 @@ String getSourceIp();
 String getUserAgentHost();
 String getUserAgentProtocol();
 String getTargetScheme();
+List<?> getTargetHosts();           // backend target host(s)
 Instant getCreationTime();
+Locale  getResolvedLocale();
+PolicyConfiguration getPolicyConfiguration();   // application + resource metadata
 <T> Optional<T> getProperty(ExchangeProperty<T>);
 <T> void setProperty(ExchangeProperty<T>, T);
+
+// PolicyConfiguration provides:
+//   Application getApplication();   → getName(), getContextRoot(), getRealm(), getDefaultAuthType()
+//   Resource    getResource();      → getName(), getPathPatterns(), getAudit(), getPolicy()
 ```
+
+> **Adapter note:** `getPolicyConfiguration()` provides application/resource
+> metadata that could be surfaced as transform context (e.g., `$context.application`).
+> This is **not** exposed in v1 but is available for future enrichment.
 
 ### Message (parent of Request and Response)
 
@@ -246,12 +257,20 @@ class SimplePluginConfiguration implements PluginConfiguration { ... }
 
 // @UIElement (on configuration fields)
 @UIElement(order = N, type = ConfigurationType.TEXT|TEXTAREA|SELECT|CHECKBOX|...,
-           label = "...", required = true|false, defaultValue = "...")
+           label = "...", required = true|false, defaultValue = "...",
+           modelAccessor = SomeAccessor.class)  // optional: dynamic dropdown
 
-// ConfigurationType enum values:
+// ConfigurationType enum values (from SDK 9.0.1 bytecode):
 //   TEXT, TEXTAREA, TIME, SELECT, GROOVY, CONCEALED, LIST, TABLE,
-//   CHECKBOX, AUTOCOMPLETEOPEN, AUTOCOMPLETECLOSED, COMPOSITE, RADIO_BUTTON
+//   CHECKBOX, AUTOCOMPLETEOPEN
+//
+// Note: RADIO_BUTTON is NOT a ConfigurationType enum value. Radio buttons
+//       are implemented using boolean fields (see SDK sample: radio1/radio2).
 ```
+
+> **Sync vs. Async naming:** `RuleInterceptorBase` uses `getRenderer()` while
+> `AsyncRuleInterceptorBase` uses `getTemplateRenderer()`. The adapter uses the
+> Async base class — always call `getTemplateRenderer()`, not `getRenderer()`.
 
 ### Java Version Compatibility
 
