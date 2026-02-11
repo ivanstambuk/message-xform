@@ -164,7 +164,8 @@ Additional inaccuracies found after initial gap analysis (during flat `$session`
 
 | ID | Issue | Status |
 |----|-------|--------|
-| GAP-16 | `Identity.getTokenExpiration()` returns `Instant`, not `Date` (spec said `Date`) | ⬜ Pending |
-| GAP-17 | `OAuthTokenMetadata` missing `getExpiresAt()` and `getRetrievedAt()` | ⬜ Pending |
-| GAP-18 | `SessionStateSupport` missing `getAttributeNames()` | ⬜ Pending |
-| GAP-19 | `$session` should be flat hierarchy (merge identity + OAuth + claims + session state) | ⬜ Pending |
+| GAP-16 | `Identity.getTokenExpiration()` returns `Instant`, not `Date` (spec said `Date`) | ✅ Fixed in SDK guide §4 + spec |
+| GAP-17 | `OAuthTokenMetadata` missing `getExpiresAt()` and `getRetrievedAt()` | ✅ Fixed in SDK guide §4 |
+| GAP-18 | `SessionStateSupport` missing `getAttributeNames()` | ✅ Fixed in SDK guide §4 |
+| GAP-19 | `$session` should be flat hierarchy (merge identity + OAuth + claims + session state) | ✅ Designed in spec FR-002-06 + SDK guide §4 |
+
