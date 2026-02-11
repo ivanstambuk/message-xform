@@ -32,7 +32,7 @@
 | 12 | [Supporting Types](#12-supporting-types) | Outcome, HttpStatus, Method, ExchangeProperty, ServiceFactory | `Outcome`, `HttpStatus`, `ServiceFactory` |
 | 13 | [SSL & Network Types](#13-ssl--network-types) | SslData, TargetHost, SetCookie | `SSL`, `TLS`, `cookie`, `network` |
 | 14 | [OAuth SDK](#14-oauth-sdk) | OAuthConstants, OAuthUtilities, WWW-Authenticate building | `OAuth`, `DPoP`, `RFC6750`, `constants` |
-| 15 | [Other Extension Points](#15-other-extension-points) | IdentityMapping, SiteAuthenticator, LoadBalancing, MasterKeyEncryptor | `extension`, `plugin`, `identity`, `encryption` |
+| 15 | [Other Extension Points](#15-other-extension-points) | IdentityMapping, SiteAuthenticator, LoadBalancing, LocaleOverride, MasterKeyEncryptor | `extension`, `plugin`, `identity`, `encryption`, `locale` |
 
 ---
 
@@ -1461,6 +1461,93 @@ Set<ConstraintViolation<MessageTransformConfig>> violations = validator.validate
 assertThat(violations).isNotEmpty();
 ```
 
+### HttpClient Mocking (from `RiskAuthorizationRuleTest`)
+
+When testing rules that make outbound HTTP calls via `HttpClient`, mock the
+`send()` method to return `CompletableFuture`s. Use `same()` matcher to route
+responses to the correct service:
+
+```java
+// Create service definitions
+ThirdPartyServiceModel riskService = new ThirdPartyServiceModel("id1", "risk");
+ThirdPartyServiceModel oauthService = new ThirdPartyServiceModel("id2", "OAuth AS");
+
+// Mock HttpClient to return different responses per service
+HttpClient client = mock(HttpClient.class);
+
+// OAuth token endpoint
+ClientResponse tokenResponse = createMockedResponse(
+    "{\"access_token\":\"token\"}".getBytes(UTF_8), HttpStatus.OK);
+when(client.send(any(), same(oauthService)))
+    .thenAnswer(inv -> CompletableFuture.completedFuture(tokenResponse));
+
+// Risk service endpoint
+ClientResponse riskResponse = createMockedResponse(
+    "{\"score\":75}".getBytes(UTF_8), HttpStatus.OK);
+when(client.send(any(), same(riskService)))
+    .thenAnswer(inv -> CompletableFuture.completedFuture(riskResponse));
+
+// Helper for creating mocked ClientResponse
+static ClientResponse createMockedResponse(byte[] body, HttpStatus status) {
+    ClientResponse response = mock(ClientResponse.class);
+    when(response.getBody()).thenReturn(body);
+    when(response.getHeaders()).thenReturn(ClientRequest.createHeaders());
+    when(response.getStatus()).thenReturn(status);
+    return response;
+}
+```
+
+**Simulating HttpClient failures:**
+```java
+when(client.send(any(), same(riskService))).thenAnswer(inv -> {
+    CompletableFuture<ClientResponse> failureResult = new CompletableFuture<>();
+    failureResult.completeExceptionally(
+        new HttpClientException(HttpClientException.Type.SERVICE_UNAVAILABLE,
+                                "Third-party service unavailable",
+                                new Exception()));
+    return failureResult;
+});
+```
+
+### Async Rule Test Pattern (from `RiskAuthorizationRuleTest`)
+
+When testing async rules, the `handleRequest()` returns `CompletionStage<Outcome>`.
+Use `toCompletableFuture().get()` to extract the result:
+
+```java
+RiskAuthorizationRule rule = new RiskAuthorizationRule();
+rule.configure(configuration);
+rule.setHttpClient(mockedHttpClient);
+
+CompletableFuture<Outcome> result = rule.handleRequest(exchange).toCompletableFuture();
+assertTrue(result.isDone());
+assertEquals(Outcome.RETURN, result.get());
+```
+
+### SessionStateSupport Verification (from `ExternalAuthorizationRuleTest`)
+
+Verify session state read/write interactions using `ArgumentCaptor`:
+
+```java
+SessionStateSupport sss = mock(SessionStateSupport.class);
+when(identity.getSessionStateSupport()).thenReturn(sss);
+
+// Simulate no cached session data
+when(sss.getAttributeValue("com.mycompany.auth.response.rule1")).thenReturn(null);
+
+// Invoke rule
+instance.handleRequest(exchange);
+
+// Verify session state was written
+ArgumentCaptor<JsonNode> captor = ArgumentCaptor.forClass(JsonNode.class);
+verify(sss).setAttribute(eq("com.mycompany.auth.response.rule1"), captor.capture());
+
+// Inspect captured value
+AuthorizationResponse response = objectMapper.convertValue(captor.getValue(),
+    AuthorizationResponse.class);
+assertTrue(response.isAllowed());
+```
+
 ### Test Dependency Alignment
 
 | Dependency | SDK Sample Version | Our Project | Notes |
@@ -1631,50 +1718,90 @@ LocalizedMessageResolver getLocalizedMessageResolver();
 
 ### HttpClient
 
-Available via `AsyncRuleInterceptorBase.getHttpClient()` after injection.
-Used for making outbound HTTP calls (e.g., to authorization servers).
+Available via `AsyncRuleInterceptorBase.getHttpClient()` (async base) or
+`AsyncLoadBalancingPluginBase.getHttpClient()` (LB base). Injected by PA.
 
 ```java
 // com.pingidentity.pa.sdk.http.client.HttpClient
-ClientResponse send(ClientRequest request) throws HttpClientException;
-// Sends a synchronous HTTP request. Throws HttpClientException on I/O errors.
+
+// Async — sends to a ThirdPartyServiceModel-defined host:
+CompletionStage<ClientResponse> send(ClientRequest request, ThirdPartyServiceModel target);
+// The target host, port, and TLS settings come from the ThirdPartyServiceModel.
+// The ClientRequest's requestTarget is the path + query portion only.
+```
+
+> **Note:** The send method is **asynchronous** — it returns a `CompletionStage`,
+> NOT a blocking result. Chain `.thenApply()` / `.thenCompose()` to process the
+> response, and `.exceptionally()` to handle `HttpClientException`.
+
+**Usage (from `RiskAuthorizationRule`):**
+```java
+return getHttpClient().send(accessTokenRequest, getConfiguration().getOAuthAuthorizationServer())
+                      .thenApply(this::parseAccessToken);
 ```
 
 ### ClientRequest
 
 ```java
 // com.pingidentity.pa.sdk.http.client.ClientRequest
-ClientRequest(String url, Method method);             // basic
-ClientRequest(String url, Method method, Body body);  // with body
-ClientRequest(String url, Method method, Body body, Headers headers);  // full
+ClientRequest(Method method, String requestTarget, Headers headers);             // no body (GET)
+ClientRequest(Method method, String requestTarget, Headers headers, byte[] body); // with body (POST)
+
+// Static factory:
+static Headers createHeaders();   // creates a new mutable Headers instance for outbound requests
 
 // Getters:
-String getUrl();
 Method getMethod();
-Body getBody();              // may be null
-Headers getHeaders();        // may be null
+String getRequestTarget();   // path + query, e.g. "/as/token.oauth2"
+byte[] getBody();            // may be null
+Headers getHeaders();
+```
+
+**Usage (from `RiskAuthorizationRule`):**
+```java
+Headers headers = ClientRequest.createHeaders();
+headers.setAuthorization(getClientAuthorization());
+headers.setContentType(CommonMediaTypes.APPLICATION_FORM_URL);
+byte[] body = "grant_type=client_credentials".getBytes(StandardCharsets.UTF_8);
+ClientRequest request = new ClientRequest(Method.POST, "/as/token.oauth2", headers, body);
 ```
 
 ### ClientResponse
 
 ```java
 // com.pingidentity.pa.sdk.http.client.ClientResponse
-int getStatusCode();
-Body getBody();
-Headers getHeaders();
+HttpStatus getStatus();     // HttpStatus, NOT int — use .equals(HttpStatus.OK) to compare
+byte[]     getBody();       // raw bytes — use ObjectMapper.readTree()/readValue() to parse
+Headers    getHeaders();
 ```
 
 ### HttpClientException
 
+Wraps I/O failures from the HttpClient.
+
 ```java
 // com.pingidentity.pa.sdk.http.client.HttpClientException
-HttpClientException(String message, Exception e, Type type);
+HttpClientException(HttpClientException.Type type, String message, Exception cause);
 
 Type getType();   // error classification
 
 // HttpClientException.Type enum:
-REQUEST_TIMEOUT, CONNECTION_TIMEOUT, GENERAL_IO_ERROR
+REQUEST_TIMEOUT, CONNECTION_TIMEOUT, SERVICE_UNAVAILABLE, GENERAL_IO_ERROR
 ```
+
+> **Async error handling:** When `send()` fails, the returned
+> `CompletionStage` completes exceptionally with a `CompletionException`
+> wrapping `HttpClientException`. Use `.exceptionally()` to recover:
+> ```java
+> .exceptionally(cause -> {
+>     if (cause instanceof CompletionException ce &&
+>         ce.getCause() instanceof HttpClientException) {
+>         logger.warn("HTTP call failed", cause);
+>         return Outcome.RETURN;  // graceful fallback
+>     }
+>     throw new IllegalStateException("Unexpected", cause);
+> });
+> ```
 
 ---
 
@@ -1788,14 +1915,15 @@ static String getWwwAuthenticateHeaderValue(
 
 ## 15. Other Extension Points
 
-> **Tags:** `extension`, `plugin`, `identity`, `site-authenticator`, `load-balancing`, `encryption`
+> **Tags:** `extension`, `plugin`, `identity`, `site-authenticator`, `load-balancing`, `encryption`, `locale-override`
 >
 > These extension point interfaces exist in the SDK but are **not used** by the
 > message-xform adapter. Documented here for completeness.
 
 ### IdentityMapping Plugins
 
-Maps the `Identity` subject to a backend-system identifier (e.g., LDAP DN).
+Maps the `Identity` subject to a backend-system identifier sent to the
+upstream server (e.g., as a header value).
 
 ```java
 // com.pingidentity.pa.sdk.identitymapping.IdentityMapping (annotation)
@@ -1815,9 +1943,31 @@ CompletionStage<Void> handleMapping(Exchange exchange);
 **HeaderIdentityMappingPlugin** — built-in implementation that copies identity
 attributes to request headers using `AttributeHeaderPair` mappings.
 
+**SDK sample patterns:**
+
+- **`SampleJsonIdentityMapping`**: Builds a JSON object with subject and role,
+  Base64-encodes it, then sets it as a single header value:
+  ```java
+  exchange.getRequest().getHeaders().removeFields(HEADER_NAME);  // "clobber and set"
+  exchange.getRequest().getHeaders().add(HEADER_NAME, encodedJson);
+  ```
+
+- **`SampleTableHeaderIdentityMapping`**: Uses `@UIElement(type = TABLE,
+  subFieldClass = UserAttributeTableEntry.class)` to define a configurable
+  table where each row maps a user attribute name to a header name. At runtime
+  it iterates the table, reads attributes from `identity.getAttributes()`,
+  and sets headers:
+  ```java
+  for (UserAttributeTableEntry entry : getConfiguration().entryList) {
+      JsonNode value = attributes.get(entry.userAttribute);
+      exchange.getRequest().getHeaders().add(entry.headerName, value.asText());
+  }
+  ```
+
 ### SiteAuthenticator Plugins
 
-Adds authentication headers when proxying to backend sites.
+Adds authentication data when proxying to backend sites. Unlike rules, these
+run as part of the **site connection** pipeline, not the application pipeline.
 
 ```java
 // com.pingidentity.pa.sdk.siteauthenticator.SiteAuthenticator (annotation)
@@ -1830,18 +1980,103 @@ void handleRequest(Exchange exchange) throws AccessException;
 CompletionStage<Void> handleRequest(Exchange exchange);
 ```
 
+**SDK sample pattern (`AddQueryStringSiteAuthenticator`):**
+
+Demonstrates mutating the request URI to inject authentication query parameters:
+
+```java
+// Parse existing URI, merge with configured param, rebuild
+String uriString = exchange.getRequest().getUri();
+URI uri = URI.create(uriString);
+Map<String, String[]> query = exchange.getRequest().getQueryStringParams();
+query.put(config.param, new String[]{ config.paramValue });
+exchange.getRequest().setUri(uri.getPath() + "?" + urlEncode(query));
+```
+
+> **Note:** SiteAuthenticator uses `ConfigurationBuilder` (not `@UIElement`)
+> for configuration fields:
+> ```java
+> return new ConfigurationBuilder()
+>     .configurationField("param", "Query String Param", TEXT).required()
+>     .configurationField("paramValue", "Query String Value", TEXT).required()
+>     .toConfigurationFields();
+> ```
+
 ### LoadBalancing Plugins
 
 Custom load-balancing strategies for distributing traffic across sites.
+The plugin creates a **handler** that lives for the lifetime of the
+configuration. PA calls `getHandler()` on configuration changes.
 
 ```java
 // com.pingidentity.pa.sdk.ha.lb.LoadBalancingStrategy (annotation)
 @LoadBalancingStrategy(type = "...", label = "...", expectedConfiguration = ...)
 
-// Sync: LoadBalancingPlugin<T> / LoadBalancingPluginBase<T>
-// Async: AsyncLoadBalancingPlugin<T> / AsyncLoadBalancingPluginBase<T>
-// Handler: LoadBalancingHandler / AsyncLoadBalancingHandler
+// Sync:  LoadBalancingPlugin<H, T>   / LoadBalancingPluginBase<H, T>
+// Async: AsyncLoadBalancingPlugin<H, T> / AsyncLoadBalancingPluginBase<H, T>
+//   where H = Handler type, T = Configuration type
+
+// Plugin lifecycle:
+H getHandler();                     // called on first creation
+H getHandler(H existingHandler);    // called on config change — return existing
+                                    // if no change needed, or new instance
 ```
+
+**Handler API (`AsyncLoadBalancingHandler`):**
+
+```java
+// com.pingidentity.pa.sdk.ha.lb.AsyncLoadBalancingHandler
+CompletionStage<TargetHost> calculateTargetHost(
+    Exchange exchange,             // the current request
+    List<TargetHost> availableHosts,  // hosts currently UP
+    List<TargetHost> configuredHosts  // all configured hosts
+);
+
+CompletionStage<Void> handleResponse(
+    Exchange exchange,             // completed exchange
+    TargetHost targetHost          // host that was selected
+);
+```
+
+**SDK sample patterns:**
+
+- **`BestEffortStickySessionPlugin`**: Server-side sticky sessions. Handler
+  maintains a `ConcurrentHashMap<String, TargetHost>` mapping session IDs
+  to target hosts. `handleResponse()` reads the upstream `Set-Cookie`
+  session cookie and updates the map.
+
+- **`MetricBasedPlugin`**: Queries an external monitoring API for capacity
+  data and routes to the host with most remaining capacity. Demonstrates:
+  - `HttpClient` injection via `getHttpClient()` on the plugin base
+  - `CompletionStage` chaining with `.thenApply()` / `.exceptionally()`
+  - Graceful degradation: falls back to random host on monitoring failure
+  - Configuration change detection via `equals()` on Configuration objects
+
+**Handler config change pattern (from `MetricBasedPlugin`):**
+```java
+@Override
+public Handler getHandler(Handler existingHandler) {
+    if (existingHandler.updateConfiguration(getConfiguration())) {
+        return existingHandler;  // config unchanged — reuse
+    }
+    return getHandler();  // config changed — create fresh handler
+}
+```
+
+### LocaleOverrideService
+
+SPI for overriding the client's locale preference. If the returned list
+is non-empty, PA uses these locales instead of the `Accept-Language` header.
+
+```java
+// com.pingidentity.pa.sdk.localization.LocaleOverrideService
+List<Locale> getPreferredLocales(Exchange exchange);
+// Returns ordered list of preferred locales. Empty = use Accept-Language.
+```
+
+**SDK sample (`CustomCookieLocaleOverrideService`):**
+Reads a `custom-accept-language` cookie containing a BCP 47 language tag
+(e.g., `nl-NL`) and returns it as the preferred locale.
 
 ### EntityScopedHandlerPlugin
 
@@ -1858,6 +2093,20 @@ Custom load-balancing strategies for distributing traffic across sites.
 // Interface for custom key encryption providers.
 // Throws MasterKeyEncryptorException on errors.
 ```
+
+### SPI Registration Files per Extension Type
+
+Each extension type requires its own `META-INF/services/` file:
+
+| Extension Type | SPI Service File |
+|---------------|-----------------|
+| Async Rule | `com.pingidentity.pa.sdk.policy.AsyncRuleInterceptor` |
+| Sync Rule | `com.pingidentity.pa.sdk.policy.RuleInterceptor` |
+| Identity Mapping | `com.pingidentity.pa.sdk.identitymapping.IdentityMappingPlugin` |
+| Site Authenticator | `com.pingidentity.pa.sdk.siteauthenticator.SiteAuthenticatorInterceptor` |
+| Async Load Balancing | `com.pingidentity.pa.sdk.ha.lb.AsyncLoadBalancingPlugin` |
+| Sync Load Balancing | `com.pingidentity.pa.sdk.ha.lb.LoadBalancingPlugin` |
+| Locale Override | `com.pingidentity.pa.sdk.localization.LocaleOverrideService` |
 
 ---
 
