@@ -1,35 +1,33 @@
 # Current Session State
 
-**Date:** 2026-02-11
-**Focus:** Spec-002 review completion + JMX observability feature
+**Date:** 2026-02-11 (late session)
+**Focus:** ADR cleanup, spike absorption, documentation hygiene
 
 ## Completed This Session
 
-### Spec Review (20/20 issues resolved)
-- Batches 1–5 completed across 5 commits
-- Fixed critical lifecycle ordering, error handling, boundary conditions
-- Added 6 new scenarios (S-002-29 through S-002-34)
-- Added precision notes for validation, deep-copy, thread safety
+### ADR-0034 Created
+- SLF4J compile-time binding decision (no custom logging port)
+- Documents why SLF4J is used directly (API stability, binary compat)
+- Contrasts with Jackson approach (ADR-0032)
 
-### JMX Observability (FR-002-14) — New Feature
-- Promoted JMX MBeans from non-goal (N-002-05) to opt-in feature
-- Added `enableJmxMetrics` CHECKBOX config field (default: false)
-- Specified `MessageTransformMetricsMXBean` interface with counters, latency, reset
-- Documented PA's JMX monitoring ecosystem in SDK guide §19
-- Two-layer approach: SLF4J always-on + JMX opt-in
+### ADR Cleanup (0031/0032)
+- Removed stale struck-out content from ADR-0032
+- Removed stale consequences from ADR-0031 (core Jackson coupling)
+- Strengthened ADR purity rule in AGENTS.md
 
-### SDK Guide
-- Added §19: JMX Monitoring & Custom MBeans (245 lines)
-- Documents PA monitoring mechanisms, plugin MBean registration, JConsole patterns
+### Spike Documents Deleted & Absorbed
+- Deleted `spike-pa-classloader-model.md` (654 lines) — Spike A
+- Deleted `spike-pa-dependency-extraction.md` (1013 lines) — Spike B
+- All valuable findings absorbed into ADR-0031:
+  - Bytecode evidence (Bootstrap, ServiceFactory, ConfigurablePluginPostProcessor)
+  - Spring prototype bean registration, LocalizationResourceClassLoaderUtils
+  - Full 20-library PA inventory with versions
+  - Build integration options (catalog overlay / platform module / generated TOML)
+  - Plugin ecosystem precedent (ES, Gradle, IntelliJ, Jenkins)
+  - Mismatch severity matrix, PA upgrade workflow
+  - Dual version catalog architecture
+- References in spec.md, SDK guide, knowledge-map, llms.txt updated
 
-## Key Decisions
-- JMX domain: `io.messagexform` (avoids PA internal collision)
-- LongAdder for counters (lock-free, contention-tolerant)
-- ObjectName.quote() for PA rule name safety
-- Zero overhead when disabled (no MBean registration, no counter allocation needed)
-
-## Spec State
-- 14 FRs (FR-002-01 through FR-002-14)
-- 34 scenarios (S-002-01 through S-002-34)
-- 4 NFRs, 10 constraints
-- SDK guide: 19 sections
+## Next Session
+- Implement PA dependency build integration (Feature 002)
+- See `.agent/session/pending-task.md` for details
