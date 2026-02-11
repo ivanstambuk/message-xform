@@ -27,10 +27,10 @@
 | 16 | Missing scenario: concurrent reload + request race | 🔵 Minor | 4 | ✅ Done |
 | 17 | Missing scenario: non-JSON response body | 🔵 Minor | 4 | ✅ Done |
 | 18 | `jakarta.validation-api` version mismatch risk | 🔵 Minor | 4 | ✅ Done |
-| 19 | No metrics/counters for transform operations | 🔵 Minor | 5 | ⬜ Not started |
-| 20 | Ping Maven repo URL — HTTP vs HTTPS | 🔵 Minor | 5 | ⬜ Not started |
+| 19 | No metrics/counters for transform operations | 🔵 Minor | 5 | ✅ Done |
+| 20 | Ping Maven repo URL — HTTP vs HTTPS | 🔵 Minor | 5 | ✅ Done |
 
-**Progress: 18 / 20 complete**
+**Progress: 20 / 20 complete ✅**
 
 ---
 

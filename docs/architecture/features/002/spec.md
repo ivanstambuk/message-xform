@@ -67,6 +67,12 @@ The adapter is a **thin bridge layer** — all transformation logic lives in
 - N-002-04 – PingAccess clustering or HA configuration. The adapter is a
   stateless plugin — it works identically in standalone and clustered PA
   deployments.
+- N-002-05 – Metrics and observability. The v1 adapter does not expose JMX
+  MBeans, Micrometer metrics, or OpenTelemetry spans for transform operations.
+  PingAccess’s built-in audit logging captures rule execution events at the PA
+  level. The `TransformResultSummary` `ExchangeProperty` (FR-002-07) provides
+  per-request observability for downstream rules. Aggregate metrics (counters,
+  latency histograms) are deferred to a future version.
 
 ---
 
@@ -899,9 +905,13 @@ Gradle subproject with:
 5. Shadow JAR plugin configured to exclude the `compileOnly` dependencies.
 6. Java 21 toolchain (same as core).
 7. The PingAccess Maven repository
-   (`https://maven.pingidentity.com/release/`) added as a repository. Fallback:
+   (`http://maven.pingidentity.com/release/`) added as a repository. Fallback:
    local JAR at `docs/reference/pingaccess-sdk/pingaccess-sdk-9.0.1.0.jar` via
    `files()` dependency if the Maven repo is unreachable.
+
+   > **HTTP not HTTPS:** The Ping Identity Maven repository uses HTTP per the
+   > official SDK documentation. If your organization requires HTTPS-only
+   > repositories, mirror the SDK artifacts to an internal repository manager.
 
 | Aspect | Detail |
 |--------|--------|
@@ -1271,7 +1281,7 @@ sizes).
 ```kotlin
 // Gradle (Kotlin DSL) — in adapter-pingaccess/build.gradle.kts
 repositories {
-    maven { url = uri("https://maven.pingidentity.com/release/") }
+    maven { url = uri("http://maven.pingidentity.com/release/") }  // HTTP per official SDK docs
 }
 
 dependencies {
