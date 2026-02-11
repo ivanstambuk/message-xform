@@ -33,7 +33,7 @@
 | 13 | [SSL & Network Types](#13-ssl--network-types) | SslData, TargetHost, SetCookie | `SSL`, `TLS`, `cookie`, `network` |
 | 14 | [OAuth SDK](#14-oauth-sdk) | OAuthConstants, OAuthUtilities, WWW-Authenticate building | `OAuth`, `DPoP`, `RFC6750`, `constants` |
 | 15 | [Other Extension Points](#15-other-extension-points) | IdentityMapping, SiteAuthenticator, LoadBalancing, LocaleOverride, MasterKeyEncryptor | `extension`, `plugin`, `identity`, `encryption`, `locale` |
-| 16 | [Vendor-Built Plugin Analysis](#16-vendor-built-plugin-analysis) | Decompiled patterns from PA engine's internal plugins | `decompile`, `vendor`, `internal`, `engine` |
+| 16 | [Vendor-Built Plugin Analysis](#16-vendor-built-plugin-analysis) | Patterns from PA engine's built-in plugins | `vendor`, `internal`, `engine`, `built-in` |
 
 ---
 
@@ -1582,6 +1582,122 @@ AuthorizationResponse response = objectMapper.convertValue(captor.getValue(),
 assertTrue(response.isAllowed());
 ```
 
+### SPI Registration Verification (from `TestValidateRulesAreAvailable`)
+
+Use `ServiceFactory.isValidImplName()` to verify your plugin is correctly
+registered via `META-INF/services/`:
+
+```java
+import com.pingidentity.pa.sdk.services.ServiceFactory;
+import com.pingidentity.pa.sdk.policy.RuleInterceptor;
+
+@Test
+public void testPluginIsRegistered() {
+    // Verify our plugin is loadable via ServiceFactory
+    assertTrue(ServiceFactory.isValidImplName(
+        RuleInterceptor.class, MyCustomRule.class.getName()));
+
+    // Verify non-plugins are not loadable
+    assertFalse(ServiceFactory.isValidImplName(
+        RuleInterceptor.class, this.getClass().getName()));
+}
+```
+
+> **Pattern:** this also works for `SiteAuthenticatorInterceptor.class`,
+> `IdentityMappingPlugin.class`, etc. Always include an SPI registration
+> test in your test suite.
+
+### Configuration Deserialization Test (from `TestAllUITypesAnnotationRule`)
+
+Test that configuration JSON correctly deserializes and validates:
+
+```java
+// Spring context: uses LocalValidatorFactoryBean (mock-config.xml)
+@ContextConfiguration("/mock-config.xml")
+@RunWith(SpringJUnit4ClassRunner.class)
+public class ConfigurationTest {
+    @Autowired private Validator validator;
+
+    @Test
+    public void testValidConfiguration() throws IOException {
+        // Build a Map<String, String> simulating admin UI form data
+        Map<String, String> map = new HashMap<>();
+        map.put("aText", "value");
+        map.put("aSelect", "OptionOne");
+        map.put("aTable", "[{\"col1\":\"val\",\"col2\":\"2\"}]");
+        map.put("errorResponseCode", "403");
+        // ...
+
+        // Deserialize into configuration using readerForUpdating()
+        MyPlugin.Configuration cfg = new MyPlugin.Configuration();
+        cfg.setName("testRule");
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        mapper.readerForUpdating(cfg).readValue(TestUtil.getJsonForMap(map));
+
+        // Validate using Jakarta Bean Validation
+        Set<ConstraintViolation<?>> violations =
+            new HashSet<>(validator.validate(cfg));
+        assertThat(violations.size(), is(0));
+    }
+
+    @Test
+    public void testInvalidConfiguration() throws IOException {
+        // Intentionally omit required fields or provide invalid values
+        Map<String, String> map = new HashMap<>();
+        map.put("aConcealed", "123"); // @Size(min=5) violated
+        // ...missing required field "aText"
+
+        MyPlugin.Configuration cfg = new MyPlugin.Configuration();
+        cfg.setName("testRule");
+        getMapper().readerForUpdating(cfg).readValue(TestUtil.getJsonForMap(map));
+
+        Set<ConstraintViolation<?>> violations =
+            new HashSet<>(validator.validate(cfg));
+        assertThat(violations.size(), is(4)); // exact count of violations
+    }
+}
+```
+
+> **Key pattern:** Jackson's `readerForUpdating()` merges JSON into an existing
+> object without replacing defaults. This simulates how PingAccess admin
+> deserializes config posted from the UI. The `TestUtil.getJsonForMap()` helper
+> converts `Map<String,String>` to JSON, auto-detecting array values for TABLE.
+
+### Test Infrastructure Helpers (from SDK samples)
+
+The SDK tests use a consistent set of mock implementations:
+
+```java
+// Mock HeadersFactory — returns Mockito mocks for Headers
+public static class MockHeadersFactoryImpl implements HeadersFactory {
+    public Headers create()                        { return mock(Headers.class); }
+    public Headers create(List<HeaderField> fields) { return mock(Headers.class); }
+}
+// Register via: META-INF/services/com.pingidentity.pa.sdk.http.HeadersFactory
+
+// Mock ConfigurationModelAccessorFactory — delegates to ServiceFactory
+public static class ConfigurationModelAccessorFactoryImpl
+        implements ConfigurationModelAccessorFactory {
+    public <T extends ConfigurationModelAccessor> T getConfigurationModelAccessor(Class<T> clazz) {
+        List<Class<?>> impls = ServiceFactory.getImplClasses(ConfigurationModelAccessor.class);
+        for (Class implClazz : impls) {
+            if (clazz.isAssignableFrom(implClazz)) {
+                return (T) implClazz.newInstance();
+            }
+        }
+        return null;
+    }
+}
+
+// Spring mock-config.xml for @Autowired Validator:
+// <bean id="validator" class="org.springframework.validation.beanvalidation.LocalValidatorFactoryBean">
+//   <property name="validationPropertyMap">
+//     <util:map><entry key="hibernate.validator.fail_fast" value="false"/></util:map>
+//   </property>
+// </bean>
+```
+
 ### Test Dependency Alignment
 
 | Dependency | SDK Sample Version | Our Project | Notes |
@@ -2146,9 +2262,10 @@ Each extension type requires its own `META-INF/services/` file:
 
 ## 16. Vendor-Built Plugin Analysis
 
-> **Tags:** `decompile`, `vendor`, `internal`, `engine`, `built-in`
+> **Tags:** `vendor`, `internal`, `engine`, `built-in`
 >
-> These findings come from CFR decompilation of `pingaccess-engine-9.0.1.0.jar`.
+> These findings come from analysis of class signatures, SPI service files,
+> and public API usage within `pingaccess-engine-9.0.1.0.jar`.
 > They document implementation patterns used by PingIdentity's own built-in
 > plugins. While these plugins use some engine-internal APIs not available in
 > the SDK, they also use many SDK-public APIs and reveal best practices.
@@ -2203,7 +2320,7 @@ The closest vendor plugin to our adapter. Key observations:
   — vendor pattern for externalized help text from ResourceBundle.
 - `getConfigurationFields()` returns fields generated from annotation scan.
 
-### Vendor Configuration Patterns (from decompiled Configuration classes)
+### Vendor Configuration Patterns (from engine Configuration classes)
 
 ```java
 // Vendor pattern: full @UIElement usage with modelAccessor for dynamic dropdowns
