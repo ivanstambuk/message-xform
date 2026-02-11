@@ -176,4 +176,3 @@ ADR-0033 (Port Value Objects) governs ── FR-001-14, references ADR-0032
 | `docs/architecture/features/002/pingaccess-sdk-guide.md` | Standalone PingAccess 9.0 SDK reference (19 sections, 112 classes) | Feature 002 spec, all adapter implementation |
 | `docs/research/spike-pa-classloader-model.md` | Spike A: Reverse-engineer PA classloader hierarchy, delegation model, library visibility | Feature 002 dependency strategy, ADR-0031 |
 | `docs/research/spike-pa-dependency-extraction.md` | Spike B: Extract PA library versions from Docker, design version-locked build alignment | Feature 002 dependency strategy, build system |
-| `docs/research/core-byte-boundary-plan.md` | Core byte-boundary refactor: Phases 0–7 plan for anti-corruption layer (ADR-0032, ADR-0033) | Feature 001 `MessageBody`/`HttpHeaders`/`SessionContext`, Feature 002 adapter migration |

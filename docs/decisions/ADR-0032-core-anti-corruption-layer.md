@@ -268,12 +268,11 @@ Negative / trade-offs:
 
 ## Follow-ups
 
-1. **Core API refactor** — see `docs/research/core-byte-boundary-plan.md`
-2. **Update ADR-0031** — add note about partial supersession
-3. **Update Feature 001 spec** — reflect `byte[]` API in FR-001-* requirements
-4. **Update Feature 002 spec** — remove Jackson version coupling constraints
-5. **Revert `libs.versions.toml`** — Jackson in `libs` reverts to latest;
-   PA adapter uses `pa-provided.versions.toml` exclusively
+1. **Core API refactor** — ✅ Complete (Phases 0–4, 5.1, 7)
+2. **Update ADR-0031** — ✅ Done (partial supersession note added)
+3. **Update Feature 001 spec** — ✅ Done (FR-001-14)
+4. **Update Feature 002 spec** — deferred to Feature 002 implementation
+5. **Revert `libs.versions.toml`** — ✅ Done (Jackson upgraded to 2.21.0 LTS)
 
 References:
 - ADR-0031: PA-Provided Dependencies (partially superseded)

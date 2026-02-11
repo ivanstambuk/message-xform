@@ -1111,8 +1111,8 @@ Track long-running or shared commands with timestamps to avoid duplicate work.
 ### Phase 11 — Port Value Objects (FR-001-14, ADR-0032, ADR-0033)
 
 > **Scope:** Create 4 core-owned port types + tests. Additive — does NOT modify
-> existing types or break any existing tests. This is Phase 1 of the
-> `core-byte-boundary-plan.md`.
+> existing types or break any existing tests. Phase 1 of the byte-boundary
+> refactor (ADR-0032, ADR-0033).
 
 #### I11 — MediaType enum
 

@@ -71,7 +71,6 @@ docs/research/gateway-candidates.md
 docs/research/pingam-callback-api.md
 docs/research/t-001-12-jslt-context-variables.md
 docs/research/standalone-proxy-http-server.md
-docs/research/core-byte-boundary-plan.md
 
 # Implementation tracking
 docs/architecture/features/001/tasks.md
