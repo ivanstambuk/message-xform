@@ -325,44 +325,60 @@ entries.
 abstracts the HTTP message, regardless of which gateway it came from:
 
 ```java
-public interface Message {
-    JsonNode getBodyAsJson();
-    void setBodyFromJson(JsonNode body);
-    Map<String, List<String>> getHeaders();
-    void setHeader(String name, String value);   // replaces all values for this name
-    void addHeader(String name, String value);   // appends to existing values (multi-value)
-    void removeHeader(String name);
-    int getStatusCode();          // response only
-    void setStatusCode(int code); // response only
-    String getContentType();
-    String getRequestPath();      // e.g. "/json/alpha/authenticate"
-    void setRequestPath(String path);   // URL rewrite (ADR-0027)
-    String getRequestMethod();    // e.g. "POST"
-    void setRequestMethod(String method); // method override (ADR-0027)
-    /** Gateway session context as arbitrary JSON, or null if unavailable. ADR-0030. */
-    JsonNode getSessionContext();
-    void setSessionContext(JsonNode session);
+public record Message(
+    MessageBody body,
+    HttpHeaders headers,
+    Integer statusCode,
+    String requestPath,
+    String requestMethod,
+    String queryString,
+    SessionContext session
+) {
+    /** Returns a copy with a different body. */
+    public Message withBody(MessageBody newBody) { ... }
+
+    /** Returns a copy with different headers. */
+    public Message withHeaders(HttpHeaders newHeaders) { ... }
+
+    /** Returns a copy with a different status code. */
+    public Message withStatusCode(Integer newStatusCode) { ... }
+
+    /** Convenience: media type from body. */
+    public MediaType mediaType() { return body.mediaType(); }
+
+    /** Convenience: content type string from body (e.g. "application/json"). */
+    public String contentType() { return body.mediaType().value(); }
 }
 ```
 
-Note: the body interface uses `JsonNode` directly (not `byte[]`) because the engine
-already requires JSON — and JSLT operates natively on Jackson `JsonNode`. The raw
-byte[] ↔ JsonNode conversion is the adapter's responsibility.
+Note: the body field uses `MessageBody` (a `byte[]` + `MediaType` pair), NOT
+`JsonNode`. The engine internally parses bytes to `JsonNode` using its own
+bundled, relocated Jackson — adapters never touch Jackson types. This is the
+Anti-Corruption Layer pattern defined in ADR-0032 and ADR-0033. The raw
+byte[] ↔ JsonNode conversion is the **core engine's internal** responsibility.
 
-Gateway adapters are responsible for mapping their native message types to this
-interface:
-- PingAccess: `Exchange.getRequest()` / `Exchange.getResponse()` → `Message`
-- PingGateway: `Request` / `Response` → `Message`
-- Standalone: `HttpServletRequest` / `HttpServletResponse` → `Message`
+The `Message` record replaces two separate header maps (single-value
+`Map<String, String>` and multi-value `Map<String, List<String>>`) with a
+single `HttpHeaders` object that provides both views via `toSingleValueMap()`
+and `toMultiValueMap()`. The `contentType` field is removed — it is derived
+from `body.mediaType().value()`. The `sessionContext` field is renamed to
+`session` and uses `SessionContext` instead of `JsonNode`.
+
+Gateway adapters are responsible for constructing `Message` instances using
+the port type factory methods:
+- PingAccess: `Exchange.getRequest()` / `Exchange.getResponse()` → `MessageBody.json(bytes)`, `HttpHeaders.of(map)`, `SessionContext.of(map)`
+- PingGateway: `Request` / `Response` → same factory pattern
+- Standalone: `HttpServletRequest` / `HttpServletResponse` → same factory pattern
 
 **Copy-on-wrap semantics:** Adapters MUST create a **mutable copy** of the
-gateway-native message when wrapping (deep-copy of `JsonNode` body, copy of headers
-map, snapshot of status code). The core engine mutates this copy freely during
-transformation. After transformation completes successfully (including all chain
-steps), the adapter applies the final state back to the native message via
-`GatewayAdapter.applyChanges(Message, native)`.
+gateway-native message when wrapping (snapshot body bytes, copy headers,
+snapshot of status code). The core engine receives the `Message` as an immutable
+record and produces a new `Message` (via `with*()` methods) during transformation.
+After transformation completes successfully (including all chain steps), the
+adapter reads the result `Message` fields and applies them back to the native
+message.
 
-On abort-on-failure, the adapter **does not call `applyChanges()`** — the native
+On abort-on-failure, the adapter **does not apply changes** — the native
 message remains completely untouched. This provides clean rollback semantics for
 pipeline chaining (FR-001-05) and ensures no partial mutations leak to other
 gateway filters.
@@ -370,26 +386,27 @@ gateway filters.
 ```
 wrapResponse(native) → Message (copy)
   ↓
-Engine mutates Message (body, headers, status)
+Engine processes Message → new Message (immutable result)
   ↓
-if success: applyChanges(Message, native) → writes back to native
-if failure: discard Message copy → native untouched
+if success: adapter reads result Message fields → writes back to native
+if failure: discard result Message → native untouched
 ```
 
 | Aspect | Detail |
 |--------|--------|
-| Success path | Adapter creates copy → engine processes → adapter applies changes back to native |
+| Success path | Adapter creates Message(MessageBody, HttpHeaders, ...) → engine processes → adapter reads result Message |
 | Validation path | Message body is not valid JSON → skip body transformation, apply header transforms only |
 | Failure path | Adapter cannot read body (e.g., streaming) → log warning, return error response (ADR-0022) |
-| Failure path | Transform fails → copy discarded, adapter returns error response (ADR-0022) |
-| Source | PingAccess `Exchange`, gateway adapter pattern, ADR-0011 |
+| Failure path | Transform fails → result discarded, adapter returns error response (ADR-0022) |
+| Source | PingAccess `Exchange`, gateway adapter pattern, ADR-0011, ADR-0032, ADR-0033 |
 
 **Body buffering (ADR-0018):** The core engine does NOT mandate body-size limits or
-buffering strategies. The `Message.getBodyAsJson()` contract assumes a complete `JsonNode`
-is provided. How the adapter buffers the body, and any size limits, are gateway-level
+buffering strategies. The `MessageBody` contract assumes complete body bytes
+are provided. How the adapter buffers the body, and any size limits, are gateway-level
 NFRs handled by the adapter's gateway configuration (e.g., PingAccess request body limits,
 Kong/NGINX `client_max_body_size`). Adapter feature specs SHOULD document their gateway's
 body-size configuration.
+
 
 ### FR-001-05: Transform Profiles (Backend-Specific Definitions)
 
@@ -1035,12 +1052,166 @@ MUST be rejected at load time with a diagnostic message.
 | Failure path | N/A — `$session` is always nullable; null access is safe in JSLT |
 | Source | ADR-0030, ADR-0021 precedent |
 
+### FR-001-14: Port Value Objects (Anti-Corruption Layer)
+
+**Requirement:** Core's public API MUST NOT expose any third-party types
+(Jackson `JsonNode`, SLF4J 2.x-only APIs, etc.) to adapters or callers.
+Instead, core defines its own **port value objects** — simple, immutable
+types using only Java standard library types (`byte[]`, `Map`, `String`,
+`enum`). These types form the Anti-Corruption Layer boundary (ADR-0032,
+ADR-0033, Level 2 Hexagonal Architecture).
+
+Core defines four port types:
+
+#### FR-001-14a: `MediaType` Enum
+
+```java
+public enum MediaType {
+    JSON("application/json"),
+    XML("application/xml"),
+    FORM("application/x-www-form-urlencoded"),
+    TEXT("text/plain"),
+    BINARY("application/octet-stream"),
+    NONE(null);
+
+    /** Returns the MIME type string, or null for NONE. */
+    public String value() { ... }
+
+    /**
+     * Resolves a Content-Type header value to a MediaType.
+     * Ignores parameters (charset, boundary, etc.).
+     * Recognizes structured suffixes: +json → JSON, +xml → XML.
+     * Returns NONE for null/blank, BINARY for unrecognized types.
+     */
+    public static MediaType fromContentType(String contentType) { ... }
+}
+```
+
+Core-owned replacement for raw `String contentType` and Jakarta `MediaType`.
+Zero third-party dependencies.
+
+#### FR-001-14b: `MessageBody` Record
+
+```java
+public record MessageBody(byte[] content, MediaType mediaType) {
+    /** True when content is null or zero-length. */
+    public boolean isEmpty() { ... }
+
+    /** Returns content as a UTF-8 string. */
+    public String asString() { ... }
+
+    /** Content length in bytes. */
+    public int size() { ... }
+
+    // Factory methods — guide adapter developers
+    public static MessageBody json(byte[] content) { ... }
+    public static MessageBody json(String content) { ... }
+    public static MessageBody empty() { ... }
+    public static MessageBody of(byte[] content, MediaType mediaType) { ... }
+}
+```
+
+**Design constraints:**
+- Custom `equals()`/`hashCode()` MUST use `Arrays.equals()` for byte
+  comparison (records use reference equality for arrays by default).
+- `null` content is normalized to empty `byte[0]` in the constructor.
+- Factory methods set the correct `MediaType` automatically.
+
+#### FR-001-14c: `HttpHeaders` Class
+
+```java
+public final class HttpHeaders {
+    /** First value for a header name (case-insensitive). */
+    public String first(String name) { ... }
+
+    /** All values for a header name (case-insensitive). */
+    public List<String> all(String name) { ... }
+
+    /** True if the header exists (case-insensitive). */
+    public boolean contains(String name) { ... }
+
+    /** Returns true if no headers are present. */
+    public boolean isEmpty() { ... }
+
+    /** First-value-per-name view (lowercase keys). */
+    public Map<String, String> toSingleValueMap() { ... }
+
+    /** All-values-per-name view (lowercase keys). */
+    public Map<String, List<String>> toMultiValueMap() { ... }
+
+    // Factory methods
+    public static HttpHeaders of(Map<String, String> singleValue) { ... }
+    public static HttpHeaders ofMulti(Map<String, List<String>> multiValue) { ... }
+    public static HttpHeaders empty() { ... }
+}
+```
+
+**Design constraints:**
+- Header names MUST be normalized to **lowercase** in all factory methods
+  (RFC 9110 §5.1).
+- The class is **immutable** — no add/remove/set mutations.
+- Internal storage SHOULD use `TreeMap` for consistent iteration order.
+- Replaces both `Map<String, String> headers` and
+  `Map<String, List<String>> headersAll` — single type for both views.
+
+#### FR-001-14d: `SessionContext` Class
+
+```java
+public final class SessionContext {
+    /** Raw attribute value by key. */
+    public Object get(String key) { ... }
+
+    /** String-typed attribute by key (returns null if absent or non-string). */
+    public String getString(String key) { ... }
+
+    /** True if the key exists. */
+    public boolean has(String key) { ... }
+
+    /** True if empty or no attributes. */
+    public boolean isEmpty() { ... }
+
+    /** Returns a defensive copy of the underlying map. */
+    public Map<String, Object> toMap() { ... }
+
+    // Factory methods
+    public static SessionContext of(Map<String, Object> attributes) { ... }
+    public static SessionContext empty() { ... }
+}
+```
+
+**Design constraints:**
+- `toString()` MUST print only key names (not values) to avoid leaking
+  sensitive session data in logs.
+- `empty()` SHOULD return a singleton instance.
+- Replaces `JsonNode sessionContext` — adapters convert from their native
+  session types to `Map<String, Object>` using their own Jackson/serializer.
+
+#### Interaction with Existing FRs
+
+- **FR-001-04** (Message Envelope): `Message` uses `MessageBody`, `HttpHeaders`,
+  and `SessionContext` instead of `JsonNode`, `Map`, and raw `String contentType`.
+- **FR-001-02** (Expression Engine SPI): `CompiledExpression.evaluate()` continues
+  to accept `JsonNode` and `TransformContext` — but `JsonNode` is now an
+  **internal** type (bundled via relocation). Adapters never see it.
+- **FR-001-07** (Error Handling): `TransformResult.errorResponse()` returns
+  `MessageBody` instead of `JsonNode`.
+- **FR-001-13** (Session Context): `Message.session()` returns `SessionContext`
+  instead of `JsonNode`.
+
+| Aspect | Detail |
+|--------|--------|
+| Success path | Adapter creates `Message` using port factories → engine converts internally → result uses port types |
+| Validation path | `MessageBody` null content normalized to empty bytes |
+| Validation path | `HttpHeaders.of()` normalizes keys to lowercase |
+| Failure path | N/A — port types are simple value objects, no external I/O |
+| Source | ADR-0032, ADR-0033, Hexagonal Architecture |
+
 ## Non-Functional Requirements
 
 | ID | Requirement | Driver | Measurement | Dependencies | Source |
 |----|-------------|--------|-------------|--------------|--------|
 | NFR-001-01 | The engine MUST be stateless per-request — no server-side session, cache, or shared mutable state between requests. JSLT `Expression` objects are immutable and shared across threads. | Horizontal scalability; gateway deployments must not require shared state. | Unit tests confirm no mutable static state or cross-request side effects. | None. | Architecture. |
-| NFR-001-02 | The core engine library MUST have zero gateway-specific dependencies. Allowed dependencies: Jackson (JSON), SnakeYAML (YAML parsing), JSLT (transformation), and a JSON Schema validator (e.g., `networknt/json-schema-validator`). | Gateway-agnostic core enables adapter reuse across PingAccess, PingGateway, Kong, standalone. | Maven/Gradle dependency analysis confirms no gateway SDK imports in `core`. | Module structure. | `PLAN.md`, ADR-0001. |
+| NFR-001-02 | The core engine library MUST have zero gateway-specific dependencies. Allowed dependencies: Jackson (JSON), SnakeYAML (YAML parsing), JSLT (transformation), and a JSON Schema validator (e.g., `networknt/json-schema-validator`). **Public API boundary (ADR-0032, ADR-0033):** Core's public types (`Message`, `TransformResult`, `TransformContext`, port value objects) MUST NOT reference any third-party types in their signatures. Third-party types (Jackson, JSLT, SnakeYAML) are bundled and relocated inside core's shadow JAR. The public API uses only Java standard library types and core-owned port value objects (FR-001-14). | Gateway-agnostic core enables adapter reuse across PingAccess, PingGateway, Kong, standalone. Eliminates Jackson version coupling between core and adapters. | Maven/Gradle dependency analysis confirms no gateway SDK imports in `core`. Static analysis confirms `Message`, `TransformResult`, `TransformContext` signatures contain zero `com.fasterxml` / `org.slf4j` / third-party type references. | Module structure, Shadow plugin relocation. | `PLAN.md`, ADR-0001, ADR-0032, ADR-0033. |
 | NFR-001-03 | **Latency:** transformation p95 latency MUST be < 5 ms for payloads ≤ 50 KB. Compiled JSLT expressions are evaluated per-request; compilation happens once at spec load time. **Metrics:** benchmarks MUST report p50, p90, p95, p99, and max latency (ms), average latency (ms), and throughput (ops/sec). **Payload tiers:** benchmarks MUST cover at least three tiers — small (~1 KB, identity/passthrough), medium (~10 KB, representative field mapping), and large (~50 KB, nested structure with array iteration). **Throughput floor:** identity transforms SHOULD sustain ≥ 10,000 ops/sec on development hardware (informational, not a hard gate). **Environment:** benchmark results MUST be recorded with OS, CPU architecture, Java version, and available processors for reproducibility. | Gateway rules are in the critical path; latency budget is tight. Percentile-based targets prevent outlier masking. | Opt-in microbenchmark with representative payloads across payload tiers; soft-assertion on p95 target (ADR-0028). | Core only. | Performance, ADR-0028. |
 | NFR-001-04 | Unknown/unrecognized fields in the input message MUST NOT cause transformation failure. JSLT supports `* : .` (object matching) to pass through unmentioned fields. | Upstream services may add fields at any time; transformation must be forward-compatible. | Test with input containing extra fields not in spec. | Core. | Robustness. |
 | NFR-001-05 | The core engine MUST support **atomic registry swap**: the ability to replace the full set of compiled specs and profiles via `TransformEngine.reload()`. The swap MUST use an immutable `TransformRegistry` snapshot and `AtomicReference` (or equivalent) so that in-flight requests complete with their current registry while new requests pick up the new one. Reload trigger mechanisms (file watching, polling, gateway lifecycle hooks) are adapter concerns, NOT core. | Core must be designed for safe concurrent registry replacement. | Unit test: concurrent reads during swap observe either old or new registry, never a mix. | Core. | Architecture, ADR-0012. |
@@ -1097,13 +1268,17 @@ MUST be rejected at load time with a diagnostic message.
 
 | ID | Description | Modules |
 |----|-------------|---------|
-| DO-001-01 | `Message` — generic HTTP message envelope (JsonNode body, headers, status) | core |
+| DO-001-01 | `Message` — generic HTTP message envelope (`MessageBody` body, `HttpHeaders` headers, status, session — ADR-0032, ADR-0033) | core |
 | DO-001-02 | `TransformSpec` — parsed spec (id, version, input/output JSON Schema, compiled JSLT expression, engine id) | core |
 | DO-001-03 | `CompiledExpression` — immutable, thread-safe compiled expression handle | core |
 | DO-001-04 | `TransformProfile` — user-supplied binding of specs to URL/method/content-type patterns | core |
-| DO-001-05 | `TransformResult` — outcome of applying a spec (success/aborted + diagnostics) | core |
+| DO-001-05 | `TransformResult` — outcome of applying a spec (success/aborted + diagnostics); `errorResponse` uses `MessageBody` | core |
 | DO-001-06 | `ExpressionEngine` — pluggable engine SPI (compile + evaluate) | core |
-| DO-001-07 | `TransformContext` — read-only context passed to engines (headers, headersAll, status, request path/method, queryParams, cookies, sessionContext) | core |
+| DO-001-07 | `TransformContext` — read-only context passed to engines (`HttpHeaders` headers, status, queryParams, cookies, `SessionContext` session — ADR-0033) | core |
+| DO-001-08 | `MediaType` — content type enum (JSON, XML, FORM, TEXT, BINARY, NONE) with `fromContentType()` factory (FR-001-14a) | core |
+| DO-001-09 | `MessageBody` — body value object (`byte[]` content + `MediaType`); zero third-party deps (FR-001-14b) | core |
+| DO-001-10 | `HttpHeaders` — case-insensitive header collection; single- and multi-value views (FR-001-14c) | core |
+| DO-001-11 | `SessionContext` — gateway session attributes as `Map<String, Object>`; safe `toString()` (FR-001-14d) | core |
 
 ### Core Engine API
 
@@ -1116,11 +1291,11 @@ MUST be rejected at load time with a diagnostic message.
 | API-001-05 | `TransformEngine.registerEngine(ExpressionEngine)` | Register a pluggable expression engine |
 
 **Profile match resolution (Q-028):** `transform(Message, Direction)` resolves the
-matching profile entry by reading `Message.getRequestPath()`,
-`Message.getRequestMethod()`, and `Message.getContentType()` internally. The engine
-fully owns the matching logic — adapters simply wrap the gateway-native request/response
-into a `Message` and call `transform()`. For response transforms, the adapter MUST
-set request metadata (path, method) on the response `Message` from the gateway's
+matching profile entry by reading `Message.requestPath()`,
+`Message.requestMethod()`, and `Message.mediaType()` internally. The engine
+fully owns the matching logic — adapters simply construct a `Message` using port
+type factories and call `transform()`. For response transforms, the adapter MUST
+include request metadata (path, method) in the response `Message` from the gateway's
 exchange/request context, since profile matching always operates on request criteria.
 
 ### Expression Engine SPI
@@ -1129,7 +1304,7 @@ exchange/request context, since profile matching always operates on request crit
 |----|--------|-------------|
 | SPI-001-01 | `ExpressionEngine.id()` | Return engine identifier (e.g., `"jslt"`) |
 | SPI-001-02 | `ExpressionEngine.compile(String expr)` | Compile expression string → `CompiledExpression` |
-| SPI-001-03 | `CompiledExpression.evaluate(JsonNode input, TransformContext context)` | Evaluate expression against input + context → output `JsonNode` |
+| SPI-001-03 | `CompiledExpression.evaluate(JsonNode input, TransformContext context)` | Evaluate expression against input + context → output `JsonNode`. **Note:** `JsonNode` is a core-internal type (bundled, relocated Jackson — ADR-0032). Adapters never reference it; only engine implementations see this SPI. |
 
 ### Gateway Adapter SPI
 
@@ -1182,25 +1357,103 @@ domain_objects:
     name: Message
     fields:
       - name: body
-        type: JsonNode
-        note: "Parsed JSON body (Jackson)"
+        type: MessageBody
+        note: "Port value object: byte[] content + MediaType (ADR-0032, FR-001-14b)"
       - name: headers
-        type: Map<String, List<String>>
+        type: HttpHeaders
+        note: "Port value object: case-insensitive, single+multi-value views (FR-001-14c)"
       - name: statusCode
-        type: int
-        constraints: "response only"
-      - name: contentType
-        type: string
+        type: Integer
+        constraints: "response only, nullable"
       - name: requestPath
         type: string
         note: "e.g. /json/alpha/authenticate"
       - name: requestMethod
         type: string
         note: "e.g. POST"
-      - name: sessionContext
-        type: JsonNode
-        constraints: "optional, nullable — gateway-provided (ADR-0030)"
-        note: "Arbitrary JSON session data from gateway session API"
+      - name: queryString
+        type: string
+        constraints: "nullable — raw query string without leading '?'"
+      - name: session
+        type: SessionContext
+        constraints: "optional, nullable — gateway-provided (ADR-0030, FR-001-14d)"
+        note: "Replaces JsonNode sessionContext"
+  - id: DO-001-08
+    name: MediaType
+    fields:
+      - name: value
+        type: string
+        note: "MIME type string (e.g., 'application/json'), null for NONE"
+      - name: fromContentType
+        type: "(String) → MediaType"
+        note: "Factory: parses Content-Type header, strips params, handles +json/+xml suffixes"
+  - id: DO-001-09
+    name: MessageBody
+    fields:
+      - name: content
+        type: "byte[]"
+        note: "Raw body bytes; null normalized to byte[0]"
+      - name: mediaType
+        type: MediaType
+      - name: isEmpty
+        type: "() → boolean"
+      - name: asString
+        type: "() → String"
+        note: "UTF-8 decode"
+      - name: size
+        type: "() → int"
+      - name: json
+        type: "(byte[] | String) → MessageBody"
+        note: "Factory methods"
+      - name: empty
+        type: "() → MessageBody"
+      - name: of
+        type: "(byte[], MediaType) → MessageBody"
+  - id: DO-001-10
+    name: HttpHeaders
+    fields:
+      - name: first
+        type: "(String) → String"
+        note: "Case-insensitive lookup, first value"
+      - name: all
+        type: "(String) → List<String>"
+        note: "Case-insensitive lookup, all values"
+      - name: contains
+        type: "(String) → boolean"
+      - name: isEmpty
+        type: "() → boolean"
+      - name: toSingleValueMap
+        type: "() → Map<String, String>"
+        note: "Lowercase keys, first-value semantics"
+      - name: toMultiValueMap
+        type: "() → Map<String, List<String>>"
+        note: "Lowercase keys, all values"
+      - name: of
+        type: "(Map<String, String>) → HttpHeaders"
+        note: "Factory: normalizes keys to lowercase"
+      - name: ofMulti
+        type: "(Map<String, List<String>>) → HttpHeaders"
+      - name: empty
+        type: "() → HttpHeaders"
+  - id: DO-001-11
+    name: SessionContext
+    fields:
+      - name: get
+        type: "(String) → Object"
+      - name: getString
+        type: "(String) → String"
+      - name: has
+        type: "(String) → boolean"
+      - name: isEmpty
+        type: "() → boolean"
+      - name: toMap
+        type: "() → Map<String, Object>"
+        note: "Defensive copy"
+      - name: of
+        type: "(Map<String, Object>) → SessionContext"
+      - name: empty
+        type: "() → SessionContext"
+        note: "Singleton"
   - id: DO-001-02
     name: TransformSpec
     fields:
@@ -1248,34 +1501,25 @@ domain_objects:
     fields:
       - name: evaluate
         type: "(JsonNode, TransformContext) → JsonNode"
-        note: "Thread-safe, called per-request"
+        note: "Thread-safe, called per-request. JsonNode is core-internal (relocated, ADR-0032)."
   - id: DO-001-07
     name: TransformContext
     fields:
       - name: headers
-        type: JsonNode
-        note: "Read-only $headers — keys are header names, values are first value"
-      - name: headersAll
-        type: JsonNode
-        note: "Read-only $headers_all — keys are header names, values are arrays of all values (ADR-0026)"
-      - name: statusCode
+        type: HttpHeaders
+        note: "Port value object — engine converts to $headers/$headers_all JsonNode internally"
+      - name: status
         type: Integer
         note: "$status — null for request transforms (ADR-0017, ADR-0020)"
-      - name: requestPath
-        type: string
-        note: "e.g. /json/alpha/authenticate"
-      - name: requestMethod
-        type: string
-        note: "e.g. POST"
       - name: queryParams
-        type: JsonNode
+        type: "Map<String, String>"
         note: "$queryParams — keys are param names, values are first value (ADR-0021)"
       - name: cookies
-        type: JsonNode
+        type: "Map<String, String>"
         note: "$cookies — request-side only, keys are cookie names (ADR-0021)"
-      - name: sessionContext
-        type: JsonNode
-        note: "$session — gateway-provided session context, nullable (ADR-0030)"
+      - name: session
+        type: SessionContext
+        note: "$session — port value object, nullable (ADR-0030, FR-001-14d)"
     # Future: $queryParams_all and $cookies_all (array-of-strings shape, like
     # $headers_all) may be added if multi-value query params or cookies are needed.
     # Not normative for Feature 001.
@@ -1288,11 +1532,11 @@ domain_objects:
       - name: message
         type: Message
         constraints: "nullable — null when status is PASSTHROUGH or ERROR"
-        note: "The transformed message copy (on SUCCESS)"
+        note: "The transformed message (on SUCCESS)"
       - name: errorResponse
-        type: JsonNode
+        type: MessageBody
         constraints: "nullable — present only when status is ERROR"
-        note: "RFC 9457 or custom error body (ADR-0022)"
+        note: "RFC 9457 or custom error body as bytes (ADR-0022, ADR-0032)"
       - name: errorStatusCode
         type: Integer
         constraints: "nullable — present only when status is ERROR"
@@ -1301,7 +1545,7 @@ domain_objects:
         type: "List<String>"
         constraints: "always present, may be empty"
         note: "Structured log entries for matched profile, chain steps, warnings"
-  - id: DO-001-08
+  - id: DO-001-12
     name: TransformProfile
     fields:
       - name: id
@@ -1359,6 +1603,7 @@ expression_engine_spi:
     method: evaluate
     inputs: [JsonNode, TransformContext]
     outputs: [JsonNode]
+    note: "JsonNode is core-internal (bundled, relocated — ADR-0032). Not visible to adapters."
 
 adapter_spi:
   - id: SPI-001-04

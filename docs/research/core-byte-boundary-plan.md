@@ -1,6 +1,6 @@
 # Core Byte-Boundary Refactor — Implementation Plan
 
-Status: **📋 Planned** | Created: 2026-02-11 | ADRs: 0032, 0033
+Status: **🔧 In Progress (SDD: Spec Phase)** | Created: 2026-02-11 | ADRs: 0032, 0033
 
 > **Goal:** Remove all third-party types (Jackson, SLF4J 2.x-only APIs) from
 > core's public API. Core defines its own port value objects (`MessageBody`,
@@ -557,21 +557,36 @@ Mark "Core byte-boundary refactor" as complete.
 
 ---
 
-## Execution Order
+## Execution Order (SDD Pipeline)
 
 ```
-Phase 1 ──► Phase 2 ──► Phase 4 ──► Phase 3 ──► Phase 5 ──► Phase 6 ──► Phase 7
-(new types)  (migrate)   (SLF4J)    (shadow)    (adapters)  (specs)     (cleanup)
+Phase 0  ──► Phase 1 ──► Phase 2 ──► Phase 4 ──► Phase 3 ──► Phase 5 ──► Phase 7
+(spec+tasks)  (new types)  (migrate)   (SLF4J)    (shadow)    (adapters)  (cleanup)
 ```
+
+**SDD Pipeline:** Spec → Tasks → Test → Implement → Verify
+
+| Phase | Status | SDD Step |
+|-------|--------|----------|
+| **Phase 0** (Spec + Tasks) | ✅ Feature 001 spec updated (FR-001-14, NFR-001-02, DO catalogue). Tasks TBD. | Spec |
+| **Phase 1** (Port value objects) | 🔲 Not started | Implement |
+| **Phase 2** (Migrate core API) | 🔲 Not started | Implement |
+| **Phase 3** (Shadow/relocate) | 🔲 Not started | Implement |
+| **Phase 4** (SLF4J enforcement) | 🔲 Not started | Implement |
+| **Phase 5** (Adapters) | 🔲 Not started | Implement |
+| **Phase 7** (Cleanup) | 🔲 Not started | Verify |
 
 **Rationale:**
+0. **Phase 0** (spec + tasks) MUST come first — SDD Principle 1 (Specifications Lead Execution).
 1. **Phase 1** (new types) is additive — creates files, breaks nothing.
 2. **Phase 2** (migrate API) is the big break — changes core's contract.
 3. **Phase 4** (SLF4J) can be done alongside Phase 2 — independent change.
 4. **Phase 3** (shadow/relocate) builds on Phase 2 — needs the new API first.
 5. **Phase 5** (adapters) adapts to the new core API.
-6. **Phase 6** (specs) documents the completed state.
-7. **Phase 7** (cleanup) finalizes versions and markers.
+6. **Phase 7** (cleanup) finalizes versions and markers.
+
+**Note:** Phase 6 (from original plan) has been absorbed into Phase 0 (SDD spec-first).
+Spec updates are now complete; they precede all implementation work.
 
 ---
 

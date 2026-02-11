@@ -1,7 +1,7 @@
 # Feature 001 — Message Transformation Engine — Tasks
 
-_Status:_ Complete (Phases 1–9); Phase 10 (session context) pending
-_Last updated:_ 2026-02-09
+_Status:_ Complete (Phases 1–10); Phase 11 (port value objects) in progress
+_Last updated:_ 2026-02-11
 
 **Governing spec:** `docs/architecture/features/001/spec.md`
 **Implementation plan:** `docs/architecture/features/001/plan.md`
@@ -1105,6 +1105,147 @@ Track long-running or shared commands with timestamps to avoid duplicate work.
 - [x] Coverage matrix in `scenarios.md` has no uncovered FRs/NFRs
 - [x] Implementation Drift Gate report attached to plan
 - [x] Open questions resolved and removed from `open-questions.md`
+
+---
+
+### Phase 11 — Port Value Objects (FR-001-14, ADR-0032, ADR-0033)
+
+> **Scope:** Create 4 core-owned port types + tests. Additive — does NOT modify
+> existing types or break any existing tests. This is Phase 1 of the
+> `core-byte-boundary-plan.md`.
+
+#### I11 — MediaType enum
+
+- [ ] **T-001-58** — MediaType test first (FR-001-14a, DO-001-08)
+  _Intent:_ TDD — write tests before implementation for the content type enum.
+  _Test first:_ Write `MediaTypeTest` — assert:
+  - `MediaType.JSON.value()` returns `"application/json"`.
+  - `MediaType.NONE.value()` returns `null`.
+  - `fromContentType("application/json")` returns `JSON`.
+  - `fromContentType("application/json; charset=utf-8")` returns `JSON`
+    (params stripped).
+  - `fromContentType("application/vnd.api+json")` returns `JSON`
+    (structured suffix `+json`).
+  - `fromContentType("application/atom+xml")` returns `XML`
+    (structured suffix `+xml`).
+  - `fromContentType(null)` returns `NONE`.
+  - `fromContentType("")` returns `NONE`.
+  - `fromContentType("image/png")` returns `BINARY` (unrecognized).
+  _Verify:_ Test compiles but fails (no implementation yet).
+  _Verification commands:_
+  - Compilation check only — implementation in T-001-59.
+
+- [ ] **T-001-59** — MediaType implementation (FR-001-14a, DO-001-08)
+  _Intent:_ Implement the `MediaType` enum per spec.
+  _Implement:_ Create `MediaType.java` in `core/model/`. Pure enum with
+  `value()` and `fromContentType(String)`. Zero dependencies.
+  _Verify:_ `MediaTypeTest` passes.
+  _Verification commands:_
+  - `./gradlew :core:test --tests "*MediaTypeTest*"`
+  - `./gradlew spotlessApply check`
+
+#### I12 — MessageBody record
+
+- [ ] **T-001-60** — MessageBody test first (FR-001-14b, DO-001-09)
+  _Intent:_ TDD — write tests for the body value object.
+  _Test first:_ Write `MessageBodyTest` — assert:
+  - `MessageBody.json("{}".getBytes()).mediaType()` is `JSON`.
+  - `MessageBody.json("hello").asString()` returns `"hello"`.
+  - `MessageBody.empty().isEmpty()` is `true`.
+  - `MessageBody.empty().size()` is `0`.
+  - `MessageBody.of(bytes, MediaType.XML).mediaType()` is `XML`.
+  - **Equality:** `MessageBody.json("abc").equals(MessageBody.json("abc"))`
+    is `true` (`Arrays.equals` for byte[]).
+  - **Equality:** different content is not equal.
+  - Null content normalized: `MessageBody.of(null, JSON).content()` is
+    `byte[0]`.
+  _Verify:_ Test compiles but fails.
+  _Verification commands:_
+  - Compilation check only — implementation in T-001-61.
+
+- [ ] **T-001-61** — MessageBody implementation (FR-001-14b, DO-001-09)
+  _Intent:_ Implement `MessageBody` record with custom `equals`/`hashCode`.
+  _Implement:_ Create `MessageBody.java` in `core/model/`. Record with
+  override `equals`/`hashCode` using `Arrays.equals()`. Constructor normalizes
+  null content to `byte[0]`. Factory methods: `json(byte[])`, `json(String)`,
+  `empty()`, `of(byte[], MediaType)`.
+  _Verify:_ `MessageBodyTest` passes.
+  _Verification commands:_
+  - `./gradlew :core:test --tests "*MessageBodyTest*"`
+  - `./gradlew spotlessApply check`
+
+#### I13 — HttpHeaders class
+
+- [ ] **T-001-62** — HttpHeaders test first (FR-001-14c, DO-001-10)
+  _Intent:_ TDD — write tests for the case-insensitive header collection.
+  _Test first:_ Write `HttpHeadersTest` — assert:
+  - **Case-insensitive:** `HttpHeaders.of(Map.of("Content-Type", "json")).first("content-type")` returns `"json"`.
+  - `first()` returns `null` for missing header.
+  - `all()` returns empty list for missing header.
+  - `contains("cOnTeNt-TyPe")` is `true` (case-insensitive).
+  - `isEmpty()` true for `HttpHeaders.empty()`.
+  - `toSingleValueMap()` keys are lowercase.
+  - `toMultiValueMap()` keys are lowercase.
+  - `ofMulti()` constructor works with multi-value map.
+  - **Immutability:** `toSingleValueMap()` throws on mutation attempt.
+  _Verify:_ Test compiles but fails.
+  _Verification commands:_
+  - Compilation check only — implementation in T-001-63.
+
+- [ ] **T-001-63** — HttpHeaders implementation (FR-001-14c, DO-001-10)
+  _Intent:_ Implement `HttpHeaders` class with case-insensitive lookups.
+  _Implement:_ Create `HttpHeaders.java` in `core/model/`. Final immutable
+  class. Internal `TreeMap(String.CASE_INSENSITIVE_ORDER)` for consistent
+  ordering and case-insensitive lookup. Factory methods: `of(Map)`,
+  `ofMulti(Map)`, `empty()`.
+  _Verify:_ `HttpHeadersTest` passes.
+  _Verification commands:_
+  - `./gradlew :core:test --tests "*HttpHeadersTest*"`
+  - `./gradlew spotlessApply check`
+
+#### I14 — SessionContext class
+
+- [ ] **T-001-64** — SessionContext test first (FR-001-14d, DO-001-11)
+  _Intent:_ TDD — write tests for the session context value object.
+  _Test first:_ Write `SessionContextTest` (new file, not the existing
+  `SessionContextMessageTest` which tests session in Message) — assert:
+  - `SessionContext.of(Map.of("sub", "user1")).getString("sub")` returns `"user1"`.
+  - `get("sub")` returns `"user1"` as Object.
+  - `has("sub")` is `true`.
+  - `has("missing")` is `false`.
+  - `isEmpty()` is `true` for `SessionContext.empty()`.
+  - `isEmpty()` is `false` for non-empty context.
+  - `toMap()` returns defensive copy (mutation does not affect original).
+  - **Safe toString:** `toString()` prints key names only, NOT values.
+  - `empty()` returns singleton (`empty() == empty()` is `true`).
+  - Null map: `SessionContext.of(null)` behaves like `empty()`.
+  _Verify:_ Test compiles but fails.
+  _Verification commands:_
+  - Compilation check only — implementation in T-001-65.
+
+- [ ] **T-001-65** — SessionContext implementation (FR-001-14d, DO-001-11)
+  _Intent:_ Implement `SessionContext` with safe `toString()` and singleton empty.
+  _Implement:_ Create `SessionContext.java` in `core/model/`. Final immutable
+  class. `empty()` returns singleton. `toString()` prints only key names.
+  `toMap()` returns defensive copy. `getString()` returns null for non-string.
+  _Verify:_ `SessionContextTest` passes.
+  _Verification commands:_
+  - `./gradlew :core:test --tests "*SessionContextTest*"`
+  - `./gradlew spotlessApply check`
+
+#### I15 — Phase 11 gate
+
+- [ ] **T-001-66** — Full quality gate (FR-001-14)
+  _Intent:_ Verify all port types pass together and don't break existing tests.
+  _Verify:_ All tests pass, quality gate green.
+  _Verification commands:_
+  - `./gradlew spotlessApply check`
+  - `./gradlew :core:test`
+  _Also check:_
+  - All 4 port type tests pass (MediaTypeTest, MessageBodyTest,
+    HttpHeadersTest, SessionContextTest).
+  - All existing 258+ tests still pass (no regressions).
+  - Port types have zero `com.fasterxml.jackson` imports.
 
 ## Notes / TODOs
 
