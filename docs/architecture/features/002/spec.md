@@ -416,11 +416,48 @@ private static final ExchangeProperty<Boolean> TRANSFORM_DENIED =
 | `specsDir` | TEXT | Spec Directory | Yes | `/specs` | Path to directory of transform YAML specs |
 | `profilesDir` | TEXT | Profiles Directory | No | `/profiles` | Path to directory of transform profiles |
 | `activeProfile` | TEXT | Active Profile | No | (empty) | Profile name to activate (empty = no profile) |
-| `errorMode` | SELECT | Error Mode | Yes | `PASS_THROUGH` | `PASS_THROUGH` or `DENY` — behaviour on transform failure |
+| `errorMode` | SELECT (enum: `ErrorMode`) | Error Mode | Yes | `PASS_THROUGH` | `PASS_THROUGH` or `DENY` — behaviour on transform failure |
 | `reloadIntervalSec` | TEXT | Reload Interval (s) | No | `0` | **Spec YAML file** reload interval in seconds (0 = disabled). See note below. |
-| `schemaValidation` | SELECT | Schema Validation | No | `LENIENT` | `STRICT` or `LENIENT` — schema validation mode |
+| `schemaValidation` | SELECT (enum: `SchemaValidation`) | Schema Validation | No | `LENIENT` | `STRICT` or `LENIENT` — schema validation mode |
 
 The configuration JSON maps directly to these fields via the PingAccess admin API.
+
+> **Enum auto-discovery (SDK guide §7):** The `errorMode` and
+> `schemaValidation` SELECT fields SHOULD be backed by Java enums. When a
+> `SELECT` field's type is an `Enum` and no `@Option` annotations are
+> provided, `ConfigurationBuilder.from()` auto-generates `ConfigurationOption`
+> instances from the enum constants. This eliminates manual `@Option`
+> annotations:
+>
+> ```java
+> public enum ErrorMode {
+>     PASS_THROUGH("Pass Through"),
+>     DENY("Deny");
+>     private final String label;
+>     ErrorMode(String label) { this.label = label; }
+>     @Override public String toString() { return label; }
+> }
+>
+> public enum SchemaValidation {
+>     STRICT("Strict"),
+>     LENIENT("Lenient");
+>     private final String label;
+>     SchemaValidation(String label) { this.label = label; }
+>     @Override public String toString() { return label; }
+> }
+> ```
+
+> **Help text (SDK guide §7):** Each `@UIElement` field SHOULD include
+> `@Help` annotations with inline documentation for administrators:
+>
+> | Field | Help Content |
+> |-------|-------------|
+> | `specsDir` | "Absolute path to the directory containing transform spec YAML files. Must not contain '..' segments." |
+> | `profilesDir` | "Absolute path to the directory containing transform profile files. Leave empty to use specs without profiles." |
+> | `activeProfile` | "Name of the profile to activate. Leave empty for no profile filtering." |
+> | `errorMode` | "PASS_THROUGH: log errors and continue with original message. DENY: reject the request/response with an RFC 9457 error." |
+> | `reloadIntervalSec` | "Interval in seconds for re-reading spec/profile files from disk. Set to 0 to disable (specs loaded only at startup)." |
+> | `schemaValidation` | "STRICT: reject specs failing JSON Schema validation. LENIENT: log warnings but accept specs." |
 
 **`reloadIntervalSec` clarification:** This controls periodic re-reading of
 transform spec YAML files from `specsDir` and profiles from `profilesDir` —
@@ -801,6 +838,19 @@ exceptions are caught by `getErrorHandlingCallback()` (FR-002-02).
 | Status | ⬜ Not yet implemented |
 | Source | ADR-0022, ADR-0024 |
 
+> **PA-native error handler integration (design decision):** The adapter does
+> NOT use `ErrorHandlerUtil.getConfigurationFields()` or
+> `ErrorHandlerConfigurationImpl`. **Rationale:** Our error responses use
+> RFC 9457 `application/problem+json` format (ADR-0022, ADR-0024), which is
+> semantically different from PA's built-in HTML template-based error pages.
+> Mixing both would confuse administrators — the PA error handler fields
+> (template file, content type, status message) would be misleading when the
+> adapter always produces JSON. If PA-native error templates are desired in
+> the future, this can be added as a follow-up by appending
+> `ErrorHandlerUtil.getConfigurationFields()` to `getConfigurationFields()`
+> and adding a `@JsonUnwrapped @Valid` error handler config field (see SDK
+> guide §7 for the pattern).
+
 ### FR-002-12: Docker E2E Test Script
 
 **Requirement:** The project MUST include a script (`scripts/pa-e2e-test.sh`)
@@ -1118,5 +1168,11 @@ Client                    PingAccess                        Backend
 > Full configuration patterns (annotation-driven, programmatic, `@UIElement`
 > attributes, JSR-380 validation) are documented in
 > [SDK guide §7](pingaccess-sdk-guide.md#7-plugin-configuration--ui).
+>
+> **Runtime constraint:** `ConfigurationModelAccessor` instances must only
+> be used inside `configure()`, never during `handleRequest()` /
+> `handleResponse()` (SDK guide §7). While the adapter does not currently
+> use dynamic dropdowns, any future fields using `modelAccessor` must
+> respect this constraint.
 
 
