@@ -766,8 +766,10 @@ sizes).
 | S-002-22 | **Cookie access in JSLT:** JSLT expression uses `$cookies` → resolves from PA request cookies via `TransformContext.cookiesAsJson()`. |
 | S-002-23 | **Query param access in JSLT:** JSLT expression uses `$queryParams` → resolves from PA query string via `TransformContext.queryParamsAsJson()`. |
 | S-002-24 | **Shadow JAR correctness:** Deploy shadow JAR → no `ClassNotFoundException` at runtime (all deps bundled, PA SDK excluded). |
-| S-002-25 | **OAuth context in JSLT:** JSLT expression uses `$session.oauth.clientId` and `$session.oauth.scopes` → resolves from `OAuthTokenMetadata`. |
-| S-002-26 | **Session state in JSLT:** JSLT expression uses `$session.sessionState.authzCache` → resolves from `SessionStateSupport`. |
+| S-002-25 | **OAuth context in JSLT:** JSLT expression uses `$session.clientId` and `$session.scopes` → resolves from `OAuthTokenMetadata` (flat `$session` namespace, see FR-002-06 merge layers). |
+| S-002-26 | **Session state in JSLT:** JSLT expression uses `$session.authzCache` → resolves from `SessionStateSupport` (flat `$session` namespace, layer 4 merge). |
+| S-002-27 | **Prior rule URI rewrite:** Upstream ParameterRule rewrites `/old/path` to `/new/path` → MessageTransformRule wraps using `Request.getUri()` (rewritten URI) → spec matches on `/new/path` (validates URI choice per FR-002-01 note). |
+| S-002-28 | **DENY + handleResponse interaction:** `handleRequest()` returns `Outcome.RETURN` with DENY error body → `handleResponse()` is called (SDK contract) → adapter checks `TRANSFORM_DENIED` ExchangeProperty → skips response processing → client receives original DENY error (GAP-4 fix). |
 
 ---
 

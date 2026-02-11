@@ -6,7 +6,7 @@
 | Reviewer | Agent (deep dive analysis) |
 | Target | `docs/architecture/features/002/spec.md` |
 | Cross-ref | `docs/architecture/features/002/pingaccess-sdk-guide.md` |
-| Status | 🔨 In Progress (B1–B2 done) |
+| Status | 🔨 In Progress (B1–B3 done) |
 
 > This document tracks all findings from the spec deep-dive analysis and
 > organizes them into implementation batches. Each batch is a logical unit of
@@ -32,7 +32,7 @@
 |-------|-------|-------|----------|--------|
 | **B1** | SDK API corrections (won't compile) | BUG-1, GAP-1, BUG-5 | 🔴 Critical | ✅ Done |
 | **B2** | Lifecycle & control flow (runtime crashes) | GAP-4, IMP-6, BUG-6, BUG-4 | 🔴 Critical | ✅ Done |
-| **B3** | Scenario matrix corrections | BUG-2, BUG-3, IMP-4 | 🟡 Medium | ⬜ Not started |
+| **B3** | Scenario matrix corrections | BUG-2, BUG-3, IMP-4 | 🟡 Medium | ✅ Done |
 | **B4** | Body handling & headers | GAP-2, GAP-5, IMP-1 | 🟡 Medium | ⬜ Not started |
 | **B5** | Configuration, reload & reliability | GAP-3, SEC-2, SEC-3, SEC-4 | 🟡 Medium | ⬜ Not started |
 | **B6** | Documentation, trust model & polish | SEC-1, BUG-7, IMP-2, IMP-3, IMP-5 | 💡 Low | ⬜ Not started |
@@ -297,7 +297,7 @@ Rewrite the "applyChanges Direction Strategy" section (L186–219) for clarity:
 - [x] Apply IMP-6 fixes (TransformContext lifecycle rewrite)
 - [x] Apply BUG-6 fix (override note)
 - [x] Apply BUG-4 fix (applyChanges direction rewrite)
-- [ ] Commit: `fix(spec-002): lifecycle corrections — DENY guard, TransformContext immutability, direction strategy`
+- [x] Commit: `fix(spec-002): lifecycle & control flow corrections` (`09d18a1`)
 
 ---
 
@@ -312,7 +312,7 @@ Rewrite the "applyChanges Direction Strategy" section (L186–219) for clarity:
 |-------|-------|
 | ID | BUG-2 |
 | Severity | 🟡 Medium |
-| Status | ⬜ Not started |
+| Status | ✅ Done |
 | Affected lines | spec.md L708 |
 | Root cause | `$session` uses a flat namespace. OAuth fields are at `$session.clientId`, not `$session.oauth.clientId`. |
 
@@ -332,7 +332,7 @@ New:
 |-------|-------|
 | ID | BUG-3 |
 | Severity | 🟡 Medium |
-| Status | ⬜ Not started |
+| Status | ✅ Done |
 | Affected lines | spec.md L709 |
 | Root cause | Session state attributes are spread flat into `$session` (layer 4). Path should be `$session.authzCache`, not `$session.sessionState.authzCache`. |
 
@@ -352,7 +352,7 @@ New:
 |-------|-------|
 | ID | IMP-4 |
 | Severity | 🟡 Medium |
-| Status | ⬜ Not started |
+| Status | ✅ Done |
 | Affected lines | spec.md scenario matrix (L682–709) |
 | Root cause | No scenario covers interaction with prior rules that modify the exchange (e.g., URI rewrite by an upstream ParameterRule). |
 
@@ -367,9 +367,9 @@ Add two new scenarios after S-002-26:
 
 ### B3 Commit Plan
 
-- [ ] Apply BUG-2 fix (S-002-25 path)
-- [ ] Apply BUG-3 fix (S-002-26 path)
-- [ ] Apply IMP-4 fix (add S-002-27, S-002-28)
+- [x] Apply BUG-2 fix (S-002-25 path)
+- [x] Apply BUG-3 fix (S-002-26 path)
+- [x] Apply IMP-4 fix (add S-002-27, S-002-28)
 - [ ] Commit: `fix(spec-002): correct scenario $session paths, add pipeline interaction scenarios`
 
 ---
@@ -768,8 +768,8 @@ Add a logging note after the wrapResponse mapping table:
 | Batch | Items | Status | Commit |
 |-------|-------|--------|--------|
 | **B1** SDK API corrections | BUG-1, GAP-1, BUG-5 | ✅ Done | `0861a24` |
-| **B2** Lifecycle & control flow | GAP-4, IMP-6, BUG-6, BUG-4 | ✅ Done | pending commit |
-| **B3** Scenario matrix | BUG-2, BUG-3, IMP-4 | ⬜ Not started | — |
+| **B2** Lifecycle & control flow | GAP-4, IMP-6, BUG-6, BUG-4 | ✅ Done | `09d18a1` |
+| **B3** Scenario matrix | BUG-2, BUG-3, IMP-4 | ✅ Done | pending commit |
 | **B4** Body handling & headers | GAP-2, GAP-5, IMP-1 | ⬜ Not started | — |
 | **B5** Config, reload & reliability | GAP-3, SEC-2, SEC-3, SEC-4 | ⬜ Not started | — |
 | **B6** Documentation & polish | SEC-1, BUG-7, IMP-2, IMP-3, IMP-5 | ⬜ Not started | — |
