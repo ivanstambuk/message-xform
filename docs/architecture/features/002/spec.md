@@ -67,12 +67,12 @@ The adapter is a **thin bridge layer** — all transformation logic lives in
 - N-002-04 – PingAccess clustering or HA configuration. The adapter is a
   stateless plugin — it works identically in standalone and clustered PA
   deployments.
-- N-002-05 – Metrics and observability. The v1 adapter does not expose JMX
-  MBeans, Micrometer metrics, or OpenTelemetry spans for transform operations.
-  PingAccess’s built-in audit logging captures rule execution events at the PA
-  level. The `TransformResultSummary` `ExchangeProperty` (FR-002-07) provides
-  per-request observability for downstream rules. Aggregate metrics (counters,
-  latency histograms) are deferred to a future version.
+- N-002-05 – Third-party metrics frameworks. The adapter does not bundle
+  Micrometer, OpenTelemetry, or Prometheus client libraries. Observability is
+  provided through two built-in mechanisms: (a) SLF4J logging into PA's audit
+  log pipeline (always on), and (b) opt-in JMX MBeans for aggregate counters
+  (see FR-002-14). This avoids classloader conflicts from bundling metrics
+  frameworks in the shadow JAR.
 
 ---
 
@@ -443,6 +443,7 @@ private static final ExchangeProperty<Boolean> TRANSFORM_DENIED =
 | `errorMode` | SELECT (enum: `ErrorMode`) | Error Mode | Yes | `PASS_THROUGH` | `PASS_THROUGH` or `DENY` — behaviour on transform failure |
 | `reloadIntervalSec` | TEXT | Reload Interval (s) | No | `0` | **Spec YAML file** reload interval in seconds (0 = disabled, max 86400). Java type: `Integer`. See note below. |
 | `schemaValidation` | SELECT (enum: `SchemaValidation`) | Schema Validation | No | `LENIENT` | `STRICT` or `LENIENT` — schema validation mode |
+| `enableJmxMetrics` | CHECKBOX | Enable JMX Metrics | No | `false` | When enabled, registers JMX MBeans exposing transform counters. See FR-002-14. |
 
 The configuration JSON maps directly to these fields via the PingAccess admin API.
 
@@ -486,6 +487,7 @@ The configuration JSON maps directly to these fields via the PingAccess admin AP
 > constraints. Non-numeric input is rejected by Jakarta Bean Validation (surfaced
 > in the PA admin UI as a validation error). Negative values are rejected by `@Min(0)`.
 > | `schemaValidation` | "STRICT: reject specs failing JSON Schema validation. LENIENT: log warnings but accept specs." |
+> | `enableJmxMetrics` | "Enable JMX MBean registration for transform metrics. When enabled, counters for success/error/passthrough transforms and latency are exposed via JMX under the `io.messagexform` domain. Requires JMX to be configured on PingAccess (see PA Monitoring Guide). Disabled by default for zero overhead." |
 
 **`reloadIntervalSec` clarification:** This controls periodic re-reading of
 transform spec YAML files from `specsDir` and profiles from `profilesDir` —
@@ -1001,6 +1003,108 @@ code is complete. It is listed here for traceability.
 | Status | ⬜ Not yet implemented (planned, implementation deferred) |
 | Source | G-002-05 |
 
+### FR-002-14: JMX Observability (Opt-in)
+
+**Requirement:** When `enableJmxMetrics = true`, the adapter MUST register a
+JMX MBean exposing aggregate transform metrics. When `enableJmxMetrics = false`
+(default), no MBean is registered and there is **zero performance overhead**.
+
+**Design rationale:** PingAccess's official Monitoring Guide recommends JMX
+MBeans as the primary mechanism for resource metrics (reference:
+`pingaccess-9.0.txt` §"Resource metrics", page 835). PA administrators already
+use JConsole and Splunk for JMX-based monitoring. Registering custom MBeans
+under a plugin-specific domain (`io.messagexform`) integrates naturally with
+this existing workflow. No SDK support is needed — plugins run in the same JVM
+and can use `java.lang.management.ManagementFactory` directly.
+
+**MBean Interface:**
+
+```java
+public interface MessageTransformMetricsMXBean {
+    // --- Counters ---
+    long getTransformSuccessCount();   // Successful transforms (body modified)
+    long getTransformPassthroughCount(); // PASSTHROUGH results (no match / no-op)
+    long getTransformErrorCount();     // Transform failures (JSLT error, budget exceeded)
+    long getTransformDenyCount();      // DENY outcomes (errorMode=DENY + failure)
+    long getTransformTotalCount();     // Sum of all above
+
+    // --- Spec reload ---
+    long getReloadSuccessCount();      // Successful spec/profile reloads
+    long getReloadFailureCount();      // Failed reloads (malformed YAML)
+    long getActiveSpecCount();         // Current number of loaded specs
+
+    // --- Latency (milliseconds) ---
+    double getAverageTransformTimeMs(); // Rolling average transform duration
+    long getMaxTransformTimeMs();       // Max transform duration since startup
+    long getLastTransformTimeMs();      // Most recent transform duration
+
+    // --- Reset ---
+    void resetMetrics();               // Admin operation: zero all counters
+}
+```
+
+**Implementation pattern:**
+
+```java
+// In configure() — register MBean if enabled
+if (config.isEnableJmxMetrics()) {
+    MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
+    ObjectName name = new ObjectName(
+        "io.messagexform:type=TransformMetrics,instance=" + config.getName());
+    if (!mbs.isRegistered(name)) {
+        mbs.registerMBean(this.metrics, name);
+    }
+    this.jmxObjectName = name;
+}
+
+// In destroy/cleanup — unregister MBean
+if (this.jmxObjectName != null) {
+    MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
+    if (mbs.isRegistered(this.jmxObjectName)) {
+        mbs.unregisterMBean(this.jmxObjectName);
+    }
+}
+```
+
+**ObjectName convention:**
+`io.messagexform:type=TransformMetrics,instance=<pluginInstanceName>`
+
+where `<pluginInstanceName>` is `config.getName()` from `PluginConfiguration`.
+This allows multiple rule instances on the same PA engine to have distinct
+MBeans.
+
+**Thread safety:** All counters use `java.util.concurrent.atomic.LongAdder`
+for lock-free, contention-free concurrent updates. The rolling average uses
+a `LongAdder` for total time and divides by total count. `resetMetrics()`
+resets all adders to zero — this is idempotent and safe to call concurrently.
+
+**Lifecycle:**
+
+| Event | Action |
+|-------|--------|
+| `configure()` with `enableJmxMetrics=true` | Register MBean. If MBean already registered (reconfigure), skip. |
+| `configure()` with `enableJmxMetrics=false` | Unregister MBean if previously registered. |
+| Plugin unload (PA shutdown / undeploy) | Unregister MBean in cleanup. |
+| `handleRequest()` / `handleResponse()` | Increment counters after each transform. No-op if metrics disabled. |
+
+**Audit logging (always on):** Regardless of `enableJmxMetrics`, the adapter
+MUST log transform results at INFO level via SLF4J. PingAccess routes SLF4J
+output to `pingaccess.log`, and the engine itself logs per-transaction timing
+in `pingaccess_engine_audit.log`. This provides baseline observability with
+zero configuration.
+
+> **PA monitoring integration:** PA exposes its own JMX MBeans when
+> `pa.mbean.site.connection.pool.enable=true`. PA administrators using
+> JConsole will see our `io.messagexform` domain alongside the PA platform
+> MBeans. Splunk users can collect both PA and adapter metrics through the
+> PingAccess for Splunk app (Splunkbase #5368).
+
+| Aspect | Detail |
+|--------|--------|
+| Success path | `enableJmxMetrics=true` → MBean visible in JConsole under `io.messagexform` → counters increment on each request |
+| Status | ⬜ Not yet implemented |
+| Source | PA Monitoring Guide (§Resource metrics), Issue 19 (spec review) |
+
 ### FR-002-13: TransformContext Construction
 
 **Requirement:** The adapter MUST build a `TransformContext` from the PingAccess
@@ -1104,6 +1208,8 @@ sizes).
 | S-002-30 | **Spec hot-reload (failure):** `reloadIntervalSec=30` → malformed spec written to disk → reload fails with warning log → previous specs remain active → existing transforms unaffected. |
 | S-002-31 | **Concurrent reload during active transform:** Reload swaps `AtomicReference<TransformRegistry>` while a transform is in flight → in-flight transform completes using its snapshot of the old registry (Java reference semantics guarantee this) → next request uses the new registry. Outcome: no data corruption, no locking, no request failure. Test: trigger reload in a background thread while a slow transform is executing. |
 | S-002-32 | **Non-JSON response body:** Backend returns `text/html` response body → `wrapResponse()` attempts JSON parse, fails, falls back to `NullNode` body → response-direction transforms can still operate on headers and status code → body passthrough unmodified. Outcome: PASSTHROUGH for body transforms, SUCCESS for header-only transforms. |
+| S-002-33 | **JMX metrics opt-in:** Admin configures `enableJmxMetrics=true` → adapter registers MBean on `configure()` → JConsole shows `io.messagexform:type=TransformMetrics,instance=<name>` → counters increment per request → admin calls `resetMetrics()` via JConsole → counters zero. Toggle to `false` → MBean unregistered → JConsole no longer shows it. |
+| S-002-34 | **JMX metrics disabled (default):** Admin does not toggle `enableJmxMetrics` → no MBean registered → no JMX overhead → SLF4J logging still operational → `pingaccess_engine_audit.log` records transaction timing. |
 
 ---
 

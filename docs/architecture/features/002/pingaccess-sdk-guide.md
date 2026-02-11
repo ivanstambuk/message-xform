@@ -39,6 +39,7 @@
 | 16 | [Vendor-Built Plugin Analysis](#16-vendor-built-plugin-analysis) | Patterns from PA engine's built-in plugins | `vendor`, `internal`, `engine`, `built-in` |
 | 17 | [Development Setup & Plugin Creation](#17-development-setup--plugin-creation) | SDK directory structure, 7-step creation procedure, Maven/Gradle | `setup`, `Maven`, `Gradle`, `create`, `deploy` |
 | 18 | [Behavioral Notes](#18-behavioral-notes) | Request immutability in response phase, logging | `behavior`, `constraints`, `logging` |
+| 19 | [JMX Monitoring & Custom MBeans](#19-jmx-monitoring--custom-mbeans) | PA's JMX infrastructure, plugin MBean registration pattern | `JMX`, `MBean`, `monitoring`, `metrics` |
 
 ---
 
@@ -2780,6 +2781,251 @@ private static final Logger LOG = LoggerFactory.getLogger(MyPlugin.class);
 
 PingAccess ships its own SLF4J provider — do **not** bundle SLF4J in your
 plugin JAR (see [§9 Deployment](#9-deployment--classloading)).
+
+---
+
+## 19. JMX Monitoring & Custom MBeans
+
+PingAccess provides a comprehensive JMX-based monitoring infrastructure.
+The SDK itself does **not** expose a metrics API, but plugins can register
+custom MBeans using standard `java.lang.management` — they run in the same
+JVM as the PA engine.
+
+### PA's built-in monitoring mechanisms
+
+From the **PingAccess Monitoring Guide** (PA 9.0 docs, pages 833–849):
+
+| Mechanism | Description | Configuration |
+|-----------|-------------|---------------|
+| **JMX MBeans** | Ping-recommended primary mechanism. Provides resource metric counters for performance analysis. Compatible with JConsole, Splunk, and SIEM tools. | `pa.mbean.site.connection.pool.enable=true` (default `false`) in `run.properties` |
+| **Heartbeat endpoint** | `/pa/heartbeat.ping` — returns HTTP 200 when healthy. Can return detailed JSON with CPU, memory, response time stats. | `enable.detailed.heartbeat.response=true` + `pa.statistics.window.seconds=N` in `run.properties` |
+| **Audit logging** | Per-transaction timing in `pingaccess_engine_audit.log`. Records total roundtrip, proxy roundtrip, and userinfo roundtrip (ms). | Enabled by `log4j2.xml` configuration |
+| **Splunk integration** | Pre-built PingAccess for Splunk app ([Splunkbase #5368](https://splunkbase.splunk.com/app/5368)). Parses both audit logs and JMX MBean data. | Splunk-formatted audit log appenders |
+
+### JMX connection setup
+
+**Local connection:** In JConsole, select `com.pingidentity.pa.cli.Starter`
+from the Local Process list.
+
+**Remote connection:** Add to `jvm-memory.options`:
+
+```
+-Dcom.sun.management.jmxremote.port=5000
+-Dcom.sun.management.jmxremote.login.config=<YourConfig>
+-Djava.security.auth.login.config=conf/ldap.config
+-Dcom.sun.management.jmxremote.ssl=false
+```
+
+> ⚠️ Enable SSL for production JMX. The `ssl=false` setting is for
+> testing only.
+
+### Heartbeat endpoint JSON response
+
+When `enable.detailed.heartbeat.response=true`:
+
+```json
+{"items":[{
+    "response.statistics.window.seconds": "5",
+    "response.statistics.count": "1",
+    "response.time.statistics.90.percentile": "129",
+    "response.time.statistics.mean": "129",
+    "response.time.statistics.max": "129",
+    "response.time.statistics.min": "129",
+    "response.concurrency.statistics.90.percentile": "1",
+    "response.concurrency.statistics.mean": "1",
+    "cpu.load": "15.53",
+    "total.jvm.memory": "500.695 MB",
+    "free.jvm.memory": "215.339 MB",
+    "used.jvm.memory": "285.356 MB",
+    "number.of.cpus": "8",
+    "open.client.connections": "1",
+    "number.of.applications": "11",
+    "number.of.virtual.hosts": "6"
+}]}
+```
+
+### SDK gap: no metrics API for plugins
+
+The SDK JAR (`pingaccess-sdk-9.0.1.0.jar`) contains **zero** classes related
+to JMX, MBeans, metrics, monitoring, or telemetry. There is no
+`registerMetric()`, no `MetricsService`, and no counters API.
+
+PA's own MBeans (connection pool metrics, heartbeat stats) are registered by
+the engine internally – they are not accessible or extendable from the SDK.
+
+### Plugin MBean registration pattern
+
+Plugins can register their own JMX MBeans using standard Java. This is safe
+because plugins run in the PA engine JVM and have access to
+`ManagementFactory.getPlatformMBeanServer()`.
+
+**Step 1: Define an MXBean interface**
+
+Use the `MXBean` suffix convention — the JMX runtime automatically exposes
+all public getters as attributes and methods as operations:
+
+```java
+public interface MyPluginMetricsMXBean {
+    // Attributes (read-only via JConsole)
+    long getRequestCount();
+    long getErrorCount();
+    double getAverageLatencyMs();
+    long getActiveSpecCount();
+
+    // Operations (invokable via JConsole)
+    void resetCounters();
+}
+```
+
+**Step 2: Implement the MXBean**
+
+```java
+public class MyPluginMetrics implements MyPluginMetricsMXBean {
+    private final LongAdder requestCount = new LongAdder();
+    private final LongAdder errorCount = new LongAdder();
+    private final LongAdder totalLatencyNanos = new LongAdder();
+    private volatile int activeSpecCount;
+
+    @Override
+    public long getRequestCount() { return requestCount.sum(); }
+
+    @Override
+    public long getErrorCount() { return errorCount.sum(); }
+
+    @Override
+    public double getAverageLatencyMs() {
+        long count = requestCount.sum();
+        return count == 0 ? 0.0
+            : (totalLatencyNanos.sum() / 1_000_000.0) / count;
+    }
+
+    @Override
+    public long getActiveSpecCount() { return activeSpecCount; }
+
+    @Override
+    public void resetCounters() {
+        requestCount.reset();
+        errorCount.reset();
+        totalLatencyNanos.reset();
+    }
+
+    // --- Mutators (called by plugin, not exposed via JMX) ---
+    public void recordSuccess(long elapsedNanos) {
+        requestCount.increment();
+        totalLatencyNanos.add(elapsedNanos);
+    }
+
+    public void recordError() {
+        requestCount.increment();
+        errorCount.increment();
+    }
+
+    public void setActiveSpecCount(int count) {
+        this.activeSpecCount = count;
+    }
+}
+```
+
+> **Thread safety:** `LongAdder` is specifically designed for high-contention
+> counter updates from multiple threads. It outperforms `AtomicLong` under
+> contention by using cell-based striping. All PA request-processing threads
+> can safely call `recordSuccess()` / `recordError()` concurrently.
+
+**Step 3: Register in `configure()`**
+
+```java
+private ObjectName jmxObjectName;
+private final MyPluginMetrics metrics = new MyPluginMetrics();
+
+@Override
+public void configure(MessageTransformConfig config) {
+    this.config = config;
+
+    if (config.isEnableJmxMetrics()) {
+        try {
+            MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
+            ObjectName name = new ObjectName(
+                "io.messagexform:type=TransformMetrics,instance="
+                    + ObjectName.quote(config.getName()));
+            if (!mbs.isRegistered(name)) {
+                mbs.registerMBean(metrics, name);
+                LOG.info("JMX MBean registered: {}", name);
+            }
+            this.jmxObjectName = name;
+        } catch (Exception e) {
+            LOG.warn("Failed to register JMX MBean — metrics disabled", e);
+        }
+    } else {
+        unregisterMBean();  // In case previously enabled
+    }
+}
+
+private void unregisterMBean() {
+    if (jmxObjectName != null) {
+        try {
+            MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
+            if (mbs.isRegistered(jmxObjectName)) {
+                mbs.unregisterMBean(jmxObjectName);
+                LOG.info("JMX MBean unregistered: {}", jmxObjectName);
+            }
+        } catch (Exception e) {
+            LOG.warn("Failed to unregister JMX MBean", e);
+        }
+        jmxObjectName = null;
+    }
+}
+```
+
+**ObjectName convention:** Use a plugin-specific domain (`io.messagexform`)
+to avoid collisions with PA's internal MBeans. The `instance` key property
+uses `config.getName()` (from `PluginConfiguration.getName()`) to
+distinguish multiple rule instances on the same engine.
+
+> **`ObjectName.quote()`:** Always quote the instance name. PA allows
+> arbitrary characters in rule names (including spaces, colons, commas)
+> which are illegal in unquoted ObjectName values.
+
+**Step 4: Unregister on plugin unload**
+
+PA does not expose a `destroy()` lifecycle callback in the SDK. However,
+if the plugin is reconfigured (new `configure()` call), the pattern above
+handles re-registration. For PA shutdown, the JVM termination implicitly
+cleans up MBeans. For safety, wrap unregistration in a try-catch.
+
+### ObjectName patterns for JConsole
+
+After registration, the MBean appears in JConsole under:
+
+```
+io.messagexform
+  └── TransformMetrics
+      └── instance=<rule-name>
+          ├── Attributes
+          │   ├── RequestCount
+          │   ├── ErrorCount
+          │   ├── AverageLatencyMs
+          │   └── ActiveSpecCount
+          └── Operations
+              └── resetCounters()
+```
+
+Administrators already monitoring PA's connection pool MBeans
+(`pa.mbean.site.connection.pool.enable=true`) will see the plugin MBeans
+in the same JConsole session.
+
+### Audit logging (always available)
+
+Even without JMX, every transform result is logged via SLF4J at INFO level.
+PingAccess routes plugin SLF4J output to `pingaccess.log`. The engine's
+own audit log (`pingaccess_engine_audit.log`) captures per-transaction
+timing automatically — **no plugin code needed**.
+
+Example `pingaccess_engine_audit.log` entry:
+```
+2026-02-11T19:15:12,192|...|tid:...|81 ms| 50 ms| 0 ms|app.example.com []...
+```
+
+Where `81 ms` is total roundtrip (includes our plugin processing time).
 
 ---
 
