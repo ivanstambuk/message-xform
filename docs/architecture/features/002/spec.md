@@ -284,10 +284,18 @@ JSLT (returns `null` for property access on null).
 | `headersAll` | Same source → multi-value map (all values per name, lowercase keys) |
 | `statusCode` | `null` (requests have no status code, per ADR-0020) |
 | `contentType` | `exchange.getRequest().getHeaders().getContentType()` → `MediaType.toString()` |
-| `requestPath` | `exchange.getRequest().getUri()` (path portion only, strip query string) |
+| `requestPath` | `exchange.getRequest().getUri()` (path portion only, strip query string) — see URI choice note below |
 | `requestMethod` | `exchange.getRequest().getMethod().getName()` → uppercase string |
 | `queryString` | `exchange.getRequest().getUri()` (query portion after `?`, or null) |
 | `sessionContext` | See FR-002-06 (identity/session binding) |
+
+> **URI choice:** The adapter uses `Request.getUri()` (the current URI, which
+> may already be rewritten by upstream PingAccess rules) rather than
+> `Exchange.getOriginalRequestUri()` (the URI before any rule rewrites).
+> **Rationale:** Profile matching should operate on the URI that will actually
+> reach the backend, not the original client URI. If a prior rule rewrites
+> `/old/path` to `/new/path`, the transform spec should match `/new/path`.
+> `getOriginalRequestUri()` is available for logging/diagnostics if needed.
 
 #### wrapResponse Mapping
 
@@ -496,10 +504,18 @@ session.put("subject", identity.getSubject());
 session.put("mappedSubject", identity.getMappedSubject());
 session.put("trackingId", identity.getTrackingId());
 session.put("tokenId", identity.getTokenId());
+if (identity.getTokenExpiration() != null) {
+    session.put("tokenExpiration", identity.getTokenExpiration().toInstant().toString());
+}
 if (identity.getAttributes() != null) {
     session.set("attributes", identity.getAttributes());
 }
 ```
+
+**`tokenExpiration` note:** `Identity.getTokenExpiration()` returns a `java.util.Date`.
+The adapter formats it as an ISO 8601 string (`Instant.toString()` format, e.g.
+`"2026-02-11T12:30:00Z"`). JSLT can compare this as a string for basic expiry
+checks. If the token has no expiration, the field is omitted.
 
 This enables JSLT expressions to use `$session.subject`, `$session.trackingId`,
 etc. in transform specs.
@@ -552,10 +568,29 @@ This enables PingAccess's `ServiceLoader` discovery.
 
 - The adapter classes (`io.messagexform.pingaccess.*`)
 - The core engine (`io.messagexform.core.*`)
-- All runtime dependencies (Jackson, JSLT, SnakeYAML, JSON Schema Validator, SLF4J API)
+- `META-INF/services/com.pingidentity.pa.sdk.policy.AsyncRuleInterceptor`
+- All runtime dependencies (Jackson, JSLT, SnakeYAML, JSON Schema Validator)
 
 The shadow JAR MUST **exclude** the PingAccess SDK classes — those are provided
 by the PA runtime (`/opt/server/lib/pingaccess-sdk-*.jar`).
+
+**SLF4J handling:** SLF4J API MUST be **excluded** from the shadow JAR
+(`compileOnly` scope). PingAccess ships its own SLF4J provider (Logback);
+bundling a second SLF4J API would cause a classpath conflict
+(`SLF4JServiceProvider` already loaded). The adapter uses SLF4J as a compile
+dependency only.
+
+**Jackson relocation:** PingAccess uses Jackson internally (e.g. `Identity.
+getAttributes()` returns `JsonNode`). To avoid version conflicts, the shadow
+JAR SHOULD use Gradle Shadow's `relocate` feature to shade Jackson classes
+into a private package (e.g. `io.messagexform.shaded.jackson`). If Jackson
+version alignment with PA is confirmed (same major.minor), relocation can be
+skipped — but this must be verified at build time.
+
+**TelemetryListener:** The PA adapter does NOT register a custom
+`TelemetryListener` implementation. The core engine's built-in SLF4J logging
+is sufficient. PA's own monitoring (PingAccess admin → audit logs) captures
+rule execution events. Custom telemetry can be added as a follow-up if needed.
 
 The JAR MUST be deployable by copying to `<PA_HOME>/deploy/` (Docker:
 `/opt/server/deploy/`).

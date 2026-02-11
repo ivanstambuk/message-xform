@@ -16,13 +16,13 @@ Created: 2026-02-11 | Session: spec self-critique and revision
 - [x] Gap 7: Wrong JSLT variable names in S-002-22 / S-002-23 — fixed to $cookies / $queryParams
 - [x] Gap 8: reloadIntervalSec config — clarified scope (spec YAML only) + ScheduledExecutorService
 
-## Batch 3 — Medium (9–11) + Low (12–16)
+## Batch 3 — Medium (9–11) + Low (12–16) ✅
 
-- [ ] Gap 9: tokenExpiration missing from session context — add to FR-002-06
-- [ ] Gap 10: SLF4J classpath conflict + TelemetryListener strategy — add to FR-002-09 / Constraints
-- [ ] Gap 11: 2-arg vs 3-arg transform — mandate 3-arg in FR-002-02
-- [ ] Gap 12: getOriginalRequestUri vs getRequest().getUri() — clarify in wrapRequest mapping
-- [ ] Gap 13: Query param encoding + URISyntaxException handling — clarify in FR-002-13
-- [ ] Gap 14: Jackson shadow/relocation strategy — add to FR-002-09
-- [ ] Gap 15: ErrorHandlingCallback — document default strategy
-- [ ] Gap 16: Method.forName() verification — verify SDK and fix mapping table
+- [x] Gap 9: tokenExpiration missing from session context — added to FR-002-06 with ISO 8601 formatting
+- [x] Gap 10: SLF4J classpath conflict + TelemetryListener strategy — SLF4J excluded (compileOnly), Jackson relocate SHOULD, no custom TelemetryListener
+- [x] Gap 11: 2-arg vs 3-arg transform — already fixed in Batch 1 (FR-002-02 mandates 3-arg)
+- [x] Gap 12: getOriginalRequestUri vs getRequest().getUri() — added URI choice note, decided on getUri() (current URI for profile matching)
+- [x] Gap 13: Query param encoding + URISyntaxException handling — already covered in FR-002-13 (Batch 1)
+- [x] Gap 14: Jackson shadow/relocation strategy — added Jackson relocation note to FR-002-09
+- [x] Gap 15: ErrorHandlingCallback — already covered in Batch 1 (FR-002-02 point 3, RuleInterceptorErrorHandlingCallback)
+- [x] Gap 16: Method.forName() verification — verified via javap, method exists ✅ (no fix needed)
