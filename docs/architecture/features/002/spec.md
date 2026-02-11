@@ -36,7 +36,7 @@ The adapter is a **thin bridge layer** — all transformation logic lives in
 - PingAccess Plugin API: `docs/research/pingaccess-plugin-api.md` (COMPLETE)
 - PingAccess Docker & SDK: `docs/research/pingaccess-docker-and-sdk.md` (COMPLETE)
 - PingAM Authentication API: `docs/research/pingam-authentication-api.md` (COMPLETE)
-- SDK JAR (decompiled): `docs/reference/pingaccess-sdk/pingaccess-sdk-9.0.1.0.jar` (166 classes)
+- SDK JAR: `docs/reference/pingaccess-sdk/pingaccess-sdk-9.0.1.0.jar`
 - PingAccess 9.0 reference: `docs/reference/pingaccess-9.0.pdf`
 
 ## Goals
@@ -864,8 +864,9 @@ Client                    PingAccess                        Backend
 | `docs/research/pingaccess-docker-and-sdk.md` | Docker + SDK samples (complete) |
 | `docs/research/pingam-authentication-api.md` | PingAM callback format (transform target) |
 | `docs/reference/pingaccess-9.0.pdf` | Official PA 9.0 documentation |
-| `docs/reference/pingaccess-sdk/pingaccess-sdk-9.0.1.0.jar` | SDK JAR (166 classes) |
-| `.sdk-decompile/pingaccess-9.0.1/sdk/` | Extracted SDK distribution (samples, apidocs) |
+| `docs/reference/pingaccess-sdk/pingaccess-sdk-9.0.1.0.jar` | SDK JAR |
+| `binaries/pingaccess-9.0.1/sdk/apidocs/` | Official SDK Javadoc |
+| `binaries/pingaccess-9.0.1/sdk/samples/` | SDK sample rules |
 | `adapter-standalone/src/main/java/.../StandaloneAdapter.java` | Reference adapter implementation |
 | ADR-0013 | Copy-on-wrap message adapter pattern |
 | ADR-0020 | Nullable status code (requests) |

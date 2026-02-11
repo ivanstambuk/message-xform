@@ -1,14 +1,14 @@
 # PingAccess SDK Implementation Guide
 
 > Single-source reference for implementing PingAccess 9.0.1 SDK plugins.
-> Extracted from SDK bytecode analysis (166 classes) and 9 sample rules.
+> Sourced from the official SDK Javadoc and sample rules shipped with PingAccess.
 > This document is optimized for LLM context — each section is self-contained.
 
 | Field | Value |
 |-------|-------|
 | SDK Version | `com.pingidentity.pingaccess:pingaccess-sdk:9.0.1.0` |
 | Java | 17 or 21 (Amazon Corretto, OpenJDK, Oracle JDK — 64-bit) |
-| Source | Decompiled via `javap` from `.sdk-decompile/` |
+| Source | Official SDK Javadoc (`binaries/pingaccess-9.0.1/sdk/apidocs/`) + sample rules |
 | Related spec | `docs/architecture/features/002/spec.md` (co-located) |
 
 ---
@@ -34,8 +34,14 @@
 
 > **Tags:** `plugin`, `SPI`, `interceptor`, `lifecycle`, `AsyncRuleInterceptorBase`
 
-The PingAccess plugin SPI for rule interceptors that process HTTP traffic.
+A `AsyncRuleInterceptor` is the runtime instantiation of a Rule that supports
+applying access control logic as an asynchronous computation.
 Your adapter extends `AsyncRuleInterceptorBase<T>` which provides sensible defaults.
+
+> **When to use Async vs Sync:** Per the SDK Javadoc, `AsyncRuleInterceptor`
+> should only be used when the logic of the Rule requires using a `HttpClient`.
+> If no `HttpClient` is needed, use `RuleInterceptor` instead. Our adapter uses
+> async because future features may require HTTP callouts.
 
 ### Interface: `AsyncRuleInterceptor<T>`
 
@@ -52,9 +58,9 @@ ErrorHandlingCallback    getErrorHandlingCallback();
 ```java
 // com.pingidentity.pa.sdk.policy.AsyncRuleInterceptorBase<T extends PluginConfiguration>
 //   implements AsyncRuleInterceptor<T>
-// Pre-wired fields:
-//   - HttpClient httpClient (via @Inject)
-//   - TemplateRenderer templateRenderer (via @Inject)
+// Pre-wired fields (set via setter injection):
+//   - HttpClient httpClient (via setHttpClient)
+//   - TemplateRenderer templateRenderer (via setTemplateRenderer)
 //   - T configuration (via configure(T))
 void configure(T config) throws ValidationException;
 T getConfiguration();
@@ -141,7 +147,14 @@ Resource    getResource();      // PA resource (endpoint) metadata
 Body    getBody();                 void setBody(Body);
 void    setBodyContent(byte[]);    // replaces body + auto-updates Content-Length
 Headers getHeaders();              void setHeaders(Headers);
+String  getStartLine();            // HTTP start line
+String  getVersion();              // "1.0" or "1.1"
+boolean isKeepAlive();
 ```
+
+> **⚠️ `setBody()` vs `setBodyContent()`:** Per the Javadoc, `setBody()` does
+> **NOT** update the `Content-Length` header. Use `setBodyContent(byte[])` instead
+> — it updates `Content-Length` automatically. The provided byte array is copied.
 
 ### Request
 
@@ -198,51 +211,71 @@ MediaType getContentType();      void setContentType(String);
 
 ### Identity
 
+An `Identity` object contains attributes and associated values derived from an
+authentication token issued by a token provider. The actual token can be a PA
+JWT cookie or an OAuth token.
+
 ```java
 // com.pingidentity.pa.sdk.identity.Identity
 String  getSubject();             // authenticated user principal
-String  getMappedSubject();       // mapped identity (set by IdentityMapping plugins)
+String  getMappedSubject();       // subject set by IdentityMappingPlugin (may be null/empty)
 void    setMappedSubject(String); // used by IdentityMapping — adapter should NOT call this
-String  getTrackingId();          // PA tracking ID
-String  getTokenId();             // OAuth token ID
+String  getTrackingId();          // PA tracking ID (for logging only, NOT globally unique)
+String  getTokenId();             // unique ID presented in the authentication token
 Instant getTokenExpiration();     // token expiry (java.time.Instant, NOT Date)
-JsonNode getAttributes();        // identity attributes as Jackson JsonNode (OIDC/token claims)
+JsonNode getAttributes();        // JSON identity attributes (OIDC/token claims)
 SessionStateSupport getSessionStateSupport();  // persistent session key-value store
-OAuthTokenMetadata  getOAuthTokenMetadata();   // OAuth token metadata
+OAuthTokenMetadata  getOAuthTokenMetadata();   // null if OAuth is not used
 ```
 
 > **`exchange.getIdentity()` may return `null`** for unauthenticated/anonymous
 > resources. Always null-check before accessing identity fields.
+>
+> **`getAttributes()` returns an immutable snapshot:** Modifications to the
+> returned `JsonNode` will NOT update the identity's attributes.
 
 ### SessionStateSupport
 
-Provides persistent key-value session storage. Attributes survive across
-requests within the same PingAccess session. Used by `ExternalAuthorizationRule`
-sample to cache authorization decisions.
+Provides access to persistent data across exchanges. Session state data is stored
+in a cookie. Requires a web application with a web session configured.
 
 ```java
 // com.pingidentity.pa.sdk.identity.SessionStateSupport
-Map<String, JsonNode> getAttributes();         // all session state attributes
-Set<String>           getAttributeNames();     // attribute key names
-JsonNode              getAttributeValue(String name);  // single attribute by key
+Map<String, JsonNode> getAttributes();         // unmodifiable map (snapshot)
+Set<String>           getAttributeNames();     // unmodifiable set (snapshot)
+JsonNode              getAttributeValue(String name);  // single attribute or null
 void                  setAttribute(String name, JsonNode value);
 void                  removeAttribute(String name);
 ```
 
+> **Caveats from SDK Javadoc:**
+> - `getAttributes()` and `getAttributeNames()` return **unmodifiable snapshots**.
+>   Later `setAttribute`/`removeAttribute` calls are NOT reflected in already-returned maps.
+> - Server-side attribute caching may cause cache entries to be deleted if cache
+>   limits are exceeded. Implementers should be prepared to re-acquire data.
+> - In a cluster, requests to other nodes may result in a **cache miss**.
+> - API-configured applications may **not support** persistent session state.
+>
 > **Adapter usage:** The adapter reads session attributes as read-only context
 > for JSLT transforms. Writing to session state is out of scope for v1.
 
 ### OAuthTokenMetadata
 
+The `OAuthTokenMetadata` provides access to additional details about an OAuth
+token apart from the attributes on `Identity`.
+
 ```java
 // com.pingidentity.pa.sdk.identity.OAuthTokenMetadata
-String      getClientId();     // OAuth client that obtained the token
-Set<String> getScopes();       // granted OAuth scopes
+String      getClientId();     // client_id of the OAuth client (null if not present)
+Set<String> getScopes();       // granted OAuth scopes (empty if not present)
 String      getTokenType();    // e.g., "Bearer"
-String      getRealm();        // OAuth realm
-Instant     getExpiresAt();    // token expiration timestamp
-Instant     getRetrievedAt();  // when the token was fetched/validated
+String      getRealm();        // OAuth realm associated with the application (may be null)
+Instant     getExpiresAt();    // calculated expiration from expires_in (null if not present)
+Instant     getRetrievedAt();  // when PingAccess received the access token response
 ```
+
+> **Null handling:** `getOAuthTokenMetadata()` returns `null` if OAuth is not
+> used for authentication. Individual fields may also be null.
 
 ### Building $session — Flat Merge Pattern
 
@@ -348,7 +381,7 @@ negligible in cost (<1ms for typical OIDC claim payloads).
 )
 ```
 
-### ConfigurationType Enum (SDK 9.0.1 bytecode)
+### ConfigurationType Enum (SDK 9.0.1)
 
 ```java
 // Available values:
@@ -428,15 +461,41 @@ public class AdvancedConfiguration implements PluginConfiguration {
 
 ### ResponseBuilder API
 
+Builder used for creating `Response` objects. Each `build()` invocation creates
+a new `Response` instance.
+
 ```java
-// com.pingidentity.pa.sdk.http.ResponseBuilder
-static ResponseBuilder ok();               // 200
-static ResponseBuilder notFound();         // 404
-static ResponseBuilder status(int code);   // arbitrary status
+// com.pingidentity.pa.sdk.http.ResponseBuilder — static factories
+static ResponseBuilder newInstance(HttpStatus status);   // arbitrary status
+static ResponseBuilder ok();                             // 200 OK
+static ResponseBuilder ok(String msg);                   // 200 + text/html body
+static ResponseBuilder badRequest();                     // 400
+static ResponseBuilder badRequestJson(String json);      // 400 + application/json body
+static ResponseBuilder unauthorized();                   // 401
+static ResponseBuilder forbidden();                      // 403
+static ResponseBuilder notFound();                       // 404 + text/html
+static ResponseBuilder notFoundJson();                   // 404 + application/json
+static ResponseBuilder unprocessableEntity();            // 422
+static ResponseBuilder internalServerError();            // 500
+static ResponseBuilder serviceUnavailable();             // 503
+static ResponseBuilder found(String url);                // 302 redirect
+
+// Builder methods
 ResponseBuilder header(String name, String value);
-ResponseBuilder body(byte[] content);
-Response build();
+ResponseBuilder header(HeaderField headerField);
+ResponseBuilder headers(Headers headers);         // copies, does not store reference
+ResponseBuilder contentType(String type);
+ResponseBuilder contentType(MediaType type);
+ResponseBuilder body(byte[] body);                // copies array, updates Content-Length
+ResponseBuilder body(String msg);                 // UTF-8 encoding, updates Content-Length
+ResponseBuilder body(String msg, Charset charset);
+Response build();                                 // creates new Response instance
 ```
+
+> **Note:** The `body(byte[])` and `headers(Headers)` methods copy the provided
+> objects — they do not store references. The `headers()` method throws
+> `IllegalArgumentException` if the `Headers` object was not created by the
+> provided `HeadersFactory` (see `ServiceFactory.headersFactory()`).
 
 ### ⚠️ CRITICAL: DENY Mode in handleRequest — Response is NULL
 
@@ -560,10 +619,10 @@ Any state derived from a specific request (parsed bodies, transform results,
 error responses) MUST be local to the `handleRequest()` / `handleResponse()`
 method. Do NOT store per-request state in instance fields.
 
-### SDK Evidence
+### Evidence from SDK Samples
 
 The `ExternalAuthorizationRule` sample uses instance field `objectMapper`
-(injected via `@Inject`) across threads — confirming that PA treats injected
+(injected via setter) across threads — confirming that PA treats injected
 fields as thread-safe. It stores per-request authorization results in
 `SessionStateSupport` (not instance fields).
 
@@ -697,7 +756,7 @@ the core module. No cross-compilation needed.
 
 | Artefact | Path |
 |----------|------|
-| SDK JAR (binary) | `binaries/pingaccess-sdk-9.0.1.0.jar` |
-| Decompiled classes | `.sdk-decompile/` (generated via `javap`) |
-| Sample rules source | `docs/reference/sdk-samples/` (if extracted) |
-| SDK documentation | `docs/reference/` |
+| SDK JAR (binary) | `binaries/pingaccess-9.0.1/sdk/` |
+| SDK Javadoc (HTML) | `binaries/pingaccess-9.0.1/sdk/apidocs/` |
+| SDK sample rules | `binaries/pingaccess-9.0.1/sdk/samples/` |
+| Local SDK JAR copy | `docs/reference/pingaccess-sdk/pingaccess-sdk-9.0.1.0.jar` |
