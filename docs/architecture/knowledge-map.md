@@ -170,3 +170,5 @@ ADR-0030 (Session Context)   governs ── FR-001-13, references ADR-0021, ADR-
 | `docs/research/pingaccess-docker-and-sdk.md` | PingAccess Docker image, SDK samples, Java version | Feature 002 spec |
 | `docs/research/pingam-authentication-api.md` | PingAM /json/authenticate endpoint, callback format | Feature 002 scenarios |
 | `docs/architecture/features/002/pingaccess-sdk-guide.md` | Standalone PingAccess 9.0 SDK reference (19 sections, 112 classes) | Feature 002 spec, all adapter implementation |
+| `docs/research/spike-pa-classloader-model.md` | Spike A: Reverse-engineer PA classloader hierarchy, delegation model, library visibility | Feature 002 dependency strategy, ADR-0031 |
+| `docs/research/spike-pa-dependency-extraction.md` | Spike B: Extract PA library versions from Docker, design version-locked build alignment | Feature 002 dependency strategy, build system |
