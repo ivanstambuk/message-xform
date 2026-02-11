@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import io.messagexform.core.error.EvalBudgetExceededException;
 import io.messagexform.core.error.ExpressionEvalException;
 import io.messagexform.core.error.InputSchemaViolation;
+import io.messagexform.core.testkit.TestMessages;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -36,7 +37,7 @@ class ErrorResponseBuilderTest {
             ExpressionEvalException ex =
                     new ExpressionEvalException("undefined variable 'foo'", "callback-prettify@1.0.0", null);
 
-            JsonNode response = builder.buildErrorResponse(ex, "/json/alpha/authenticate");
+            JsonNode response = TestMessages.parseBody(builder.buildErrorResponse(ex, "/json/alpha/authenticate"));
 
             assertThat(response.get("type").asText()).isEqualTo(ExpressionEvalException.URN);
             assertThat(response.get("type").asText()).isEqualTo("urn:message-xform:error:expression-eval-failed");
@@ -47,7 +48,7 @@ class ErrorResponseBuilderTest {
         void title_isTransformFailed() {
             ExpressionEvalException ex = new ExpressionEvalException("some error", "spec-1", null);
 
-            JsonNode response = builder.buildErrorResponse(ex, "/api/test");
+            JsonNode response = TestMessages.parseBody(builder.buildErrorResponse(ex, "/api/test"));
 
             assertThat(response.get("title").asText()).isEqualTo("Transform Failed");
         }
@@ -57,7 +58,7 @@ class ErrorResponseBuilderTest {
         void status_defaultsTo502() {
             ExpressionEvalException ex = new ExpressionEvalException("some error", "spec-1", null);
 
-            JsonNode response = builder.buildErrorResponse(ex, "/api/test");
+            JsonNode response = TestMessages.parseBody(builder.buildErrorResponse(ex, "/api/test"));
 
             assertThat(response.get("status").asInt()).isEqualTo(502);
         }
@@ -68,7 +69,7 @@ class ErrorResponseBuilderTest {
             ExpressionEvalException ex = new ExpressionEvalException(
                     "JSLT evaluation error: undefined variable at line 3", "callback-prettify@1.0.0", null);
 
-            JsonNode response = builder.buildErrorResponse(ex, "/api/test");
+            JsonNode response = TestMessages.parseBody(builder.buildErrorResponse(ex, "/api/test"));
 
             assertThat(response.get("detail").asText()).contains("JSLT evaluation error");
             assertThat(response.get("detail").asText()).contains("undefined variable");
@@ -79,7 +80,7 @@ class ErrorResponseBuilderTest {
         void instance_isRequestPath() {
             ExpressionEvalException ex = new ExpressionEvalException("error", "spec-1", null);
 
-            JsonNode response = builder.buildErrorResponse(ex, "/json/alpha/authenticate");
+            JsonNode response = TestMessages.parseBody(builder.buildErrorResponse(ex, "/json/alpha/authenticate"));
 
             assertThat(response.get("instance").asText()).isEqualTo("/json/alpha/authenticate");
         }
@@ -95,7 +96,7 @@ class ErrorResponseBuilderTest {
             EvalBudgetExceededException ex =
                     new EvalBudgetExceededException("evaluation exceeded 50ms budget", "slow-spec", null);
 
-            JsonNode response = builder.buildErrorResponse(ex, "/api/slow");
+            JsonNode response = TestMessages.parseBody(builder.buildErrorResponse(ex, "/api/slow"));
 
             assertThat(response.get("type").asText()).isEqualTo(EvalBudgetExceededException.URN);
             assertThat(response.get("type").asText()).isEqualTo("urn:message-xform:error:eval-budget-exceeded");
@@ -112,7 +113,7 @@ class ErrorResponseBuilderTest {
             InputSchemaViolation ex =
                     new InputSchemaViolation("missing required field: authId", "callback-prettify", null);
 
-            JsonNode response = builder.buildErrorResponse(ex, "/api/validate");
+            JsonNode response = TestMessages.parseBody(builder.buildErrorResponse(ex, "/api/validate"));
 
             assertThat(response.get("type").asText()).isEqualTo(InputSchemaViolation.URN);
             assertThat(response.get("type").asText()).isEqualTo("urn:message-xform:error:schema-validation-failed");
@@ -129,7 +130,7 @@ class ErrorResponseBuilderTest {
             ErrorResponseBuilder customBuilder = new ErrorResponseBuilder(500);
 
             ExpressionEvalException ex = new ExpressionEvalException("error", "spec-1", null);
-            JsonNode response = customBuilder.buildErrorResponse(ex, "/api/test");
+            JsonNode response = TestMessages.parseBody(customBuilder.buildErrorResponse(ex, "/api/test"));
 
             assertThat(response.get("status").asInt()).isEqualTo(500);
         }
@@ -140,7 +141,7 @@ class ErrorResponseBuilderTest {
             ErrorResponseBuilder customBuilder = new ErrorResponseBuilder(503);
 
             EvalBudgetExceededException ex = new EvalBudgetExceededException("timeout", "slow-spec", null);
-            JsonNode response = customBuilder.buildErrorResponse(ex, "/api/test");
+            JsonNode response = TestMessages.parseBody(customBuilder.buildErrorResponse(ex, "/api/test"));
 
             assertThat(response.get("status").asInt()).isEqualTo(503);
         }
@@ -155,7 +156,7 @@ class ErrorResponseBuilderTest {
         void nullInstance_producesNullNode() {
             ExpressionEvalException ex = new ExpressionEvalException("error", "spec-1", null);
 
-            JsonNode response = builder.buildErrorResponse(ex, null);
+            JsonNode response = TestMessages.parseBody(builder.buildErrorResponse(ex, null));
 
             assertThat(response.get("instance").isNull()).isTrue();
         }
@@ -165,7 +166,7 @@ class ErrorResponseBuilderTest {
         void nullSpecId_handledGracefully() {
             ExpressionEvalException ex = new ExpressionEvalException("error", null, null);
 
-            JsonNode response = builder.buildErrorResponse(ex, "/api/test");
+            JsonNode response = TestMessages.parseBody(builder.buildErrorResponse(ex, "/api/test"));
 
             assertThat(response.has("detail")).isTrue();
             assertThat(response.get("type").asText()).isEqualTo(ExpressionEvalException.URN);

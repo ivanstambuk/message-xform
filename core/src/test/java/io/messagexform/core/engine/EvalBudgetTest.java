@@ -6,9 +6,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.messagexform.core.engine.jslt.JsltExpressionEngine;
 import io.messagexform.core.error.EvalBudgetExceededException;
 import io.messagexform.core.model.Direction;
+import io.messagexform.core.model.HttpHeaders;
 import io.messagexform.core.model.Message;
+import io.messagexform.core.model.SessionContext;
 import io.messagexform.core.model.TransformResult;
 import io.messagexform.core.spec.SpecParser;
+import io.messagexform.core.testkit.TestMessages;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -53,8 +56,14 @@ class EvalBudgetTest {
 
             engine.loadSpec(specPath);
 
-            Message message =
-                    new Message(MAPPER.readTree("{}"), null, null, 200, "application/json", "/api/test", "GET");
+            Message message = new Message(
+                    TestMessages.toBody(MAPPER.readTree("{}"), "application/json"),
+                    HttpHeaders.empty(),
+                    200,
+                    "/api/test",
+                    "GET",
+                    null,
+                    SessionContext.empty());
             TransformResult result = engine.transform(message, Direction.RESPONSE);
 
             assertThat(result.isSuccess()).isTrue();
@@ -85,14 +94,23 @@ class EvalBudgetTest {
 
             engine.loadSpec(specPath);
 
-            Message message =
-                    new Message(MAPPER.readTree("{}"), null, null, 200, "application/json", "/api/test", "GET");
+            Message message = new Message(
+                    TestMessages.toBody(MAPPER.readTree("{}"), "application/json"),
+                    HttpHeaders.empty(),
+                    200,
+                    "/api/test",
+                    "GET",
+                    null,
+                    SessionContext.empty());
             TransformResult result = engine.transform(message, Direction.RESPONSE);
 
             assertThat(result.isError())
                     .as("Output exceeding max-output-bytes should produce ERROR")
                     .isTrue();
-            assertThat(result.errorResponse().get("type").asText()).isEqualTo(EvalBudgetExceededException.URN);
+            assertThat(TestMessages.parseBody(result.errorResponse())
+                            .get("type")
+                            .asText())
+                    .isEqualTo(EvalBudgetExceededException.URN);
         }
     }
 
@@ -123,8 +141,14 @@ class EvalBudgetTest {
 
             engine.loadSpec(specPath);
 
-            Message message =
-                    new Message(MAPPER.readTree("{}"), null, null, 200, "application/json", "/api/test", "GET");
+            Message message = new Message(
+                    TestMessages.toBody(MAPPER.readTree("{}"), "application/json"),
+                    HttpHeaders.empty(),
+                    200,
+                    "/api/test",
+                    "GET",
+                    null,
+                    SessionContext.empty());
             TransformResult result = engine.transform(message, Direction.RESPONSE);
 
             assertThat(result.isSuccess()).isTrue();

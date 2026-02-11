@@ -1,18 +1,20 @@
 package io.messagexform.core.model;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Objects;
 
 /**
  * Outcome of applying a transform (DO-001-05). Exactly one of three states:
  *
  * <ul>
- *   <li>{@link Type#SUCCESS} — transformation succeeded; {@code message} holds the transformed
- *       message.
- *   <li>{@link Type#ERROR} — transformation failed; {@code errorResponse} holds the error body and
- *       {@code errorStatusCode} the HTTP status.
- *   <li>{@link Type#PASSTHROUGH} — no transform matched; the original message is returned
- *       unmodified.
+ * <li>{@link Type#SUCCESS} — transformation succeeded; {@code message} holds
+ * the transformed
+ * message.
+ * <li>{@link Type#ERROR} — transformation failed; {@code errorResponse} holds
+ * the error body and
+ * {@code errorStatusCode} the HTTP status.
+ * <li>{@link Type#PASSTHROUGH} — no transform matched; the original message is
+ * returned
+ * unmodified.
  * </ul>
  */
 public final class TransformResult {
@@ -26,10 +28,10 @@ public final class TransformResult {
 
     private final Type type;
     private final Message message;
-    private final JsonNode errorResponse;
+    private final MessageBody errorResponse;
     private final Integer errorStatusCode;
 
-    private TransformResult(Type type, Message message, JsonNode errorResponse, Integer errorStatusCode) {
+    private TransformResult(Type type, Message message, MessageBody errorResponse, Integer errorStatusCode) {
         this.type = type;
         this.message = message;
         this.errorResponse = errorResponse;
@@ -43,7 +45,7 @@ public final class TransformResult {
     }
 
     /** Creates an ERROR result with an error response body and HTTP status code. */
-    public static TransformResult error(JsonNode errorResponse, int errorStatusCode) {
+    public static TransformResult error(MessageBody errorResponse, int errorStatusCode) {
         Objects.requireNonNull(errorResponse, "errorResponse must not be null for ERROR");
         return new TransformResult(Type.ERROR, null, errorResponse, errorStatusCode);
     }
@@ -57,17 +59,21 @@ public final class TransformResult {
         return type;
     }
 
-    /** Returns the transformed message. Only valid when {@code type() == SUCCESS}. */
+    /**
+     * Returns the transformed message. Only valid when {@code type() == SUCCESS}.
+     */
     public Message message() {
         return message;
     }
 
     /** Returns the error response body. Only valid when {@code type() == ERROR}. */
-    public JsonNode errorResponse() {
+    public MessageBody errorResponse() {
         return errorResponse;
     }
 
-    /** Returns the error HTTP status code. Only valid when {@code type() == ERROR}. */
+    /**
+     * Returns the error HTTP status code. Only valid when {@code type() == ERROR}.
+     */
     public Integer errorStatusCode() {
         return errorStatusCode;
     }

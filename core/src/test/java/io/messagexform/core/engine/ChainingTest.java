@@ -5,9 +5,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.messagexform.core.model.Direction;
+import io.messagexform.core.model.HttpHeaders;
 import io.messagexform.core.model.Message;
+import io.messagexform.core.model.SessionContext;
 import io.messagexform.core.model.TransformResult;
 import io.messagexform.core.spec.SpecParser;
+import io.messagexform.core.testkit.TestMessages;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -117,18 +120,18 @@ class ChainingTest {
                 }
                 """);
         Message message = new Message(
-                inputBody,
-                Map.of("content-type", "application/json"),
-                Map.of(),
+                TestMessages.toBody(inputBody, "application/json"),
+                TestMessages.toHeaders(Map.of("content-type", "application/json"), Map.of()),
                 200,
-                "application/json",
                 "/api/users",
-                "POST");
+                "POST",
+                null,
+                SessionContext.empty());
 
         TransformResult result = engine.transform(message, Direction.RESPONSE);
 
         assertThat(result.isSuccess()).isTrue();
-        JsonNode body = result.message().body();
+        JsonNode body = TestMessages.parseBody(result.message().body());
 
         // Step 1 should have renamed user_id → userId
         assertThat(body.get("userId").asText()).isEqualTo("u123");
@@ -214,7 +217,14 @@ class ChainingTest {
         strictEngine.loadProfile(profilePath);
 
         JsonNode inputBody = JSON.readTree("{\"value\": \"hello\"}");
-        Message message = new Message(inputBody, Map.of(), Map.of(), 200, "application/json", "/api/test", "GET");
+        Message message = new Message(
+                TestMessages.toBody(inputBody, "application/json"),
+                HttpHeaders.empty(),
+                200,
+                "/api/test",
+                "GET",
+                null,
+                SessionContext.empty());
 
         TransformResult result = strictEngine.transform(message, Direction.RESPONSE);
 
@@ -262,11 +272,19 @@ class ChainingTest {
         engine.loadProfile(profilePath);
 
         JsonNode inputBody = JSON.readTree("{\"input\": \"data\"}");
-        Message message = new Message(inputBody, Map.of(), Map.of(), 200, "application/json", "/api/test", "GET");
+        Message message = new Message(
+                TestMessages.toBody(inputBody, "application/json"),
+                HttpHeaders.empty(),
+                200,
+                "/api/test",
+                "GET",
+                null,
+                SessionContext.empty());
 
         TransformResult result = engine.transform(message, Direction.RESPONSE);
 
         assertThat(result.isSuccess()).isTrue();
-        assertThat(result.message().body().get("result").asText()).isEqualTo("data");
+        assertThat(TestMessages.parseBody(result.message().body()).get("result").asText())
+                .isEqualTo("data");
     }
 }

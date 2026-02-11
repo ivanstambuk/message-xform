@@ -8,9 +8,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.messagexform.core.engine.jslt.JsltExpressionEngine;
 import io.messagexform.core.error.SpecParseException;
 import io.messagexform.core.model.Direction;
+import io.messagexform.core.model.HttpHeaders;
 import io.messagexform.core.model.Message;
+import io.messagexform.core.model.SessionContext;
 import io.messagexform.core.model.TransformResult;
 import io.messagexform.core.spec.SpecParser;
+import io.messagexform.core.testkit.TestMessages;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -66,14 +69,25 @@ class StatusTransformTest {
             engine.loadSpec(specPath);
 
             JsonNode body = MAPPER.readTree("{\"id\": \"job-42\"}");
-            Message message = new Message(body, null, null, 200, "application/json", "/api/test", "POST");
+            Message message = new Message(
+                    TestMessages.toBody(body, "application/json"),
+                    HttpHeaders.empty(),
+                    200,
+                    "/api/test",
+                    "POST",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.RESPONSE);
 
             assertThat(result.isSuccess()).isTrue();
             assertThat(result.message().statusCode()).isEqualTo(202);
-            assertThat(result.message().body().get("accepted").asBoolean()).isTrue();
-            assertThat(result.message().body().get("id").asText()).isEqualTo("job-42");
+            assertThat(TestMessages.parseBody(result.message().body())
+                            .get("accepted")
+                            .asBoolean())
+                    .isTrue();
+            assertThat(TestMessages.parseBody(result.message().body()).get("id").asText())
+                    .isEqualTo("job-42");
         }
     }
 
@@ -110,14 +124,27 @@ class StatusTransformTest {
 
             JsonNode body = MAPPER.readTree(
                     "{\"error\": \"invalid_grant\", \"error_description\": \"The provided grant is invalid or expired\"}");
-            Message message = new Message(body, null, null, 200, "application/json", "/api/test", "POST");
+            Message message = new Message(
+                    TestMessages.toBody(body, "application/json"),
+                    HttpHeaders.empty(),
+                    200,
+                    "/api/test",
+                    "POST",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.RESPONSE);
 
             assertThat(result.isSuccess()).isTrue();
             assertThat(result.message().statusCode()).isEqualTo(400);
-            assertThat(result.message().body().get("success").asBoolean()).isFalse();
-            assertThat(result.message().body().get("error").asText()).isEqualTo("invalid_grant");
+            assertThat(TestMessages.parseBody(result.message().body())
+                            .get("success")
+                            .asBoolean())
+                    .isFalse();
+            assertThat(TestMessages.parseBody(result.message().body())
+                            .get("error")
+                            .asText())
+                    .isEqualTo("invalid_grant");
         }
 
         @Test
@@ -147,13 +174,23 @@ class StatusTransformTest {
             engine.loadSpec(specPath);
 
             JsonNode body = MAPPER.readTree("{\"data\": \"all good\"}");
-            Message message = new Message(body, null, null, 200, "application/json", "/api/test", "POST");
+            Message message = new Message(
+                    TestMessages.toBody(body, "application/json"),
+                    HttpHeaders.empty(),
+                    200,
+                    "/api/test",
+                    "POST",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.RESPONSE);
 
             assertThat(result.isSuccess()).isTrue();
             assertThat(result.message().statusCode()).isEqualTo(200);
-            assertThat(result.message().body().get("success").asBoolean()).isTrue();
+            assertThat(TestMessages.parseBody(result.message().body())
+                            .get("success")
+                            .asBoolean())
+                    .isTrue();
         }
 
         @Test
@@ -185,7 +222,14 @@ class StatusTransformTest {
 
             // Input does NOT have "computed" — it's only in the transformed output
             JsonNode body = MAPPER.readTree("{\"data\": \"test\"}");
-            Message message = new Message(body, null, null, 200, "application/json", "/api/test", "POST");
+            Message message = new Message(
+                    TestMessages.toBody(body, "application/json"),
+                    HttpHeaders.empty(),
+                    200,
+                    "/api/test",
+                    "POST",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.RESPONSE);
 
@@ -309,7 +353,14 @@ class StatusTransformTest {
             engine.loadSpec(specPath);
 
             JsonNode body = MAPPER.readTree("{\"data\": \"test\"}");
-            Message message = new Message(body, null, null, 200, "application/json", "/api/test", "POST");
+            Message message = new Message(
+                    TestMessages.toBody(body, "application/json"),
+                    HttpHeaders.empty(),
+                    200,
+                    "/api/test",
+                    "POST",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.RESPONSE);
 
@@ -345,7 +396,14 @@ class StatusTransformTest {
             engine.loadSpec(specPath);
 
             JsonNode body = MAPPER.readTree("{\"payload\": \"hello\"}");
-            Message message = new Message(body, null, null, 200, "application/json", "/api/test", "GET");
+            Message message = new Message(
+                    TestMessages.toBody(body, "application/json"),
+                    HttpHeaders.empty(),
+                    200,
+                    "/api/test",
+                    "GET",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.RESPONSE);
 

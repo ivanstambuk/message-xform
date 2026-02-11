@@ -1,6 +1,6 @@
 # Core Byte-Boundary Refactor — Implementation Plan
 
-Status: **🔧 In Progress (SDD: Spec Phase)** | Created: 2026-02-11 | ADRs: 0032, 0033
+Status: **🔧 In Progress (Phase 3: Shadow/Relocate)** | Created: 2026-02-11 | ADRs: 0032, 0033
 
 > **Goal:** Remove all third-party types (Jackson, SLF4J 2.x-only APIs) from
 > core's public API. Core defines its own port value objects (`MessageBody`,
@@ -164,16 +164,16 @@ Test coverage:
 > **Scope:** Modify existing `Message`, `TransformResult`, `TransformContext`
 > to use the new port types. This is the breaking change.
 
-**Status: 🔲 Not started**
+**Status: ✅ Complete** (2026-02-11)
 
 | # | Task | Status | Task ID |
 |---|------|--------|---------|
-| 2.1 | Rewrite `Message.java` | 🔲 | — |
-| 2.2 | Rewrite `TransformResult.java` | 🔲 | — |
-| 2.3 | Rewrite `TransformContext.java` | 🔲 | — |
-| 2.4 | Update `TransformEngine.java` internals | 🔲 | — |
-| 2.5 | Update `HeaderTransformer`, `StatusTransformer`, `UrlTransformer` | 🔲 | — |
-| 2.6 | Update all core tests (~15-20 files) | 🔲 | — |
+| 2.1 | Rewrite `Message.java` | ✅ Done | — |
+| 2.2 | Rewrite `TransformResult.java` | ✅ Done | — |
+| 2.3 | Rewrite `TransformContext.java` | ✅ Done | — |
+| 2.4 | Update `TransformEngine.java` internals | ✅ Done | — |
+| 2.5 | Update `HeaderTransformer`, `StatusTransformer`, `UrlTransformer` | ✅ Done | — |
+| 2.6 | Update all core tests (~15-20 files) | ✅ Done | — |
 
 ### 2.1 — Rewrite `Message.java`
 
@@ -327,13 +327,13 @@ Message msg = new Message(
 > **Scope:** Build configuration changes to bundle and relocate Jackson
 > inside core's shadow JAR.
 
-**Status: 🔲 Not started**
+**Status: ✅ Complete** (2026-02-11)
 
 | # | Task | Status | Task ID |
 |---|------|--------|---------|
-| 3.1 | Add Shadow plugin to core module | 🔲 | — |
-| 3.2 | Update `libs.versions.toml` | 🔲 | — |
-| 3.3 | Verify relocation (jar tf checks) | 🔲 | — |
+| 3.1 | Add Shadow plugin to core module | ✅ Done | — |
+| 3.2 | Update `libs.versions.toml` | ✅ Done (already had Shadow 9.3.1) | — |
+| 3.3 | Verify relocation (jar tf checks) | ✅ Done | — |
 
 ### 3.1 — Add Shadow plugin to core module
 
@@ -405,36 +405,39 @@ jar tf core/build/libs/core-*.jar | grep com/fasterxml/jackson
 
 ## Phase 4: SLF4J Compile-Time Enforcement
 
-**Status: 🔲 Not started**
+**Status: ✅ Complete**
+
+**Approach changed:** Instead of downgrading SLF4J to 1.7.x (which would force
+dependence on ancient jars), we added a **source-scan guard task** that scans
+core main sources for SLF4J 2.x-only patterns and fails the build.
 
 | # | Task | Status | Task ID |
 |---|------|--------|---------|
-| 4.1 | Downgrade SLF4J in `libs.versions.toml` | 🔲 | — |
-| 4.2 | Test classpath keeps SLF4J 2.x | 🔲 | — |
-| 4.3 | `StructuredLoggingTest` adjustment | 🔲 | — |
+| 4.1 | `checkSlf4jCompat` Gradle task scanning for 2.x-only APIs | ✅ Done | — |
+| 4.2 | Remove SLF4J 2.x fluent API from `TransformEngine` | ✅ Done | — |
+| 4.3 | `StructuredLoggingTest` updated to parse formatted strings | ✅ Done | — |
 
-### 4.1 — Downgrade SLF4J in `libs.versions.toml`
+### 4.1 — `checkSlf4jCompat` source-scan guard
 
-```toml
-slf4j = "1.7.36"
-```
+Added to `core/build.gradle.kts`. Scans all main Java source files for:
+- `.atInfo(`, `.atWarn(`, `.atDebug(`, `.atError(`, `.atTrace(`
+- `.makeLoggingEventBuilder(`
+- `import org.slf4j.event.KeyValuePair`
+- `import org.slf4j.spi.LoggingEventBuilder`
 
-Core compiles against SLF4J 1.7.x API. The compiler prevents use of 2.x-only
-methods (`LOG.atInfo()`, `LOG.atWarn()`, `LOG.isEnabledForLevel()`).
+Fails the build immediately if any violations are found. Runs automatically
+after `classes` via `finalizedBy`.
 
-### 4.2 — Test classpath keeps SLF4J 2.x
+### 4.2 — Fluent API removal
 
-```kotlin
-// core/build.gradle.kts
-testImplementation("ch.qos.logback:logback-classic:1.5.6")
-// Logback 1.5.x transitively brings SLF4J 2.x into test classpath.
-// Tests that use KeyValuePair or fluent API still compile.
-```
+`TransformEngine.emitTransformMatchedLog()` was using `LOG.atInfo().addKeyValue()`
+(SLF4J 2.x only). Replaced with `LOG.info("key={}", value)` format strings
+compatible with SLF4J 1.7.x.
 
-### 4.3 — `StructuredLoggingTest` adjustment
+### 4.3 — `StructuredLoggingTest` adaptation
 
-This test imports `org.slf4j.event.KeyValuePair` (SLF4J 2.x). It compiles
-against the test classpath (SLF4J 2.x via Logback). No changes needed.
+Test updated to parse key=value pairs from formatted log message strings using
+a regex, instead of using `KeyValuePair` (SLF4J 2.x-only class).
 
 ---
 
@@ -444,7 +447,7 @@ against the test classpath (SLF4J 2.x via Logback). No changes needed.
 
 | # | Task | Status | Task ID |
 |---|------|--------|---------|
-| 5.1 | Update `adapter-standalone` | 🔲 | — |
+| 5.1 | Update `adapter-standalone` | ✅ Done | — |
 | 5.2 | Update `adapter-pingaccess` (Feature 002) | 🔲 | — |
 | 5.3 | Update `StandaloneDependencyTest` | 🔲 | — |
 
@@ -634,10 +637,10 @@ Phase 0  ──► Phase 1 ──► Phase 2 ──► Phase 4 ──► Phase 3
 |-------|--------|----------|
 | **Phase 0** (Spec + Tasks) | ✅ Complete (FR-001-14, NFR-001-02, DO catalogue, tasks T-001-58..66) | Spec |
 | **Phase 1** (Port value objects) | ✅ Complete (MediaType, MessageBody, HttpHeaders, SessionContext + tests) | Implement |
-| **Phase 2** (Migrate core API) | 🔲 Not started | Implement |
-| **Phase 3** (Shadow/relocate) | 🔲 Not started | Implement |
-| **Phase 4** (SLF4J enforcement) | 🔲 Not started | Implement |
-| **Phase 5** (Adapters) | 🔲 Not started | Implement |
+| **Phase 2** (Migrate core API) | ✅ Complete (Message, TransformResult, TransformContext, Engine, all tests) | Implement |
+| **Phase 3** (Shadow/relocate) | ✅ Complete (1173 relocated Jackson classes, 3.6 MB JAR, 0 leakage) | Implement |
+| **Phase 4** (SLF4J enforcement) | ✅ Complete (source-scan guard in build.gradle.kts, fluent API removal) | Implement |
+| **Phase 5** (Adapters) | 🔧 5.1 Done (standalone), 5.2 pending (PA) | Implement |
 | **Phase 7** (Cleanup) | 🔲 Not started | Verify |
 
 **Rationale:**

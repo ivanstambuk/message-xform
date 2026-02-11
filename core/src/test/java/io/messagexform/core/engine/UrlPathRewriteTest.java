@@ -6,9 +6,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.messagexform.core.engine.jslt.JsltExpressionEngine;
 import io.messagexform.core.model.Direction;
+import io.messagexform.core.model.HttpHeaders;
 import io.messagexform.core.model.Message;
+import io.messagexform.core.model.SessionContext;
 import io.messagexform.core.model.TransformResult;
 import io.messagexform.core.spec.SpecParser;
+import io.messagexform.core.testkit.TestMessages;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -67,16 +70,31 @@ class UrlPathRewriteTest {
 
             JsonNode body = MAPPER.readTree(
                     "{\"action\": \"users\", \"resourceId\": \"123\", \"name\": \"Bob Jensen\", \"email\": \"bjensen@example.com\"}");
-            Message message = new Message(body, null, null, null, "application/json", "/dispatch", "POST");
+            Message message = new Message(
+                    TestMessages.toBody(body, "application/json"),
+                    HttpHeaders.empty(),
+                    null,
+                    "/dispatch",
+                    "POST",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.REQUEST);
 
             assertThat(result.isSuccess()).isTrue();
             // Body transform strips routing fields
-            assertThat(result.message().body().has("action")).isFalse();
-            assertThat(result.message().body().has("resourceId")).isFalse();
-            assertThat(result.message().body().get("name").asText()).isEqualTo("Bob Jensen");
-            assertThat(result.message().body().get("email").asText()).isEqualTo("bjensen@example.com");
+            assertThat(TestMessages.parseBody(result.message().body()).has("action"))
+                    .isFalse();
+            assertThat(TestMessages.parseBody(result.message().body()).has("resourceId"))
+                    .isFalse();
+            assertThat(TestMessages.parseBody(result.message().body())
+                            .get("name")
+                            .asText())
+                    .isEqualTo("Bob Jensen");
+            assertThat(TestMessages.parseBody(result.message().body())
+                            .get("email")
+                            .asText())
+                    .isEqualTo("bjensen@example.com");
             // Path rewritten from original body fields
             assertThat(result.message().requestPath()).isEqualTo("/api/users/123");
         }
@@ -108,14 +126,25 @@ class UrlPathRewriteTest {
 
             JsonNode body =
                     MAPPER.readTree("{\"resourceType\": \"orders\", \"resourceId\": \"456\", \"data\": \"payload\"}");
-            Message message = new Message(body, null, null, null, "application/json", "/generic", "POST");
+            Message message = new Message(
+                    TestMessages.toBody(body, "application/json"),
+                    HttpHeaders.empty(),
+                    null,
+                    "/generic",
+                    "POST",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.REQUEST);
 
             assertThat(result.isSuccess()).isTrue();
             // Transformed body does NOT have routing fields
-            assertThat(result.message().body().get("result").asText()).isEqualTo("transformed");
-            assertThat(result.message().body().has("resourceType")).isFalse();
+            assertThat(TestMessages.parseBody(result.message().body())
+                            .get("result")
+                            .asText())
+                    .isEqualTo("transformed");
+            assertThat(TestMessages.parseBody(result.message().body()).has("resourceType"))
+                    .isFalse();
             // But path was still rewritten from original body
             assertThat(result.message().requestPath()).isEqualTo("/resources/orders/456");
         }
@@ -148,7 +177,14 @@ class UrlPathRewriteTest {
             engine.loadSpec(specPath);
 
             JsonNode body = MAPPER.readTree("{\"query\": \"hello world\"}");
-            Message message = new Message(body, null, null, null, "application/json", "/search", "GET");
+            Message message = new Message(
+                    TestMessages.toBody(body, "application/json"),
+                    HttpHeaders.empty(),
+                    null,
+                    "/search",
+                    "GET",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.REQUEST);
 
@@ -180,7 +216,14 @@ class UrlPathRewriteTest {
             engine.loadSpec(specPath);
 
             JsonNode body = MAPPER.readTree("{\"fileName\": \"report 2026 Q1.pdf\"}");
-            Message message = new Message(body, null, null, null, "application/json", "/files", "GET");
+            Message message = new Message(
+                    TestMessages.toBody(body, "application/json"),
+                    HttpHeaders.empty(),
+                    null,
+                    "/files",
+                    "GET",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.REQUEST);
 
@@ -219,7 +262,14 @@ class UrlPathRewriteTest {
             engine.loadSpec(specPath);
 
             JsonNode body = MAPPER.readTree("{\"data\": \"payload\"}");
-            Message message = new Message(body, null, null, null, "application/json", "/original", "POST");
+            Message message = new Message(
+                    TestMessages.toBody(body, "application/json"),
+                    HttpHeaders.empty(),
+                    null,
+                    "/original",
+                    "POST",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.REQUEST);
 
@@ -250,7 +300,14 @@ class UrlPathRewriteTest {
             engine.loadSpec(specPath);
 
             JsonNode body = MAPPER.readTree("{\"data\": \"payload\"}");
-            Message message = new Message(body, null, null, null, "application/json", "/original", "POST");
+            Message message = new Message(
+                    TestMessages.toBody(body, "application/json"),
+                    HttpHeaders.empty(),
+                    null,
+                    "/original",
+                    "POST",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.REQUEST);
 
@@ -288,14 +345,28 @@ class UrlPathRewriteTest {
             JsonNode body = MAPPER.readTree("{\"data\": \"payload\"}");
 
             // Response direction — URL block should be ignored
-            Message responseMessage = new Message(body, null, null, 200, "application/json", "/original", "GET");
+            Message responseMessage = new Message(
+                    TestMessages.toBody(body, "application/json"),
+                    HttpHeaders.empty(),
+                    200,
+                    "/original",
+                    "GET",
+                    null,
+                    SessionContext.empty());
             TransformResult responseResult = engine.transform(responseMessage, Direction.RESPONSE);
 
             assertThat(responseResult.isSuccess()).isTrue();
             assertThat(responseResult.message().requestPath()).isEqualTo("/original");
 
             // Request direction — URL block should be applied
-            Message requestMessage = new Message(body, null, null, null, "application/json", "/original", "POST");
+            Message requestMessage = new Message(
+                    TestMessages.toBody(body, "application/json"),
+                    HttpHeaders.empty(),
+                    null,
+                    "/original",
+                    "POST",
+                    null,
+                    SessionContext.empty());
             TransformResult requestResult = engine.transform(requestMessage, Direction.REQUEST);
 
             assertThat(requestResult.isSuccess()).isTrue();
@@ -328,7 +399,14 @@ class UrlPathRewriteTest {
             engine.loadSpec(specPath);
 
             JsonNode body = MAPPER.readTree("{\"payload\": \"hello\"}");
-            Message message = new Message(body, null, null, null, "application/json", "/api/test", "POST");
+            Message message = new Message(
+                    TestMessages.toBody(body, "application/json"),
+                    HttpHeaders.empty(),
+                    null,
+                    "/api/test",
+                    "POST",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.REQUEST);
 

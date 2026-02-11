@@ -6,9 +6,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.messagexform.core.engine.jslt.JsltExpressionEngine;
 import io.messagexform.core.model.Direction;
+import io.messagexform.core.model.HttpHeaders;
 import io.messagexform.core.model.Message;
+import io.messagexform.core.model.SessionContext;
 import io.messagexform.core.model.TransformResult;
 import io.messagexform.core.spec.SpecParser;
+import io.messagexform.core.testkit.TestMessages;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -63,19 +66,25 @@ class ContextBindingTest {
 
         JsonNode body = MAPPER.readTree("{\"payload\": \"hello\"}");
         Message message = new Message(
-                body,
-                Map.of("x-request-id", "req-abc-123", "content-type", "application/json"),
-                Map.of("x-request-id", List.of("req-abc-123"), "content-type", List.of("application/json")),
+                TestMessages.toBody(body, "application/json"),
+                TestMessages.toHeaders(
+                        Map.of("x-request-id", "req-abc-123", "content-type", "application/json"),
+                        Map.of("x-request-id", List.of("req-abc-123"), "content-type", List.of("application/json"))),
                 200,
-                "application/json",
                 "/api/test",
-                "POST");
+                "POST",
+                null,
+                SessionContext.empty());
 
         TransformResult result = engine.transform(message, Direction.RESPONSE);
 
         assertThat(result.isSuccess()).isTrue();
-        assertThat(result.message().body().get("requestId").asText()).isEqualTo("req-abc-123");
-        assertThat(result.message().body().get("data").asText()).isEqualTo("hello");
+        assertThat(TestMessages.parseBody(result.message().body())
+                        .get("requestId")
+                        .asText())
+                .isEqualTo("req-abc-123");
+        assertThat(TestMessages.parseBody(result.message().body()).get("data").asText())
+                .isEqualTo("hello");
     }
 
     @Test
@@ -103,14 +112,26 @@ class ContextBindingTest {
         engine.loadSpec(specPath);
 
         JsonNode body = MAPPER.readTree("{\"payload\": \"response-data\"}");
-        Message message = new Message(body, null, null, 200, "application/json", "/api/test", "GET");
+        Message message = new Message(
+                TestMessages.toBody(body, "application/json"),
+                HttpHeaders.empty(),
+                200,
+                "/api/test",
+                "GET",
+                null,
+                SessionContext.empty());
 
         TransformResult result = engine.transform(message, Direction.RESPONSE);
 
         assertThat(result.isSuccess()).isTrue();
-        assertThat(result.message().body().get("statusCode").asInt()).isEqualTo(200);
-        assertThat(result.message().body().get("ok").asBoolean()).isTrue();
-        assertThat(result.message().body().get("data").asText()).isEqualTo("response-data");
+        assertThat(TestMessages.parseBody(result.message().body())
+                        .get("statusCode")
+                        .asInt())
+                .isEqualTo(200);
+        assertThat(TestMessages.parseBody(result.message().body()).get("ok").asBoolean())
+                .isTrue();
+        assertThat(TestMessages.parseBody(result.message().body()).get("data").asText())
+                .isEqualTo("response-data");
     }
 
     @Test
@@ -138,13 +159,24 @@ class ContextBindingTest {
 
         JsonNode body = MAPPER.readTree("{\"payload\": \"request-data\"}");
         // Request messages have null statusCode
-        Message message = new Message(body, null, null, null, "application/json", "/api/test", "POST");
+        Message message = new Message(
+                TestMessages.toBody(body, "application/json"),
+                HttpHeaders.empty(),
+                null,
+                "/api/test",
+                "POST",
+                null,
+                SessionContext.empty());
 
         TransformResult result = engine.transform(message, Direction.REQUEST);
 
         assertThat(result.isSuccess()).isTrue();
-        assertThat(result.message().body().get("hasStatus").asBoolean()).isFalse();
-        assertThat(result.message().body().get("data").asText()).isEqualTo("request-data");
+        assertThat(TestMessages.parseBody(result.message().body())
+                        .get("hasStatus")
+                        .asBoolean())
+                .isFalse();
+        assertThat(TestMessages.parseBody(result.message().body()).get("data").asText())
+                .isEqualTo("request-data");
     }
 
     @Test
@@ -172,18 +204,23 @@ class ContextBindingTest {
 
         JsonNode body = MAPPER.readTree("{\"payload\": \"test\"}");
         Message message = new Message(
-                body,
-                Map.of("accept", "application/json"),
-                Map.of("accept", List.of("application/json", "text/html")),
+                TestMessages.toBody(body, "application/json"),
+                TestMessages.toHeaders(
+                        Map.of("accept", "application/json"),
+                        Map.of("accept", List.of("application/json", "text/html"))),
                 200,
-                "application/json",
                 "/api/test",
-                "GET");
+                "GET",
+                null,
+                SessionContext.empty());
 
         TransformResult result = engine.transform(message, Direction.RESPONSE);
 
         assertThat(result.isSuccess()).isTrue();
-        assertThat(result.message().body().get("acceptCount").asInt()).isEqualTo(2);
+        assertThat(TestMessages.parseBody(result.message().body())
+                        .get("acceptCount")
+                        .asInt())
+                .isEqualTo(2);
     }
 
     @Test
@@ -212,18 +249,19 @@ class ContextBindingTest {
 
         JsonNode body = MAPPER.readTree("{\"msg\": \"hello world\"}");
         Message message = new Message(
-                body,
-                Map.of("x-request-id", "trace-456"),
-                Map.of("x-request-id", List.of("trace-456")),
+                TestMessages.toBody(body, "application/json"),
+                TestMessages.toHeaders(
+                        Map.of("x-request-id", "trace-456"), Map.of("x-request-id", List.of("trace-456"))),
                 201,
-                "application/json",
                 "/api/items",
-                "POST");
+                "POST",
+                null,
+                SessionContext.empty());
 
         TransformResult result = engine.transform(message, Direction.RESPONSE);
 
         assertThat(result.isSuccess()).isTrue();
-        JsonNode output = result.message().body();
+        JsonNode output = TestMessages.parseBody(result.message().body());
         assertThat(output.get("requestId").asText()).isEqualTo("trace-456");
         assertThat(output.get("status").asInt()).isEqualTo(201);
         assertThat(output.get("message").asText()).isEqualTo("hello world");

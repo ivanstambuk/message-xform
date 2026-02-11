@@ -81,15 +81,17 @@ public final class UrlTransformer {
         if (!java.util.Objects.equals(newPath, message.requestPath())
                 || !java.util.Objects.equals(newMethod, message.requestMethod())
                 || !java.util.Objects.equals(newQueryString, message.queryString())) {
-            return new Message(
-                    message.body(),
-                    message.headers(),
-                    message.headersAll(),
-                    message.statusCode(),
-                    message.contentType(),
-                    newPath,
-                    newMethod,
-                    newQueryString);
+            Message result = message;
+            if (!java.util.Objects.equals(newPath, message.requestPath())) {
+                result = result.withRequestPath(newPath);
+            }
+            if (!java.util.Objects.equals(newMethod, message.requestMethod())) {
+                result = result.withRequestMethod(newMethod);
+            }
+            if (!java.util.Objects.equals(newQueryString, message.queryString())) {
+                result = result.withQueryString(newQueryString);
+            }
+            return result;
         }
 
         return message;

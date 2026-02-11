@@ -1,10 +1,11 @@
 package io.messagexform.standalone.adapter;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.NullNode;
 import io.javalin.http.Context;
+import io.messagexform.core.model.HttpHeaders;
 import io.messagexform.core.model.Message;
+import io.messagexform.core.model.MessageBody;
+import io.messagexform.core.model.SessionContext;
 import io.messagexform.core.model.TransformContext;
 import io.messagexform.core.spi.GatewayAdapter;
 import java.util.ArrayList;
@@ -37,16 +38,12 @@ public final class StandaloneAdapter implements GatewayAdapter<Context> {
 
     @Override
     public Message wrapRequest(Context ctx) {
-        // Parse JSON body — NullNode for absent or empty bodies
-        JsonNode body = parseBody(ctx.body());
+        // Parse JSON body
+        MessageBody body = parseBody(ctx.body(), ctx.contentType());
 
-        // Build single-value header map with lowercase keys (FR-004-09)
-        Map<String, String> headers = normalizeHeaders(ctx.headerMap());
+        // Build header map with lowercase keys (FR-004-09)
+        HttpHeaders headers = buildHeaders(ctx);
 
-        // Build multi-value header map from servlet request (FR-004-09)
-        Map<String, List<String>> headersAll = extractHeadersAll(ctx);
-
-        String contentType = ctx.contentType();
         String requestPath = ctx.path();
         String requestMethod = ctx.method().name();
         String queryString = ctx.queryString();
@@ -56,9 +53,9 @@ public final class StandaloneAdapter implements GatewayAdapter<Context> {
                 requestMethod,
                 requestPath,
                 ctx.body() != null ? ctx.body().length() : 0,
-                headers.size());
+                headers.toSingleValueMap().size());
 
-        return new Message(body, headers, headersAll, null, contentType, requestPath, requestMethod, queryString);
+        return new Message(body, headers, null, requestPath, requestMethod, queryString, SessionContext.empty());
     }
 
     /**
@@ -71,44 +68,42 @@ public final class StandaloneAdapter implements GatewayAdapter<Context> {
      * @return a {@link Message} with NullNode body and all other fields populated
      */
     public Message wrapRequestRaw(Context ctx) {
-        Map<String, String> headers = normalizeHeaders(ctx.headerMap());
-        Map<String, List<String>> headersAll = extractHeadersAll(ctx);
-        String contentType = ctx.contentType();
+        HttpHeaders headers = buildHeaders(ctx);
         String requestPath = ctx.path();
         String requestMethod = ctx.method().name();
         String queryString = ctx.queryString();
 
-        LOG.debug("wrapRequestRaw: {} {} (body skipped, headers={})", requestMethod, requestPath, headers.size());
+        LOG.debug(
+                "wrapRequestRaw: {} {} (body skipped, headers={})",
+                requestMethod,
+                requestPath,
+                headers.toSingleValueMap().size());
 
         return new Message(
-                NullNode.getInstance(),
-                headers,
-                headersAll,
-                null,
-                contentType,
-                requestPath,
-                requestMethod,
-                queryString);
+                MessageBody.empty(), headers, null, requestPath, requestMethod, queryString, SessionContext.empty());
     }
 
     @Override
     public Message wrapResponse(Context ctx) {
         // Read response body from ctx.result() (set by ProxyHandler)
-        JsonNode body = parseBody(ctx.result());
+        String contentType = null;
 
         // Read response headers from servlet response (FR-004-06a)
-        Map<String, String> headers = new LinkedHashMap<>();
         Map<String, List<String>> headersAll = new LinkedHashMap<>();
         for (String name : ctx.res().getHeaderNames()) {
             String lowerName = name.toLowerCase();
-            headers.putIfAbsent(lowerName, ctx.res().getHeader(name));
             headersAll.putIfAbsent(
                     lowerName,
                     Collections.unmodifiableList(new ArrayList<>(ctx.res().getHeaders(name))));
+            if ("content-type".equals(lowerName) && contentType == null) {
+                contentType = ctx.res().getHeader(name);
+            }
         }
+        HttpHeaders headers = HttpHeaders.ofMulti(headersAll);
+
+        MessageBody body = parseBody(ctx.result(), contentType);
 
         int statusCode = ctx.statusCode();
-        String contentType = headers.get("content-type");
 
         // Original request path/method for profile matching (FR-004-06b)
         String requestPath = ctx.path();
@@ -120,10 +115,10 @@ public final class StandaloneAdapter implements GatewayAdapter<Context> {
                 requestPath,
                 statusCode,
                 ctx.result() != null ? ctx.result().length() : 0,
-                headers.size());
+                headers.toSingleValueMap().size());
 
         // queryString is null for responses
-        return new Message(body, headers, headersAll, statusCode, contentType, requestPath, requestMethod, null);
+        return new Message(body, headers, statusCode, requestPath, requestMethod, null, SessionContext.empty());
     }
 
     /**
@@ -136,18 +131,16 @@ public final class StandaloneAdapter implements GatewayAdapter<Context> {
      * @return a {@link Message} with NullNode body and all other fields populated
      */
     public Message wrapResponseRaw(Context ctx) {
-        Map<String, String> headers = new LinkedHashMap<>();
         Map<String, List<String>> headersAll = new LinkedHashMap<>();
         for (String name : ctx.res().getHeaderNames()) {
             String lowerName = name.toLowerCase();
-            headers.putIfAbsent(lowerName, ctx.res().getHeader(name));
             headersAll.putIfAbsent(
                     lowerName,
                     Collections.unmodifiableList(new ArrayList<>(ctx.res().getHeaders(name))));
         }
+        HttpHeaders headers = HttpHeaders.ofMulti(headersAll);
 
         int statusCode = ctx.statusCode();
-        String contentType = headers.get("content-type");
         String requestPath = ctx.path();
         String requestMethod = ctx.method().name();
 
@@ -156,25 +149,25 @@ public final class StandaloneAdapter implements GatewayAdapter<Context> {
                 requestMethod,
                 requestPath,
                 statusCode,
-                headers.size());
+                headers.toSingleValueMap().size());
 
         return new Message(
-                NullNode.getInstance(), headers, headersAll, statusCode, contentType, requestPath, requestMethod, null);
+                MessageBody.empty(), headers, statusCode, requestPath, requestMethod, null, SessionContext.empty());
     }
 
     @Override
     public void applyChanges(Message transformedMessage, Context ctx) {
-        // Write body — NullNode → empty body (FR-004-08)
+        // Write body — empty MessageBody → empty body (FR-004-08)
         String bodyStr;
-        if (transformedMessage.body() == null || transformedMessage.body().isNull()) {
+        if (transformedMessage.body() == null || transformedMessage.body().isEmpty()) {
             bodyStr = "";
         } else {
-            bodyStr = transformedMessage.body().toString();
+            bodyStr = transformedMessage.body().asString();
         }
         ctx.result(bodyStr);
 
         // Write headers
-        transformedMessage.headers().forEach(ctx::header);
+        transformedMessage.headers().toSingleValueMap().forEach(ctx::header);
 
         // Write status code
         if (transformedMessage.statusCode() != null) {
@@ -184,7 +177,7 @@ public final class StandaloneAdapter implements GatewayAdapter<Context> {
         LOG.debug(
                 "applyChanges: status={}, headers={}, body={} bytes",
                 transformedMessage.statusCode(),
-                transformedMessage.headers().size(),
+                transformedMessage.headers().toSingleValueMap().size(),
                 bodyStr.length());
     }
 
@@ -198,8 +191,7 @@ public final class StandaloneAdapter implements GatewayAdapter<Context> {
      * @return a populated {@link TransformContext}
      */
     public TransformContext buildTransformContext(Context ctx) {
-        Map<String, String> headers = normalizeHeaders(ctx.headerMap());
-        Map<String, List<String>> headersAll = extractHeadersAll(ctx);
+        HttpHeaders headers = buildHeaders(ctx);
 
         // Cookies from Javalin (already URL-decoded)
         Map<String, String> cookies = new LinkedHashMap<>(ctx.cookieMap());
@@ -207,19 +199,22 @@ public final class StandaloneAdapter implements GatewayAdapter<Context> {
         // Query params — first value only for multi-value (FR-004-39)
         Map<String, String> queryParams = extractQueryParams(ctx);
 
-        return new TransformContext(headers, headersAll, null, queryParams, cookies);
+        return new TransformContext(headers, null, queryParams, cookies, SessionContext.empty());
     }
 
     /**
-     * Parses a JSON body string into a {@link JsonNode}.
-     * Returns {@link NullNode} for null, empty, or whitespace-only bodies.
+     * Parses a body string into a {@link MessageBody}.
+     * Returns {@link MessageBody#empty()} for null or whitespace-only bodies.
+     * Validates JSON by parsing (throws on invalid JSON).
      */
-    private static JsonNode parseBody(String body) {
+    private static MessageBody parseBody(String body, String contentType) {
         if (body == null || body.isBlank()) {
-            return NullNode.getInstance();
+            return MessageBody.empty();
         }
         try {
-            return MAPPER.readTree(body).deepCopy();
+            // Validate JSON by parsing. This ensures malformed JSON is rejected.
+            MAPPER.readTree(body);
+            return MessageBody.json(body);
         } catch (Exception e) {
             // JSON parse errors will be handled upstream (ProxyHandler returns 400)
             throw new IllegalArgumentException("Failed to parse JSON body", e);
@@ -227,22 +222,11 @@ public final class StandaloneAdapter implements GatewayAdapter<Context> {
     }
 
     /**
-     * Normalizes header names to lowercase, producing a single-value map
-     * (first-value semantics). Returns a deep copy of the map (ADR-0013).
+     * Builds an {@link HttpHeaders} from the Javalin request's multi-value
+     * headers with lowercase key normalization (FR-004-09). Uses the servlet
+     * request to capture all header values.
      */
-    private static Map<String, String> normalizeHeaders(Map<String, String> rawHeaders) {
-        Map<String, String> normalized = new LinkedHashMap<>();
-        if (rawHeaders != null) {
-            rawHeaders.forEach((name, value) -> normalized.putIfAbsent(name.toLowerCase(), value));
-        }
-        return normalized;
-    }
-
-    /**
-     * Extracts multi-value headers from the servlet request with lowercase
-     * key normalization (FR-004-09). Returns a deep copy.
-     */
-    private static Map<String, List<String>> extractHeadersAll(Context ctx) {
+    private static HttpHeaders buildHeaders(Context ctx) {
         Map<String, List<String>> headersAll = new LinkedHashMap<>();
         var headerNames = ctx.req().getHeaderNames();
         if (headerNames != null) {
@@ -258,7 +242,7 @@ public final class StandaloneAdapter implements GatewayAdapter<Context> {
                 headersAll.put(name.toLowerCase(), Collections.unmodifiableList(valueList));
             }
         }
-        return headersAll;
+        return HttpHeaders.ofMulti(headersAll);
     }
 
     /**

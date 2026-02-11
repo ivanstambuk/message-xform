@@ -219,7 +219,7 @@ class ScenarioSuiteTest {
             assertThat(result.message()).isNotNull();
 
             // Assert output body matches expected
-            assertThat(result.message().body())
+            assertThat(TestMessages.parseBody(result.message().body()))
                     .as("Scenario %s output body", scenario.id())
                     .isEqualTo(scenario.expectedOutput());
         } finally {
@@ -310,7 +310,14 @@ class ScenarioSuiteTest {
         // Session context (FR-001-13, ADR-0030)
         JsonNode sessionContext = scenario.sessionContext();
 
-        return new Message(body, headers, headersAll, statusCode, contentType, path, method, null, sessionContext);
+        return new Message(
+                TestMessages.toBody(body, contentType),
+                TestMessages.toHeaders(headers, headersAll),
+                statusCode,
+                path,
+                method,
+                null,
+                TestMessages.toSessionContext(sessionContext));
     }
 
     private Direction parseDirection(ScenarioDefinition scenario) {

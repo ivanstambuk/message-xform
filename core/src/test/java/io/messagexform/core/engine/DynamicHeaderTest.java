@@ -6,9 +6,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.messagexform.core.engine.jslt.JsltExpressionEngine;
 import io.messagexform.core.model.Direction;
+import io.messagexform.core.model.HttpHeaders;
 import io.messagexform.core.model.Message;
+import io.messagexform.core.model.SessionContext;
 import io.messagexform.core.model.TransformResult;
 import io.messagexform.core.spec.SpecParser;
+import io.messagexform.core.testkit.TestMessages;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -77,13 +80,20 @@ class DynamicHeaderTest {
                   "error": {"code": "AUTH_REQUIRED", "message": "Authentication required"}
                 }
                 """);
-        Message message = new Message(body, Map.of(), Map.of(), 200, "application/json", "/api/auth", "POST");
+        Message message = new Message(
+                TestMessages.toBody(body, "application/json"),
+                HttpHeaders.empty(),
+                200,
+                "/api/auth",
+                "POST",
+                null,
+                SessionContext.empty());
 
         TransformResult result = engine.transform(message, Direction.RESPONSE);
 
         assertThat(result.isSuccess()).isTrue();
         // Dynamic header: evaluates expr against TRANSFORMED body
-        assertThat(result.message().headers())
+        assertThat(result.message().headers().toSingleValueMap())
                 .containsEntry("x-auth-method", "challenge")
                 .containsEntry("x-error-code", "AUTH_REQUIRED")
                 .containsEntry("x-transformed-by", "message-xform");
@@ -116,13 +126,20 @@ class DynamicHeaderTest {
         engine.loadSpec(specPath);
 
         JsonNode body = MAPPER.readTree("{\"count\": 42, \"active\": true}");
-        Message message = new Message(body, Map.of(), Map.of(), 200, "application/json", "/api/items", "GET");
+        Message message = new Message(
+                TestMessages.toBody(body, "application/json"),
+                HttpHeaders.empty(),
+                200,
+                "/api/items",
+                "GET",
+                null,
+                SessionContext.empty());
 
         TransformResult result = engine.transform(message, Direction.RESPONSE);
 
         assertThat(result.isSuccess()).isTrue();
         // Non-string results coerced to their JSON text representation
-        assertThat(result.message().headers())
+        assertThat(result.message().headers().toSingleValueMap())
                 .containsEntry("x-item-count", "42")
                 .containsEntry("x-is-active", "true");
     }
@@ -152,13 +169,20 @@ class DynamicHeaderTest {
         engine.loadSpec(specPath);
 
         JsonNode body = MAPPER.readTree("{\"payload\": \"hello\"}");
-        Message message = new Message(body, Map.of(), Map.of(), 200, "application/json", "/api/test", "GET");
+        Message message = new Message(
+                TestMessages.toBody(body, "application/json"),
+                HttpHeaders.empty(),
+                200,
+                "/api/test",
+                "GET",
+                null,
+                SessionContext.empty());
 
         TransformResult result = engine.transform(message, Direction.RESPONSE);
 
         assertThat(result.isSuccess()).isTrue();
         // Null result → header not set
-        assertThat(result.message().headers()).doesNotContainKey("x-maybe");
+        assertThat(result.message().headers().toSingleValueMap()).doesNotContainKey("x-maybe");
     }
 
     @Test
@@ -190,18 +214,18 @@ class DynamicHeaderTest {
 
         JsonNode body = MAPPER.readTree("{\"status\": \"active\", \"data\": \"payload\"}");
         Message message = new Message(
-                body,
-                Map.of("x-internal-debug", "true", "x-keep", "me"),
-                Map.of(),
+                TestMessages.toBody(body, "application/json"),
+                TestMessages.toHeaders(Map.of("x-internal-debug", "true", "x-keep", "me"), Map.of()),
                 200,
-                "application/json",
                 "/api/test",
-                "GET");
+                "GET",
+                null,
+                SessionContext.empty());
 
         TransformResult result = engine.transform(message, Direction.RESPONSE);
 
         assertThat(result.isSuccess()).isTrue();
-        assertThat(result.message().headers())
+        assertThat(result.message().headers().toSingleValueMap())
                 .containsEntry("x-static", "always")
                 .containsEntry("x-dynamic-status", "active")
                 .containsEntry("x-keep", "me")

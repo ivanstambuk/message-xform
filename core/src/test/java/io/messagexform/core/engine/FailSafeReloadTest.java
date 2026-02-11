@@ -6,12 +6,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.messagexform.core.model.Direction;
+import io.messagexform.core.model.HttpHeaders;
 import io.messagexform.core.model.Message;
+import io.messagexform.core.model.SessionContext;
 import io.messagexform.core.model.TransformResult;
 import io.messagexform.core.spec.SpecParser;
+import io.messagexform.core.testkit.TestMessages;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -104,7 +106,14 @@ class FailSafeReloadTest {
 
     private Message stubMessage() {
         ObjectNode body = MAPPER.createObjectNode().put("name", "alice");
-        return new Message(body, Map.of(), null, null, "application/json", "/test", "POST", null);
+        return new Message(
+                TestMessages.toBody(body, "application/json"),
+                HttpHeaders.empty(),
+                null,
+                "/test",
+                "POST",
+                null,
+                SessionContext.empty());
     }
 
     // --- Tests ---
@@ -118,7 +127,10 @@ class FailSafeReloadTest {
         Message msg = stubMessage();
         TransformResult resultBefore = engine.transform(msg, Direction.RESPONSE);
         assertThat(resultBefore.isSuccess()).isTrue();
-        assertThat(resultBefore.message().body().get("result").asText()).isEqualTo("alice");
+        assertThat(TestMessages.parseBody(resultBefore.message().body())
+                        .get("result")
+                        .asText())
+                .isEqualTo("alice");
 
         // Attempt reload with a broken spec — should fail
         Path brokenSpec = writeBrokenSpec("broken.yaml");
@@ -127,7 +139,10 @@ class FailSafeReloadTest {
         // Engine still serves with the OLD registry
         TransformResult resultAfter = engine.transform(msg, Direction.RESPONSE);
         assertThat(resultAfter.isSuccess()).isTrue();
-        assertThat(resultAfter.message().body().get("result").asText()).isEqualTo("alice");
+        assertThat(TestMessages.parseBody(resultAfter.message().body())
+                        .get("result")
+                        .asText())
+                .isEqualTo("alice");
     }
 
     @Test

@@ -7,8 +7,11 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.messagexform.core.error.ExpressionCompileException;
 import io.messagexform.core.error.ExpressionEvalException;
+import io.messagexform.core.model.HttpHeaders;
+import io.messagexform.core.model.SessionContext;
 import io.messagexform.core.model.TransformContext;
 import io.messagexform.core.spi.CompiledExpression;
+import io.messagexform.core.testkit.TestMessages;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
@@ -92,7 +95,12 @@ class JsltExpressionEngineTest {
     void contextVariablesAreAccessible() throws Exception {
         // T-001-12: verify that JSLT can access injected context variables
         CompiledExpression compiled = engine.compile("{\"requestId\": $headers.\"x-request-id\", \"status\": $status}");
-        TransformContext ctx = new TransformContext(Map.of("x-request-id", "abc-123"), null, 200, null, null);
+        TransformContext ctx = new TransformContext(
+                TestMessages.toHeaders(Map.of("x-request-id", "abc-123"), null),
+                200,
+                null,
+                null,
+                SessionContext.empty());
         JsonNode input = MAPPER.readTree("{}");
         JsonNode output = compiled.evaluate(input, ctx);
 
@@ -103,7 +111,8 @@ class JsltExpressionEngineTest {
     @Test
     void contextVariableQueryParams() throws Exception {
         CompiledExpression compiled = engine.compile("{\"page\": $queryParams.page}");
-        TransformContext ctx = new TransformContext(null, null, null, Map.of("page", "3"), null);
+        TransformContext ctx =
+                new TransformContext(HttpHeaders.empty(), null, Map.of("page", "3"), null, SessionContext.empty());
         JsonNode input = MAPPER.readTree("{}");
         JsonNode output = compiled.evaluate(input, ctx);
 

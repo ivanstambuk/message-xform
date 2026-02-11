@@ -7,9 +7,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.NullNode;
 import io.messagexform.core.engine.jslt.JsltExpressionEngine;
 import io.messagexform.core.model.Direction;
+import io.messagexform.core.model.HttpHeaders;
 import io.messagexform.core.model.Message;
+import io.messagexform.core.model.SessionContext;
 import io.messagexform.core.model.TransformResult;
 import io.messagexform.core.spec.SpecParser;
+import io.messagexform.core.testkit.TestMessages;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -45,13 +48,15 @@ class PassthroughTest {
         void noSpecs_anyMessage_returnsPassthrough() throws Exception {
             JsonNode body = MAPPER.readTree("{\"key\": \"value\"}");
             Message message = new Message(
-                    body,
-                    Map.of("content-type", "application/json"),
-                    Map.of("content-type", List.of("application/json")),
+                    TestMessages.toBody(body, "application/json"),
+                    TestMessages.toHeaders(
+                            Map.of("content-type", "application/json"),
+                            Map.of("content-type", List.of("application/json"))),
                     200,
-                    "application/json",
                     "/api/users",
-                    "GET");
+                    "GET",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.RESPONSE);
 
@@ -65,7 +70,14 @@ class PassthroughTest {
         @DisplayName("Passthrough result has no message or error")
         void noSpecs_passthroughHasNoMessageOrError() throws Exception {
             JsonNode body = MAPPER.readTree("{\"test\": true}");
-            Message message = new Message(body, null, null, null, null, null, null);
+            Message message = new Message(
+                    TestMessages.toBody(body, null),
+                    HttpHeaders.empty(),
+                    null,
+                    null,
+                    null,
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.REQUEST);
 
@@ -78,7 +90,14 @@ class PassthroughTest {
         @Test
         @DisplayName("Passthrough works for both REQUEST and RESPONSE directions")
         void noSpecs_passthroughWorksBothDirections() throws Exception {
-            Message message = new Message(NullNode.getInstance(), null, null, null, null, null, null);
+            Message message = new Message(
+                    TestMessages.toBody(NullNode.getInstance(), null),
+                    HttpHeaders.empty(),
+                    null,
+                    null,
+                    null,
+                    null,
+                    SessionContext.empty());
 
             TransformResult requestResult = engine.transform(message, Direction.REQUEST);
             TransformResult responseResult = engine.transform(message, Direction.RESPONSE);
@@ -109,7 +128,14 @@ class PassthroughTest {
                     "content-type", List.of("application/json"),
                     "x-request-id", List.of("req-abc-123"));
 
-            Message original = new Message(body, headers, headersAll, 200, "application/json", "/api/users/42", "GET");
+            Message original = new Message(
+                    TestMessages.toBody(body, "application/json"),
+                    TestMessages.toHeaders(headers, headersAll),
+                    200,
+                    "/api/users/42",
+                    "GET",
+                    null,
+                    SessionContext.empty());
 
             // With no specs loaded, any transform should passthrough
             TransformResult result = engine.transform(original, Direction.RESPONSE);
@@ -122,7 +148,14 @@ class PassthroughTest {
         @Test
         @DisplayName("Passthrough with minimal message (null optional fields)")
         void passthrough_worksWithMinimalMessage() throws Exception {
-            Message minimal = new Message(NullNode.getInstance(), null, null, null, null, null, null);
+            Message minimal = new Message(
+                    TestMessages.toBody(NullNode.getInstance(), null),
+                    HttpHeaders.empty(),
+                    null,
+                    null,
+                    null,
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(minimal, Direction.REQUEST);
 

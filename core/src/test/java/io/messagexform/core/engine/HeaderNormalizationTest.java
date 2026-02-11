@@ -6,9 +6,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.messagexform.core.engine.jslt.JsltExpressionEngine;
 import io.messagexform.core.model.Direction;
+import io.messagexform.core.model.HttpHeaders;
 import io.messagexform.core.model.Message;
+import io.messagexform.core.model.SessionContext;
 import io.messagexform.core.model.TransformResult;
 import io.messagexform.core.spec.SpecParser;
+import io.messagexform.core.testkit.TestMessages;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -73,14 +76,26 @@ class HeaderNormalizationTest {
         mixedCaseHeadersAll.put("content-type", List.of("application/json"));
 
         JsonNode body = MAPPER.readTree("{\"data\": \"test\"}");
-        Message message =
-                new Message(body, mixedCaseHeaders, mixedCaseHeadersAll, 200, "application/json", "/api/test", "GET");
+        Message message = new Message(
+                TestMessages.toBody(body, "application/json"),
+                TestMessages.toHeaders(mixedCaseHeaders, mixedCaseHeadersAll),
+                200,
+                "/api/test",
+                "GET",
+                null,
+                SessionContext.empty());
 
         TransformResult result = engine.transform(message, Direction.RESPONSE);
 
         assertThat(result.isSuccess()).isTrue();
-        assertThat(result.message().body().get("requestId").asText()).isEqualTo("req-123");
-        assertThat(result.message().body().get("contentType").asText()).isEqualTo("application/json");
+        assertThat(TestMessages.parseBody(result.message().body())
+                        .get("requestId")
+                        .asText())
+                .isEqualTo("req-123");
+        assertThat(TestMessages.parseBody(result.message().body())
+                        .get("contentType")
+                        .asText())
+                .isEqualTo("application/json");
     }
 
     @Test
@@ -118,12 +133,19 @@ class HeaderNormalizationTest {
         headersAll.put("x-public", List.of("visible"));
 
         JsonNode body = MAPPER.readTree("{\"payload\": \"hello\"}");
-        Message message = new Message(body, headers, headersAll, 200, "application/json", "/api/test", "GET");
+        Message message = new Message(
+                TestMessages.toBody(body, "application/json"),
+                TestMessages.toHeaders(headers, headersAll),
+                200,
+                "/api/test",
+                "GET",
+                null,
+                SessionContext.empty());
 
         TransformResult result = engine.transform(message, Direction.RESPONSE);
 
         assertThat(result.isSuccess()).isTrue();
-        assertThat(result.message().headers())
+        assertThat(result.message().headers().toSingleValueMap())
                 .doesNotContainKey("x-internal-id")
                 .doesNotContainKey("x-internal-trace")
                 .containsEntry("x-public", "visible");
@@ -161,12 +183,19 @@ class HeaderNormalizationTest {
         headersAll.put("x-keep", List.of("untouched"));
 
         JsonNode body = MAPPER.readTree("{\"payload\": \"hello\"}");
-        Message message = new Message(body, headers, headersAll, 200, "application/json", "/api/test", "GET");
+        Message message = new Message(
+                TestMessages.toBody(body, "application/json"),
+                TestMessages.toHeaders(headers, headersAll),
+                200,
+                "/api/test",
+                "GET",
+                null,
+                SessionContext.empty());
 
         TransformResult result = engine.transform(message, Direction.RESPONSE);
 
         assertThat(result.isSuccess()).isTrue();
-        assertThat(result.message().headers())
+        assertThat(result.message().headers().toSingleValueMap())
                 .doesNotContainKey("x-old-name")
                 .containsEntry("x-new-name", "my-value")
                 .containsEntry("x-keep", "untouched");
@@ -196,14 +225,21 @@ class HeaderNormalizationTest {
         engine.loadSpec(specPath);
 
         JsonNode body = MAPPER.readTree("{\"payload\": \"hello\"}");
-        Message message = new Message(body, Map.of(), Map.of(), 200, "application/json", "/api/test", "GET");
+        Message message = new Message(
+                TestMessages.toBody(body, "application/json"),
+                HttpHeaders.empty(),
+                200,
+                "/api/test",
+                "GET",
+                null,
+                SessionContext.empty());
 
         TransformResult result = engine.transform(message, Direction.RESPONSE);
 
         assertThat(result.isSuccess()).isTrue();
         // Header name should be normalized to lowercase in the output
-        assertThat(result.message().headers()).containsEntry("x-added-header", "my-value");
-        assertThat(result.message().headers()).doesNotContainKey("X-Added-Header");
+        assertThat(result.message().headers().toSingleValueMap()).containsEntry("x-added-header", "my-value");
+        assertThat(result.message().headers().toSingleValueMap()).doesNotContainKey("X-Added-Header");
     }
 
     @Test
@@ -240,16 +276,23 @@ class HeaderNormalizationTest {
         headersAll.put("x-untouched", List.of("preserved"));
 
         JsonNode body = MAPPER.readTree("{\"payload\": \"hello\"}");
-        Message message = new Message(body, headers, headersAll, 200, "application/json", "/api/test", "GET");
+        Message message = new Message(
+                TestMessages.toBody(body, "application/json"),
+                TestMessages.toHeaders(headers, headersAll),
+                200,
+                "/api/test",
+                "GET",
+                null,
+                SessionContext.empty());
 
         TransformResult result = engine.transform(message, Direction.RESPONSE);
 
         assertThat(result.isSuccess()).isTrue();
         // All output header names must be lowercase
-        for (String key : result.message().headers().keySet()) {
+        for (String key : result.message().headers().toSingleValueMap().keySet()) {
             assertThat(key).isEqualTo(key.toLowerCase());
         }
-        assertThat(result.message().headers())
+        assertThat(result.message().headers().toSingleValueMap())
                 .containsEntry("x-new", "added")
                 .containsEntry("x-renamed", "renamed-value")
                 .containsEntry("x-untouched", "preserved");

@@ -7,9 +7,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.messagexform.core.error.ProfileResolveException;
 import io.messagexform.core.model.Direction;
+import io.messagexform.core.model.HttpHeaders;
 import io.messagexform.core.model.Message;
+import io.messagexform.core.model.SessionContext;
 import io.messagexform.core.model.TransformResult;
 import io.messagexform.core.spec.SpecParser;
+import io.messagexform.core.testkit.TestMessages;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -79,18 +82,18 @@ class ProfileIntegrationTest {
                                         }
                                         """);
             Message message = new Message(
-                    inputBody,
-                    Map.of("content-type", "application/json"),
-                    Map.of(),
+                    TestMessages.toBody(inputBody, "application/json"),
+                    TestMessages.toHeaders(Map.of("content-type", "application/json"), Map.of()),
                     200,
-                    "application/json",
                     "/api/users",
-                    "POST");
+                    "POST",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.RESPONSE);
 
             assertThat(result.isSuccess()).isTrue();
-            JsonNode body = result.message().body();
+            JsonNode body = TestMessages.parseBody(result.message().body());
             assertThat(body.get("userId").asText()).isEqualTo("u123");
             assertThat(body.get("displayName").asText()).isEqualTo("John Doe");
             assertThat(body.get("contact").get("email").asText()).isEqualTo("john@example.com");
@@ -118,7 +121,13 @@ class ProfileIntegrationTest {
             // Build a message with a different path
             JsonNode inputBody = JSON.readTree("{\"key\": \"value\"}");
             Message message = new Message(
-                    inputBody, Map.of(), Map.of(), 200, "application/json", "/completely/different/path", "GET");
+                    TestMessages.toBody(inputBody, "application/json"),
+                    HttpHeaders.empty(),
+                    200,
+                    "/completely/different/path",
+                    "GET",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.RESPONSE);
 
@@ -147,8 +156,14 @@ class ProfileIntegrationTest {
             engine.loadProfile(profilePath);
 
             JsonNode inputBody = JSON.readTree("{\"key\": \"value\"}");
-            Message message =
-                    new Message(inputBody, Map.of(), Map.of(), null, "application/json", "/api/users", "POST");
+            Message message = new Message(
+                    TestMessages.toBody(inputBody, "application/json"),
+                    HttpHeaders.empty(),
+                    null,
+                    "/api/users",
+                    "POST",
+                    null,
+                    SessionContext.empty());
 
             // Request direction shouldn't match a response-only entry
             TransformResult result = engine.transform(message, Direction.REQUEST);
@@ -195,13 +210,19 @@ class ProfileIntegrationTest {
                                         }
                                         """);
             Message message = new Message(
-                    inputBody, Map.of(), Map.of(), 200, "application/json", "/json/alpha/authenticate", "POST");
+                    TestMessages.toBody(inputBody, "application/json"),
+                    HttpHeaders.empty(),
+                    200,
+                    "/json/alpha/authenticate",
+                    "POST",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.RESPONSE);
 
             assertThat(result.isSuccess()).isTrue();
             // simple-rename produces userId, displayName, contact
-            assertThat(result.message().body().has("userId"))
+            assertThat(TestMessages.parseBody(result.message().body()).has("userId"))
                     .as("the matching entry (simple-rename) should be used")
                     .isTrue();
         }
@@ -251,12 +272,22 @@ class ProfileIntegrationTest {
                                           "is_active": true
                                         }
                                         """);
-            Message message = new Message(inputBody, Map.of(), Map.of(), 200, "application/json", "/any/path", "GET");
+            Message message = new Message(
+                    TestMessages.toBody(inputBody, "application/json"),
+                    HttpHeaders.empty(),
+                    200,
+                    "/any/path",
+                    "GET",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.RESPONSE);
 
             assertThat(result.isSuccess()).isTrue();
-            assertThat(result.message().body().get("userId").asText()).isEqualTo("u123");
+            assertThat(TestMessages.parseBody(result.message().body())
+                            .get("userId")
+                            .asText())
+                    .isEqualTo("u123");
         }
     }
 }

@@ -7,9 +7,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.messagexform.core.engine.jslt.JsltExpressionEngine;
 import io.messagexform.core.error.ExpressionEvalException;
 import io.messagexform.core.model.Direction;
+import io.messagexform.core.model.HttpHeaders;
 import io.messagexform.core.model.Message;
+import io.messagexform.core.model.SessionContext;
 import io.messagexform.core.model.TransformResult;
 import io.messagexform.core.spec.SpecParser;
+import io.messagexform.core.testkit.TestMessages;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -61,7 +64,14 @@ class EvalErrorTest {
         engine.loadSpec(specPath);
 
         JsonNode body = MAPPER.readTree("{\"payload\": \"test\"}");
-        Message message = new Message(body, null, null, 200, "application/json", "/api/broken", "POST");
+        Message message = new Message(
+                TestMessages.toBody(body, "application/json"),
+                HttpHeaders.empty(),
+                200,
+                "/api/broken",
+                "POST",
+                null,
+                SessionContext.empty());
 
         TransformResult result = engine.transform(message, Direction.RESPONSE);
 
@@ -94,16 +104,27 @@ class EvalErrorTest {
         engine.loadSpec(specPath);
 
         JsonNode body = MAPPER.readTree("{\"key\": \"value\"}");
-        Message message = new Message(body, null, null, 200, "application/json", "/api/test", "GET");
+        Message message = new Message(
+                TestMessages.toBody(body, "application/json"),
+                HttpHeaders.empty(),
+                200,
+                "/api/test",
+                "GET",
+                null,
+                SessionContext.empty());
 
         TransformResult result = engine.transform(message, Direction.RESPONSE);
 
         assertThat(result.isError()).isTrue();
         assertThat(result.errorResponse()).isNotNull();
-        assertThat(result.errorResponse().get("type").asText()).isEqualTo(ExpressionEvalException.URN);
-        assertThat(result.errorResponse().get("title").asText()).isEqualTo("Transform Failed");
-        assertThat(result.errorResponse().get("status").asInt()).isEqualTo(502);
-        assertThat(result.errorResponse().get("detail").asText()).contains("JSLT");
+        assertThat(TestMessages.parseBody(result.errorResponse()).get("type").asText())
+                .isEqualTo(ExpressionEvalException.URN);
+        assertThat(TestMessages.parseBody(result.errorResponse()).get("title").asText())
+                .isEqualTo("Transform Failed");
+        assertThat(TestMessages.parseBody(result.errorResponse()).get("status").asInt())
+                .isEqualTo(502);
+        assertThat(TestMessages.parseBody(result.errorResponse()).get("detail").asText())
+                .contains("JSLT");
     }
 
     @Test
@@ -129,12 +150,22 @@ class EvalErrorTest {
         engine.loadSpec(specPath);
 
         JsonNode body = MAPPER.readTree("{\"key\": \"value\"}");
-        Message message = new Message(body, null, null, 200, "application/json", "/json/alpha/authenticate", "POST");
+        Message message = new Message(
+                TestMessages.toBody(body, "application/json"),
+                HttpHeaders.empty(),
+                200,
+                "/json/alpha/authenticate",
+                "POST",
+                null,
+                SessionContext.empty());
 
         TransformResult result = engine.transform(message, Direction.RESPONSE);
 
         assertThat(result.isError()).isTrue();
-        assertThat(result.errorResponse().get("instance").asText()).isEqualTo("/json/alpha/authenticate");
+        assertThat(TestMessages.parseBody(result.errorResponse())
+                        .get("instance")
+                        .asText())
+                .isEqualTo("/json/alpha/authenticate");
     }
 
     @Test
@@ -160,7 +191,14 @@ class EvalErrorTest {
         engine.loadSpec(specPath);
 
         JsonNode body = MAPPER.readTree("{\"secret\": \"should-not-leak\"}");
-        Message message = new Message(body, null, null, 200, "application/json", "/api/secure", "POST");
+        Message message = new Message(
+                TestMessages.toBody(body, "application/json"),
+                HttpHeaders.empty(),
+                200,
+                "/api/secure",
+                "POST",
+                null,
+                SessionContext.empty());
 
         TransformResult result = engine.transform(message, Direction.RESPONSE);
 
@@ -194,7 +232,14 @@ class EvalErrorTest {
         engine.loadSpec(specPath);
 
         JsonNode body = MAPPER.readTree("{}");
-        Message message = new Message(body, null, null, 200, "application/json", "/api/test", "GET");
+        Message message = new Message(
+                TestMessages.toBody(body, "application/json"),
+                HttpHeaders.empty(),
+                200,
+                "/api/test",
+                "GET",
+                null,
+                SessionContext.empty());
 
         TransformResult result = engine.transform(message, Direction.RESPONSE);
 

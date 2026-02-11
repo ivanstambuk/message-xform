@@ -6,11 +6,13 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.messagexform.core.model.Direction;
+import io.messagexform.core.model.HttpHeaders;
 import io.messagexform.core.model.Message;
+import io.messagexform.core.model.SessionContext;
 import io.messagexform.core.model.TransformResult;
 import io.messagexform.core.spec.SpecParser;
+import io.messagexform.core.testkit.TestMessages;
 import java.nio.file.Path;
-import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
@@ -67,7 +69,14 @@ class AtomicReloadTest {
 
     private Message stubMessage(String key, String value) {
         ObjectNode body = MAPPER.createObjectNode().put(key, value);
-        return new Message(body, Map.of(), null, null, "application/json", "/test", "POST", null);
+        return new Message(
+                TestMessages.toBody(body, "application/json"),
+                HttpHeaders.empty(),
+                null,
+                "/test",
+                "POST",
+                null,
+                SessionContext.empty());
     }
 
     // --- Tests ---
@@ -82,7 +91,10 @@ class AtomicReloadTest {
         Message msg = stubMessage("name", "alice");
         TransformResult result1 = engine.transform(msg, Direction.RESPONSE);
         assertThat(result1.isSuccess()).isTrue();
-        assertThat(result1.message().body().get("old_name").asText()).isEqualTo("alice");
+        assertThat(TestMessages.parseBody(result1.message().body())
+                        .get("old_name")
+                        .asText())
+                .isEqualTo("alice");
 
         // Write V2 spec: renames "name" to "new_name"
         Path specV2 = writeSpec("v2.yaml", "swap-test", "2.0.0", "{ \"new_name\": .name }");
@@ -93,8 +105,12 @@ class AtomicReloadTest {
         // After reload, the engine uses the new registry
         TransformResult result2 = engine.transform(msg, Direction.RESPONSE);
         assertThat(result2.isSuccess()).isTrue();
-        assertThat(result2.message().body().get("new_name").asText()).isEqualTo("alice");
-        assertThat(result2.message().body().has("old_name")).isFalse();
+        assertThat(TestMessages.parseBody(result2.message().body())
+                        .get("new_name")
+                        .asText())
+                .isEqualTo("alice");
+        assertThat(TestMessages.parseBody(result2.message().body()).has("old_name"))
+                .isFalse();
     }
 
     @Test
@@ -206,7 +222,7 @@ class AtomicReloadTest {
                     for (int j = 0; j < 50; j++) {
                         TransformResult r = engine.transform(msg, Direction.RESPONSE);
                         assertThat(r.isSuccess()).isTrue();
-                        JsonNode body = r.message().body();
+                        JsonNode body = TestMessages.parseBody(r.message().body());
                         // Must see either v1 or v2, but the result must be consistent
                         String version = body.get("version").asText();
                         assertThat(version).isIn("v1", "v2");

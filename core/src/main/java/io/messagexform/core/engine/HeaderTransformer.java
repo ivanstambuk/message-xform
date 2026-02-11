@@ -2,6 +2,7 @@ package io.messagexform.core.engine;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import io.messagexform.core.model.HeaderSpec;
+import io.messagexform.core.model.HttpHeaders;
 import io.messagexform.core.model.Message;
 import io.messagexform.core.model.TransformContext;
 import io.messagexform.core.spi.CompiledExpression;
@@ -55,10 +56,10 @@ public final class HeaderTransformer {
             return message;
         }
 
-        // Start with mutable copies of the headers
-        Map<String, String> headers = new LinkedHashMap<>(message.headers());
+        // Extract mutable maps from HttpHeaders for modification
+        Map<String, String> headers = new LinkedHashMap<>(message.headers().toSingleValueMap());
         Map<String, List<String>> headersAll = new LinkedHashMap<>();
-        message.headersAll().forEach((k, v) -> headersAll.put(k, new ArrayList<>(v)));
+        message.headers().toMultiValueMap().forEach((k, v) -> headersAll.put(k, new ArrayList<>(v)));
 
         // 1. Remove — glob pattern matching
         if (!headerSpec.remove().isEmpty()) {
@@ -80,15 +81,8 @@ public final class HeaderTransformer {
             applyDynamicAdd(headers, headersAll, headerSpec.dynamicAdd(), transformedBody);
         }
 
-        return new Message(
-                message.body(),
-                headers,
-                headersAll,
-                message.statusCode(),
-                message.contentType(),
-                message.requestPath(),
-                message.requestMethod(),
-                message.queryString());
+        // Build new HttpHeaders from modified multi-value map and return
+        return message.withHeaders(HttpHeaders.ofMulti(headersAll));
     }
 
     // --- Private helpers ---

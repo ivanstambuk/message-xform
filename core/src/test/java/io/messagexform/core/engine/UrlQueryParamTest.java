@@ -6,9 +6,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.messagexform.core.engine.jslt.JsltExpressionEngine;
 import io.messagexform.core.model.Direction;
+import io.messagexform.core.model.HttpHeaders;
 import io.messagexform.core.model.Message;
+import io.messagexform.core.model.SessionContext;
 import io.messagexform.core.model.TransformResult;
 import io.messagexform.core.spec.SpecParser;
+import io.messagexform.core.testkit.TestMessages;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -67,7 +70,14 @@ class UrlQueryParamTest {
             engine.loadSpec(specPath);
 
             JsonNode body = MAPPER.readTree("{\"data\": \"payload\"}");
-            Message message = new Message(body, null, null, null, "application/json", "/api/resource", "POST", null);
+            Message message = new Message(
+                    TestMessages.toBody(body, "application/json"),
+                    HttpHeaders.empty(),
+                    null,
+                    "/api/resource",
+                    "POST",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.REQUEST);
 
@@ -99,8 +109,14 @@ class UrlQueryParamTest {
             engine.loadSpec(specPath);
 
             JsonNode body = MAPPER.readTree("{\"data\": \"payload\"}");
-            Message message =
-                    new Message(body, null, null, null, "application/json", "/api/resource", "POST", "existing=keep");
+            Message message = new Message(
+                    TestMessages.toBody(body, "application/json"),
+                    HttpHeaders.empty(),
+                    null,
+                    "/api/resource",
+                    "POST",
+                    "existing=keep",
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.REQUEST);
 
@@ -142,7 +158,14 @@ class UrlQueryParamTest {
             JsonNode body = MAPPER.readTree("{\"data\": \"payload\"}");
             Map<String, String> headers = new LinkedHashMap<>();
             headers.put("x-correlation-id", "abc-123-def");
-            Message message = new Message(body, headers, null, null, "application/json", "/api/resource", "POST", null);
+            Message message = new Message(
+                    TestMessages.toBody(body, "application/json"),
+                    TestMessages.toHeaders(headers, null),
+                    null,
+                    "/api/resource",
+                    "POST",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.REQUEST);
 
@@ -176,7 +199,14 @@ class UrlQueryParamTest {
             engine.loadSpec(specPath);
 
             JsonNode body = MAPPER.readTree("{\"apiVersion\": \"v2\", \"data\": \"payload\"}");
-            Message message = new Message(body, null, null, null, "application/json", "/api/resource", "POST", null);
+            Message message = new Message(
+                    TestMessages.toBody(body, "application/json"),
+                    HttpHeaders.empty(),
+                    null,
+                    "/api/resource",
+                    "POST",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.REQUEST);
 
@@ -214,14 +244,13 @@ class UrlQueryParamTest {
 
             JsonNode body = MAPPER.readTree("{\"data\": \"payload\"}");
             Message message = new Message(
-                    body,
+                    TestMessages.toBody(body, "application/json"),
+                    HttpHeaders.empty(),
                     null,
-                    null,
-                    null,
-                    "application/json",
                     "/api/resource",
                     "POST",
-                    "_debug=true&_internal=metric&existing=keep");
+                    "_debug=true&_internal=metric&existing=keep",
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.REQUEST);
 
@@ -253,14 +282,13 @@ class UrlQueryParamTest {
 
             JsonNode body = MAPPER.readTree("{\"data\": \"payload\"}");
             Message message = new Message(
-                    body,
+                    TestMessages.toBody(body, "application/json"),
+                    HttpHeaders.empty(),
                     null,
-                    null,
-                    null,
-                    "application/json",
                     "/api/resource",
                     "POST",
-                    "_debug=true&_internal=metric&existing=keep&_trace=on");
+                    "_debug=true&_internal=metric&existing=keep&_trace=on",
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.REQUEST);
 
@@ -292,8 +320,14 @@ class UrlQueryParamTest {
             engine.loadSpec(specPath);
 
             JsonNode body = MAPPER.readTree("{\"data\": \"payload\"}");
-            Message message =
-                    new Message(body, null, null, null, "application/json", "/api/resource", "POST", "foo=bar&baz=qux");
+            Message message = new Message(
+                    TestMessages.toBody(body, "application/json"),
+                    HttpHeaders.empty(),
+                    null,
+                    "/api/resource",
+                    "POST",
+                    "foo=bar&baz=qux",
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.REQUEST);
 
@@ -336,14 +370,13 @@ class UrlQueryParamTest {
             Map<String, String> headers = new LinkedHashMap<>();
             headers.put("x-correlation-id", "req-456");
             Message message = new Message(
-                    body,
-                    headers,
+                    TestMessages.toBody(body, "application/json"),
+                    TestMessages.toHeaders(headers, null),
                     null,
-                    null,
-                    "application/json",
                     "/api/resource",
                     "POST",
-                    "_debug=true&_internal=metric&existing=keep");
+                    "_debug=true&_internal=metric&existing=keep",
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.REQUEST);
 
@@ -390,7 +423,14 @@ class UrlQueryParamTest {
             engine.loadSpec(specPath);
 
             JsonNode body = MAPPER.readTree("{\"searchTerm\": \"hello world\"}");
-            Message message = new Message(body, null, null, null, "application/json", "/api/search", "GET", null);
+            Message message = new Message(
+                    TestMessages.toBody(body, "application/json"),
+                    HttpHeaders.empty(),
+                    null,
+                    "/api/search",
+                    "GET",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.REQUEST);
 
@@ -429,7 +469,14 @@ class UrlQueryParamTest {
             engine.loadSpec(specPath);
 
             JsonNode body = MAPPER.readTree("{\"data\": \"payload\"}");
-            Message message = new Message(body, null, null, null, "application/json", "/api/resource", "POST", null);
+            Message message = new Message(
+                    TestMessages.toBody(body, "application/json"),
+                    HttpHeaders.empty(),
+                    null,
+                    "/api/resource",
+                    "POST",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.REQUEST);
 

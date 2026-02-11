@@ -5,11 +5,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.messagexform.core.model.Direction;
+import io.messagexform.core.model.HttpHeaders;
 import io.messagexform.core.model.Message;
+import io.messagexform.core.model.SessionContext;
 import io.messagexform.core.model.TransformResult;
 import io.messagexform.core.spec.SpecParser;
 import io.messagexform.core.spi.TelemetryListener;
 import io.messagexform.core.spi.TelemetryListener.*;
+import io.messagexform.core.testkit.TestMessages;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -83,7 +86,14 @@ class TelemetryListenerTest {
         engine.loadProfile(profilePath);
 
         JsonNode body = JSON.readTree("{\"data\": 1}");
-        Message msg = new Message(body, Map.of(), Map.of(), 200, "application/json", "/api/test", "GET");
+        Message msg = new Message(
+                TestMessages.toBody(body, "application/json"),
+                HttpHeaders.empty(),
+                200,
+                "/api/test",
+                "GET",
+                null,
+                SessionContext.empty());
         TransformResult result = engine.transform(msg, Direction.RESPONSE);
 
         assertThat(result.isSuccess()).isTrue();
@@ -148,7 +158,14 @@ class TelemetryListenerTest {
         engine.loadProfile(profilePath);
 
         JsonNode body = JSON.readTree("{\"data\": 1}");
-        Message msg = new Message(body, Map.of(), Map.of(), 200, "application/json", "/api/fail", "POST");
+        Message msg = new Message(
+                TestMessages.toBody(body, "application/json"),
+                HttpHeaders.empty(),
+                200,
+                "/api/fail",
+                "POST",
+                null,
+                SessionContext.empty());
         TransformResult result = engine.transform(msg, Direction.RESPONSE);
 
         assertThat(result.isError()).isTrue();
@@ -259,13 +276,15 @@ class TelemetryListenerTest {
 
         JsonNode body = JSON.readTree("{\"password\": \"super-secret-123\"}");
         Message msg = new Message(
-                body,
-                Map.of("authorization", "Bearer token-xyz"),
-                Map.of("authorization", List.of("Bearer token-xyz")),
+                TestMessages.toBody(body, "application/json"),
+                TestMessages.toHeaders(
+                        Map.of("authorization", "Bearer token-xyz"),
+                        Map.of("authorization", List.of("Bearer token-xyz"))),
                 200,
-                "application/json",
                 "/api/safe",
-                "GET");
+                "GET",
+                null,
+                SessionContext.empty());
         engine.transform(msg, Direction.RESPONSE);
 
         // Verify no event toString() contains body or header content

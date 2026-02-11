@@ -175,10 +175,10 @@ public final class ProxyHandler implements Handler {
                     forwardMethod = transformed.requestMethod();
                     forwardPath = buildForwardPath(transformed.requestPath(), transformed.queryString());
                     forwardBody =
-                            transformed.body() != null && !transformed.body().isNull()
-                                    ? transformed.body().toString()
+                            transformed.body() != null && !transformed.body().isEmpty()
+                                    ? transformed.body().asString()
                                     : null;
-                    forwardHeaders = transformed.headers();
+                    forwardHeaders = transformed.headers().toSingleValueMap();
                 }
                 case PASSTHROUGH -> {
                     // Forward the raw request unmodified — no JSON parse round-trip
@@ -186,7 +186,7 @@ public final class ProxyHandler implements Handler {
                     forwardPath = buildForwardPath(ctx.path(), ctx.queryString());
                     forwardBody = ctx.body();
                     // Use already-constructed requestMessage headers (avoids re-parsing body)
-                    forwardHeaders = requestMessage.headers();
+                    forwardHeaders = requestMessage.headers().toSingleValueMap();
                 }
                 case ERROR -> {
                     // Return error to client immediately — do NOT forward to backend
@@ -305,7 +305,7 @@ public final class ProxyHandler implements Handler {
     private static void writeErrorResponse(Context ctx, TransformResult result) {
         ctx.status(result.errorStatusCode());
         ctx.contentType("application/problem+json");
-        ctx.result(result.errorResponse().toString());
+        ctx.result(result.errorResponse().asString());
 
         LOG.warn("Transform error: status={}, body={}", result.errorStatusCode(), result.errorResponse());
     }

@@ -6,6 +6,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.NullNode;
 import io.messagexform.core.model.Message;
+import io.messagexform.core.model.SessionContext;
+import io.messagexform.core.testkit.TestMessages;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -70,14 +72,15 @@ class GatewayAdapterSpiTest {
             JsonNode body = parseBody(nativeRequest.bodyJson);
             Map<String, String> firstHeaders = firstValue(nativeRequest.headers);
             return new Message(
-                    body.deepCopy(),
-                    firstHeaders,
-                    deepCopyHeaders(nativeRequest.headers),
-                    null, // no status for requests
-                    nativeRequest.contentType,
+                    TestMessages.toBody(
+                            body.deepCopy(), // no status for requests
+                            nativeRequest.contentType),
+                    TestMessages.toHeaders(firstHeaders, deepCopyHeaders(nativeRequest.headers)),
+                    null,
                     nativeRequest.path,
                     nativeRequest.method,
-                    nativeRequest.queryString);
+                    nativeRequest.queryString,
+                    SessionContext.empty());
         }
 
         @Override
@@ -85,22 +88,23 @@ class GatewayAdapterSpiTest {
             JsonNode body = parseBody(nativeResponse.bodyJson);
             Map<String, String> firstHeaders = firstValue(nativeResponse.headers);
             return new Message(
-                    body.deepCopy(),
-                    firstHeaders,
-                    deepCopyHeaders(nativeResponse.headers),
+                    TestMessages.toBody(body.deepCopy(), nativeResponse.contentType),
+                    TestMessages.toHeaders(firstHeaders, deepCopyHeaders(nativeResponse.headers)),
                     nativeResponse.statusCode,
-                    nativeResponse.contentType,
                     nativeResponse.path,
-                    nativeResponse.method);
+                    nativeResponse.method,
+                    null,
+                    SessionContext.empty());
         }
 
         @Override
         public void applyChanges(Message transformedMessage, MockNativeExchange nativeTarget) {
-            nativeTarget.bodyJson = transformedMessage.body().toString();
+            nativeTarget.bodyJson =
+                    TestMessages.parseBody(transformedMessage.body()).toString();
             nativeTarget.statusCode = transformedMessage.statusCode();
             // Write back headers
             nativeTarget.headers.clear();
-            transformedMessage.headersAll().forEach((name, values) -> {
+            transformedMessage.headers().toMultiValueMap().forEach((name, values) -> {
                 nativeTarget.headers.put(name, new ArrayList<>(values));
             });
             // Write back URL fields
@@ -160,8 +164,8 @@ class GatewayAdapterSpiTest {
 
         Message msg = adapter.wrapRequest(exchange);
 
-        assertThat(msg.body().get("userId").asInt()).isEqualTo(42);
-        assertThat(msg.headers()).containsEntry("x-request-id", "abc-123");
+        assertThat(TestMessages.parseBody(msg.body()).get("userId").asInt()).isEqualTo(42);
+        assertThat(msg.headers().toSingleValueMap()).containsEntry("x-request-id", "abc-123");
         assertThat(msg.statusCode()).isNull();
         assertThat(msg.requestPath()).isEqualTo("/api/v1/users");
         assertThat(msg.requestMethod()).isEqualTo("POST");
@@ -179,11 +183,11 @@ class GatewayAdapterSpiTest {
 
         Message msg = adapter.wrapResponse(exchange);
 
-        assertThat(msg.body().get("status").asText()).isEqualTo("ok");
+        assertThat(TestMessages.parseBody(msg.body()).get("status").asText()).isEqualTo("ok");
         assertThat(msg.statusCode()).isEqualTo(200);
         assertThat(msg.requestPath()).isEqualTo("/api/v1/users");
         assertThat(msg.requestMethod()).isEqualTo("GET");
-        assertThat(msg.headersAll().get("set-cookie")).containsExactly("a=1", "b=2");
+        assertThat(msg.headers().toMultiValueMap().get("set-cookie")).containsExactly("a=1", "b=2");
     }
 
     @Test
@@ -195,7 +199,7 @@ class GatewayAdapterSpiTest {
         Message msg = adapter.wrapRequest(exchange);
 
         // Mutate the Message body — native should be unaffected (ADR-0013 copy-on-wrap)
-        ((com.fasterxml.jackson.databind.node.ObjectNode) msg.body()).put("name", "mutated");
+        ((com.fasterxml.jackson.databind.node.ObjectNode) TestMessages.parseBody(msg.body())).put("name", "mutated");
 
         // Re-parse the native body to verify independence
         JsonNode nativeBody = parseJson(exchange.bodyJson);
@@ -220,7 +224,13 @@ class GatewayAdapterSpiTest {
         var newHeaders = Map.of("x-new", "added");
         var newHeadersAll = Map.of("x-new", List.of("added"));
         Message transformed = new Message(
-                transformedBody, newHeaders, newHeadersAll, 201, "application/json", "/new/path", "PUT", "format=json");
+                TestMessages.toBody(transformedBody, "application/json"),
+                TestMessages.toHeaders(newHeaders, newHeadersAll),
+                201,
+                "/new/path",
+                "PUT",
+                "format=json",
+                SessionContext.empty());
 
         adapter.applyChanges(transformed, nativeExchange);
 

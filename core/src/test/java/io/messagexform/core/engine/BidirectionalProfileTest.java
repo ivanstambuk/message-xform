@@ -5,13 +5,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.messagexform.core.model.Direction;
+import io.messagexform.core.model.HttpHeaders;
 import io.messagexform.core.model.Message;
+import io.messagexform.core.model.SessionContext;
 import io.messagexform.core.model.TransformResult;
 import io.messagexform.core.spec.SpecParser;
+import io.messagexform.core.testkit.TestMessages;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -70,12 +72,19 @@ class BidirectionalProfileTest {
                   "is_active": true
                 }
                 """);
-        Message message = new Message(inputBody, Map.of(), Map.of(), 200, "application/json", "/api/users", "GET");
+        Message message = new Message(
+                TestMessages.toBody(inputBody, "application/json"),
+                HttpHeaders.empty(),
+                200,
+                "/api/users",
+                "GET",
+                null,
+                SessionContext.empty());
 
         TransformResult result = engine.transform(message, Direction.RESPONSE);
 
         assertThat(result.isSuccess()).isTrue();
-        JsonNode body = result.message().body();
+        JsonNode body = TestMessages.parseBody(result.message().body());
         // forward.expr: snake_case → camelCase with nested contact
         assertThat(body.get("userId").asText()).isEqualTo("u456");
         assertThat(body.get("contact").get("email").asText()).isEqualTo("jane@example.com");
@@ -113,12 +122,19 @@ class BidirectionalProfileTest {
                   "active": true
                 }
                 """);
-        Message message = new Message(inputBody, Map.of(), Map.of(), null, "application/json", "/api/users", "POST");
+        Message message = new Message(
+                TestMessages.toBody(inputBody, "application/json"),
+                HttpHeaders.empty(),
+                null,
+                "/api/users",
+                "POST",
+                null,
+                SessionContext.empty());
 
         TransformResult result = engine.transform(message, Direction.REQUEST);
 
         assertThat(result.isSuccess()).isTrue();
-        JsonNode body = result.message().body();
+        JsonNode body = TestMessages.parseBody(result.message().body());
         // reverse.expr: camelCase nested → snake_case flat
         assertThat(body.get("user_id").asText()).isEqualTo("u456");
         assertThat(body.get("email_address").asText()).isEqualTo("jane@example.com");
@@ -160,19 +176,33 @@ class BidirectionalProfileTest {
                 """);
 
         // Step 1: Forward (response direction) — DB → API
-        Message responseMsg = new Message(original, Map.of(), Map.of(), 200, "application/json", "/api/users", "GET");
+        Message responseMsg = new Message(
+                TestMessages.toBody(original, "application/json"),
+                HttpHeaders.empty(),
+                200,
+                "/api/users",
+                "GET",
+                null,
+                SessionContext.empty());
         TransformResult forwardResult = engine.transform(responseMsg, Direction.RESPONSE);
 
         assertThat(forwardResult.isSuccess()).isTrue();
-        JsonNode apiFormat = forwardResult.message().body();
+        JsonNode apiFormat = TestMessages.parseBody(forwardResult.message().body());
         assertThat(apiFormat.get("userId").asText()).isEqualTo("u789");
 
         // Step 2: Reverse (request direction) — API → DB
-        Message requestMsg = new Message(apiFormat, Map.of(), Map.of(), null, "application/json", "/api/users", "POST");
+        Message requestMsg = new Message(
+                TestMessages.toBody(apiFormat, "application/json"),
+                HttpHeaders.empty(),
+                null,
+                "/api/users",
+                "POST",
+                null,
+                SessionContext.empty());
         TransformResult reverseResult = engine.transform(requestMsg, Direction.REQUEST);
 
         assertThat(reverseResult.isSuccess()).isTrue();
-        JsonNode roundTripped = reverseResult.message().body();
+        JsonNode roundTripped = TestMessages.parseBody(reverseResult.message().body());
 
         // Round-trip should recover the original fields
         assertThat(roundTripped.get("user_id").asText()).isEqualTo("u789");

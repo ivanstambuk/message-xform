@@ -8,9 +8,12 @@ import ch.qos.logback.core.read.ListAppender;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.messagexform.core.model.Direction;
+import io.messagexform.core.model.HttpHeaders;
 import io.messagexform.core.model.Message;
+import io.messagexform.core.model.SessionContext;
 import io.messagexform.core.model.TransformResult;
 import io.messagexform.core.spec.SpecParser;
+import io.messagexform.core.testkit.TestMessages;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -99,13 +102,13 @@ class TraceContextTest {
 
         JsonNode body = JSON.readTree("{\"data\": 1}");
         Message msg = new Message(
-                body,
-                Map.of("x-request-id", "abc-123"),
-                Map.of("x-request-id", List.of("abc-123")),
+                TestMessages.toBody(body, "application/json"),
+                TestMessages.toHeaders(Map.of("x-request-id", "abc-123"), Map.of("x-request-id", List.of("abc-123"))),
                 200,
-                "application/json",
                 "/api/trace",
-                "GET");
+                "GET",
+                null,
+                SessionContext.empty());
 
         TransformResult result = engine.transform(msg, Direction.RESPONSE);
         assertThat(result.isSuccess()).isTrue();
@@ -156,13 +159,13 @@ class TraceContextTest {
         String traceparent = "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01";
         JsonNode body = JSON.readTree("{\"data\": 1}");
         Message msg = new Message(
-                body,
-                Map.of("traceparent", traceparent),
-                Map.of("traceparent", List.of(traceparent)),
+                TestMessages.toBody(body, "application/json"),
+                TestMessages.toHeaders(Map.of("traceparent", traceparent), Map.of("traceparent", List.of(traceparent))),
                 200,
-                "application/json",
                 "/api/tp",
-                "GET");
+                "GET",
+                null,
+                SessionContext.empty());
 
         TransformResult result = engine.transform(msg, Direction.RESPONSE);
         assertThat(result.isSuccess()).isTrue();
@@ -209,7 +212,14 @@ class TraceContextTest {
         engine.loadProfile(profilePath);
 
         JsonNode body = JSON.readTree("{\"data\": 1}");
-        Message msg = new Message(body, Map.of(), Map.of(), 200, "application/json", "/api/no-trace", "GET");
+        Message msg = new Message(
+                TestMessages.toBody(body, "application/json"),
+                HttpHeaders.empty(),
+                200,
+                "/api/no-trace",
+                "GET",
+                null,
+                SessionContext.empty());
 
         TransformResult result = engine.transform(msg, Direction.RESPONSE);
         assertThat(result.isSuccess()).isTrue();
@@ -259,13 +269,14 @@ class TraceContextTest {
 
         JsonNode body = JSON.readTree("{\"data\": 1}");
         Message msg = new Message(
-                body,
-                Map.of("x-request-id", "cleanup-test"),
-                Map.of("x-request-id", List.of("cleanup-test")),
+                TestMessages.toBody(body, "application/json"),
+                TestMessages.toHeaders(
+                        Map.of("x-request-id", "cleanup-test"), Map.of("x-request-id", List.of("cleanup-test"))),
                 200,
-                "application/json",
                 "/api/cleanup",
-                "GET");
+                "GET",
+                null,
+                SessionContext.empty());
 
         engine.transform(msg, Direction.RESPONSE);
 

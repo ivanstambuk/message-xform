@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.NullNode;
+import io.messagexform.core.testkit.TestMessages;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -20,12 +21,19 @@ class MessageTest {
         var headers = Map.of("content-type", "application/json", "x-request-id", "abc-123");
         var headersAll = Map.of("accept", List.of("application/json", "text/html"));
 
-        var msg = new Message(body, headers, headersAll, 200, "application/json", "/api/v1/users", "POST");
+        var msg = new Message(
+                TestMessages.toBody(body, "application/json"),
+                TestMessages.toHeaders(headers, headersAll),
+                200,
+                "/api/v1/users",
+                "POST",
+                null,
+                SessionContext.empty());
 
-        assertThat(msg.body().get("key").asText()).isEqualTo("value");
-        assertThat(msg.headers()).containsEntry("content-type", "application/json");
-        assertThat(msg.headers()).containsEntry("x-request-id", "abc-123");
-        assertThat(msg.headersAll().get("accept")).containsExactly("application/json", "text/html");
+        assertThat(TestMessages.parseBody(msg.body()).get("key").asText()).isEqualTo("value");
+        assertThat(msg.headers().toSingleValueMap()).containsEntry("content-type", "application/json");
+        assertThat(msg.headers().toSingleValueMap()).containsEntry("x-request-id", "abc-123");
+        assertThat(msg.headers().toMultiValueMap().get("accept")).containsExactly("application/json", "text/html");
         assertThat(msg.statusCode()).isEqualTo(200);
         assertThat(msg.contentType()).isEqualTo("application/json");
         assertThat(msg.requestPath()).isEqualTo("/api/v1/users");
@@ -34,41 +42,70 @@ class MessageTest {
 
     @Test
     void nullBodyThrowsNullPointerException() {
-        assertThatThrownBy(() -> new Message(null, null, null, null, null, null, null))
+        assertThatThrownBy(() -> new Message(null, HttpHeaders.empty(), null, null, null, null, SessionContext.empty()))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessageContaining("body must not be null");
     }
 
     @Test
     void nullHeadersDefaultToEmptyMaps() {
-        var msg = new Message(NullNode.getInstance(), null, null, null, null, null, null);
+        var msg = new Message(
+                TestMessages.toBody(NullNode.getInstance(), null),
+                HttpHeaders.empty(),
+                null,
+                null,
+                null,
+                null,
+                SessionContext.empty());
 
-        assertThat(msg.headers()).isEmpty();
-        assertThat(msg.headersAll()).isEmpty();
+        assertThat(msg.headers().toSingleValueMap()).isEmpty();
+        assertThat(msg.headers().toMultiValueMap()).isEmpty();
     }
 
     @Test
     void headersAreUnmodifiable() {
         var headers = new java.util.HashMap<String, String>();
         headers.put("x-test", "value");
-        var msg = new Message(NullNode.getInstance(), headers, null, null, null, null, null);
+        var msg = new Message(
+                TestMessages.toBody(NullNode.getInstance(), null),
+                TestMessages.toHeaders(headers, null),
+                null,
+                null,
+                null,
+                null,
+                SessionContext.empty());
 
-        assertThatThrownBy(() -> msg.headers().put("x-new", "val")).isInstanceOf(UnsupportedOperationException.class);
+        assertThatThrownBy(() -> msg.headers().toSingleValueMap().put("x-new", "val"))
+                .isInstanceOf(UnsupportedOperationException.class);
     }
 
     @Test
     void headersAllAreUnmodifiable() {
         var headersAll = new java.util.HashMap<String, List<String>>();
         headersAll.put("accept", List.of("text/html"));
-        var msg = new Message(NullNode.getInstance(), null, headersAll, null, null, null, null);
+        var msg = new Message(
+                TestMessages.toBody(NullNode.getInstance(), null),
+                TestMessages.toHeaders(null, headersAll),
+                null,
+                null,
+                null,
+                null,
+                SessionContext.empty());
 
-        assertThatThrownBy(() -> msg.headersAll().put("x-new", List.of("val")))
+        assertThatThrownBy(() -> msg.headers().toMultiValueMap().put("x-new", List.of("val")))
                 .isInstanceOf(UnsupportedOperationException.class);
     }
 
     @Test
     void statusCodeAndPathCanBeNull() {
-        var msg = new Message(NullNode.getInstance(), null, null, null, null, null, null);
+        var msg = new Message(
+                TestMessages.toBody(NullNode.getInstance(), null),
+                HttpHeaders.empty(),
+                null,
+                null,
+                null,
+                null,
+                SessionContext.empty());
 
         assertThat(msg.statusCode()).isNull();
         assertThat(msg.requestPath()).isNull();

@@ -6,9 +6,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.messagexform.core.engine.jslt.JsltExpressionEngine;
 import io.messagexform.core.model.Direction;
+import io.messagexform.core.model.HttpHeaders;
 import io.messagexform.core.model.Message;
+import io.messagexform.core.model.SessionContext;
 import io.messagexform.core.model.TransformResult;
 import io.messagexform.core.spec.SpecParser;
+import io.messagexform.core.testkit.TestMessages;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -68,12 +71,19 @@ class HeaderTransformTest {
             engine.loadSpec(specPath);
 
             JsonNode body = MAPPER.readTree("{\"payload\": \"hello\"}");
-            Message message = new Message(body, Map.of(), Map.of(), 200, "application/json", "/api/test", "POST");
+            Message message = new Message(
+                    TestMessages.toBody(body, "application/json"),
+                    HttpHeaders.empty(),
+                    200,
+                    "/api/test",
+                    "POST",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.RESPONSE);
 
             assertThat(result.isSuccess()).isTrue();
-            assertThat(result.message().headers())
+            assertThat(result.message().headers().toSingleValueMap())
                     .containsEntry("x-transformed-by", "message-xform")
                     .containsEntry("x-spec-version", "1.0.0");
         }
@@ -103,18 +113,20 @@ class HeaderTransformTest {
 
             JsonNode body = MAPPER.readTree("{\"payload\": \"hello\"}");
             Message message = new Message(
-                    body,
-                    Map.of("x-existing", "keep-me", "content-type", "application/json"),
-                    Map.of("x-existing", List.of("keep-me"), "content-type", List.of("application/json")),
+                    TestMessages.toBody(body, "application/json"),
+                    TestMessages.toHeaders(
+                            Map.of("x-existing", "keep-me", "content-type", "application/json"),
+                            Map.of("x-existing", List.of("keep-me"), "content-type", List.of("application/json"))),
                     200,
-                    "application/json",
                     "/api/test",
-                    "GET");
+                    "GET",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.RESPONSE);
 
             assertThat(result.isSuccess()).isTrue();
-            assertThat(result.message().headers())
+            assertThat(result.message().headers().toSingleValueMap())
                     .containsEntry("x-existing", "keep-me")
                     .containsEntry("x-new-header", "added");
         }
@@ -150,28 +162,30 @@ class HeaderTransformTest {
 
             JsonNode body = MAPPER.readTree("{\"payload\": \"hello\"}");
             Message message = new Message(
-                    body,
-                    Map.of(
-                            "x-internal-id", "999",
-                            "x-internal-trace", "abc",
-                            "x-debug-info", "verbose",
-                            "x-request-id", "keep-this",
-                            "content-type", "application/json"),
-                    Map.of(
-                            "x-internal-id", List.of("999"),
-                            "x-internal-trace", List.of("abc"),
-                            "x-debug-info", List.of("verbose"),
-                            "x-request-id", List.of("keep-this"),
-                            "content-type", List.of("application/json")),
+                    TestMessages.toBody(body, "application/json"),
+                    TestMessages.toHeaders(
+                            Map.of(
+                                    "x-internal-id", "999",
+                                    "x-internal-trace", "abc",
+                                    "x-debug-info", "verbose",
+                                    "x-request-id", "keep-this",
+                                    "content-type", "application/json"),
+                            Map.of(
+                                    "x-internal-id", List.of("999"),
+                                    "x-internal-trace", List.of("abc"),
+                                    "x-debug-info", List.of("verbose"),
+                                    "x-request-id", List.of("keep-this"),
+                                    "content-type", List.of("application/json"))),
                     200,
-                    "application/json",
                     "/api/test",
-                    "GET");
+                    "GET",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.RESPONSE);
 
             assertThat(result.isSuccess()).isTrue();
-            assertThat(result.message().headers())
+            assertThat(result.message().headers().toSingleValueMap())
                     .doesNotContainKey("x-internal-id")
                     .doesNotContainKey("x-internal-trace")
                     .doesNotContainKey("x-debug-info")
@@ -204,18 +218,22 @@ class HeaderTransformTest {
 
             JsonNode body = MAPPER.readTree("{\"payload\": \"hello\"}");
             Message message = new Message(
-                    body,
-                    Map.of("x-secret", "classified", "x-public", "visible"),
-                    Map.of("x-secret", List.of("classified"), "x-public", List.of("visible")),
+                    TestMessages.toBody(body, "application/json"),
+                    TestMessages.toHeaders(
+                            Map.of("x-secret", "classified", "x-public", "visible"),
+                            Map.of("x-secret", List.of("classified"), "x-public", List.of("visible"))),
                     200,
-                    "application/json",
                     "/api/test",
-                    "GET");
+                    "GET",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.RESPONSE);
 
             assertThat(result.isSuccess()).isTrue();
-            assertThat(result.message().headers()).doesNotContainKey("x-secret").containsEntry("x-public", "visible");
+            assertThat(result.message().headers().toSingleValueMap())
+                    .doesNotContainKey("x-secret")
+                    .containsEntry("x-public", "visible");
         }
     }
 
@@ -248,18 +266,20 @@ class HeaderTransformTest {
 
             JsonNode body = MAPPER.readTree("{\"payload\": \"hello\"}");
             Message message = new Message(
-                    body,
-                    Map.of("x-old-header", "my-value", "x-other", "unchanged"),
-                    Map.of("x-old-header", List.of("my-value"), "x-other", List.of("unchanged")),
+                    TestMessages.toBody(body, "application/json"),
+                    TestMessages.toHeaders(
+                            Map.of("x-old-header", "my-value", "x-other", "unchanged"),
+                            Map.of("x-old-header", List.of("my-value"), "x-other", List.of("unchanged"))),
                     200,
-                    "application/json",
                     "/api/test",
-                    "GET");
+                    "GET",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.RESPONSE);
 
             assertThat(result.isSuccess()).isTrue();
-            assertThat(result.message().headers())
+            assertThat(result.message().headers().toSingleValueMap())
                     .doesNotContainKey("x-old-header")
                     .containsEntry("x-new-header", "my-value")
                     .containsEntry("x-other", "unchanged");
@@ -290,18 +310,18 @@ class HeaderTransformTest {
 
             JsonNode body = MAPPER.readTree("{\"payload\": \"hello\"}");
             Message message = new Message(
-                    body,
-                    Map.of("x-existing", "val"),
-                    Map.of("x-existing", List.of("val")),
+                    TestMessages.toBody(body, "application/json"),
+                    TestMessages.toHeaders(Map.of("x-existing", "val"), Map.of("x-existing", List.of("val"))),
                     200,
-                    "application/json",
                     "/api/test",
-                    "GET");
+                    "GET",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.RESPONSE);
 
             assertThat(result.isSuccess()).isTrue();
-            assertThat(result.message().headers())
+            assertThat(result.message().headers().toSingleValueMap())
                     .doesNotContainKey("x-missing")
                     .doesNotContainKey("x-target")
                     .containsEntry("x-existing", "val");
@@ -345,24 +365,26 @@ class HeaderTransformTest {
 
             JsonNode body = MAPPER.readTree("{\"payload\": \"hello\"}");
             Message message = new Message(
-                    body,
-                    Map.of(
-                            "x-internal-id", "999",
-                            "x-old", "legacy-value",
-                            "x-keep", "preserved"),
-                    Map.of(
-                            "x-internal-id", List.of("999"),
-                            "x-old", List.of("legacy-value"),
-                            "x-keep", List.of("preserved")),
+                    TestMessages.toBody(body, "application/json"),
+                    TestMessages.toHeaders(
+                            Map.of(
+                                    "x-internal-id", "999",
+                                    "x-old", "legacy-value",
+                                    "x-keep", "preserved"),
+                            Map.of(
+                                    "x-internal-id", List.of("999"),
+                                    "x-old", List.of("legacy-value"),
+                                    "x-keep", List.of("preserved"))),
                     200,
-                    "application/json",
                     "/api/test",
-                    "POST");
+                    "POST",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.RESPONSE);
 
             assertThat(result.isSuccess()).isTrue();
-            Map<String, String> headers = result.message().headers();
+            var headers = result.message().headers().toSingleValueMap();
             // removed
             assertThat(headers).doesNotContainKey("x-internal-id");
             // renamed
@@ -399,18 +421,18 @@ class HeaderTransformTest {
 
             JsonNode body = MAPPER.readTree("{\"payload\": \"hello\"}");
             Message message = new Message(
-                    body,
-                    Map.of("x-version", "1.0"),
-                    Map.of("x-version", List.of("1.0")),
+                    TestMessages.toBody(body, "application/json"),
+                    TestMessages.toHeaders(Map.of("x-version", "1.0"), Map.of("x-version", List.of("1.0"))),
                     200,
-                    "application/json",
                     "/api/test",
-                    "GET");
+                    "GET",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.RESPONSE);
 
             assertThat(result.isSuccess()).isTrue();
-            assertThat(result.message().headers()).containsEntry("x-version", "2.0");
+            assertThat(result.message().headers().toSingleValueMap()).containsEntry("x-version", "2.0");
         }
     }
 
@@ -440,18 +462,18 @@ class HeaderTransformTest {
 
             JsonNode body = MAPPER.readTree("{\"payload\": \"hello\"}");
             Message message = new Message(
-                    body,
-                    Map.of("x-existing", "keep"),
-                    Map.of("x-existing", List.of("keep")),
+                    TestMessages.toBody(body, "application/json"),
+                    TestMessages.toHeaders(Map.of("x-existing", "keep"), Map.of("x-existing", List.of("keep"))),
                     200,
-                    "application/json",
                     "/api/test",
-                    "GET");
+                    "GET",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.RESPONSE);
 
             assertThat(result.isSuccess()).isTrue();
-            assertThat(result.message().headers()).containsEntry("x-existing", "keep");
+            assertThat(result.message().headers().toSingleValueMap()).containsEntry("x-existing", "keep");
         }
     }
 

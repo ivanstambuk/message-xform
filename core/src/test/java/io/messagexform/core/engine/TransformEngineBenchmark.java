@@ -6,9 +6,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.messagexform.core.engine.jslt.JsltExpressionEngine;
 import io.messagexform.core.model.Direction;
+import io.messagexform.core.model.HttpHeaders;
 import io.messagexform.core.model.Message;
+import io.messagexform.core.model.SessionContext;
 import io.messagexform.core.model.TransformResult;
 import io.messagexform.core.spec.SpecParser;
+import io.messagexform.core.testkit.TestMessages;
 import java.nio.file.Path;
 import java.util.Arrays;
 import org.junit.jupiter.api.BeforeAll;
@@ -91,7 +94,14 @@ class TransformEngineBenchmark {
 
         // Sanity check — transform works
         JsonNode sanityBody = MAPPER.readTree(body1KB);
-        Message sanityInput = new Message(sanityBody, null, null, 200, "application/json", "/bench", "GET");
+        Message sanityInput = new Message(
+                TestMessages.toBody(sanityBody, "application/json"),
+                HttpHeaders.empty(),
+                200,
+                "/bench",
+                "GET",
+                null,
+                SessionContext.empty());
         TransformResult sanity = engine.transform(sanityInput, Direction.RESPONSE);
         assertTransformSuccess(sanity, "identity-sanity");
 
@@ -142,7 +152,14 @@ class TransformEngineBenchmark {
         for (int i = 0; i < WARMUP_ITERATIONS; i++) {
             // Re-parse body each iteration to avoid JIT optimizing away the work
             JsonNode freshBody = MAPPER.readTree(bodyJson);
-            Message freshInput = new Message(freshBody, null, null, 200, "application/json", "/bench", "GET");
+            Message freshInput = new Message(
+                    TestMessages.toBody(freshBody, "application/json"),
+                    HttpHeaders.empty(),
+                    200,
+                    "/bench",
+                    "GET",
+                    null,
+                    SessionContext.empty());
             TransformResult result = engine.transform(freshInput, Direction.RESPONSE);
             if (!result.isSuccess()) {
                 throw new AssertionError("Transform failed during warmup at iteration " + i);
@@ -155,7 +172,14 @@ class TransformEngineBenchmark {
 
         for (int i = 0; i < MEASURED_ITERATIONS; i++) {
             JsonNode freshBody = MAPPER.readTree(bodyJson);
-            Message freshInput = new Message(freshBody, null, null, 200, "application/json", "/bench", "GET");
+            Message freshInput = new Message(
+                    TestMessages.toBody(freshBody, "application/json"),
+                    HttpHeaders.empty(),
+                    200,
+                    "/bench",
+                    "GET",
+                    null,
+                    SessionContext.empty());
 
             long startNs = System.nanoTime();
             TransformResult result = engine.transform(freshInput, Direction.RESPONSE);

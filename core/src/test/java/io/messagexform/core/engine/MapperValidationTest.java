@@ -8,9 +8,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.messagexform.core.engine.jslt.JsltExpressionEngine;
 import io.messagexform.core.error.SpecParseException;
 import io.messagexform.core.model.Direction;
+import io.messagexform.core.model.HttpHeaders;
 import io.messagexform.core.model.Message;
+import io.messagexform.core.model.SessionContext;
 import io.messagexform.core.model.TransformResult;
 import io.messagexform.core.spec.SpecParser;
+import io.messagexform.core.testkit.TestMessages;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -285,12 +288,22 @@ class MapperValidationTest {
             engine.loadSpec(specPath);
 
             JsonNode body = MAPPER.readTree("{\"data\": \"hello\"}");
-            Message message = new Message(body, null, null, 200, "application/json", "/test", "POST");
+            Message message = new Message(
+                    TestMessages.toBody(body, "application/json"),
+                    HttpHeaders.empty(),
+                    200,
+                    "/test",
+                    "POST",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.RESPONSE);
 
             assertThat(result.isSuccess()).isTrue();
-            assertThat(result.message().body().get("result").asText()).isEqualTo("hello");
+            assertThat(TestMessages.parseBody(result.message().body())
+                            .get("result")
+                            .asText())
+                    .isEqualTo("hello");
         }
     }
 

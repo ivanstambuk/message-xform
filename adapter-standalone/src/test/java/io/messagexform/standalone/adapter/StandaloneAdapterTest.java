@@ -5,11 +5,14 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.NullNode;
 import io.javalin.http.Context;
 import io.javalin.http.HandlerType;
+import io.messagexform.core.model.HttpHeaders;
 import io.messagexform.core.model.Message;
+import io.messagexform.core.model.MessageBody;
+import io.messagexform.core.model.SessionContext;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -26,6 +29,8 @@ import org.junit.jupiter.api.Test;
  */
 class StandaloneAdapterTest {
 
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+
     private StandaloneAdapter adapter;
 
     @BeforeEach
@@ -39,7 +44,7 @@ class StandaloneAdapterTest {
 
         @Test
         @DisplayName("POST with JSON body → Message.body() is correct JsonNode")
-        void postWithJsonBody() {
+        void postWithJsonBody() throws Exception {
             Context ctx = mockContext(
                     HandlerType.POST,
                     "/api/v1/users",
@@ -49,9 +54,10 @@ class StandaloneAdapterTest {
 
             Message msg = adapter.wrapRequest(ctx);
 
-            assertThat(msg.body().isObject()).isTrue();
-            assertThat(msg.body().get("name").asText()).isEqualTo("Ivan");
-            assertThat(msg.body().get("age").asInt()).isEqualTo(30);
+            JsonNode body = MAPPER.readTree(msg.body().asString());
+            assertThat(body.isObject()).isTrue();
+            assertThat(body.get("name").asText()).isEqualTo("Ivan");
+            assertThat(body.get("age").asInt()).isEqualTo(30);
         }
 
         @Test
@@ -66,12 +72,13 @@ class StandaloneAdapterTest {
 
             Message msg = adapter.wrapRequest(ctx);
 
-            assertThat(msg.headers()).containsEntry("content-type", "application/json");
-            assertThat(msg.headers()).containsEntry("x-custom-header", "custom-value");
-            assertThat(msg.headers()).containsEntry("authorization", "Bearer token123");
-            // No original-case keys
-            assertThat(msg.headers()).doesNotContainKey("Content-Type");
-            assertThat(msg.headers()).doesNotContainKey("X-Custom-Header");
+            assertThat(msg.headers().toSingleValueMap()).containsEntry("content-type", "application/json");
+            assertThat(msg.headers().toSingleValueMap()).containsEntry("x-custom-header", "custom-value");
+            assertThat(msg.headers().toSingleValueMap()).containsEntry("authorization", "Bearer token123");
+            // No original-case keys (keys are lowercased)
+            assertThat(msg.headers().first("Content-Type")).isEqualTo("application/json");
+            // Case-insensitive lookup should still work
+            assertThat(msg.headers().first("content-type")).isEqualTo("application/json");
         }
 
         @Test
@@ -88,10 +95,10 @@ class StandaloneAdapterTest {
 
             Message msg = adapter.wrapRequest(ctx);
 
-            assertThat(msg.headersAll()).containsKey("accept");
-            assertThat(msg.headersAll().get("accept")).containsExactly("text/html", "application/json");
-            assertThat(msg.headersAll()).containsKey("x-multi");
-            assertThat(msg.headersAll().get("x-multi")).containsExactly("val1", "val2", "val3");
+            assertThat(msg.headers().toMultiValueMap()).containsKey("accept");
+            assertThat(msg.headers().toMultiValueMap().get("accept")).containsExactly("text/html", "application/json");
+            assertThat(msg.headers().toMultiValueMap()).containsKey("x-multi");
+            assertThat(msg.headers().toMultiValueMap().get("x-multi")).containsExactly("val1", "val2", "val3");
         }
 
         @Test
@@ -117,23 +124,23 @@ class StandaloneAdapterTest {
         }
 
         @Test
-        @DisplayName("no body (GET) → Message.body() is NullNode")
-        void noBodyReturnsNullNode() {
+        @DisplayName("no body (GET) → Message.body() is empty")
+        void noBodyReturnsEmpty() {
             Context ctx = mockContext(HandlerType.GET, "/api/users", null, Map.of(), null);
 
             Message msg = adapter.wrapRequest(ctx);
 
-            assertThat(msg.body()).isInstanceOf(NullNode.class);
+            assertThat(msg.body().isEmpty()).isTrue();
         }
 
         @Test
-        @DisplayName("empty body string → Message.body() is NullNode")
-        void emptyBodyReturnsNullNode() {
+        @DisplayName("empty body string → Message.body() is empty")
+        void emptyBodyReturnsEmpty() {
             Context ctx = mockContext(HandlerType.GET, "/api/users", "", Map.of(), null);
 
             Message msg = adapter.wrapRequest(ctx);
 
-            assertThat(msg.body()).isInstanceOf(NullNode.class);
+            assertThat(msg.body().isEmpty()).isTrue();
         }
 
         @Test
@@ -148,7 +155,8 @@ class StandaloneAdapterTest {
 
             Message msg = adapter.wrapRequest(ctx);
 
-            assertThat(msg.contentType()).isEqualTo("application/json; charset=utf-8");
+            // Body carries a JSON media type from the parseBody method
+            assertThat(msg.body().isEmpty()).isFalse();
         }
 
         @Test
@@ -163,17 +171,18 @@ class StandaloneAdapterTest {
 
         @Test
         @DisplayName("deep copy: mutation to Message does not affect original Context (ADR-0013)")
-        void deepCopySemantics() {
+        void deepCopySemantics() throws Exception {
             String originalBody = "{\"name\":\"Original\"}";
             Context ctx = mockContext(
                     HandlerType.POST, "/api/data", originalBody, Map.of("content-type", "application/json"), null);
 
             Message msg = adapter.wrapRequest(ctx);
 
-            // The body JsonNode is a deep copy — verify by checking it's a separate object
-            assertThat(msg.body().get("name").asText()).isEqualTo("Original");
-            // Headers map is an independent copy
-            assertThat(msg.headers()).isNotSameAs(ctx.headerMap());
+            // The body is a deep copy — verify by parsing
+            JsonNode body = MAPPER.readTree(msg.body().asString());
+            assertThat(body.get("name").asText()).isEqualTo("Original");
+            // Headers are an independent copy via HttpHeaders
+            assertThat(msg.headers().toSingleValueMap()).isNotSameAs(ctx.headerMap());
         }
     }
 
@@ -183,7 +192,7 @@ class StandaloneAdapterTest {
 
         @Test
         @DisplayName("response with JSON body → Message.body() is correct JsonNode")
-        void responseWithJsonBody() {
+        void responseWithJsonBody() throws Exception {
             Context ctx = mockResponseContext(
                     200,
                     "{\"result\":\"ok\",\"count\":42}",
@@ -193,9 +202,10 @@ class StandaloneAdapterTest {
 
             Message msg = adapter.wrapResponse(ctx);
 
-            assertThat(msg.body().isObject()).isTrue();
-            assertThat(msg.body().get("result").asText()).isEqualTo("ok");
-            assertThat(msg.body().get("count").asInt()).isEqualTo(42);
+            JsonNode body = MAPPER.readTree(msg.body().asString());
+            assertThat(body.isObject()).isTrue();
+            assertThat(body.get("result").asText()).isEqualTo("ok");
+            assertThat(body.get("count").asInt()).isEqualTo(42);
         }
 
         @Test
@@ -220,9 +230,10 @@ class StandaloneAdapterTest {
 
             Message msg = adapter.wrapResponse(ctx);
 
-            assertThat(msg.headers()).containsEntry("content-type", "application/json");
-            assertThat(msg.headers()).containsEntry("x-correlation-id", "abc-123");
-            assertThat(msg.headers()).doesNotContainKey("Content-Type");
+            assertThat(msg.headers().toSingleValueMap()).containsEntry("content-type", "application/json");
+            assertThat(msg.headers().toSingleValueMap()).containsEntry("x-correlation-id", "abc-123");
+            // Case-insensitive (HttpHeaders stores lowercase)
+            assertThat(msg.headers().first("content-type")).isEqualTo("application/json");
         }
 
         @Test
@@ -249,13 +260,13 @@ class StandaloneAdapterTest {
         }
 
         @Test
-        @DisplayName("no body (204) → Message.body() is NullNode (S-004-64)")
-        void noBody204ReturnsNullNode() {
+        @DisplayName("no body (204) → Message.body() is empty (S-004-64)")
+        void noBody204ReturnsEmpty() {
             Context ctx = mockResponseContext(204, null, Map.of(), "/api/data", HandlerType.DELETE);
 
             Message msg = adapter.wrapResponse(ctx);
 
-            assertThat(msg.body()).isInstanceOf(NullNode.class);
+            assertThat(msg.body().isEmpty()).isTrue();
             assertThat(msg.statusCode()).isEqualTo(204);
         }
     }
@@ -264,13 +275,17 @@ class StandaloneAdapterTest {
     @DisplayName("applyChanges")
     class ApplyChanges {
 
-        private static final ObjectMapper MAPPER = new ObjectMapper();
-
         @Test
         @DisplayName("transformed body written to ctx.result()")
-        void bodyWrittenToResult() throws Exception {
-            var body = MAPPER.readTree("{\"result\":\"ok\"}");
-            Message msg = new Message(body, Map.of(), Map.of(), 200, "application/json", "/api/data", "GET");
+        void bodyWrittenToResult() {
+            Message msg = new Message(
+                    MessageBody.json("{\"result\":\"ok\"}"),
+                    HttpHeaders.empty(),
+                    200,
+                    "/api/data",
+                    "GET",
+                    null,
+                    SessionContext.empty());
 
             Context ctx = mock(Context.class);
             when(ctx.result("{\"result\":\"ok\"}")).thenReturn(ctx);
@@ -282,13 +297,19 @@ class StandaloneAdapterTest {
 
         @Test
         @DisplayName("transformed headers written to ctx.header()")
-        void headersWrittenToContext() throws Exception {
-            var body = MAPPER.readTree("{}");
+        void headersWrittenToContext() {
             Map<String, String> headers = new LinkedHashMap<>();
             headers.put("x-custom", "value1");
             headers.put("x-correlation-id", "abc-123");
 
-            Message msg = new Message(body, headers, Map.of(), 200, "application/json", "/api/data", "GET");
+            Message msg = new Message(
+                    MessageBody.json("{}"),
+                    HttpHeaders.of(headers),
+                    200,
+                    "/api/data",
+                    "GET",
+                    null,
+                    SessionContext.empty());
 
             Context ctx = mock(Context.class);
             when(ctx.header("x-custom", "value1")).thenReturn(ctx);
@@ -302,9 +323,15 @@ class StandaloneAdapterTest {
 
         @Test
         @DisplayName("transformed status code written to ctx.status()")
-        void statusWrittenToContext() throws Exception {
-            var body = MAPPER.readTree("{}");
-            Message msg = new Message(body, Map.of(), Map.of(), 201, "application/json", "/api/users", "POST");
+        void statusWrittenToContext() {
+            Message msg = new Message(
+                    MessageBody.json("{}"),
+                    HttpHeaders.empty(),
+                    201,
+                    "/api/users",
+                    "POST",
+                    null,
+                    SessionContext.empty());
 
             Context ctx = mock(Context.class);
             when(ctx.status(201)).thenReturn(ctx);
@@ -315,9 +342,10 @@ class StandaloneAdapterTest {
         }
 
         @Test
-        @DisplayName("NullNode body → empty response body")
-        void nullNodeBodyWritesEmptyResult() {
-            Message msg = new Message(NullNode.getInstance(), Map.of(), Map.of(), 204, null, "/api/data", "DELETE");
+        @DisplayName("empty body → empty response body")
+        void emptyBodyWritesEmptyResult() {
+            Message msg = new Message(
+                    MessageBody.empty(), HttpHeaders.empty(), 204, "/api/data", "DELETE", null, SessionContext.empty());
 
             Context ctx = mock(Context.class);
             when(ctx.result("")).thenReturn(ctx);

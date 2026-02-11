@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.NullNode;
+import io.messagexform.core.testkit.TestMessages;
 import org.junit.jupiter.api.Test;
 
 /** Tests for {@link TransformResult} (DO-001-05). */
@@ -14,7 +15,14 @@ class TransformResultTest {
 
     @Test
     void successResultHasTransformedMessage() {
-        var msg = new Message(NullNode.getInstance(), null, null, 200, null, null, null);
+        var msg = new Message(
+                TestMessages.toBody(NullNode.getInstance(), null),
+                HttpHeaders.empty(),
+                200,
+                null,
+                null,
+                null,
+                SessionContext.empty());
         var result = TransformResult.success(msg);
 
         assertThat(result.type()).isEqualTo(TransformResult.Type.SUCCESS);
@@ -29,14 +37,15 @@ class TransformResultTest {
     @Test
     void errorResultHasErrorResponseAndStatus() throws Exception {
         var errorBody = MAPPER.readTree("{\"type\":\"urn:message-xform:error:transform-failed\"}");
-        var result = TransformResult.error(errorBody, 502);
+        var errorMessageBody = TestMessages.toBody(errorBody);
+        var result = TransformResult.error(errorMessageBody, 502);
 
         assertThat(result.type()).isEqualTo(TransformResult.Type.ERROR);
         assertThat(result.isError()).isTrue();
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.isPassthrough()).isFalse();
         assertThat(result.message()).isNull();
-        assertThat(result.errorResponse()).isSameAs(errorBody);
+        assertThat(result.errorResponse()).isSameAs(errorMessageBody);
         assertThat(result.errorStatusCode()).isEqualTo(502);
     }
 
@@ -70,7 +79,8 @@ class TransformResultTest {
     @Test
     void toStringContainsType() {
         assertThat(TransformResult.passthrough().toString()).contains("PASSTHROUGH");
-        assertThat(TransformResult.error(NullNode.getInstance(), 502).toString())
+        assertThat(TransformResult.error(TestMessages.toBody(NullNode.getInstance()), 502)
+                        .toString())
                 .contains("ERROR")
                 .contains("502");
     }

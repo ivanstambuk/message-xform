@@ -1,9 +1,10 @@
 package io.messagexform.core.testkit;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.NullNode;
+import io.messagexform.core.model.HttpHeaders;
+import io.messagexform.core.model.MediaType;
 import io.messagexform.core.model.Message;
+import io.messagexform.core.model.MessageBody;
+import io.messagexform.core.model.SessionContext;
 import io.messagexform.core.spi.GatewayAdapter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -32,52 +33,56 @@ import java.util.Objects;
  */
 public final class TestGatewayAdapter implements GatewayAdapter<TestMessage> {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
-
     @Override
     public Message wrapRequest(TestMessage nativeRequest) {
         Objects.requireNonNull(nativeRequest, "nativeRequest must not be null");
-        JsonNode body = parseAndCopy(nativeRequest.bodyJson());
-        Map<String, String> firstHeaders = firstValueMap(nativeRequest.headers());
-        Map<String, List<String>> allHeaders = deepCopyHeaders(nativeRequest.headers());
+        MessageBody body = parseBodyJson(nativeRequest.bodyJson(), nativeRequest.contentType());
+        HttpHeaders headers = toHttpHeaders(nativeRequest.headers());
         return new Message(
                 body,
-                firstHeaders,
-                allHeaders,
+                headers,
                 null, // no status code for requests
-                nativeRequest.contentType(),
                 nativeRequest.path(),
                 nativeRequest.method(),
-                nativeRequest.queryString());
+                nativeRequest.queryString(),
+                SessionContext.empty());
     }
 
     @Override
     public Message wrapResponse(TestMessage nativeResponse) {
         Objects.requireNonNull(nativeResponse, "nativeResponse must not be null");
-        JsonNode body = parseAndCopy(nativeResponse.bodyJson());
-        Map<String, String> firstHeaders = firstValueMap(nativeResponse.headers());
-        Map<String, List<String>> allHeaders = deepCopyHeaders(nativeResponse.headers());
+        MessageBody body = parseBodyJson(nativeResponse.bodyJson(), nativeResponse.contentType());
+        HttpHeaders headers = toHttpHeaders(nativeResponse.headers());
         return new Message(
                 body,
-                firstHeaders,
-                allHeaders,
+                headers,
                 nativeResponse.statusCode(),
-                nativeResponse.contentType(),
                 nativeResponse.path(),
                 nativeResponse.method(),
-                nativeResponse.queryString());
+                nativeResponse.queryString(),
+                SessionContext.empty());
     }
 
     @Override
     public void applyChanges(Message transformedMessage, TestMessage nativeTarget) {
         Objects.requireNonNull(transformedMessage, "transformedMessage must not be null");
         Objects.requireNonNull(nativeTarget, "nativeTarget must not be null");
-        nativeTarget.setBodyJson(transformedMessage.body().toString());
+
+        // Write back body — convert MessageBody bytes to String for TestMessage
+        if (!transformedMessage.body().isEmpty()) {
+            nativeTarget.setBodyJson(
+                    new String(transformedMessage.body().content(), java.nio.charset.StandardCharsets.UTF_8));
+        } else {
+            nativeTarget.setBodyJson(null);
+        }
         nativeTarget.setStatusCode(transformedMessage.statusCode());
 
         // Write back headers
         Map<String, List<String>> newHeaders = new LinkedHashMap<>();
-        transformedMessage.headersAll().forEach((name, values) -> newHeaders.put(name, new ArrayList<>(values)));
+        transformedMessage
+                .headers()
+                .toMultiValueMap()
+                .forEach((name, values) -> newHeaders.put(name, new ArrayList<>(values)));
         nativeTarget.setHeaders(newHeaders);
         nativeTarget.setContentType(transformedMessage.contentType());
 
@@ -87,35 +92,27 @@ public final class TestGatewayAdapter implements GatewayAdapter<TestMessage> {
         nativeTarget.setQueryString(transformedMessage.queryString());
     }
 
-    // --- Internal helpers
-    // -----------------------------------------------------------
+    // --- Internal helpers ---
 
-    private JsonNode parseAndCopy(String json) {
+    private MessageBody parseBodyJson(String json, String contentType) {
         if (json == null || json.isBlank()) {
-            return NullNode.getInstance();
+            return MessageBody.empty();
         }
-        try {
-            return MAPPER.readTree(json).deepCopy();
-        } catch (Exception e) {
-            return NullNode.getInstance();
-        }
+        MediaType mediaType = contentType != null ? MediaType.fromContentType(contentType) : MediaType.JSON;
+        return MessageBody.of(json.getBytes(java.nio.charset.StandardCharsets.UTF_8), mediaType);
     }
 
-    private Map<String, String> firstValueMap(Map<String, List<String>> multi) {
-        Map<String, String> result = new LinkedHashMap<>();
-        if (multi == null) return result;
+    private HttpHeaders toHttpHeaders(Map<String, List<String>> multi) {
+        if (multi == null || multi.isEmpty()) {
+            return HttpHeaders.empty();
+        }
+        // Lowercase keys during conversion
+        Map<String, List<String>> normalized = new LinkedHashMap<>();
         multi.forEach((k, v) -> {
             if (v != null && !v.isEmpty()) {
-                result.put(k.toLowerCase(), v.get(0));
+                normalized.put(k.toLowerCase(), new ArrayList<>(v));
             }
         });
-        return result;
-    }
-
-    private Map<String, List<String>> deepCopyHeaders(Map<String, List<String>> source) {
-        Map<String, List<String>> copy = new LinkedHashMap<>();
-        if (source == null) return copy;
-        source.forEach((k, v) -> copy.put(k.toLowerCase(), new ArrayList<>(v)));
-        return copy;
+        return HttpHeaders.ofMulti(normalized);
     }
 }

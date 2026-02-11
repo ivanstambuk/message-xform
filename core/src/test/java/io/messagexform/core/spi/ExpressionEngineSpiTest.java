@@ -4,6 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.messagexform.core.engine.TransformEngine;
+import io.messagexform.core.model.HttpHeaders;
+import io.messagexform.core.model.SessionContext;
 import io.messagexform.core.model.TransformContext;
 import org.junit.jupiter.api.Test;
 
@@ -64,7 +67,7 @@ class ExpressionEngineSpiTest {
                     var node = input.deepCopy();
                     if (node.isObject()) {
                         ((com.fasterxml.jackson.databind.node.ObjectNode) node)
-                                .set("status_from_context", context.statusAsJson());
+                                .set("status_from_context", TransformEngine.statusToJson(context.status()));
                     }
                     return node;
                 };
@@ -73,7 +76,7 @@ class ExpressionEngineSpiTest {
 
         CompiledExpression compiled = contextAwareEngine.compile(".");
         JsonNode input = MAPPER.readTree("{\"key\": \"value\"}");
-        TransformContext ctx = new TransformContext(null, null, 200, null, null);
+        TransformContext ctx = new TransformContext(HttpHeaders.empty(), 200, null, null, SessionContext.empty());
         JsonNode output = compiled.evaluate(input, ctx);
 
         assertThat(output.get("key").asText()).isEqualTo("value");

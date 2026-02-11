@@ -7,9 +7,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.messagexform.core.engine.jslt.JsltExpressionEngine;
 import io.messagexform.core.error.InputSchemaViolation;
 import io.messagexform.core.model.Direction;
+import io.messagexform.core.model.HttpHeaders;
 import io.messagexform.core.model.Message;
+import io.messagexform.core.model.SessionContext;
 import io.messagexform.core.model.TransformResult;
 import io.messagexform.core.spec.SpecParser;
+import io.messagexform.core.testkit.TestMessages;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -58,12 +61,22 @@ class StrictModeTest {
             engine.loadSpec(specPath);
 
             JsonNode body = MAPPER.readTree("{\"name\": \"Alice\"}");
-            Message message = new Message(body, null, null, 200, "application/json", "/api/greet", "POST");
+            Message message = new Message(
+                    TestMessages.toBody(body, "application/json"),
+                    HttpHeaders.empty(),
+                    200,
+                    "/api/greet",
+                    "POST",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.RESPONSE);
 
             assertThat(result.isSuccess()).isTrue();
-            assertThat(result.message().body().get("greeting").asText()).isEqualTo("Hello Alice");
+            assertThat(TestMessages.parseBody(result.message().body())
+                            .get("greeting")
+                            .asText())
+                    .isEqualTo("Hello Alice");
         }
 
         @Test
@@ -94,14 +107,24 @@ class StrictModeTest {
 
             // Missing required field "name"
             JsonNode body = MAPPER.readTree("{\"age\": 30}");
-            Message message = new Message(body, null, null, 200, "application/json", "/api/greet", "POST");
+            Message message = new Message(
+                    TestMessages.toBody(body, "application/json"),
+                    HttpHeaders.empty(),
+                    200,
+                    "/api/greet",
+                    "POST",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.RESPONSE);
 
             assertThat(result.isError())
                     .as("Non-conforming input should produce ERROR in strict mode")
                     .isTrue();
-            assertThat(result.errorResponse().get("type").asText()).isEqualTo(InputSchemaViolation.URN);
+            assertThat(TestMessages.parseBody(result.errorResponse())
+                            .get("type")
+                            .asText())
+                    .isEqualTo(InputSchemaViolation.URN);
         }
 
         @Test
@@ -130,12 +153,22 @@ class StrictModeTest {
 
             // count is a string, not integer
             JsonNode body = MAPPER.readTree("{\"count\": \"not-a-number\"}");
-            Message message = new Message(body, null, null, 200, "application/json", "/api/calc", "POST");
+            Message message = new Message(
+                    TestMessages.toBody(body, "application/json"),
+                    HttpHeaders.empty(),
+                    200,
+                    "/api/calc",
+                    "POST",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.RESPONSE);
 
             assertThat(result.isError()).isTrue();
-            assertThat(result.errorResponse().get("type").asText()).isEqualTo(InputSchemaViolation.URN);
+            assertThat(TestMessages.parseBody(result.errorResponse())
+                            .get("type")
+                            .asText())
+                    .isEqualTo(InputSchemaViolation.URN);
         }
     }
 
@@ -171,7 +204,14 @@ class StrictModeTest {
 
             // Missing required "name" — but lenient mode skips validation
             JsonNode body = MAPPER.readTree("{\"age\": 30}");
-            Message message = new Message(body, null, null, 200, "application/json", "/api/greet", "POST");
+            Message message = new Message(
+                    TestMessages.toBody(body, "application/json"),
+                    HttpHeaders.empty(),
+                    200,
+                    "/api/greet",
+                    "POST",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.RESPONSE);
 
@@ -209,7 +249,14 @@ class StrictModeTest {
 
             // Missing required "name" — should still succeed with default (lenient) mode
             JsonNode body = MAPPER.readTree("{}");
-            Message message = new Message(body, null, null, 200, "application/json", "/api/test", "GET");
+            Message message = new Message(
+                    TestMessages.toBody(body, "application/json"),
+                    HttpHeaders.empty(),
+                    200,
+                    "/api/test",
+                    "GET",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.RESPONSE);
 

@@ -10,7 +10,9 @@ import io.messagexform.core.engine.EngineRegistry;
 import io.messagexform.core.engine.TransformEngine;
 import io.messagexform.core.engine.jslt.JsltExpressionEngine;
 import io.messagexform.core.model.Direction;
+import io.messagexform.core.model.HttpHeaders;
 import io.messagexform.core.model.Message;
+import io.messagexform.core.model.SessionContext;
 import io.messagexform.core.model.TransformResult;
 import io.messagexform.core.spec.SpecParser;
 import java.nio.file.Path;
@@ -43,8 +45,8 @@ class TestAdapterTest {
 
             Message msg = adapter.wrapRequest(request);
 
-            assertThat(msg.body().get("userId").asInt()).isEqualTo(42);
-            assertThat(msg.headers()).containsEntry("x-request-id", "abc-123");
+            assertThat(TestMessages.parseBody(msg.body()).get("userId").asInt()).isEqualTo(42);
+            assertThat(msg.headers().toSingleValueMap()).containsEntry("x-request-id", "abc-123");
             assertThat(msg.statusCode()).isNull();
             assertThat(msg.requestPath()).isEqualTo("/api/users");
             assertThat(msg.requestMethod()).isEqualTo("POST");
@@ -57,7 +59,7 @@ class TestAdapterTest {
             TestMessage request = TestMessage.request("{\"name\": \"original\"}", "/test", "GET");
 
             Message msg = adapter.wrapRequest(request);
-            ((ObjectNode) msg.body()).put("name", "mutated");
+            ((ObjectNode) TestMessages.parseBody(msg.body())).put("name", "mutated");
 
             // Native is unaffected — copy-on-wrap (ADR-0013)
             assertThat(request.bodyJson()).isEqualTo("{\"name\": \"original\"}");
@@ -69,7 +71,7 @@ class TestAdapterTest {
 
             Message msg = adapter.wrapRequest(request);
 
-            assertThat(msg.body().isNull()).isTrue();
+            assertThat(TestMessages.parseBody(msg.body()).isNull()).isTrue();
         }
 
         @Test
@@ -78,8 +80,8 @@ class TestAdapterTest {
 
             Message msg = adapter.wrapRequest(request);
 
-            assertThat(msg.headers()).isEmpty();
-            assertThat(msg.headersAll()).isEmpty();
+            assertThat(msg.headers().toSingleValueMap()).isEmpty();
+            assertThat(msg.headers().toMultiValueMap()).isEmpty();
         }
 
         @Test
@@ -90,8 +92,8 @@ class TestAdapterTest {
 
             Message msg = adapter.wrapRequest(request);
 
-            assertThat(msg.headers()).containsKey("x-mixed-case");
-            assertThat(msg.headersAll()).containsKey("x-mixed-case");
+            assertThat(msg.headers().toSingleValueMap()).containsKey("x-mixed-case");
+            assertThat(msg.headers().toMultiValueMap()).containsKey("x-mixed-case");
         }
 
         @Test
@@ -112,11 +114,12 @@ class TestAdapterTest {
 
             Message msg = adapter.wrapResponse(response);
 
-            assertThat(msg.body().get("status").asText()).isEqualTo("ok");
+            assertThat(TestMessages.parseBody(msg.body()).get("status").asText())
+                    .isEqualTo("ok");
             assertThat(msg.statusCode()).isEqualTo(200);
             assertThat(msg.requestPath()).isEqualTo("/api/users");
             assertThat(msg.requestMethod()).isEqualTo("GET");
-            assertThat(msg.headersAll().get("set-cookie")).containsExactly("a=1", "b=2");
+            assertThat(msg.headers().toMultiValueMap().get("set-cookie")).containsExactly("a=1", "b=2");
         }
 
         @Test
@@ -139,7 +142,14 @@ class TestAdapterTest {
         void writesTransformedBodyToNative() throws Exception {
             TestMessage nativeMsg = TestMessage.response("{\"old\": true}", 200);
             JsonNode newBody = MAPPER.readTree("{\"new\": true}");
-            Message transformed = new Message(newBody, Map.of(), Map.of(), 200, null, null, null);
+            Message transformed = new Message(
+                    TestMessages.toBody(newBody, null),
+                    HttpHeaders.empty(),
+                    200,
+                    null,
+                    null,
+                    null,
+                    SessionContext.empty());
 
             adapter.applyChanges(transformed, nativeMsg);
 
@@ -149,7 +159,14 @@ class TestAdapterTest {
         @Test
         void writesTransformedStatusToNative() throws Exception {
             TestMessage nativeMsg = TestMessage.response("{}", 200);
-            Message transformed = new Message(MAPPER.readTree("{}"), Map.of(), Map.of(), 201, null, null, null);
+            Message transformed = new Message(
+                    TestMessages.toBody(MAPPER.readTree("{}"), null),
+                    HttpHeaders.empty(),
+                    201,
+                    null,
+                    null,
+                    null,
+                    SessionContext.empty());
 
             adapter.applyChanges(transformed, nativeMsg);
 
@@ -160,8 +177,14 @@ class TestAdapterTest {
         void writesTransformedHeadersToNative() throws Exception {
             TestMessage nativeMsg = TestMessage.response("{}", 200).withHeader("x-old", "remove-me");
             var newHeadersAll = Map.of("x-new", List.of("added"));
-            Message transformed =
-                    new Message(MAPPER.readTree("{}"), Map.of("x-new", "added"), newHeadersAll, 200, null, null, null);
+            Message transformed = new Message(
+                    TestMessages.toBody(MAPPER.readTree("{}"), null),
+                    TestMessages.toHeaders(Map.of("x-new", "added"), newHeadersAll),
+                    200,
+                    null,
+                    null,
+                    null,
+                    SessionContext.empty());
 
             adapter.applyChanges(transformed, nativeMsg);
 
@@ -174,7 +197,13 @@ class TestAdapterTest {
             TestMessage nativeMsg =
                     TestMessage.request("{}", "/old/path", "POST").withQueryString("debug=true");
             Message transformed = new Message(
-                    MAPPER.readTree("{}"), Map.of(), Map.of(), null, null, "/new/path", "PUT", "format=json");
+                    TestMessages.toBody(MAPPER.readTree("{}"), null),
+                    HttpHeaders.empty(),
+                    null,
+                    "/new/path",
+                    "PUT",
+                    "format=json",
+                    SessionContext.empty());
 
             adapter.applyChanges(transformed, nativeMsg);
 
@@ -186,7 +215,14 @@ class TestAdapterTest {
         @Test
         void rejectsNullArguments() {
             TestMessage msg = TestMessage.create().withBodyJson("{}");
-            Message transformed = new Message(MAPPER.createObjectNode(), Map.of(), Map.of(), null, null, null, null);
+            Message transformed = new Message(
+                    TestMessages.toBody(MAPPER.createObjectNode(), null),
+                    HttpHeaders.empty(),
+                    null,
+                    null,
+                    null,
+                    null,
+                    SessionContext.empty());
 
             assertThatThrownBy(() -> adapter.applyChanges(null, msg)).isInstanceOf(NullPointerException.class);
 
@@ -213,14 +249,13 @@ class TestAdapterTest {
             // For this test, manually create the transformed message
             JsonNode transformedBody = MAPPER.readTree("{\"id\": 42, \"operation\": \"CREATE\"}");
             Message transformedMsg = new Message(
-                    transformedBody,
+                    TestMessages.toBody(transformedBody, requestMsg.contentType()),
                     requestMsg.headers(),
-                    requestMsg.headersAll(),
                     null,
-                    requestMsg.contentType(),
                     "/api/users/42",
                     "PUT",
-                    null);
+                    null,
+                    SessionContext.empty());
 
             // 4. Apply changes back to native
             adapter.applyChanges(transformedMsg, nativeRequest);
@@ -247,13 +282,13 @@ class TestAdapterTest {
             // 3. Simulate transform
             JsonNode transformedBody = MAPPER.readTree("{\"fields\": [{\"label\": \"Username\"}]}");
             Message transformedMsg = new Message(
-                    transformedBody,
+                    TestMessages.toBody(transformedBody, responseMsg.contentType()),
                     responseMsg.headers(),
-                    responseMsg.headersAll(),
                     200,
-                    responseMsg.contentType(),
                     responseMsg.requestPath(),
-                    responseMsg.requestMethod());
+                    responseMsg.requestMethod(),
+                    null,
+                    SessionContext.empty());
 
             // 4. Apply changes
             adapter.applyChanges(transformedMsg, nativeResponse);

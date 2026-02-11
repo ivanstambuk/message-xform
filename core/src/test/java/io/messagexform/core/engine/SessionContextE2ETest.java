@@ -6,9 +6,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.messagexform.core.engine.jslt.JsltExpressionEngine;
 import io.messagexform.core.model.Direction;
+import io.messagexform.core.model.HttpHeaders;
 import io.messagexform.core.model.Message;
+import io.messagexform.core.model.SessionContext;
 import io.messagexform.core.model.TransformResult;
 import io.messagexform.core.spec.SpecParser;
+import io.messagexform.core.testkit.TestMessages;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,8 +22,8 @@ import org.junit.jupiter.api.io.TempDir;
  * End-to-end tests for session context binding (T-001-57, FR-001-13, ADR-0030).
  *
  * <p>
- * Verifies the full data flow: {@code Message.sessionContext()} →
- * {@code TransformContext.sessionContext()} → {@code $session} in JSLT.
+ * Verifies the full data flow: {@code Message.session()} →
+ * {@code TransformContext.session()} → {@code $session} in JSLT.
  */
 class SessionContextE2ETest {
 
@@ -64,14 +67,25 @@ class SessionContextE2ETest {
         // Create message WITH session context
         JsonNode body = MAPPER.readTree("{\"action\": \"login\"}");
         JsonNode session = MAPPER.readTree("{\"sub\": \"bjensen\"}");
-        Message message = new Message(body, null, null, null, "application/json", "/api/test", "POST", null, session);
+        Message message = new Message(
+                TestMessages.toBody(body, "application/json"),
+                HttpHeaders.empty(),
+                null,
+                "/api/test",
+                "POST",
+                null,
+                TestMessages.toSessionContext(session));
 
         // Transform — uses the 2-arg overload which builds context from message
         TransformResult result = engine.transform(message, Direction.REQUEST);
 
         assertThat(result.isSuccess()).isTrue();
-        assertThat(result.message().body().get("action").asText()).isEqualTo("login");
-        assertThat(result.message().body().get("subject").asText()).isEqualTo("bjensen");
+        assertThat(TestMessages.parseBody(result.message().body()).get("action").asText())
+                .isEqualTo("login");
+        assertThat(TestMessages.parseBody(result.message().body())
+                        .get("subject")
+                        .asText())
+                .isEqualTo("bjensen");
     }
 
     @Test
@@ -99,15 +113,27 @@ class SessionContextE2ETest {
 
         // Create message WITHOUT session context
         JsonNode body = MAPPER.readTree("{\"action\": \"login\"}");
-        Message message = new Message(body, null, null, null, "application/json", "/api/test", "POST");
+        Message message = new Message(
+                TestMessages.toBody(body, "application/json"),
+                HttpHeaders.empty(),
+                null,
+                "/api/test",
+                "POST",
+                null,
+                SessionContext.empty());
 
         TransformResult result = engine.transform(message, Direction.REQUEST);
 
         assertThat(result.isSuccess()).isTrue();
-        assertThat(result.message().body().get("action").asText()).isEqualTo("login");
+        assertThat(TestMessages.parseBody(result.message().body()).get("action").asText())
+                .isEqualTo("login");
         // $session is null → $session.sub evaluates to absent → if-guard falls to else
-        assertThat(result.message().body().has("subject")).isFalse();
-        assertThat(result.message().body().get("subject_present").asBoolean()).isFalse();
+        assertThat(TestMessages.parseBody(result.message().body()).has("subject"))
+                .isFalse();
+        assertThat(TestMessages.parseBody(result.message().body())
+                        .get("subject_present")
+                        .asBoolean())
+                .isFalse();
     }
 
     @Test
@@ -134,12 +160,20 @@ class SessionContextE2ETest {
 
         JsonNode body = MAPPER.readTree("{\"data\": \"result\"}");
         JsonNode session = MAPPER.readTree("{\"sub\": \"admin\"}");
-        Message message = new Message(body, null, null, 200, "application/json", "/api/test", "GET", null, session);
+        Message message = new Message(
+                TestMessages.toBody(body, "application/json"),
+                HttpHeaders.empty(),
+                200,
+                "/api/test",
+                "GET",
+                null,
+                TestMessages.toSessionContext(session));
 
         TransformResult result = engine.transform(message, Direction.RESPONSE);
 
         assertThat(result.isSuccess()).isTrue();
-        assertThat(result.message().body().get("user").asText()).isEqualTo("admin");
+        assertThat(TestMessages.parseBody(result.message().body()).get("user").asText())
+                .isEqualTo("admin");
     }
 
     @Test
@@ -176,14 +210,26 @@ class SessionContextE2ETest {
                     "claims": {"tenant": "acme", "level": 3}
                 }
                 """);
-        Message message = new Message(body, null, null, null, "application/json", "/api/test", "POST", null, session);
+        Message message = new Message(
+                TestMessages.toBody(body, "application/json"),
+                HttpHeaders.empty(),
+                null,
+                "/api/test",
+                "POST",
+                null,
+                TestMessages.toSessionContext(session));
 
         TransformResult result = engine.transform(message, Direction.REQUEST);
 
         assertThat(result.isSuccess()).isTrue();
-        assertThat(result.message().body().get("user").asText()).isEqualTo("bjensen");
-        assertThat(result.message().body().get("role_count").asInt()).isEqualTo(3);
-        assertThat(result.message().body().get("tenant").asText()).isEqualTo("acme");
+        assertThat(TestMessages.parseBody(result.message().body()).get("user").asText())
+                .isEqualTo("bjensen");
+        assertThat(TestMessages.parseBody(result.message().body())
+                        .get("role_count")
+                        .asInt())
+                .isEqualTo(3);
+        assertThat(TestMessages.parseBody(result.message().body()).get("tenant").asText())
+                .isEqualTo("acme");
     }
 
     private Path createSpec(String yamlContent) throws Exception {

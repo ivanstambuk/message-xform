@@ -2,7 +2,6 @@ package io.messagexform.standalone.proxy;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -40,8 +39,6 @@ import org.junit.jupiter.api.io.TempDir;
  * </ul>
  */
 class ZeroDowntimeReloadTest extends ProxyTestHarness {
-
-    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     @TempDir
     Path specsDir;

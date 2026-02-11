@@ -8,21 +8,26 @@ import ch.qos.logback.core.read.ListAppender;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.messagexform.core.model.Direction;
+import io.messagexform.core.model.HttpHeaders;
 import io.messagexform.core.model.Message;
+import io.messagexform.core.model.SessionContext;
 import io.messagexform.core.model.TransformResult;
 import io.messagexform.core.spec.SpecParser;
+import io.messagexform.core.testkit.TestMessages;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.LoggerFactory;
-import org.slf4j.event.KeyValuePair;
 
 /**
  * Tests for structured log entries on matched transforms (T-001-41,
@@ -32,11 +37,18 @@ import org.slf4j.event.KeyValuePair;
  * Every matched request MUST produce a structured log entry containing:
  * profile id, spec id@version, request path, specificity score, eval duration,
  * and direction. Passthrough requests MUST NOT produce transform log entries.
+ *
+ * <p>
+ * Log fields are emitted via SLF4J 1.x-compatible format strings
+ * (key=value pairs) for compatibility with PingAccess's SLF4J 1.7.x runtime.
  */
 @DisplayName("StructuredLoggingTest")
 class StructuredLoggingTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
+
+    /** Pattern that extracts key=value pairs from the formatted log message. */
+    private static final Pattern KV_PATTERN = Pattern.compile("(\\w+)=(\\S+)");
 
     private TransformEngine engine;
     private ListAppender<ILoggingEvent> logAppender;
@@ -71,37 +83,43 @@ class StructuredLoggingTest {
         // Arrange: load a spec and profile
         Path specPath = tempDir.resolve("test-spec.yaml");
         Files.writeString(specPath, """
-                id: callback-prettify
-                version: "2.1.0"
-                input:
-                  schema:
-                    type: object
-                output:
-                  schema:
-                    type: object
-                transform:
-                  lang: jslt
-                  expr: |
-                    { "transformed": true, "data": .data }
-                """);
+        id: callback-prettify
+        version: "2.1.0"
+        input:
+          schema:
+            type: object
+        output:
+          schema:
+            type: object
+        transform:
+          lang: jslt
+          expr: |
+            { "transformed": true, "data": .data }
+        """);
         engine.loadSpec(specPath);
 
         Path profilePath = tempDir.resolve("test-profile.yaml");
         Files.writeString(profilePath, """
-                profile: pingam-prettify
-                version: "1.0.0"
-                transforms:
-                  - spec: callback-prettify@2.1.0
-                    direction: response
-                    match:
-                      path: "/json/alpha/authenticate"
-                      method: POST
-                """);
+        profile: pingam-prettify
+        version: "1.0.0"
+        transforms:
+          - spec: callback-prettify@2.1.0
+            direction: response
+            match:
+              path: "/json/alpha/authenticate"
+              method: POST
+        """);
         engine.loadProfile(profilePath);
 
         JsonNode inputBody = JSON.readTree("{\"data\": \"hello\"}");
-        Message message =
-                new Message(inputBody, Map.of(), Map.of(), 200, "application/json", "/json/alpha/authenticate", "POST");
+        Message message = new Message(
+                TestMessages.toBody(inputBody, "application/json"),
+                HttpHeaders.empty(),
+                200,
+                "/json/alpha/authenticate",
+                "POST",
+                null,
+                SessionContext.empty());
 
         // Act
         TransformResult result = engine.transform(message, Direction.RESPONSE);
@@ -111,7 +129,8 @@ class StructuredLoggingTest {
 
         // Assert: structured log entry with required fields
         List<ILoggingEvent> transformLogs = logAppender.list.stream()
-                .filter(e -> e.getMessage() != null && e.getMessage().contains("transform.matched"))
+                .filter(e -> e.getFormattedMessage() != null
+                        && e.getFormattedMessage().contains("transform.matched"))
                 .toList();
 
         assertThat(transformLogs)
@@ -119,30 +138,17 @@ class StructuredLoggingTest {
                 .hasSize(1);
 
         ILoggingEvent logEvent = transformLogs.get(0);
+        Map<String, String> kvMap = extractKeyValuePairs(logEvent);
 
-        // Verify key-value pairs contain all required NFR-001-08 fields
-        Map<String, Object> kvMap = extractKeyValuePairs(logEvent);
-
-        assertThat(kvMap).containsKey("profile_id");
-        assertThat(kvMap.get("profile_id")).isEqualTo("pingam-prettify");
-
-        assertThat(kvMap).containsKey("spec_id");
-        assertThat(kvMap.get("spec_id")).isEqualTo("callback-prettify");
-
-        assertThat(kvMap).containsKey("spec_version");
-        assertThat(kvMap.get("spec_version")).isEqualTo("2.1.0");
-
-        assertThat(kvMap).containsKey("request_path");
-        assertThat(kvMap.get("request_path")).isEqualTo("/json/alpha/authenticate");
-
+        assertThat(kvMap).containsEntry("profile_id", "pingam-prettify");
+        assertThat(kvMap).containsEntry("spec_id", "callback-prettify");
+        assertThat(kvMap).containsEntry("spec_version", "2.1.0");
+        assertThat(kvMap).containsEntry("request_path", "/json/alpha/authenticate");
         assertThat(kvMap).containsKey("specificity_score");
-        assertThat(((Number) kvMap.get("specificity_score")).intValue()).isEqualTo(3);
-
+        assertThat(Integer.parseInt(kvMap.get("specificity_score"))).isEqualTo(3);
         assertThat(kvMap).containsKey("eval_duration_ms");
-        assertThat(((Number) kvMap.get("eval_duration_ms")).longValue()).isGreaterThanOrEqualTo(0);
-
-        assertThat(kvMap).containsKey("direction");
-        assertThat(kvMap.get("direction")).isEqualTo("RESPONSE");
+        assertThat(Long.parseLong(kvMap.get("eval_duration_ms"))).isGreaterThanOrEqualTo(0);
+        assertThat(kvMap).containsEntry("direction", "RESPONSE");
     }
 
     @Test
@@ -151,37 +157,44 @@ class StructuredLoggingTest {
         // Arrange: load a spec and profile that won't match
         Path specPath = tempDir.resolve("test-spec.yaml");
         Files.writeString(specPath, """
-                id: callback-prettify
-                version: "1.0.0"
-                input:
-                  schema:
-                    type: object
-                output:
-                  schema:
-                    type: object
-                transform:
-                  lang: jslt
-                  expr: |
-                    { "transformed": true }
-                """);
+        id: callback-prettify
+        version: "1.0.0"
+        input:
+          schema:
+            type: object
+        output:
+          schema:
+            type: object
+        transform:
+          lang: jslt
+          expr: |
+            { "transformed": true }
+        """);
         engine.loadSpec(specPath);
 
         Path profilePath = tempDir.resolve("test-profile.yaml");
         Files.writeString(profilePath, """
-                profile: test-profile
-                version: "1.0.0"
-                transforms:
-                  - spec: callback-prettify@1.0.0
-                    direction: response
-                    match:
-                      path: "/json/alpha/authenticate"
-                      method: POST
-                """);
+        profile: test-profile
+        version: "1.0.0"
+        transforms:
+          - spec: callback-prettify@1.0.0
+            direction: response
+            match:
+              path: "/json/alpha/authenticate"
+              method: POST
+        """);
         engine.loadProfile(profilePath);
 
         // Non-matching request path
         JsonNode inputBody = JSON.readTree("{\"data\": \"hello\"}");
-        Message message = new Message(inputBody, Map.of(), Map.of(), 200, "application/json", "/api/unmatched", "GET");
+        Message message = new Message(
+                TestMessages.toBody(inputBody, "application/json"),
+                HttpHeaders.empty(),
+                200,
+                "/api/unmatched",
+                "GET",
+                null,
+                SessionContext.empty());
 
         // Act
         TransformResult result = engine.transform(message, Direction.RESPONSE);
@@ -191,7 +204,8 @@ class StructuredLoggingTest {
 
         // Assert: no transform.matched log entry
         List<ILoggingEvent> transformLogs = logAppender.list.stream()
-                .filter(e -> e.getMessage() != null && e.getMessage().contains("transform.matched"))
+                .filter(e -> e.getFormattedMessage() != null
+                        && e.getFormattedMessage().contains("transform.matched"))
                 .toList();
 
         assertThat(transformLogs)
@@ -206,42 +220,49 @@ class StructuredLoggingTest {
         for (int i = 1; i <= 2; i++) {
             Path specPath = tempDir.resolve("chain-spec-" + i + ".yaml");
             Files.writeString(specPath, """
-                    id: chain-step-%d
-                    version: "1.0.0"
-                    input:
-                      schema:
-                        type: object
-                    output:
-                      schema:
-                        type: object
-                    transform:
-                      lang: jslt
-                      expr: |
-                        { "step%d": true, "data": .data }
-                    """.formatted(i, i));
+          id: chain-step-%d
+          version: "1.0.0"
+          input:
+            schema:
+              type: object
+          output:
+            schema:
+              type: object
+          transform:
+            lang: jslt
+            expr: |
+              { "step%d": true, "data": .data }
+          """.formatted(i, i));
             engine.loadSpec(specPath);
         }
 
         Path profilePath = tempDir.resolve("chain-profile.yaml");
         Files.writeString(profilePath, """
-                profile: chain-test
-                version: "1.0.0"
-                transforms:
-                  - spec: chain-step-1@1.0.0
-                    direction: response
-                    match:
-                      path: "/api/chain"
-                      method: POST
-                  - spec: chain-step-2@1.0.0
-                    direction: response
-                    match:
-                      path: "/api/chain"
-                      method: POST
-                """);
+        profile: chain-test
+        version: "1.0.0"
+        transforms:
+          - spec: chain-step-1@1.0.0
+            direction: response
+            match:
+              path: "/api/chain"
+              method: POST
+          - spec: chain-step-2@1.0.0
+            direction: response
+            match:
+              path: "/api/chain"
+              method: POST
+        """);
         engine.loadProfile(profilePath);
 
         JsonNode inputBody = JSON.readTree("{\"data\": \"test\"}");
-        Message message = new Message(inputBody, Map.of(), Map.of(), 200, "application/json", "/api/chain", "POST");
+        Message message = new Message(
+                TestMessages.toBody(inputBody, "application/json"),
+                HttpHeaders.empty(),
+                200,
+                "/api/chain",
+                "POST",
+                null,
+                SessionContext.empty());
 
         // Act
         TransformResult result = engine.transform(message, Direction.RESPONSE);
@@ -250,7 +271,8 @@ class StructuredLoggingTest {
         assertThat(result.isSuccess()).isTrue();
 
         List<ILoggingEvent> transformLogs = logAppender.list.stream()
-                .filter(e -> e.getMessage() != null && e.getMessage().contains("transform.matched"))
+                .filter(e -> e.getFormattedMessage() != null
+                        && e.getFormattedMessage().contains("transform.matched"))
                 .toList();
 
         assertThat(transformLogs)
@@ -258,24 +280,31 @@ class StructuredLoggingTest {
                 .hasSize(2);
 
         // First step
-        Map<String, Object> step1Kv = extractKeyValuePairs(transformLogs.get(0));
-        assertThat(step1Kv.get("spec_id")).isEqualTo("chain-step-1");
-        assertThat(step1Kv.get("chain_step")).isEqualTo("1/2");
+        Map<String, String> step1Kv = extractKeyValuePairs(transformLogs.get(0));
+        assertThat(step1Kv).containsEntry("spec_id", "chain-step-1");
+        assertThat(step1Kv).containsEntry("chain_step", "1/2");
 
         // Second step
-        Map<String, Object> step2Kv = extractKeyValuePairs(transformLogs.get(1));
-        assertThat(step2Kv.get("spec_id")).isEqualTo("chain-step-2");
-        assertThat(step2Kv.get("chain_step")).isEqualTo("2/2");
+        Map<String, String> step2Kv = extractKeyValuePairs(transformLogs.get(1));
+        assertThat(step2Kv).containsEntry("spec_id", "chain-step-2");
+        assertThat(step2Kv).containsEntry("chain_step", "2/2");
     }
 
     /**
-     * Extracts SLF4J 2.0 key-value pairs from a logback event.
+     * Extracts key=value pairs from the formatted log message string.
+     * The production code emits structured fields as key=value tokens in
+     * the SLF4J 1.x-compatible message format.
      */
-    private Map<String, Object> extractKeyValuePairs(ILoggingEvent event) {
-        List<KeyValuePair> pairs = event.getKeyValuePairs();
-        if (pairs == null) {
+    private Map<String, String> extractKeyValuePairs(ILoggingEvent event) {
+        String formatted = event.getFormattedMessage();
+        if (formatted == null) {
             return Map.of();
         }
-        return pairs.stream().collect(java.util.stream.Collectors.toMap(kvp -> kvp.key, kvp -> kvp.value));
+        Map<String, String> result = new LinkedHashMap<>();
+        Matcher matcher = KV_PATTERN.matcher(formatted);
+        while (matcher.find()) {
+            result.put(matcher.group(1), matcher.group(2));
+        }
+        return result;
     }
 }

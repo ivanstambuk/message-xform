@@ -6,9 +6,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.messagexform.core.engine.jslt.JsltExpressionEngine;
 import io.messagexform.core.model.Direction;
+import io.messagexform.core.model.HttpHeaders;
 import io.messagexform.core.model.Message;
+import io.messagexform.core.model.SessionContext;
 import io.messagexform.core.model.TransformResult;
 import io.messagexform.core.spec.SpecParser;
+import io.messagexform.core.testkit.TestMessages;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -65,7 +68,14 @@ class UrlDirectionRestrictionTest {
             engine.loadSpec(specPath);
 
             JsonNode body = MAPPER.readTree("{\"data\": \"payload\"}");
-            Message message = new Message(body, null, null, 200, "application/json", "/original/path", "GET");
+            Message message = new Message(
+                    TestMessages.toBody(body, "application/json"),
+                    HttpHeaders.empty(),
+                    200,
+                    "/original/path",
+                    "GET",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.RESPONSE);
 
@@ -99,7 +109,13 @@ class UrlDirectionRestrictionTest {
 
             JsonNode body = MAPPER.readTree("{\"data\": \"payload\"}");
             Message message = new Message(
-                    body, null, null, 200, "application/json", "/api/resource", "GET", "_debug=true&existing=keep");
+                    TestMessages.toBody(body, "application/json"),
+                    HttpHeaders.empty(),
+                    200,
+                    "/api/resource",
+                    "GET",
+                    "_debug=true&existing=keep",
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.RESPONSE);
 
@@ -131,7 +147,14 @@ class UrlDirectionRestrictionTest {
             engine.loadSpec(specPath);
 
             JsonNode body = MAPPER.readTree("{\"data\": \"payload\"}");
-            Message message = new Message(body, null, null, 200, "application/json", "/api/resource", "POST");
+            Message message = new Message(
+                    TestMessages.toBody(body, "application/json"),
+                    HttpHeaders.empty(),
+                    200,
+                    "/api/resource",
+                    "POST",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.RESPONSE);
 
@@ -167,8 +190,14 @@ class UrlDirectionRestrictionTest {
             engine.loadSpec(specPath);
 
             JsonNode body = MAPPER.readTree("{\"data\": \"payload\"}");
-            Message message =
-                    new Message(body, null, null, 200, "application/json", "/original/path", "GET", "existing=keep");
+            Message message = new Message(
+                    TestMessages.toBody(body, "application/json"),
+                    HttpHeaders.empty(),
+                    200,
+                    "/original/path",
+                    "GET",
+                    "existing=keep",
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.RESPONSE);
 
@@ -211,7 +240,14 @@ class UrlDirectionRestrictionTest {
             engine.loadSpec(specPath);
 
             JsonNode body = MAPPER.readTree("{\"data\": \"payload\"}");
-            Message message = new Message(body, null, null, null, "application/json", "/original/path", "POST");
+            Message message = new Message(
+                    TestMessages.toBody(body, "application/json"),
+                    HttpHeaders.empty(),
+                    null,
+                    "/original/path",
+                    "POST",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.REQUEST);
 

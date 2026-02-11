@@ -6,9 +6,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.messagexform.core.engine.jslt.JsltExpressionEngine;
 import io.messagexform.core.model.Direction;
+import io.messagexform.core.model.HttpHeaders;
 import io.messagexform.core.model.Message;
+import io.messagexform.core.model.SessionContext;
 import io.messagexform.core.model.TransformResult;
 import io.messagexform.core.spec.SpecParser;
+import io.messagexform.core.testkit.TestMessages;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -64,7 +67,14 @@ class UrlMethodOverrideTest {
             engine.loadSpec(specPath);
 
             JsonNode body = MAPPER.readTree("{\"resourceId\": \"123\"}");
-            Message message = new Message(body, null, null, null, "application/json", "/api/resource/123", "POST");
+            Message message = new Message(
+                    TestMessages.toBody(body, "application/json"),
+                    HttpHeaders.empty(),
+                    null,
+                    "/api/resource/123",
+                    "POST",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.REQUEST);
 
@@ -101,7 +111,14 @@ class UrlMethodOverrideTest {
             engine.loadSpec(specPath);
 
             JsonNode body = MAPPER.readTree("{\"action\": \"read\", \"resourceId\": \"42\"}");
-            Message message = new Message(body, null, null, null, "application/json", "/api/resource", "POST");
+            Message message = new Message(
+                    TestMessages.toBody(body, "application/json"),
+                    HttpHeaders.empty(),
+                    null,
+                    "/api/resource",
+                    "POST",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.REQUEST);
 
@@ -133,7 +150,14 @@ class UrlMethodOverrideTest {
             engine.loadSpec(specPath);
 
             JsonNode body = MAPPER.readTree("{\"action\": \"write\", \"resourceId\": \"42\"}");
-            Message message = new Message(body, null, null, null, "application/json", "/api/resource", "POST");
+            Message message = new Message(
+                    TestMessages.toBody(body, "application/json"),
+                    HttpHeaders.empty(),
+                    null,
+                    "/api/resource",
+                    "POST",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.REQUEST);
 
@@ -172,7 +196,14 @@ class UrlMethodOverrideTest {
 
             // Body has .action = "delete", but transform strips it
             JsonNode body = MAPPER.readTree("{\"action\": \"delete\", \"resourceId\": \"99\"}");
-            Message message = new Message(body, null, null, null, "application/json", "/api/resource/99", "POST");
+            Message message = new Message(
+                    TestMessages.toBody(body, "application/json"),
+                    HttpHeaders.empty(),
+                    null,
+                    "/api/resource/99",
+                    "POST",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.REQUEST);
 
@@ -180,7 +211,8 @@ class UrlMethodOverrideTest {
             // method.when evaluates against ORIGINAL body (has .action), so method changes
             assertThat(result.message().requestMethod()).isEqualTo("DELETE");
             // Body was transformed (no .action in output)
-            assertThat(result.message().body().has("action")).isFalse();
+            assertThat(TestMessages.parseBody(result.message().body()).has("action"))
+                    .isFalse();
         }
     }
 
@@ -216,15 +248,24 @@ class UrlMethodOverrideTest {
 
             JsonNode body = MAPPER.readTree(
                     "{\"action\": \"delete\", \"resource\": \"users\", \"resourceId\": \"42\", \"name\": \"Bob\"}");
-            Message message = new Message(body, null, null, null, "application/json", "/api/dispatch", "POST");
+            Message message = new Message(
+                    TestMessages.toBody(body, "application/json"),
+                    HttpHeaders.empty(),
+                    null,
+                    "/api/dispatch",
+                    "POST",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.REQUEST);
 
             assertThat(result.isSuccess()).isTrue();
             assertThat(result.message().requestPath()).isEqualTo("/api/users/42");
             assertThat(result.message().requestMethod()).isEqualTo("DELETE");
-            assertThat(result.message().body().has("name")).isTrue();
-            assertThat(result.message().body().has("action")).isFalse();
+            assertThat(TestMessages.parseBody(result.message().body()).has("name"))
+                    .isTrue();
+            assertThat(TestMessages.parseBody(result.message().body()).has("action"))
+                    .isFalse();
         }
     }
 
@@ -255,7 +296,14 @@ class UrlMethodOverrideTest {
             engine.loadSpec(specPath);
 
             JsonNode body = MAPPER.readTree("{\"data\": \"payload\"}");
-            Message message = new Message(body, null, null, 200, "application/json", "/api/resource", "POST");
+            Message message = new Message(
+                    TestMessages.toBody(body, "application/json"),
+                    HttpHeaders.empty(),
+                    200,
+                    "/api/resource",
+                    "POST",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.RESPONSE);
 

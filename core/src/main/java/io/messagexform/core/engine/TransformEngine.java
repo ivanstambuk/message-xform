@@ -11,7 +11,9 @@ import io.messagexform.core.error.InputSchemaViolation;
 import io.messagexform.core.error.TransformEvalException;
 import io.messagexform.core.model.ApplyStep;
 import io.messagexform.core.model.Direction;
+import io.messagexform.core.model.MediaType;
 import io.messagexform.core.model.Message;
+import io.messagexform.core.model.MessageBody;
 import io.messagexform.core.model.ProfileEntry;
 import io.messagexform.core.model.TransformContext;
 import io.messagexform.core.model.TransformProfile;
@@ -59,6 +61,93 @@ public final class TransformEngine {
     private static final ObjectMapper SIZE_MAPPER = new ObjectMapper();
     private static final JsonSchemaFactory SCHEMA_FACTORY =
             JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012);
+
+    // --- Body conversion helpers (Phase 2 port boundary) ---
+
+    /** Deserializes a MessageBody into a JsonNode for internal processing. */
+    private static JsonNode bodyToJson(MessageBody body) {
+        if (body == null || body.isEmpty()) {
+            return SIZE_MAPPER.nullNode();
+        }
+        try {
+            return SIZE_MAPPER.readTree(body.content());
+        } catch (java.io.IOException e) {
+            throw new IllegalArgumentException("Failed to parse message body as JSON", e);
+        }
+    }
+
+    /** Wraps a JsonNode back into a MessageBody with the given media type. */
+    private static MessageBody jsonToBody(JsonNode node, MediaType mediaType) {
+        if (node == null || node.isNull() || node.isMissingNode()) {
+            return MessageBody.empty();
+        }
+        try {
+            byte[] bytes = SIZE_MAPPER.writeValueAsBytes(node);
+            return MessageBody.of(bytes, mediaType != null ? mediaType : MediaType.JSON);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new IllegalArgumentException("Failed to serialize JsonNode to MessageBody", e);
+        }
+    }
+
+    // --- Context-to-JSON conversion helpers (Phase 2 port boundary) ---
+    // Used by JsltExpressionEngine to build JSLT context variables from port value
+    // objects.
+
+    /** Converts HttpHeaders to a JSON object with single-value entries. */
+    public static JsonNode headersToJson(io.messagexform.core.model.HttpHeaders headers) {
+        if (headers == null || headers.isEmpty()) {
+            return SIZE_MAPPER.createObjectNode();
+        }
+        var node = SIZE_MAPPER.createObjectNode();
+        headers.toSingleValueMap().forEach(node::put);
+        return node;
+    }
+
+    /** Converts HttpHeaders to a JSON object with multi-value (array) entries. */
+    public static JsonNode headersAllToJson(io.messagexform.core.model.HttpHeaders headers) {
+        if (headers == null || headers.isEmpty()) {
+            return SIZE_MAPPER.createObjectNode();
+        }
+        var node = SIZE_MAPPER.createObjectNode();
+        headers.toMultiValueMap().forEach((key, values) -> {
+            var arr = node.putArray(key);
+            values.forEach(arr::add);
+        });
+        return node;
+    }
+
+    /** Converts an Integer status to a JSON IntNode or NullNode. */
+    public static JsonNode statusToJson(Integer status) {
+        return status != null ? SIZE_MAPPER.getNodeFactory().numberNode(status) : SIZE_MAPPER.nullNode();
+    }
+
+    /** Converts a query params map to a JSON object. */
+    public static JsonNode queryParamsToJson(Map<String, String> queryParams) {
+        if (queryParams == null || queryParams.isEmpty()) {
+            return SIZE_MAPPER.createObjectNode();
+        }
+        var node = SIZE_MAPPER.createObjectNode();
+        queryParams.forEach(node::put);
+        return node;
+    }
+
+    /** Converts a cookies map to a JSON object. */
+    public static JsonNode cookiesToJson(Map<String, String> cookies) {
+        if (cookies == null || cookies.isEmpty()) {
+            return SIZE_MAPPER.createObjectNode();
+        }
+        var node = SIZE_MAPPER.createObjectNode();
+        cookies.forEach(node::put);
+        return node;
+    }
+
+    /** Converts a SessionContext to a JSON object. */
+    public static JsonNode sessionToJson(io.messagexform.core.model.SessionContext session) {
+        if (session == null || session.isEmpty()) {
+            return SIZE_MAPPER.createObjectNode();
+        }
+        return SIZE_MAPPER.valueToTree(session.toMap());
+    }
 
     private final SpecParser specParser;
     private final ErrorResponseBuilder errorResponseBuilder;
@@ -296,8 +385,8 @@ public final class TransformEngine {
         // For REQUEST transforms, $status is null (ADR-0017).
         // Session context is passed through from the message (FR-001-13, ADR-0030).
         Integer status = direction == Direction.RESPONSE ? message.statusCode() : null;
-        TransformContext context = new TransformContext(
-                message.headers(), message.headersAll(), status, null, null, message.sessionContext());
+        TransformContext context =
+                new TransformContext(message.headers(), status, Map.of(), Map.of(), message.session());
 
         return transform(message, direction, context);
     }
@@ -445,7 +534,7 @@ public final class TransformEngine {
         CompiledExpression expr = resolveExpression(spec, direction);
 
         // Save the original body for URL rewriting (ADR-0027: "route the input")
-        JsonNode originalBody = message.body();
+        JsonNode originalBody = bodyToJson(message.body());
 
         // T-001-42: Notify telemetry listener of transform start
         notifyTransformStarted(spec, direction);
@@ -455,7 +544,7 @@ public final class TransformEngine {
         try {
             // T-001-26: Strict-mode input schema validation
             if (schemaValidationMode == SchemaValidationMode.STRICT && spec.inputSchema() != null) {
-                validateInputSchema(message.body(), spec);
+                validateInputSchema(bodyToJson(message.body()), spec);
             }
 
             // T-001-39: Apply pipeline or single expression evaluation (FR-001-08,
@@ -463,7 +552,7 @@ public final class TransformEngine {
             JsonNode transformedBody;
             if (spec.hasApplyPipeline()) {
                 // Execute apply steps in declaration order — each step's output feeds the next
-                JsonNode pipelineInput = message.body();
+                JsonNode pipelineInput = bodyToJson(message.body());
                 for (ApplyStep step : spec.applySteps()) {
                     if (step.isExpr()) {
                         // Main transform expression
@@ -476,7 +565,7 @@ public final class TransformEngine {
                 transformedBody = pipelineInput;
             } else {
                 // No apply directive — backwards-compatible single expression evaluation
-                transformedBody = expr.evaluate(message.body(), context);
+                transformedBody = expr.evaluate(bodyToJson(message.body()), context);
             }
 
             long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
@@ -505,14 +594,13 @@ public final class TransformEngine {
 
             // Build the transformed message, preserving envelope metadata
             Message transformedMessage = new Message(
-                    transformedBody,
+                    jsonToBody(transformedBody, message.body().mediaType()),
                     message.headers(),
-                    message.headersAll(),
                     message.statusCode(),
-                    message.contentType(),
                     message.requestPath(),
                     message.requestMethod(),
-                    message.queryString());
+                    message.queryString(),
+                    message.session());
 
             // T-001-38a: Apply declarative URL rewrite (FR-001-12, ADR-0027)
             // Processing order: body transform → URL rewrite (original body) → headers →
@@ -535,15 +623,7 @@ public final class TransformEngine {
                 Integer newStatus =
                         StatusTransformer.apply(transformedMessage.statusCode(), spec.statusSpec(), transformedBody);
                 if (!java.util.Objects.equals(newStatus, transformedMessage.statusCode())) {
-                    transformedMessage = new Message(
-                            transformedMessage.body(),
-                            transformedMessage.headers(),
-                            transformedMessage.headersAll(),
-                            newStatus,
-                            transformedMessage.contentType(),
-                            transformedMessage.requestPath(),
-                            transformedMessage.requestMethod(),
-                            transformedMessage.queryString());
+                    transformedMessage = transformedMessage.withStatusCode(newStatus);
                 }
             }
 
@@ -554,7 +634,7 @@ public final class TransformEngine {
             notifyTransformFailed(spec, direction, failedMs, e.getMessage());
             // ADR-0022: Never pass through the original message on eval error.
             // Build an RFC 9457 error response instead.
-            JsonNode errorBody = errorResponseBuilder.buildErrorResponse(e, message.requestPath());
+            MessageBody errorBody = errorResponseBuilder.buildErrorResponse(e, message.requestPath());
             return TransformResult.error(errorBody, errorResponseBuilder.status());
         }
     }
@@ -592,18 +672,30 @@ public final class TransformEngine {
             // Phase 4 fallback — no profile context available
             return;
         }
-        var builder = LOG.atInfo()
-                .addKeyValue("profile_id", logCtx.profileId())
-                .addKeyValue("spec_id", spec.id())
-                .addKeyValue("spec_version", spec.version())
-                .addKeyValue("request_path", logCtx.requestPath())
-                .addKeyValue("specificity_score", logCtx.specificityScore())
-                .addKeyValue("eval_duration_ms", evalDurationMs)
-                .addKeyValue("direction", logCtx.direction().name());
         if (logCtx.chainStep() != null) {
-            builder = builder.addKeyValue("chain_step", logCtx.chainStep());
+            LOG.info(
+                    "transform.matched profile_id={} spec_id={} spec_version={} request_path={} "
+                            + "specificity_score={} eval_duration_ms={} direction={} chain_step={}",
+                    logCtx.profileId(),
+                    spec.id(),
+                    spec.version(),
+                    logCtx.requestPath(),
+                    logCtx.specificityScore(),
+                    evalDurationMs,
+                    logCtx.direction().name(),
+                    logCtx.chainStep());
+        } else {
+            LOG.info(
+                    "transform.matched profile_id={} spec_id={} spec_version={} request_path={} "
+                            + "specificity_score={} eval_duration_ms={} direction={}",
+                    logCtx.profileId(),
+                    spec.id(),
+                    spec.version(),
+                    logCtx.requestPath(),
+                    logCtx.specificityScore(),
+                    evalDurationMs,
+                    logCtx.direction().name());
         }
-        builder.log("transform.matched");
     }
 
     // --- Telemetry notification helpers (T-001-42, NFR-001-09) ---
@@ -717,11 +809,11 @@ public final class TransformEngine {
      * Called at the start of {@link #transform(Message, Direction)}.
      */
     private void setTraceContext(Message message) {
-        String requestId = message.headers().get("x-request-id");
+        String requestId = message.headers().toSingleValueMap().get("x-request-id");
         if (requestId != null && !requestId.isBlank()) {
             MDC.put(MDC_REQUEST_ID, requestId);
         }
-        String traceparent = message.headers().get("traceparent");
+        String traceparent = message.headers().toSingleValueMap().get("traceparent");
         if (traceparent != null && !traceparent.isBlank()) {
             MDC.put(MDC_TRACEPARENT, traceparent);
         }

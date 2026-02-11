@@ -8,14 +8,16 @@ import ch.qos.logback.core.read.ListAppender;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.messagexform.core.model.Direction;
+import io.messagexform.core.model.HttpHeaders;
 import io.messagexform.core.model.Message;
+import io.messagexform.core.model.SessionContext;
 import io.messagexform.core.model.TransformResult;
 import io.messagexform.core.spec.SpecParser;
+import io.messagexform.core.testkit.TestMessages;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -109,7 +111,14 @@ class ChainStepLoggingTest {
         engine.loadProfile(profilePath);
 
         JsonNode inputBody = JSON.readTree("{\"data\": \"test\"}");
-        Message message = new Message(inputBody, Map.of(), Map.of(), 200, "application/json", "/api/chain", "POST");
+        Message message = new Message(
+                TestMessages.toBody(inputBody, "application/json"),
+                HttpHeaders.empty(),
+                200,
+                "/api/chain",
+                "POST",
+                null,
+                SessionContext.empty());
 
         TransformResult result = engine.transform(message, Direction.RESPONSE);
 

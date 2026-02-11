@@ -6,9 +6,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.messagexform.core.engine.jslt.JsltExpressionEngine;
 import io.messagexform.core.model.Direction;
+import io.messagexform.core.model.HttpHeaders;
 import io.messagexform.core.model.Message;
+import io.messagexform.core.model.SessionContext;
 import io.messagexform.core.model.TransformResult;
 import io.messagexform.core.spec.SpecParser;
+import io.messagexform.core.testkit.TestMessages;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -62,14 +65,28 @@ class StatusBindingTest {
         engine.loadSpec(specPath);
 
         JsonNode body = MAPPER.readTree("{\"data\": \"payload\"}");
-        Message message = new Message(body, null, null, 200, "application/json", "/api/test", "GET");
+        Message message = new Message(
+                TestMessages.toBody(body, "application/json"),
+                HttpHeaders.empty(),
+                200,
+                "/api/test",
+                "GET",
+                null,
+                SessionContext.empty());
 
         TransformResult result = engine.transform(message, Direction.RESPONSE);
 
         assertThat(result.isSuccess()).isTrue();
-        assertThat(result.message().body().get("success").asBoolean()).isTrue();
-        assertThat(result.message().body().get("httpStatus").asInt()).isEqualTo(200);
-        assertThat(result.message().body().get("data").asText()).isEqualTo("payload");
+        assertThat(TestMessages.parseBody(result.message().body())
+                        .get("success")
+                        .asBoolean())
+                .isTrue();
+        assertThat(TestMessages.parseBody(result.message().body())
+                        .get("httpStatus")
+                        .asInt())
+                .isEqualTo(200);
+        assertThat(TestMessages.parseBody(result.message().body()).get("data").asText())
+                .isEqualTo("payload");
     }
 
     @Test
@@ -97,13 +114,26 @@ class StatusBindingTest {
         engine.loadSpec(specPath);
 
         JsonNode body = MAPPER.readTree("{\"data\": \"error payload\"}");
-        Message message = new Message(body, null, null, 500, "application/json", "/api/test", "GET");
+        Message message = new Message(
+                TestMessages.toBody(body, "application/json"),
+                HttpHeaders.empty(),
+                500,
+                "/api/test",
+                "GET",
+                null,
+                SessionContext.empty());
 
         TransformResult result = engine.transform(message, Direction.RESPONSE);
 
         assertThat(result.isSuccess()).isTrue();
-        assertThat(result.message().body().get("success").asBoolean()).isFalse();
-        assertThat(result.message().body().get("httpStatus").asInt()).isEqualTo(500);
+        assertThat(TestMessages.parseBody(result.message().body())
+                        .get("success")
+                        .asBoolean())
+                .isFalse();
+        assertThat(TestMessages.parseBody(result.message().body())
+                        .get("httpStatus")
+                        .asInt())
+                .isEqualTo(500);
     }
 
     @Test
@@ -131,14 +161,28 @@ class StatusBindingTest {
         engine.loadSpec(specPath);
 
         JsonNode body = MAPPER.readTree("{\"data\": \"hello\"}");
-        Message message = new Message(body, null, null, null, "application/json", "/api/test", "POST");
+        Message message = new Message(
+                TestMessages.toBody(body, "application/json"),
+                HttpHeaders.empty(),
+                null,
+                "/api/test",
+                "POST",
+                null,
+                SessionContext.empty());
 
         TransformResult result = engine.transform(message, Direction.REQUEST);
 
         assertThat(result.isSuccess()).isTrue();
-        assertThat(result.message().body().get("data").asText()).isEqualTo("hello");
-        assertThat(result.message().body().get("statusKnown").asBoolean()).isFalse();
-        assertThat(result.message().body().get("httpStatus").asText()).isEqualTo("N/A");
+        assertThat(TestMessages.parseBody(result.message().body()).get("data").asText())
+                .isEqualTo("hello");
+        assertThat(TestMessages.parseBody(result.message().body())
+                        .get("statusKnown")
+                        .asBoolean())
+                .isFalse();
+        assertThat(TestMessages.parseBody(result.message().body())
+                        .get("httpStatus")
+                        .asText())
+                .isEqualTo("N/A");
     }
 
     @Test
@@ -166,14 +210,28 @@ class StatusBindingTest {
         engine.loadSpec(specPath);
 
         JsonNode body = MAPPER.readTree("{\"data\": \"test\"}");
-        Message message = new Message(body, null, null, null, "application/json", "/api/test", "POST");
+        Message message = new Message(
+                TestMessages.toBody(body, "application/json"),
+                HttpHeaders.empty(),
+                null,
+                "/api/test",
+                "POST",
+                null,
+                SessionContext.empty());
 
         TransformResult result = engine.transform(message, Direction.REQUEST);
 
         assertThat(result.isSuccess()).isTrue();
-        assertThat(result.message().body().get("statusIsNull").asBoolean()).isTrue();
-        assertThat(result.message().body().get("statusType").asText()).isEqualTo("absent");
-        assertThat(result.message().body().get("data").asText()).isEqualTo("test");
+        assertThat(TestMessages.parseBody(result.message().body())
+                        .get("statusIsNull")
+                        .asBoolean())
+                .isTrue();
+        assertThat(TestMessages.parseBody(result.message().body())
+                        .get("statusType")
+                        .asText())
+                .isEqualTo("absent");
+        assertThat(TestMessages.parseBody(result.message().body()).get("data").asText())
+                .isEqualTo("test");
     }
 
     // --- Helper ---

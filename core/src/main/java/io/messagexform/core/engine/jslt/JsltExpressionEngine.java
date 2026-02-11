@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.schibsted.spt.data.jslt.Expression;
 import com.schibsted.spt.data.jslt.JsltException;
 import com.schibsted.spt.data.jslt.Parser;
+import io.messagexform.core.engine.TransformEngine;
 import io.messagexform.core.error.ExpressionCompileException;
 import io.messagexform.core.error.ExpressionEvalException;
 import io.messagexform.core.model.TransformContext;
@@ -69,12 +70,12 @@ public final class JsltExpressionEngine implements ExpressionEngine {
          */
         private static Map<String, JsonNode> buildVariables(TransformContext context) {
             Map<String, JsonNode> vars = new HashMap<>();
-            vars.put("headers", context.headersAsJson());
-            vars.put("headers_all", context.headersAllAsJson());
-            vars.put("status", context.statusAsJson());
-            vars.put("queryParams", context.queryParamsAsJson());
-            vars.put("cookies", context.cookiesAsJson());
-            vars.put("session", context.sessionContextAsJson());
+            vars.put("headers", TransformEngine.headersToJson(context.headers()));
+            vars.put("headers_all", TransformEngine.headersAllToJson(context.headers()));
+            vars.put("status", TransformEngine.statusToJson(context.status()));
+            vars.put("queryParams", TransformEngine.queryParamsToJson(context.queryParams()));
+            vars.put("cookies", TransformEngine.cookiesToJson(context.cookies()));
+            vars.put("session", TransformEngine.sessionToJson(context.session()));
             return vars;
         }
     }

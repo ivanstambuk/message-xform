@@ -4,10 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.NullNode;
 import io.messagexform.core.engine.jslt.JsltExpressionEngine;
+import io.messagexform.core.model.HttpHeaders;
+import io.messagexform.core.model.SessionContext;
 import io.messagexform.core.model.TransformContext;
 import io.messagexform.core.spi.CompiledExpression;
+import io.messagexform.core.testkit.TestMessages;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
@@ -31,7 +33,8 @@ class SessionContextBindingTest {
 
         JsonNode input = MAPPER.readTree("{\"action\": \"login\"}");
         JsonNode session = MAPPER.readTree("{\"sub\": \"bjensen\"}");
-        TransformContext ctx = new TransformContext(Map.of(), Map.of(), null, Map.of(), Map.of(), session);
+        TransformContext ctx = new TransformContext(
+                HttpHeaders.empty(), null, Map.of(), Map.of(), TestMessages.toSessionContext(session));
 
         JsonNode result = expr.evaluate(input, ctx);
 
@@ -46,7 +49,8 @@ class SessionContextBindingTest {
 
         JsonNode input = MAPPER.readTree("{}");
         JsonNode session = MAPPER.readTree("{\"roles\": [\"admin\", \"user\"]}");
-        TransformContext ctx = new TransformContext(Map.of(), Map.of(), null, Map.of(), Map.of(), session);
+        TransformContext ctx = new TransformContext(
+                HttpHeaders.empty(), null, Map.of(), Map.of(), TestMessages.toSessionContext(session));
 
         JsonNode result = expr.evaluate(input, ctx);
 
@@ -65,7 +69,8 @@ class SessionContextBindingTest {
 
         JsonNode input = MAPPER.readTree("{}");
         // No session context (null)
-        TransformContext ctx = new TransformContext(Map.of(), Map.of(), null, Map.of(), Map.of(), null);
+        TransformContext ctx =
+                new TransformContext(HttpHeaders.empty(), null, Map.of(), Map.of(), SessionContext.empty());
 
         JsonNode result = expr.evaluate(input, ctx);
 
@@ -82,7 +87,8 @@ class SessionContextBindingTest {
         JsonNode input = MAPPER.readTree("{\"data\": 1}");
         JsonNode session = MAPPER.readTree("{\"tenant\": \"acme\"}");
         // Request context: status is null
-        TransformContext ctx = new TransformContext(Map.of(), Map.of(), null, Map.of(), Map.of(), session);
+        TransformContext ctx = new TransformContext(
+                HttpHeaders.empty(), null, Map.of(), Map.of(), TestMessages.toSessionContext(session));
 
         JsonNode result = expr.evaluate(input, ctx);
 
@@ -96,7 +102,8 @@ class SessionContextBindingTest {
         JsonNode input = MAPPER.readTree("{\"status\": \"ok\"}");
         JsonNode session = MAPPER.readTree("{\"sub\": \"admin\"}");
         // Response context: status is 200
-        TransformContext ctx = new TransformContext(Map.of(), Map.of(), 200, Map.of(), Map.of(), session);
+        TransformContext ctx = new TransformContext(
+                HttpHeaders.empty(), 200, Map.of(), Map.of(), TestMessages.toSessionContext(session));
 
         JsonNode result = expr.evaluate(input, ctx);
 
@@ -111,8 +118,12 @@ class SessionContextBindingTest {
 
         JsonNode input = MAPPER.readTree("{}");
         JsonNode session = MAPPER.readTree("{\"sub\": \"bjensen\"}");
-        TransformContext ctx =
-                new TransformContext(Map.of("host", "api.example.com"), Map.of(), 200, Map.of(), Map.of(), session);
+        TransformContext ctx = new TransformContext(
+                TestMessages.toHeaders(Map.of("host", "api.example.com"), Map.of()),
+                200,
+                Map.of(),
+                Map.of(),
+                TestMessages.toSessionContext(session));
 
         JsonNode result = expr.evaluate(input, ctx);
 
@@ -130,7 +141,8 @@ class SessionContextBindingTest {
 
         JsonNode input = MAPPER.readTree("{}");
         JsonNode session = MAPPER.readTree("{}");
-        TransformContext ctx = new TransformContext(Map.of(), Map.of(), null, Map.of(), Map.of(), session);
+        TransformContext ctx = new TransformContext(
+                HttpHeaders.empty(), null, Map.of(), Map.of(), TestMessages.toSessionContext(session));
 
         JsonNode result = expr.evaluate(input, ctx);
 
@@ -139,19 +151,23 @@ class SessionContextBindingTest {
     }
 
     @Test
-    void sessionContext_nullNodeIsDistinctFromNull() throws Exception {
-        // Explicit NullNode as session context → sessionContextAsJson() returns
-        // NullNode
-        TransformContext ctxNull =
-                new TransformContext(Map.of(), Map.of(), null, Map.of(), Map.of(), NullNode.getInstance());
+    void sessionContext_emptyReturnsEmptyObject() throws Exception {
+        // Empty session context → sessionToJson() returns empty ObjectNode {}.
+        // This is better than NullNode because JSLT can access $session.sub
+        // (evaluates to absent) without crashing on NullNode.
+        TransformContext ctxEmpty =
+                new TransformContext(HttpHeaders.empty(), null, Map.of(), Map.of(), SessionContext.empty());
 
-        JsonNode resultNull = ctxNull.sessionContextAsJson();
-        assertThat(resultNull.isNull()).isTrue();
+        JsonNode result = TransformEngine.sessionToJson(ctxEmpty.session());
+        assertThat(result.isObject()).isTrue();
+        assertThat(result.isEmpty()).isTrue();
 
-        // No session context (Java null) → sessionContextAsJson() also returns NullNode
-        TransformContext ctxNoSession = new TransformContext(Map.of(), Map.of(), null, Map.of(), Map.of(), null);
+        // Populated session → returns non-empty ObjectNode
+        TransformContext ctxPopulated = new TransformContext(
+                HttpHeaders.empty(), null, Map.of(), Map.of(), SessionContext.of(Map.of("sub", "user1")));
 
-        JsonNode resultNoSession = ctxNoSession.sessionContextAsJson();
-        assertThat(resultNoSession.isNull()).isTrue();
+        JsonNode resultPopulated = TransformEngine.sessionToJson(ctxPopulated.session());
+        assertThat(resultPopulated.isObject()).isTrue();
+        assertThat(resultPopulated.get("sub").asText()).isEqualTo("user1");
     }
 }

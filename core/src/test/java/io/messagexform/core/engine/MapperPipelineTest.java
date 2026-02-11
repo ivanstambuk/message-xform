@@ -6,9 +6,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.messagexform.core.engine.jslt.JsltExpressionEngine;
 import io.messagexform.core.model.Direction;
+import io.messagexform.core.model.HttpHeaders;
 import io.messagexform.core.model.Message;
+import io.messagexform.core.model.SessionContext;
 import io.messagexform.core.model.TransformResult;
 import io.messagexform.core.spec.SpecParser;
+import io.messagexform.core.testkit.TestMessages;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -99,12 +102,19 @@ class MapperPipelineTest {
             "_debug_trace": "svc=orders,dur=8ms"
           }
           """);
-            Message message = new Message(body, null, null, 200, "application/json", "/api/orders", "POST");
+            Message message = new Message(
+                    TestMessages.toBody(body, "application/json"),
+                    HttpHeaders.empty(),
+                    200,
+                    "/api/orders",
+                    "POST",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.RESPONSE);
 
             assertThat(result.isSuccess()).isTrue();
-            JsonNode output = result.message().body();
+            JsonNode output = TestMessages.parseBody(result.message().body());
 
             // Verify strip-internal removed the unwanted fields
             assertThat(output.has("_internal_id")).isFalse();
@@ -158,12 +168,19 @@ class MapperPipelineTest {
             engine.loadSpec(specPath);
 
             JsonNode body = MAPPER.readTree("{\"initial\": true}");
-            Message message = new Message(body, null, null, 200, "application/json", "/test", "POST");
+            Message message = new Message(
+                    TestMessages.toBody(body, "application/json"),
+                    HttpHeaders.empty(),
+                    200,
+                    "/test",
+                    "POST",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.RESPONSE);
 
             assertThat(result.isSuccess()).isTrue();
-            JsonNode output = result.message().body();
+            JsonNode output = TestMessages.parseBody(result.message().body());
 
             // All steps executed
             assertThat(output.get("initial").asBoolean()).isTrue();
@@ -203,12 +220,22 @@ class MapperPipelineTest {
             engine.loadSpec(specPath);
 
             JsonNode body = MAPPER.readTree("{\"data\": \"hello\"}");
-            Message message = new Message(body, null, null, 200, "application/json", "/test", "POST");
+            Message message = new Message(
+                    TestMessages.toBody(body, "application/json"),
+                    HttpHeaders.empty(),
+                    200,
+                    "/test",
+                    "POST",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.RESPONSE);
 
             assertThat(result.isSuccess()).isTrue();
-            assertThat(result.message().body().get("result").asText()).isEqualTo("hello");
+            assertThat(TestMessages.parseBody(result.message().body())
+                            .get("result")
+                            .asText())
+                    .isEqualTo("hello");
         }
 
         @Test
@@ -238,14 +265,25 @@ class MapperPipelineTest {
             engine.loadSpec(specPath);
 
             JsonNode body = MAPPER.readTree("{\"data\": \"hello\"}");
-            Message message = new Message(body, null, null, 200, "application/json", "/test", "POST");
+            Message message = new Message(
+                    TestMessages.toBody(body, "application/json"),
+                    HttpHeaders.empty(),
+                    200,
+                    "/test",
+                    "POST",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.RESPONSE);
 
             assertThat(result.isSuccess()).isTrue();
-            assertThat(result.message().body().get("result").asText()).isEqualTo("hello");
+            assertThat(TestMessages.parseBody(result.message().body())
+                            .get("result")
+                            .asText())
+                    .isEqualTo("hello");
             // unused mapper should NOT have been applied
-            assertThat(result.message().body().has("unused")).isFalse();
+            assertThat(TestMessages.parseBody(result.message().body()).has("unused"))
+                    .isFalse();
         }
     }
 
@@ -276,12 +314,22 @@ class MapperPipelineTest {
             engine.loadSpec(specPath);
 
             JsonNode body = MAPPER.readTree("{\"data\": \"test\"}");
-            Message message = new Message(body, null, null, 200, "application/json", "/test", "POST");
+            Message message = new Message(
+                    TestMessages.toBody(body, "application/json"),
+                    HttpHeaders.empty(),
+                    200,
+                    "/test",
+                    "POST",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.RESPONSE);
 
             assertThat(result.isSuccess()).isTrue();
-            assertThat(result.message().body().get("processed").asText()).isEqualTo("test");
+            assertThat(TestMessages.parseBody(result.message().body())
+                            .get("processed")
+                            .asText())
+                    .isEqualTo("test");
         }
 
         @Test
@@ -315,13 +363,23 @@ class MapperPipelineTest {
             engine.loadSpec(specPath);
 
             JsonNode body = MAPPER.readTree("{\"name\": \"alice\"}");
-            Message message = new Message(body, null, null, 200, "application/json", "/test", "POST");
+            Message message = new Message(
+                    TestMessages.toBody(body, "application/json"),
+                    HttpHeaders.empty(),
+                    200,
+                    "/test",
+                    "POST",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.RESPONSE);
 
             assertThat(result.isSuccess()).isTrue();
             // Mapper added displayName with "User:" prefix, then expr used it
-            assertThat(result.message().body().get("greeting").asText()).isEqualTo("Hello, User:alice!");
+            assertThat(TestMessages.parseBody(result.message().body())
+                            .get("greeting")
+                            .asText())
+                    .isEqualTo("Hello, User:alice!");
         }
     }
 
@@ -361,15 +419,28 @@ class MapperPipelineTest {
             engine.loadSpec(specPath);
 
             JsonNode body = MAPPER.readTree("{\"value\": \"important\"}");
-            Message message = new Message(body, null, null, 200, "application/json", "/test", "POST");
+            Message message = new Message(
+                    TestMessages.toBody(body, "application/json"),
+                    HttpHeaders.empty(),
+                    200,
+                    "/test",
+                    "POST",
+                    null,
+                    SessionContext.empty());
 
             TransformResult result = engine.transform(message, Direction.RESPONSE);
 
             assertThat(result.isSuccess()).isTrue();
-            assertThat(result.message().body().get("data").asText()).isEqualTo("important");
-            assertThat(result.message().body().get("enriched").asBoolean()).isTrue();
+            assertThat(TestMessages.parseBody(result.message().body())
+                            .get("data")
+                            .asText())
+                    .isEqualTo("important");
+            assertThat(TestMessages.parseBody(result.message().body())
+                            .get("enriched")
+                            .asBoolean())
+                    .isTrue();
             // Header also applied
-            assertThat(result.message().headers().get("x-pipeline-applied")).isEqualTo("true");
+            assertThat(result.message().headers().first("x-pipeline-applied")).isEqualTo("true");
         }
     }
 

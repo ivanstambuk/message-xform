@@ -7,6 +7,7 @@ import io.messagexform.core.error.EvalBudgetExceededException;
 import io.messagexform.core.error.ExpressionEvalException;
 import io.messagexform.core.error.InputSchemaViolation;
 import io.messagexform.core.error.TransformEvalException;
+import io.messagexform.core.model.MessageBody;
 
 /**
  * Builds error responses from evaluation-time exceptions (FR-001-07,
@@ -69,7 +70,7 @@ public final class ErrorResponseBuilder {
     }
 
     /**
-     * Builds an error response JSON from an evaluation exception.
+     * Builds an error response from an evaluation exception.
      *
      * <p>
      * In RFC 9457 mode, produces a standard Problem Details response.
@@ -77,13 +78,21 @@ public final class ErrorResponseBuilder {
      *
      * @param exception    the evaluation-time exception
      * @param instancePath the request path, may be null
-     * @return a {@link JsonNode} error response
+     * @return a {@link MessageBody} error response (JSON)
      */
-    public JsonNode buildErrorResponse(TransformEvalException exception, String instancePath) {
-        if (customTemplate != null) {
-            return buildCustomResponse(exception);
+    public MessageBody buildErrorResponse(TransformEvalException exception, String instancePath) {
+        try {
+            JsonNode node;
+            if (customTemplate != null) {
+                node = buildCustomResponse(exception);
+            } else {
+                node = buildRfc9457Response(exception, instancePath);
+            }
+            return MessageBody.json(MAPPER.writeValueAsBytes(node));
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            // Should never happen for a valid ObjectNode
+            return MessageBody.json("{\"type\":\"urn:message-xform:error:unknown\",\"title\":\"Transform Failed\"}");
         }
-        return buildRfc9457Response(exception, instancePath);
     }
 
     /** Returns the HTTP status code used by this builder. */

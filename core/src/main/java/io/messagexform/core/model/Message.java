@@ -1,94 +1,79 @@
 package io.messagexform.core.model;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 
 /**
- * Generic HTTP message envelope (DO-001-01). Gateway adapters produce instances
- * of this interface by
- * wrapping their native request/response objects. The engine operates
- * exclusively on {@code Message}
- * — it never touches gateway-native types.
+ * Generic HTTP message envelope (DO-001-01, FR-001-04). Gateway adapters
+ * produce instances by wrapping their native request/response objects. The
+ * engine operates exclusively on {@code Message} — it never touches
+ * gateway-native types.
  *
  * <p>
- * All fields are nullable except {@code body}, which defaults to a JSON null
- * node.
- *
- * <p>
- * Header names MUST be normalized to lowercase (RFC 9110 §5.1). The
- * {@link #headers()} map
- * contains first-value semantics; {@link #headersAll()} provides multi-value
- * access.
+ * All port-type fields ({@code body}, {@code headers}, {@code session})
+ * are core-owned value objects with zero third-party dependencies (ADR-0032,
+ * ADR-0033). The record is immutable — use {@code with*()} methods to create
+ * copies with modified fields.
  */
 public record Message(
-        JsonNode body,
-        Map<String, String> headers,
-        Map<String, List<String>> headersAll,
+        MessageBody body,
+        HttpHeaders headers,
         Integer statusCode,
-        String contentType,
         String requestPath,
         String requestMethod,
         String queryString,
-        JsonNode sessionContext) {
+        SessionContext session) {
 
-    /**
-     * Canonical constructor with validation.
-     *
-     * @param body           the JSON body — must not be null (use Jackson's
-     *                       NullNode
-     *                       for absent bodies)
-     * @param headers        single-value header map (lowercase keys)
-     * @param headersAll     multi-value header map (lowercase keys)
-     * @param statusCode     HTTP status code (null for requests if unknown)
-     * @param contentType    the Content-Type header value (convenience accessor)
-     * @param requestPath    the request path (needed for profile matching on
-     *                       response transforms)
-     * @param requestMethod  the HTTP method (needed for profile matching)
-     * @param queryString    the raw query string without leading '?' (e.g.
-     *                       "key=val&other=x"), nullable
-     * @param sessionContext optional gateway session context (FR-001-13, ADR-0030),
-     *                       nullable — adapters populate this from their native
-     *                       session APIs
-     */
+    /** Canonical constructor with validation. */
     public Message {
-        Objects.requireNonNull(body, "body must not be null; use NullNode for absent bodies");
-        headers = headers != null ? Collections.unmodifiableMap(headers) : Map.of();
-        headersAll = headersAll != null ? Collections.unmodifiableMap(headersAll) : Map.of();
+        Objects.requireNonNull(body, "body must not be null; use MessageBody.empty() for absent bodies");
+        if (headers == null) headers = HttpHeaders.empty();
+        if (session == null) session = SessionContext.empty();
+    }
+
+    // ── with*() copy methods ──
+
+    /** Returns a copy with a different body. */
+    public Message withBody(MessageBody newBody) {
+        return new Message(newBody, headers, statusCode, requestPath, requestMethod, queryString, session);
+    }
+
+    /** Returns a copy with different headers. */
+    public Message withHeaders(HttpHeaders newHeaders) {
+        return new Message(body, newHeaders, statusCode, requestPath, requestMethod, queryString, session);
+    }
+
+    /** Returns a copy with a different status code. */
+    public Message withStatusCode(Integer newStatusCode) {
+        return new Message(body, headers, newStatusCode, requestPath, requestMethod, queryString, session);
+    }
+
+    /** Returns a copy with a different request path. */
+    public Message withRequestPath(String newRequestPath) {
+        return new Message(body, headers, statusCode, newRequestPath, requestMethod, queryString, session);
+    }
+
+    /** Returns a copy with a different request method. */
+    public Message withRequestMethod(String newRequestMethod) {
+        return new Message(body, headers, statusCode, requestPath, newRequestMethod, queryString, session);
+    }
+
+    /** Returns a copy with a different query string. */
+    public Message withQueryString(String newQueryString) {
+        return new Message(body, headers, statusCode, requestPath, requestMethod, newQueryString, session);
+    }
+
+    // ── Derived accessors ──
+
+    /** Returns the media type of the body. */
+    public MediaType mediaType() {
+        return body.mediaType();
     }
 
     /**
-     * Convenience constructor without session context (backward compatibility).
-     * Existing call sites that supply queryString but not sessionContext use this
-     * form.
+     * Returns the Content-Type string from the body's media type.
+     * Returns {@code null} when the media type is {@link MediaType#NONE}.
      */
-    public Message(
-            JsonNode body,
-            Map<String, String> headers,
-            Map<String, List<String>> headersAll,
-            Integer statusCode,
-            String contentType,
-            String requestPath,
-            String requestMethod,
-            String queryString) {
-        this(body, headers, headersAll, statusCode, contentType, requestPath, requestMethod, queryString, null);
-    }
-
-    /**
-     * Convenience constructor without query string or session context (backward
-     * compatibility).
-     * Most test call sites use this form.
-     */
-    public Message(
-            JsonNode body,
-            Map<String, String> headers,
-            Map<String, List<String>> headersAll,
-            Integer statusCode,
-            String contentType,
-            String requestPath,
-            String requestMethod) {
-        this(body, headers, headersAll, statusCode, contentType, requestPath, requestMethod, null, null);
+    public String contentType() {
+        return body.mediaType().value();
     }
 }
