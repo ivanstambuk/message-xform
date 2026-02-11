@@ -72,6 +72,13 @@ wrappers).
 - N-001-04 – Implementing alternative expression engines (JOLT, jq, JSONata) is not part
   of this feature. The SPI is defined here; engine adapters are tracked separately.
 
+> **Type notation:** Interface and type definitions in this specification use
+> TypeScript-style declarations (`.d.ts`) as a **language-neutral notation**.
+> The implementation language is Java, but specs are intentionally notation-agnostic.
+> `JsonTree` represents a parsed JSON tree (Jackson `JsonNode` in the Java
+> implementation). `T | null` denotes nullable types. `namespace` groups
+> factory/static methods.
+
 ## Functional Requirements
 
 ### FR-001-01: Transformation Spec Format
@@ -170,37 +177,36 @@ in sequence.
 
 **Requirement:** The engine MUST support a pluggable expression engine model. Each
 expression engine is identified by a string id (e.g., `jslt`, `jolt`, `jq`, `jsonata`)
-and implements a common Java interface.
+and implements a common interface.
 
-```java
+```typescript
 /**
  * Expression engine plugin — evaluates a transform expression against a JSON input.
  * Implementations MUST be pure (no I/O), thread-safe, and respect engine limits.
  * See ADR-0010 (Pluggable Expression Engine SPI).
  */
-public interface ExpressionEngine {
-    /** Engine identifier, e.g. "jslt", "jolt", "jq". */
-    String id();
+interface ExpressionEngine {
+  /** Engine identifier, e.g. "jslt", "jolt", "jq". */
+  readonly id: string;
 
-    /**
-     * Compile an expression string into a reusable, thread-safe handle.
-     * Called once at spec load time.
-     */
-    CompiledExpression compile(String expr) throws ExpressionCompileException;
-    // ExpressionCompileException is a subtype of TransformLoadException — see Error Catalogue.
+  /**
+   * Compile an expression string into a reusable, thread-safe handle.
+   * Called once at spec load time.
+   * @throws ExpressionCompileException (subtype of TransformLoadException)
+   */
+  compile(expr: string): CompiledExpression;
 }
 
-public interface CompiledExpression {
-    /**
-     * Evaluate the compiled expression against the input JSON.
-     * Called per-request on the gateway hot path — MUST be fast and thread-safe.
-     *
-     * @param input   the JSON message body
-     * @param context read-only transform context (headers, status, request metadata)
-     */
-    JsonNode evaluate(JsonNode input, TransformContext context)
-        throws ExpressionEvalException;
-    // ExpressionEvalException is a subtype of TransformEvalException — see Error Catalogue.
+interface CompiledExpression {
+  /**
+   * Evaluate the compiled expression against the input JSON.
+   * Called per-request on the gateway hot path — MUST be fast and thread-safe.
+   *
+   * @param input   the JSON message body
+   * @param context read-only transform context (headers, status, request metadata)
+   * @throws ExpressionEvalException (subtype of TransformEvalException)
+   */
+  evaluate(input: JsonTree, context: TransformContext): JsonTree;
 }
 
 /**
@@ -208,23 +214,23 @@ public interface CompiledExpression {
  * Engines consume whichever context they support (e.g., JSLT binds $headers
  * and $status as variables; JOLT ignores them).
  */
- public interface TransformContext {
-    /** HTTP headers as a JsonNode object (keys = header names, values = first value). */
-    JsonNode getHeaders();
-    /** All HTTP header values as a JsonNode object (keys = header names, values = arrays of strings). ADR-0026. */
-    JsonNode getHeadersAll();
-    /** HTTP status code, or null for request transforms (ADR-0017, ADR-0020). */
-    Integer getStatusCode();
-    /** Request path (e.g., "/json/alpha/authenticate"). */
-    String getRequestPath();
-    /** HTTP method (e.g., "POST"). */
-    String getRequestMethod();
-    /** Query params as JsonNode object (keys = param names, values = first value). ADR-0021. */
-    JsonNode getQueryParams();
-    /** Request cookies as JsonNode object (keys = cookie names, values = cookie values). ADR-0021. */
-    JsonNode getCookies();
-    /** Gateway session context as arbitrary JSON, or null if unavailable. ADR-0030. */
-    JsonNode getSessionContext();
+interface TransformContext {
+  /** HTTP headers as a JSON object (keys = header names, values = first value). */
+  readonly headers: JsonTree;
+  /** All HTTP header values (keys = header names, values = string arrays). ADR-0026. */
+  readonly headersAll: JsonTree;
+  /** HTTP status code, or null for request transforms (ADR-0017, ADR-0020). */
+  readonly statusCode: number | null;
+  /** Request path (e.g., "/json/alpha/authenticate"). */
+  readonly requestPath: string;
+  /** HTTP method (e.g., "POST"). */
+  readonly requestMethod: string;
+  /** Query params as JSON object (keys = param names, values = first value). ADR-0021. */
+  readonly queryParams: JsonTree;
+  /** Request cookies as JSON object (keys = cookie names, values = cookie values). ADR-0021. */
+  readonly cookies: JsonTree;
+  /** Gateway session context as arbitrary JSON, or null if unavailable. ADR-0030. */
+  readonly sessionContext: JsonTree | null;
 }
 ```
 
@@ -324,31 +330,27 @@ entries.
 **Requirement:** The engine MUST operate on a generic **message envelope** that
 abstracts the HTTP message, regardless of which gateway it came from:
 
-```java
-public record Message(
-    MessageBody body,
-    HttpHeaders headers,
-    Integer statusCode,
-    String requestPath,
-    String requestMethod,
-    String queryString,
-    SessionContext session
-) {
-    /** Returns a copy with a different body. */
-    public Message withBody(MessageBody newBody) { ... }
+```typescript
+/** Immutable message envelope — abstracts an HTTP message regardless of gateway origin. */
+type Message = {
+  readonly body: MessageBody;
+  readonly headers: HttpHeaders;
+  readonly statusCode: number | null;     // null for requests (ADR-0020)
+  readonly requestPath: string;
+  readonly requestMethod: string;
+  readonly queryString: string | null;
+  readonly session: SessionContext | null;
 
-    /** Returns a copy with different headers. */
-    public Message withHeaders(HttpHeaders newHeaders) { ... }
+  /** Convenience: media type from body. */
+  mediaType(): MediaType;
+  /** Convenience: content type string from body (e.g. "application/json"). */
+  contentType(): string | null;
 
-    /** Returns a copy with a different status code. */
-    public Message withStatusCode(Integer newStatusCode) { ... }
-
-    /** Convenience: media type from body. */
-    public MediaType mediaType() { return body.mediaType(); }
-
-    /** Convenience: content type string from body (e.g. "application/json"). */
-    public String contentType() { return body.mediaType().value(); }
-}
+  // Copy constructors — return a new Message with one field replaced
+  withBody(newBody: MessageBody): Message;
+  withHeaders(newHeaders: HttpHeaders): Message;
+  withStatusCode(newStatusCode: number | null): Message;
+};
 ```
 
 Note: the body field uses `MessageBody` (a `byte[]` + `MediaType` pair), NOT
@@ -1057,33 +1059,36 @@ MUST be rejected at load time with a diagnostic message.
 **Requirement:** Core's public API MUST NOT expose any third-party types
 (Jackson `JsonNode`, SLF4J 2.x-only APIs, etc.) to adapters or callers.
 Instead, core defines its own **port value objects** — simple, immutable
-types using only Java standard library types (`byte[]`, `Map`, `String`,
-`enum`). These types form the Anti-Corruption Layer boundary (ADR-0032,
+types using only standard library primitives (byte arrays, maps, strings,
+enums). These types form the Anti-Corruption Layer boundary (ADR-0032,
 ADR-0033, Level 2 Hexagonal Architecture).
 
 Core defines four port types:
 
 #### FR-001-14a: `MediaType` Enum
 
-```java
-public enum MediaType {
-    JSON("application/json"),
-    XML("application/xml"),
-    FORM("application/x-www-form-urlencoded"),
-    TEXT("text/plain"),
-    BINARY("application/octet-stream"),
-    NONE(null);
+```typescript
+/** Core-owned replacement for raw content-type strings. Zero dependencies. */
+enum MediaType {
+  JSON   = "application/json",
+  XML    = "application/xml",
+  FORM   = "application/x-www-form-urlencoded",
+  TEXT   = "text/plain",
+  BINARY = "application/octet-stream",
+  NONE   = null                            // no content type
+}
 
-    /** Returns the MIME type string, or null for NONE. */
-    public String value() { ... }
+namespace MediaType {
+  /** Returns the MIME type string, or null for NONE. */
+  function value(): string | null;
 
-    /**
-     * Resolves a Content-Type header value to a MediaType.
-     * Ignores parameters (charset, boundary, etc.).
-     * Recognizes structured suffixes: +json → JSON, +xml → XML.
-     * Returns NONE for null/blank, BINARY for unrecognized types.
-     */
-    public static MediaType fromContentType(String contentType) { ... }
+  /**
+   * Resolves a Content-Type header value to a MediaType.
+   * Ignores parameters (charset, boundary, etc.).
+   * Recognizes structured suffixes: +json → JSON, +xml → XML.
+   * Returns NONE for null/blank, BINARY for unrecognized types.
+   */
+  function fromContentType(contentType: string | null): MediaType;
 }
 ```
 
@@ -1092,22 +1097,25 @@ Zero third-party dependencies.
 
 #### FR-001-14b: `MessageBody` Record
 
-```java
-public record MessageBody(byte[] content, MediaType mediaType) {
-    /** True when content is null or zero-length. */
-    public boolean isEmpty() { ... }
+```typescript
+/** Immutable body container — opaque bytes + media type. */
+type MessageBody = {
+  readonly content: Uint8Array;           // body bytes (normalized: null → empty)
+  readonly mediaType: MediaType;
 
-    /** Returns content as a UTF-8 string. */
-    public String asString() { ... }
+  /** True when content is null or zero-length. */
+  isEmpty(): boolean;
+  /** Returns content as a UTF-8 string. */
+  asString(): string;
+  /** Content length in bytes. */
+  size(): number;
+};
 
-    /** Content length in bytes. */
-    public int size() { ... }
-
-    // Factory methods — guide adapter developers
-    public static MessageBody json(byte[] content) { ... }
-    public static MessageBody json(String content) { ... }
-    public static MessageBody empty() { ... }
-    public static MessageBody of(byte[] content, MediaType mediaType) { ... }
+namespace MessageBody {
+  /** Factory methods — guide adapter developers */
+  function json(content: Uint8Array | string): MessageBody;
+  function empty(): MessageBody;
+  function of(content: Uint8Array, mediaType: MediaType): MessageBody;
 }
 ```
 
@@ -1119,30 +1127,28 @@ public record MessageBody(byte[] content, MediaType mediaType) {
 
 #### FR-001-14c: `HttpHeaders` Class
 
-```java
-public final class HttpHeaders {
-    /** First value for a header name (case-insensitive). */
-    public String first(String name) { ... }
+```typescript
+/** Immutable HTTP header container — case-insensitive, dual-view (single/multi-value). */
+type HttpHeaders = {
+  /** First value for a header name (case-insensitive). */
+  first(name: string): string | null;
+  /** All values for a header name (case-insensitive). */
+  all(name: string): string[];
+  /** True if the header exists (case-insensitive). */
+  contains(name: string): boolean;
+  /** Returns true if no headers are present. */
+  isEmpty(): boolean;
 
-    /** All values for a header name (case-insensitive). */
-    public List<String> all(String name) { ... }
+  /** First-value-per-name view (lowercase keys). */
+  toSingleValueMap(): Record<string, string>;
+  /** All-values-per-name view (lowercase keys). */
+  toMultiValueMap(): Record<string, string[]>;
+};
 
-    /** True if the header exists (case-insensitive). */
-    public boolean contains(String name) { ... }
-
-    /** Returns true if no headers are present. */
-    public boolean isEmpty() { ... }
-
-    /** First-value-per-name view (lowercase keys). */
-    public Map<String, String> toSingleValueMap() { ... }
-
-    /** All-values-per-name view (lowercase keys). */
-    public Map<String, List<String>> toMultiValueMap() { ... }
-
-    // Factory methods
-    public static HttpHeaders of(Map<String, String> singleValue) { ... }
-    public static HttpHeaders ofMulti(Map<String, List<String>> multiValue) { ... }
-    public static HttpHeaders empty() { ... }
+namespace HttpHeaders {
+  function of(singleValue: Record<string, string>): HttpHeaders;
+  function ofMulti(multiValue: Record<string, string[]>): HttpHeaders;
+  function empty(): HttpHeaders;
 }
 ```
 
@@ -1156,26 +1162,25 @@ public final class HttpHeaders {
 
 #### FR-001-14d: `SessionContext` Class
 
-```java
-public final class SessionContext {
-    /** Raw attribute value by key. */
-    public Object get(String key) { ... }
+```typescript
+/** Immutable session attribute container — toString() prints keys only (no sensitive values). */
+type SessionContext = {
+  /** Raw attribute value by key. */
+  get(key: string): unknown | null;
+  /** String-typed attribute by key (returns null if absent or non-string). */
+  getString(key: string): string | null;
+  /** True if the key exists. */
+  has(key: string): boolean;
+  /** True if empty or no attributes. */
+  isEmpty(): boolean;
 
-    /** String-typed attribute by key (returns null if absent or non-string). */
-    public String getString(String key) { ... }
+  /** Returns a defensive copy of the underlying map. */
+  toMap(): Record<string, unknown>;
+};
 
-    /** True if the key exists. */
-    public boolean has(String key) { ... }
-
-    /** True if empty or no attributes. */
-    public boolean isEmpty() { ... }
-
-    /** Returns a defensive copy of the underlying map. */
-    public Map<String, Object> toMap() { ... }
-
-    // Factory methods
-    public static SessionContext of(Map<String, Object> attributes) { ... }
-    public static SessionContext empty() { ... }
+namespace SessionContext {
+  function of(attributes: Record<string, unknown>): SessionContext;
+  function empty(): SessionContext;    // SHOULD return a singleton
 }
 ```
 
