@@ -47,6 +47,17 @@ gateway's Jackson (or no Jackson at all) independently.
 > **Scope:** New files in `core/src/main/java/io/messagexform/core/model/`.
 > Non-breaking — old types remain until Phase 2.
 
+**Status: ✅ Complete** (2026-02-11)
+
+| # | Task | Status | Task ID |
+|---|------|--------|---------|
+| 1.1 | Create `MediaType` enum | ✅ Done | T-001-58, T-001-59 |
+| 1.2 | Create `MessageBody` record | ✅ Done | T-001-60, T-001-61 |
+| 1.3 | Create `HttpHeaders` class | ✅ Done | T-001-62, T-001-63 |
+| 1.4 | Create `SessionContext` class | ✅ Done | T-001-64, T-001-65 |
+| 1.5 | Write unit tests for all port types | ✅ Done | T-001-58..65 |
+| — | Quality gate (all tests pass, zero Jackson imports) | ✅ Done | T-001-66 |
+
 ### 1.1 — Create `MediaType` enum
 
 **File:** `core/src/main/java/io/messagexform/core/model/MediaType.java`
@@ -152,6 +163,17 @@ Test coverage:
 
 > **Scope:** Modify existing `Message`, `TransformResult`, `TransformContext`
 > to use the new port types. This is the breaking change.
+
+**Status: 🔲 Not started**
+
+| # | Task | Status | Task ID |
+|---|------|--------|---------|
+| 2.1 | Rewrite `Message.java` | 🔲 | — |
+| 2.2 | Rewrite `TransformResult.java` | 🔲 | — |
+| 2.3 | Rewrite `TransformContext.java` | 🔲 | — |
+| 2.4 | Update `TransformEngine.java` internals | 🔲 | — |
+| 2.5 | Update `HeaderTransformer`, `StatusTransformer`, `UrlTransformer` | 🔲 | — |
+| 2.6 | Update all core tests (~15-20 files) | 🔲 | — |
 
 ### 2.1 — Rewrite `Message.java`
 
@@ -305,6 +327,14 @@ Message msg = new Message(
 > **Scope:** Build configuration changes to bundle and relocate Jackson
 > inside core's shadow JAR.
 
+**Status: 🔲 Not started**
+
+| # | Task | Status | Task ID |
+|---|------|--------|---------|
+| 3.1 | Add Shadow plugin to core module | 🔲 | — |
+| 3.2 | Update `libs.versions.toml` | 🔲 | — |
+| 3.3 | Verify relocation (jar tf checks) | 🔲 | — |
+
 ### 3.1 — Add Shadow plugin to core module
 
 **File:** `core/build.gradle.kts`
@@ -375,6 +405,14 @@ jar tf core/build/libs/core-*.jar | grep com/fasterxml/jackson
 
 ## Phase 4: SLF4J Compile-Time Enforcement
 
+**Status: 🔲 Not started**
+
+| # | Task | Status | Task ID |
+|---|------|--------|---------|
+| 4.1 | Downgrade SLF4J in `libs.versions.toml` | 🔲 | — |
+| 4.2 | Test classpath keeps SLF4J 2.x | 🔲 | — |
+| 4.3 | `StructuredLoggingTest` adjustment | 🔲 | — |
+
 ### 4.1 — Downgrade SLF4J in `libs.versions.toml`
 
 ```toml
@@ -401,6 +439,14 @@ against the test classpath (SLF4J 2.x via Logback). No changes needed.
 ---
 
 ## Phase 5: Update Adapters
+
+**Status: 🔲 Not started**
+
+| # | Task | Status | Task ID |
+|---|------|--------|---------|
+| 5.1 | Update `adapter-standalone` | 🔲 | — |
+| 5.2 | Update `adapter-pingaccess` (Feature 002) | 🔲 | — |
+| 5.3 | Update `StandaloneDependencyTest` | 🔲 | — |
 
 ### 5.1 — Update `adapter-standalone`
 
@@ -470,6 +516,15 @@ Update allowed groups accordingly.
 
 ## Phase 6: Update Specifications and Documentation
 
+**Status: ✅ Absorbed into Phase 0 (SDD spec-first)**
+
+| # | Task | Status | Notes |
+|---|------|--------|-------|
+| 6.1 | Feature 001 spec | ✅ Done | FR-001-14, NFR-001-02, DO catalogue updated |
+| 6.2 | Feature 002 spec | 🔲 | Deferred to Phase 5 (adapter updates) |
+| 6.3 | Knowledge map | 🔲 | — |
+| 6.4 | SDK guide | 🔲 | — |
+
 ### 6.1 — Feature 001 spec
 
 - Add non-functional requirement: "Core's public API must not reference any
@@ -495,6 +550,15 @@ Update allowed groups accordingly.
 ---
 
 ## Phase 7: Cleanup
+
+**Status: 🔲 Not started**
+
+| # | Task | Status | Task ID |
+|---|------|--------|---------|
+| 7.1 | Revert Jackson version | 🔲 | — |
+| 7.2 | Remove `net.bytebuddy` from `StandaloneDependencyTest` | 🔲 | — |
+| 7.3 | Update ADR-0031 | 🔲 | — |
+| 7.4 | Update PLAN.md | 🔲 | — |
 
 ### 7.1 — Revert Jackson version
 
