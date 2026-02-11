@@ -232,10 +232,15 @@ console's rule type list.
 
 **Given** a transform is applied successfully (spec matched, body transformed),
 **when** `handleRequest()` completes,
-**then** `exchange.getProperty(TRANSFORM_RESULT)` returns a Map containing:
+**then** `exchange.getProperty(TRANSFORM_RESULT)` returns a `TransformResultSummary`
+record containing:
 - `specId` — the matched spec identifier
-- `matched` — `true`
-- `durationMs` — transform execution time in milliseconds.
+- `specVersion` — the matched spec version
+- `direction` — `"REQUEST"` or `"RESPONSE"`
+- `durationMs` — transform execution time in milliseconds
+- `outcome` — `"SUCCESS"`, `"PASSTHROUGH"`, or `"ERROR"`
+- `errorType` — error type code (null if no error)
+- `errorMessage` — human-readable error message (null if no error)
 
 ---
 
@@ -273,3 +278,85 @@ console's rule type list.
 (`com.pingidentity.pa.sdk.*`),
 **and** the shadow JAR DOES contain all core + transitive dependencies (Jackson,
 JSLT, SnakeYAML, JSON Schema Validator).
+
+---
+
+## S-002-25: OAuth Context in JSLT
+
+**Given** the PingAccess Exchange has an Identity with
+`OAuthTokenMetadata.getClientId() = "my-app"` and
+`OAuthTokenMetadata.getScopes() = ["openid", "email"]`,
+**and** a transform spec uses `$session.clientId` and `$session.scopes`,
+**when** `handleRequest()` processes the exchange,
+**then** `$session.clientId` resolves to `"my-app"`,
+**and** `$session.scopes` resolves to `["openid", "email"]`.
+
+> **Note:** The `$session` namespace is flat — OAuth metadata is merged at
+> layer 2 (see FR-002-06). There is no `$session.oauth` nesting.
+
+---
+
+## S-002-26: Session State in JSLT
+
+**Given** a prior rule has stored `authzCache = "PERMIT"` via
+`SessionStateSupport` on the Exchange,
+**and** a transform spec uses `$session.authzCache`,
+**when** `handleRequest()` processes the exchange,
+**then** `$session.authzCache` resolves to `"PERMIT"`.
+
+> **Note:** Session state attributes are merged flat into `$session` at layer 4
+> (highest precedence). There is no `$session.sessionState` nesting.
+
+---
+
+## S-002-27: Prior Rule URI Rewrite
+
+**Given** an upstream `ParameterRule` rewrites the request URI from `/old/path`
+to `/new/path` before the `MessageTransformRule` executes,
+**when** `wrapRequest()` reads the request URI via `exchange.getRequest().getUri()`,
+**then** the adapter wraps the **rewritten** URI (`/new/path`),
+**and** `Message.requestPath()` contains `/new/path`,
+**and** spec matching uses the rewritten URI, not the original client URI.
+
+> **Note:** This validates the FR-002-01 note that `Request.getUri()` reflects
+> modifications by prior rules in the interceptor chain.
+
+---
+
+## S-002-28: DENY + handleResponse Interaction
+
+**Given** `errorMode = DENY` in the plugin configuration,
+**and** a spec's JSLT expression throws a runtime error during `handleRequest()`,
+**when** `handleRequest()` returns `Outcome.RETURN` with an RFC 9457 error body,
+**then** PingAccess still calls `handleResponse()` (SDK contract — response
+interceptors fire in reverse order even on `RETURN`),
+**and** `handleResponse()` checks `exchange.getProperty(TRANSFORM_DENIED)`,
+**and** finding it `true`, skips all response processing,
+**and** the client receives the original DENY error response unchanged.
+
+> **Note:** Without the DENY guard (GAP-4 fix), `handleResponse()` would
+> overwrite the error response with a normal response transform.
+
+---
+
+## S-002-29: Spec Hot-Reload (Success)
+
+**Given** `reloadIntervalSec = 30` in the plugin configuration,
+**and** the adapter has loaded specs from `specsDir` during `configure()`,
+**when** an operator modifies a spec YAML file on disk,
+**and** the next scheduled reload poll fires,
+**then** `TransformEngine.reload()` is called,
+**and** the updated spec is loaded into the `TransformRegistry`,
+**and** subsequent requests use the updated spec.
+
+---
+
+## S-002-30: Spec Hot-Reload (Failure)
+
+**Given** `reloadIntervalSec = 30` in the plugin configuration,
+**and** the adapter has loaded valid specs during `configure()`,
+**when** an operator writes a malformed YAML file to `specsDir`,
+**and** the next scheduled reload poll fires,
+**then** `TransformEngine.reload()` fails with a warning log,
+**and** the previous valid `TransformRegistry` remains active,
+**and** in-flight and subsequent requests continue to use the previously valid specs.
