@@ -6,7 +6,7 @@
 | Reviewer | Agent (deep dive analysis) |
 | Target | `docs/architecture/features/002/spec.md` |
 | Cross-ref | `docs/architecture/features/002/pingaccess-sdk-guide.md` |
-| Status | 🔨 In Progress (B1 done) |
+| Status | 🔨 In Progress (B1–B2 done) |
 
 > This document tracks all findings from the spec deep-dive analysis and
 > organizes them into implementation batches. Each batch is a logical unit of
@@ -31,7 +31,7 @@
 | Batch | Theme | Items | Severity | Status |
 |-------|-------|-------|----------|--------|
 | **B1** | SDK API corrections (won't compile) | BUG-1, GAP-1, BUG-5 | 🔴 Critical | ✅ Done |
-| **B2** | Lifecycle & control flow (runtime crashes) | GAP-4, IMP-6, BUG-6, BUG-4 | 🔴 Critical | ⬜ Not started |
+| **B2** | Lifecycle & control flow (runtime crashes) | GAP-4, IMP-6, BUG-6, BUG-4 | 🔴 Critical | ✅ Done |
 | **B3** | Scenario matrix corrections | BUG-2, BUG-3, IMP-4 | 🟡 Medium | ⬜ Not started |
 | **B4** | Body handling & headers | GAP-2, GAP-5, IMP-1 | 🟡 Medium | ⬜ Not started |
 | **B5** | Configuration, reload & reliability | GAP-3, SEC-2, SEC-3, SEC-4 | 🟡 Medium | ⬜ Not started |
@@ -149,7 +149,7 @@ Headers.asMap() returns Map<String, String[]>.
 - [x] Apply BUG-1 fixes (3 lines + normalization note)
 - [x] Apply GAP-1 fixes (pre-read step + mapping table updates)
 - [x] Apply BUG-5 fixes (null-guard on 2 lines + note)
-- [ ] Commit: `fix(spec-002): correct SDK API references — asMap(), body.read(), ContentType null`
+- [x] Commit: `fix(spec-002): correct SDK API refs in mapping tables` (`0861a24`)
 
 ---
 
@@ -164,7 +164,7 @@ Headers.asMap() returns Map<String, String[]>.
 |-------|-------|
 | ID | GAP-4 |
 | Severity | 🔴 Critical |
-| Status | ⬜ Not started |
+| Status | ✅ Done |
 | Affected lines | spec.md FR-002-02 (L245–282) |
 | Root cause | SDK guide §12 (L1726): "`RETURN` does NOT skip response interceptors — it triggers them in reverse order." If `handleRequest()` returns `RETURN` (DENY mode), `handleResponse()` is still called and would overwrite the error response. |
 | Cross-ref | SDK guide §1 (L87–89): `handleResponse` contract |
@@ -199,7 +199,7 @@ Headers.asMap() returns Map<String, String[]>.
 |-------|-------|
 | ID | IMP-6 |
 | Severity | 🔴 Critical (incorrect lifecycle description) |
-| Status | ⬜ Not started |
+| Status | ✅ Done |
 | Affected lines | spec.md FR-002-13 (L650–653) |
 | Root cause | `TransformContext` is a Java record (immutable). The spec says "The same `TransformContext` is reused for both request and response phases (with `status` updated for the response phase)." This is impossible — records are immutable. |
 | Cross-ref | `core/src/main/java/.../TransformContext.java` — confirmed `public record TransformContext(...)` |
@@ -240,7 +240,7 @@ Update the `buildTransformContext` method signature in the FR-002-13 table (L629
 |-------|-------|
 | ID | BUG-6 |
 | Severity | 🟡 Low |
-| Status | ⬜ Not started |
+| Status | ✅ Done |
 | Affected lines | spec.md FR-002-02 (L260) |
 | Root cause | `AsyncRuleInterceptorBase` provides a default no-op `handleResponse()`. The spec doesn't explicitly state that the adapter must override this default. |
 | Cross-ref | SDK guide §1 (L102): `CompletionStage<Void> handleResponse(Exchange exchange); // default no-op` |
@@ -262,7 +262,7 @@ Add a note to FR-002-02 after the `handleResponse` description (L267):
 |-------|-------|
 | ID | BUG-4 |
 | Severity | 🟡 Medium |
-| Status | ⬜ Not started |
+| Status | ✅ Done |
 | Affected lines | spec.md L186–219 |
 | Root cause | `GatewayAdapter<R>.applyChanges(Message, R)` has no direction parameter. The spec proposes a direction-aware overload but the analysis is incomplete — it says "default to RESPONSE" for the SPI method, but `StandaloneAdapter` writes all fields regardless of direction. |
 
@@ -293,10 +293,10 @@ Rewrite the "applyChanges Direction Strategy" section (L186–219) for clarity:
 
 ### B2 Commit Plan
 
-- [ ] Apply GAP-4 fixes (DENY guard + ExchangeProperty)
-- [ ] Apply IMP-6 fixes (TransformContext lifecycle rewrite)
-- [ ] Apply BUG-6 fix (override note)
-- [ ] Apply BUG-4 fix (applyChanges direction rewrite)
+- [x] Apply GAP-4 fixes (DENY guard + ExchangeProperty)
+- [x] Apply IMP-6 fixes (TransformContext lifecycle rewrite)
+- [x] Apply BUG-6 fix (override note)
+- [x] Apply BUG-4 fix (applyChanges direction rewrite)
 - [ ] Commit: `fix(spec-002): lifecycle corrections — DENY guard, TransformContext immutability, direction strategy`
 
 ---
@@ -767,8 +767,8 @@ Add a logging note after the wrapResponse mapping table:
 
 | Batch | Items | Status | Commit |
 |-------|-------|--------|--------|
-| **B1** SDK API corrections | BUG-1, GAP-1, BUG-5 | ✅ Done | pending commit |
-| **B2** Lifecycle & control flow | GAP-4, IMP-6, BUG-6, BUG-4 | ⬜ Not started | — |
+| **B1** SDK API corrections | BUG-1, GAP-1, BUG-5 | ✅ Done | `0861a24` |
+| **B2** Lifecycle & control flow | GAP-4, IMP-6, BUG-6, BUG-4 | ✅ Done | pending commit |
 | **B3** Scenario matrix | BUG-2, BUG-3, IMP-4 | ⬜ Not started | — |
 | **B4** Body handling & headers | GAP-2, GAP-5, IMP-1 | ⬜ Not started | — |
 | **B5** Config, reload & reliability | GAP-3, SEC-2, SEC-3, SEC-4 | ⬜ Not started | — |

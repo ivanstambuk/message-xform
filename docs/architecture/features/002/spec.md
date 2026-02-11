@@ -214,18 +214,27 @@ knows the direction and routes accordingly:
 - **During `handleResponse`:** caller passes `exchange` and the adapter writes
   to `exchange.getResponse()` (body, headers, status code).
 
-**Implementation approach:** The adapter stores the current direction as a
-method-local parameter. Two concrete approaches:
+**Chosen approach — two internal helpers:**
 
-1. **Direction parameter on adapter** (preferred): Add a `Direction` enum
-   parameter as a private helper: `applyChanges(Message, Exchange, Direction)`.
-   The public `GatewayAdapter.applyChanges(Message, Exchange)` delegates by
-   defaulting to RESPONSE (backward-compatible with `StandaloneAdapter`).
-   `MessageTransformRule` calls the direction-aware overload directly.
+The adapter provides two direction-specific internal methods (not part of the
+`GatewayAdapter` SPI):
 
-2. **Two methods**: `applyRequestChanges(Message, Exchange)` and
-   `applyResponseChanges(Message, Exchange)` as internal helpers. The SPI
-   `applyChanges()` delegates to the appropriate one.
+```java
+// Internal helpers — called directly by MessageTransformRule:
+void applyRequestChanges(Message transformed, Exchange exchange)
+void applyResponseChanges(Message transformed, Exchange exchange)
+```
+
+`MessageTransformRule` knows the current direction from the lifecycle phase
+(`handleRequest` vs `handleResponse`) and calls the appropriate helper directly.
+The public SPI method `applyChanges(Message, Exchange)` delegates to
+`applyResponseChanges()` as a reasonable default for general-purpose callers.
+
+> **SPI contract note:** The `GatewayAdapter<R>` SPI does not mandate direction
+> awareness — this is adapter-specific. The `StandaloneAdapter` does not need
+> direction awareness because Javalin's `Context` API naturally separates
+> request and response writes (all writes go through `ctx.result()`,
+> `ctx.header()`, `ctx.status()` regardless of phase).
 
 | Phase | Target Side | Fields Written |
 |-------|-------------|----------------|
@@ -267,20 +276,26 @@ result without leaking pre-existing headers that the spec intended to remove.
 `AsyncRuleInterceptorBase<MessageTransformConfig>` with:
 
 1. `handleRequest(Exchange)` → `CompletionStage<Outcome>`:
-   - Builds `TransformContext` via `PingAccessAdapter.buildTransformContext()` (FR-002-13).
+   - Builds `TransformContext` via `PingAccessAdapter.buildTransformContext(exchange, null)` (FR-002-13; `status = null` for request phase).
    - Wraps request via `PingAccessAdapter.wrapRequest()`.
    - Transforms via `TransformEngine.transform(message, Direction.REQUEST, transformContext)`
      (**3-arg overload** — required for `$cookies`, `$queryParams`, `$session` injection).
    - Dispatches on `TransformResult.type()`:
-     - `SUCCESS` → applies changes via `PingAccessAdapter.applyChanges()` with REQUEST direction.
+     - `SUCCESS` → applies changes via `PingAccessAdapter.applyRequestChanges()`.
      - `PASSTHROUGH` → no-op (exchange untouched).
      - `ERROR` → see FR-002-11 error-mode dispatch.
+   - On DENY: set `ExchangeProperty TRANSFORM_DENIED = true` on the exchange,
+     build error response via `ResponseBuilder`, set on exchange, return `Outcome.RETURN`.
    - Returns `Outcome.CONTINUE` (or `Outcome.RETURN` in DENY mode on error).
 2. `handleResponse(Exchange)` → `CompletionStage<Void>`:
+   - **DENY guard:** If `exchange.getProperty(TRANSFORM_DENIED)` is `true`, skip
+     all processing and return a completed stage immediately. This prevents
+     overwriting the error response set during `handleRequest()`.
+   - Builds `TransformContext` via `PingAccessAdapter.buildTransformContext(exchange, exchange.getResponse().getStatusCode())`.
    - Wraps response via `PingAccessAdapter.wrapResponse()`.
    - Transforms via `TransformEngine.transform(message, Direction.RESPONSE, transformContext)`.
    - Dispatches on `TransformResult.type()`:
-     - `SUCCESS` → applies changes via `PingAccessAdapter.applyChanges()` with RESPONSE direction.
+     - `SUCCESS` → applies changes via `PingAccessAdapter.applyResponseChanges()`.
      - `PASSTHROUGH` → no-op.
      - `ERROR` → see FR-002-11 error-mode dispatch.
    - Returns completed `CompletionStage<Void>`.
@@ -290,12 +305,30 @@ result without leaking pre-existing headers that the spec intended to remove.
      using the SDK's provided implementation. This callback writes a PA-formatted
      error response when an unhandled exception escapes `handleRequest()`/`handleResponse()`.
 
+> **Override note:** `AsyncRuleInterceptorBase` provides a default no-op
+> implementation of `handleResponse()`. The adapter MUST override this to
+> implement response-phase transformations. Without the override, response
+> transforms would be silently skipped.
+
+> **DENY guard rationale:** The SDK contract states that `RETURN` from
+> `handleRequest()` does NOT skip response interceptors — it triggers them in
+> reverse order (SDK guide §12). Without the DENY guard, `handleResponse()` would
+> overwrite the RFC 9457 error response that `handleRequest()` set on the exchange.
+
+**DENY ExchangeProperty declaration:**
+
+```java
+private static final ExchangeProperty<Boolean> TRANSFORM_DENIED =
+    ExchangeProperty.create("io.messagexform", "transformDenied", Boolean.class);
+```
+
 | Aspect | Detail |
 |--------|--------|
 | Success path | Request body transformed, response body transformed, both directions independent |
 | Failure path | Transform error → log warning, return original untouched exchange (ADR-0013 copy-on-wrap safety), continue pipeline |
-| Error mode (request) | `PASS_THROUGH` → `Outcome.CONTINUE` with original. `DENY` → `Outcome.RETURN` with RFC 9457 error response body written to exchange. |
-| Error mode (response) | `PASS_THROUGH` → original response untouched. `DENY` → **rewrite** the response body/status to a 502 RFC 9457 error (there is no pipeline-halt mechanism for responses — `handleResponse` returns `Void`, not `Outcome`). |
+| Error mode (request) | `PASS_THROUGH` → `Outcome.CONTINUE` with original. `DENY` → set `TRANSFORM_DENIED`, `Outcome.RETURN` with RFC 9457 error response. |
+| Error mode (response) | `PASS_THROUGH` → original response untouched. `DENY` → **rewrite** the response body/status to a 502 RFC 9457 error. |
+| DENY + handleResponse | `handleRequest()` DENY → `handleResponse()` called (SDK contract) → DENY guard skips processing → client receives DENY error. |
 | Thread safety | Plugin instances may be shared across threads — all adapter state is method-local |
 | Status | ⬜ Not yet implemented |
 | Source | G-002-02 |
@@ -666,10 +699,19 @@ warning and returns an empty `queryParams` map. The transform proceeds with
 `$queryParams` as an empty object — JSLT expressions referencing query params
 evaluate to `null` gracefully.
 
-**Lifecycle note:** `buildTransformContext()` is called **once per request** at
-the start of `handleRequest()`. The same `TransformContext` is reused for both
-request and response phases of the same exchange (with `status` updated for the
-response phase). This avoids re-parsing cookies/query params in `handleResponse()`.
+**Lifecycle note:** `TransformContext` is an immutable record (`public record
+TransformContext(...)`). Two instances are built per exchange:
+
+1. **Request phase:** `buildTransformContext(exchange, null)` — `status` is
+   `null` (no response yet).
+2. **Response phase:** `buildTransformContext(exchange, exchange.getResponse().getStatusCode())`
+   — `status` is the response status code.
+
+To avoid re-parsing cookies and query params in the response phase, the adapter
+MAY cache the parsed `cookies` and `queryParams` maps as method-local variables
+in `handleRequest()` and pass them to `handleResponse()` via an `ExchangeProperty`.
+Alternatively, re-parsing is acceptable (cost is negligible for typical request
+sizes).
 
 
 
