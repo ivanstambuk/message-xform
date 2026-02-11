@@ -745,37 +745,83 @@ configured error mode. Transform errors include: JSLT evaluation failures,
 spec parse errors at runtime, eval budget exceeded, and output size exceeded.
 
 | Error Mode | handleRequest Behaviour | handleResponse Behaviour |
-|------------|------------------------|--------------------------|
+|------------|------------------------|--------------------------
 | `PASS_THROUGH` | Log warning, return `Outcome.CONTINUE` (original untouched request continues to backend) | Log warning, leave original response untouched |
-| `DENY` | Write RFC 9457 error body to `exchange.getResponse()` via `setBodyContent()` + `setStatus(HttpStatus.forCode(502))`, return `Outcome.RETURN` to halt pipeline | **Rewrite** response: `exchange.getResponse().setBodyContent()` with RFC 9457 error body + `setStatus(502)`. There is **no pipeline-halt** for responses (returns `Void`, not `Outcome`). The error response replaces the backend response. |
+| `DENY` | Build error response via `ResponseBuilder` + `exchange.setResponse()`, return `Outcome.RETURN` to halt pipeline | **Rewrite** response: `exchange.getResponse().setBodyContent()` with RFC 9457 error body + `setStatus(502)`. **This is a body/status rewrite, not a pipeline halt.** |
 
 **DENY mode detailed behaviour:**
 
-1. **In `handleRequest`:** The engine returns `TransformResult.ERROR` with
-   `errorResponse` (RFC 9457 JSON) and `errorStatusCode` (typically 502).
-   The adapter writes this error body to the exchange's response via
-   `exchange.getResponse().setBodyContent(errorBytes)` and sets status to
-   `HttpStatus.forCode(502)`. Then returns `Outcome.RETURN` — PingAccess
-   short-circuits and returns the error response to the client without
-   forwarding to the backend.
+1. **In `handleRequest` (⚠️ response is null at this point):** The engine
+   returns `TransformResult.ERROR` with `errorResponse` (RFC 9457 JSON)
+   and `errorStatusCode` (typically 502). During request processing,
+   **`exchange.getResponse()` is `null`** because the backend has not yet
+   responded. The adapter MUST construct a new `Response` via
+   `ResponseBuilder` and set it on the exchange:
 
-2. **In `handleResponse`:** The engine returns `TransformResult.ERROR`.
-   Since `handleResponse()` returns `CompletionStage<Void>` (no `Outcome`
-   mechanism), the adapter writes the error body to
-   `exchange.getResponse().setBodyContent(errorBytes)` and sets status
-   to 502 via `setStatus()`. The client receives the error response
-   instead of the original backend response. **This is a body/status
-   rewrite, not a pipeline halt.**
+   ```java
+   // DENY mode — handleRequest error path (GAP-09 fix)
+   byte[] errorBody = result.errorResponse().getBytes(StandardCharsets.UTF_8);
+   Response errorResponse = ResponseBuilder.status(result.errorStatusCode())
+       .header("Content-Type", "application/problem+json")
+       .body(errorBody)
+       .build();
+   exchange.setResponse(errorResponse);
+   return CompletableFuture.completedFuture(Outcome.RETURN);
+   ```
+
+   > **Alternative considered:** Throw `AccessException` and delegate error
+   > response writing to `ErrorHandlingCallback`. Rejected because the
+   > `ErrorHandlingCallback` writes a PA-formatted HTML error page, not our
+   > RFC 9457 JSON format. We need to control the exact response body.
+
+   > **Previous incorrect design (GAP-09):** The spec previously described
+   > calling `exchange.getResponse().setBodyContent()` during request phase.
+   > This would cause a `NullPointerException` because the response object
+   > does not exist during request processing.
+
+2. **In `handleResponse` (response exists):** The engine returns
+   `TransformResult.ERROR`. Since `handleResponse()` returns
+   `CompletionStage<Void>` (no `Outcome` mechanism), and the response
+   object **already exists** at this point, the adapter can safely rewrite
+   it in-place:
+
+   ```java
+   // DENY mode — handleResponse error path
+   byte[] errorBody = result.errorResponse().getBytes(StandardCharsets.UTF_8);
+   exchange.getResponse().setBodyContent(errorBody);  // replaces body + updates Content-Length
+   exchange.getResponse().setStatus(HttpStatus.forCode(result.errorStatusCode()));
+   exchange.getResponse().getHeaders().setContentType("application/problem+json");
+   ```
+
+   The client receives the error response instead of the original backend
+   response. **This is a body/status rewrite, not a pipeline halt.**
 
 The adapter MUST NOT throw `AccessException` for transform failures — transform
 errors are non-fatal by default (adapter continues the pipeline). Unhandled
 exceptions are caught by `getErrorHandlingCallback()` (FR-002-02).
 
+**`ResponseBuilder` API** (used for DENY mode in request phase):
+
+```java
+// com.pingidentity.pa.sdk.http.ResponseBuilder
+static ResponseBuilder ok();               // 200
+static ResponseBuilder notFound();         // 404
+static ResponseBuilder status(int code);   // arbitrary status
+ResponseBuilder header(String name, String value);
+ResponseBuilder body(byte[] content);
+Response build();
+```
+
+> **SDK reference:** `Clobber404ResponseRule.handleResponse()` uses
+> `ResponseBuilder.notFound()` + `getRenderer().renderResponse(exchange, ...)`
+> to construct a new response. `RiskAuthorizationRule.handleRequest()` uses
+> `Outcome.RETURN` with `POLICY_ERROR_INFO` to delegate to ErrorHandlingCallback.
+
 | Aspect | Detail |
 |--------|--------|
 | Success path (PASS_THROUGH) | Malformed JSON body → log + continue with original body |
-| Success path (DENY, request) | JSLT error → write 502 error to exchange response → `Outcome.RETURN` |
-| Success path (DENY, response) | JSLT error → rewrite response body/status to 502 error |
+| Success path (DENY, request) | JSLT error → build Response via `ResponseBuilder` + `exchange.setResponse()` → `Outcome.RETURN` |
+| Success path (DENY, response) | JSLT error → rewrite response body/status to 502 error in-place |
 | Status | ⬜ Not yet implemented |
 | Source | ADR-0022, ADR-0024 |
 
