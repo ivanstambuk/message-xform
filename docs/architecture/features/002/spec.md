@@ -516,8 +516,14 @@ during `configure()` and changes require a PA restart.
 |--------|--------|
 | Success path | Admin creates rule → specifies spec directory → plugin loads specs on `configure()` |
 | Validation path | Missing `specsDir` → `ValidationException` on `configure()` |
+| Config discovery | Annotation-driven: `ConfigurationBuilder.from(Config.class)` (recommended, used by adapter) |
 | Status | ⬜ Not yet implemented |
 | Source | G-002-03 |
+
+> **Configuration field discovery patterns** (see Appendix D for details):
+> 1. **Annotation-driven** — `ConfigurationBuilder.from(Config.class)` auto-discovers `@UIElement`-annotated fields. Used by `Clobber404ResponseRule`, `RiskAuthorizationRule`.
+> 2. **Programmatic** — `new ConfigurationBuilder().configurationField(...)` with manual field registration, options, help text, and sub-fields. Used by `ParameterRule`.
+> 3. Both patterns compose with `ErrorHandlerUtil.getConfigurationFields()` via `.addAll()` to append standard error handler config.
 
 ### FR-002-05: Plugin Lifecycle
 
@@ -1050,6 +1056,7 @@ Client                    PingAccess                        Backend
 | `docs/research/pingam-authentication-api.md` | PingAM callback format (transform target) |
 | `docs/reference/pingaccess-9.0.pdf` | Official PA 9.0 documentation |
 | `docs/reference/pingaccess-sdk/pingaccess-sdk-9.0.1.0.jar` | SDK JAR (166 classes) |
+| `.sdk-decompile/pingaccess-9.0.1/sdk/` | Extracted SDK distribution (samples, apidocs) |
 | `adapter-standalone/src/main/java/.../StandaloneAdapter.java` | Reference adapter implementation |
 | ADR-0013 | Copy-on-wrap message adapter pattern |
 | ADR-0020 | Nullable status code (requests) |
@@ -1057,3 +1064,69 @@ Client                    PingAccess                        Backend
 | ADR-0024 | Error type catalogue |
 | ADR-0027 | URL rewriting |
 | ADR-0030 | Session context binding |
+
+### D. Configuration Patterns (SDK Reference)
+
+> Source: SDK samples in `.sdk-decompile/pingaccess-9.0.1/sdk/samples/Rules/`
+
+**Pattern 1 — Annotation-driven (used by adapter):**
+
+```java
+public List<ConfigurationField> getConfigurationFields() {
+    return ConfigurationBuilder.from(Configuration.class)  // auto-discovers @UIElement
+            .addAll(ErrorHandlerUtil.getConfigurationFields())  // appends error handler fields
+            .toConfigurationFields();
+}
+```
+
+**Pattern 2 — Programmatic (ParameterRule sample):**
+
+```java
+public List<ConfigurationField> getConfigurationFields() {
+    return new ConfigurationBuilder()
+        .configurationField("paramType", "Param Type", ConfigurationType.SELECT)
+            .required()
+            .option("QueryString", "Query String")     // SELECT dropdown options
+            .option("Cookie", "Cookie")
+            .helpContent("Choose a source for variables to validate.")
+            .helpTitle("Param Type to control access with.")
+            .helpURL("http://en.wikipedia.org/wiki/Query_string")
+        .configurationField("table", "Params to filter", ConfigurationType.TABLE)
+            .subFields(                                  // TABLE sub-columns
+                new ConfigurationBuilder()
+                    .configurationField("paramName", "Param Name", ConfigurationType.TEXT)
+                        .required()
+                    .configurationField("paramValue", "Param Value", ConfigurationType.TEXT)
+                        .required()
+                    .toConfigurationFields()
+            )
+        .addAll(ErrorHandlerUtil.getConfigurationFields())
+        .toConfigurationFields();
+}
+```
+
+**Advanced `@UIElement` attributes:**
+
+| Attribute | Purpose | Example |
+|-----------|---------|---------|
+| `modelAccessor` | Dynamic dropdown populated by accessor classes | `ThirdPartyServiceAccessor.class`, `KeyPairAccessor.class` |
+| `defaultValue` | Default value shown in admin UI | `"general.error.page.template.html"` |
+| `order` | Field ordering in admin UI (0-based) | `order = 10` |
+
+**Validation constraints (JSR-380 / Jakarta Bean Validation):**
+
+```java
+public static class Configuration extends SimplePluginConfiguration {
+    @UIElement(label = "Risk Score", type = TEXT, required = true)
+    @Min(value = 1, message = "Must be > 0")     // numeric range
+    @Max(value = 100, message = "Must be ≤ 100")
+    private int riskScoreThreshold;
+
+    @NotNull(message = "Please choose a Param Type")  // required field
+    public ParameterType paramType;
+
+    @JsonUnwrapped                 // flattens error handler fields into config JSON
+    @Valid                         // enables nested validation
+    private ErrorHandlerConfigurationImpl errorHandlerPolicyConfig;
+}
+```
