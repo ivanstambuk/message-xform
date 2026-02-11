@@ -5,7 +5,7 @@
 | # | Feature | Status | Spec | Dependencies | Language |
 |---|---------|--------|------|--------------|----------|
 | 001 | Message Transformation Engine (core) | ✅ Complete | `features/001/spec.md` | Research complete | Java 21 |
-| 002 | PingAccess Adapter | 🔲 Not Started | `features/002/spec.md` | Feature 001 | Java (SDK) |
+| 002 | PingAccess Adapter | 📋 Spec Ready | `features/002/spec.md` | Feature 001 | Java 21 (PA SDK 9.0) |
 | 003 | PingGateway Adapter | 🔲 Not Started | `features/003/spec.md` | Feature 001 | Java / Groovy |
 | 004 | Standalone HTTP Proxy Mode | ✅ Complete | `features/004/spec.md` | Feature 001 | Java |
 | 005 | WSO2 API Manager Adapter | 🔲 Not Started | `features/005/spec.md` | Feature 001 | Java |
@@ -24,9 +24,12 @@ JSONata). Message envelope abstraction. Profile loading. Hot-reload. Error handl
 
 ### Feature 002 — PingAccess Adapter
 
-**Primary target.** PingAccess Java Add-on SDK using `RuleInterceptor` SPI.
-Wraps PingAccess `Exchange` (request/response) as the `Message` interface.
-Research complete: `docs/research/pingaccess-plugin-api.md`.
+**Primary target.** PingAccess 9.0 Java Add-on SDK using `AsyncRuleInterceptor` SPI
+(Site-only — Agent rules cannot access body or handle responses).
+Wraps PingAccess `Exchange` (request/response) as the core `Message` record via
+`GatewayAdapter<Exchange>`. PingAccess 9.0 supports Java 21 — same toolchain as core.
+Research complete: `docs/research/pingaccess-plugin-api.md`,
+`docs/research/pingaccess-docker-and-sdk.md`.
 
 ### Feature 003 — PingGateway Adapter
 

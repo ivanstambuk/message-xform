@@ -1,6 +1,6 @@
 # Knowledge Map
 
-Status: Draft | Last updated: 2026-02-09
+Status: Draft | Last updated: 2026-02-11
 
 This document maps the architectural relationships between modules, specs, ADRs,
 and key concepts in message-xform. It serves as a navigational aid for agents and
@@ -19,7 +19,10 @@ message-xform/
 │   └── test-vectors/              # Golden YAML fixtures (FX-001-01/02/03)
 ├── engine-jslt/                   # JSLT expression engine plugin
 ├── engine-jolt/                   # JOLT expression engine plugin (future)
-├── adapter-pingaccess/            # PingAccess gateway adapter
+├── adapter-pingaccess/            # PingAccess 9.0 gateway adapter (Feature 002)
+│   ├── PingAccessAdapter          # GatewayAdapter<Exchange> — Exchange↔Message bridge
+│   ├── MessageTransformRule       # AsyncRuleInterceptorBase plugin (Site-only)
+│   └── MessageTransformConfig     # @UIElement-annotated configuration
 ├── adapter-pinggateway/           # PingGateway adapter (future)
 ├── adapter-standalone/            # Standalone HTTP proxy mode (Feature 004, Complete)
 │   ├── adapter/                   # StandaloneAdapter — GatewayAdapter SPI impl
@@ -128,6 +131,18 @@ ADR-0030 (Session Context)   governs ── FR-001-13, references ADR-0021, ADR-
 | FR-001-13 (Session Context) | ADR-0030 | — |
 | NFR-001-03 (Latency) | ADR-0028 | NFR-001-03 |
 | Hot Reload | — | NFR-001-05 |
+| FR-002-01 (GatewayAdapter) | ADR-0013, ADR-0025 | — |
+| FR-002-02 (AsyncRuleInterceptor) | ADR-0025 | NFR-002-01, NFR-002-03 |
+| FR-002-03 (@Rule Annotation) | — | — |
+| FR-002-04 (Plugin Config) | — | — |
+| FR-002-05 (Plugin Lifecycle) | ADR-0025 | — |
+| FR-002-06 (Session Context) | ADR-0030 | — |
+| FR-002-07 (ExchangeProperty) | — | — |
+| FR-002-08 (SPI Registration) | — | — |
+| FR-002-09 (Deployment Packaging) | — | NFR-002-02 |
+| FR-002-10 (Gradle Module) | — | NFR-002-05 |
+| FR-002-11 (Error Handling) | ADR-0022, ADR-0024 | — |
+| FR-002-12 (Docker E2E Test) | — | — |
 | FR-004-01 (Standalone Proxy) | ADR-0029 | NFR-004-01 through NFR-004-07 |
 | FR-004-02..13 (Transform) | ADR-0029, ADR-0025, ADR-0013 | — |
 | FR-004-14..17 (TLS/mTLS) | — | NFR-004-05 |
@@ -151,3 +166,6 @@ ADR-0030 (Session Context)   governs ── FR-001-13, references ADR-0021, ADR-
 | `docs/research/gateway-extension-models.md` | Gateway adapter comparison | Features 002–008 |
 | `docs/research/t-001-12-jslt-context-variables.md` | JSLT context variable binding approach | T-001-10 (JsltExpressionEngine), ADR-0021 |
 | `docs/research/standalone-proxy-http-server.md` | HTTP server evaluation for standalone proxy | Feature 004, ADR-0029 |
+| `docs/research/pingaccess-plugin-api.md` | PingAccess Add-on SDK, RuleInterceptor SPI, Exchange model | Feature 002 spec |
+| `docs/research/pingaccess-docker-and-sdk.md` | PingAccess Docker image, SDK samples, Java version | Feature 002 spec |
+| `docs/research/pingam-authentication-api.md` | PingAM /json/authenticate endpoint, callback format | Feature 002 scenarios |
