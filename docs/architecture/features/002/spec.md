@@ -187,12 +187,12 @@ MediaType getContentType();      void setContentType(String);
 ### Identity
 
 ```java
-String getSubject();             // authenticated user principal
-String getMappedSubject();       // mapped identity (set by IdentityMapping plugins)
-void   setMappedSubject(String); // used by IdentityMapping — adapter should NOT call this
-String getTrackingId();          // PA tracking ID
-String getTokenId();             // OAuth token ID
-Date   getTokenExpiration();
+String  getSubject();             // authenticated user principal
+String  getMappedSubject();       // mapped identity (set by IdentityMapping plugins)
+void    setMappedSubject(String); // used by IdentityMapping — adapter should NOT call this
+String  getTrackingId();          // PA tracking ID
+String  getTokenId();             // OAuth token ID
+Instant getTokenExpiration();     // token expiry (java.time.Instant, NOT Date)
 JsonNode getAttributes();        // identity attributes as Jackson JsonNode (OIDC/token claims)
 SessionStateSupport getSessionStateSupport();  // persistent session key-value store
 OAuthTokenMetadata  getOAuthTokenMetadata();   // OAuth token metadata
@@ -207,10 +207,10 @@ OAuthTokenMetadata  getOAuthTokenMetadata();   // OAuth token metadata
 ```java
 // com.pingidentity.pa.sdk.identity.SessionStateSupport
 Map<String, JsonNode> getAttributes();            // all session attributes
-JsonNode getAttribute(String name);               // single attribute by name
-JsonNode getAttributeValue(String name);           // alias for getAttribute
-void     setAttribute(String name, JsonNode value); // store/update a session attribute
-void     removeAttribute(String name);             // remove a session attribute
+Set<String>           getAttributeNames();         // attribute key names
+JsonNode              getAttributeValue(String name); // single attribute by key
+void                  setAttribute(String name, JsonNode value); // store/update
+void                  removeAttribute(String name);              // remove
 ```
 
 > **Adapter usage:** The adapter reads session attributes as context for JSLT
@@ -221,10 +221,12 @@ void     removeAttribute(String name);             // remove a session attribute
 
 ```java
 // com.pingidentity.pa.sdk.identity.OAuthTokenMetadata
-String      getClientId();   // OAuth client that obtained the token
-Set<String> getScopes();     // granted OAuth scopes
-String      getTokenType();  // e.g., "Bearer"
-String      getRealm();      // OAuth realm
+String      getClientId();     // OAuth client that obtained the token
+Set<String> getScopes();       // granted OAuth scopes
+String      getTokenType();    // e.g., "Bearer"
+String      getRealm();        // OAuth realm
+Instant     getExpiresAt();    // token expiration timestamp
+Instant     getRetrievedAt();  // when the token was fetched/validated
 ```
 
 ### Supporting Types
@@ -557,89 +559,137 @@ the PingAccess plugin lifecycle:
 **Requirement:** The adapter MUST populate the `sessionContext` field of the
 `Message` record from the PingAccess `Identity` object (ADR-0030, FR-001-13).
 
-The `$session` JsonNode includes identity fields, OAuth metadata, OIDC/token
-claims, and optionally session state attributes:
+**Design principle:** The `$session` JsonNode is a **flat merged object** that
+combines all identity sources into a single hierarchy. This allows JSLT
+expressions to access any session attribute uniformly (e.g., `$session.email`,
+`$session.clientId`, `$session.authzCache`) without navigating nested sub-objects.
+
+#### Merge Layers (lowest to highest precedence)
+
+The adapter merges four sources into a single flat `ObjectNode`. Later layers
+override earlier layers on key collision:
+
+| Layer | Source | Contents | Precedence |
+|-------|--------|----------|------------|
+| 1 (base) | `Identity` getters | `subject`, `mappedSubject`, `trackingId`, `tokenId`, `tokenExpiration` | Lowest |
+| 2 | `OAuthTokenMetadata` | `clientId`, `scopes`, `tokenType`, `realm`, `tokenExpiresAt`, `tokenRetrievedAt` | |
+| 3 | `Identity.getAttributes()` | OIDC claims / token introspection (spread into flat object) | |
+| 4 (top) | `SessionStateSupport.getAttributes()` | Dynamic session state (spread into flat object) | Highest — can override any key |
+
+> **Why this precedence?** Session state (layer 4) is the most dynamic — rules
+> can write to it during the session. It should have the highest precedence so
+> that a rule like `ExternalAuthorizationRule` can override claim values by
+> storing updated attributes. OIDC claims (layer 3) override PA identity fields
+> (layer 1) because claims are the authoritative token data — PA identity fields
+> like `subject` are convenience wrappers that may already be in the claims as `sub`.
 
 ```java
-// Build sessionContext JsonNode from Exchange.getIdentity()
-Identity identity = exchange.getIdentity();
-ObjectNode session = objectMapper.createObjectNode();
-session.put("subject", identity.getSubject());
-session.put("mappedSubject", identity.getMappedSubject());
-session.put("trackingId", identity.getTrackingId());
-session.put("tokenId", identity.getTokenId());
-if (identity.getTokenExpiration() != null) {
-    session.put("tokenExpiration", identity.getTokenExpiration().toInstant().toString());
-}
-if (identity.getAttributes() != null) {
-    session.set("attributes", identity.getAttributes());  // OIDC claims / token introspection
-}
+// Build flat $session JsonNode from Exchange.getIdentity()
+private JsonNode buildSessionContext(Identity identity) {
+    if (identity == null) return null;
 
-// OAuth metadata (GAP-03)
-OAuthTokenMetadata oauth = identity.getOAuthTokenMetadata();
-if (oauth != null) {
-    ObjectNode oauthNode = objectMapper.createObjectNode();
-    oauthNode.put("clientId", oauth.getClientId());
-    oauthNode.put("tokenType", oauth.getTokenType());
-    oauthNode.put("realm", oauth.getRealm());
-    ArrayNode scopesNode = objectMapper.createArrayNode();
-    if (oauth.getScopes() != null) {
-        oauth.getScopes().forEach(scopesNode::add);
+    ObjectNode session = objectMapper.createObjectNode();
+
+    // Layer 1: PA identity fields (base)
+    session.put("subject", identity.getSubject());
+    session.put("mappedSubject", identity.getMappedSubject());
+    session.put("trackingId", identity.getTrackingId());
+    session.put("tokenId", identity.getTokenId());
+    if (identity.getTokenExpiration() != null) {
+        session.put("tokenExpiration", identity.getTokenExpiration().toString());
     }
-    oauthNode.set("scopes", scopesNode);
-    session.set("oauth", oauthNode);
-}
 
-// Session state attributes (read-only snapshot)
-SessionStateSupport sss = identity.getSessionStateSupport();
-if (sss != null && sss.getAttributes() != null) {
-    ObjectNode stateNode = objectMapper.createObjectNode();
-    sss.getAttributes().forEach(stateNode::set);
-    session.set("sessionState", stateNode);
+    // Layer 2: OAuth metadata
+    OAuthTokenMetadata oauth = identity.getOAuthTokenMetadata();
+    if (oauth != null) {
+        session.put("clientId", oauth.getClientId());
+        session.put("tokenType", oauth.getTokenType());
+        session.put("realm", oauth.getRealm());
+        if (oauth.getExpiresAt() != null) {
+            session.put("tokenExpiresAt", oauth.getExpiresAt().toString());
+        }
+        if (oauth.getRetrievedAt() != null) {
+            session.put("tokenRetrievedAt", oauth.getRetrievedAt().toString());
+        }
+        ArrayNode scopesNode = objectMapper.createArrayNode();
+        if (oauth.getScopes() != null) {
+            oauth.getScopes().forEach(scopesNode::add);
+        }
+        session.set("scopes", scopesNode);
+    }
+
+    // Layer 3: OIDC claims / token attributes (SPREAD into flat object)
+    JsonNode attributes = identity.getAttributes();
+    if (attributes != null && attributes.isObject()) {
+        attributes.fields().forEachRemaining(entry ->
+            session.set(entry.getKey(), entry.getValue())  // overrides layers 1-2 on collision
+        );
+    }
+
+    // Layer 4: Session state (SPREAD into flat object — highest precedence)
+    SessionStateSupport sss = identity.getSessionStateSupport();
+    if (sss != null && sss.getAttributes() != null) {
+        sss.getAttributes().forEach((key, value) ->
+            session.set(key, value)  // overrides all previous layers on collision
+        );
+    }
+
+    return session;
 }
 ```
 
-#### `$session` Schema
+#### `$session` Schema (flat)
 
-| Path | Type | Source | Notes |
-|------|------|--------|-------|
-| `$session.subject` | string | `Identity.getSubject()` | Authenticated principal |
-| `$session.mappedSubject` | string | `Identity.getMappedSubject()` | Mapped by IdentityMapping plugin |
-| `$session.trackingId` | string | `Identity.getTrackingId()` | PA-generated tracking ID |
-| `$session.tokenId` | string | `Identity.getTokenId()` | OAuth token ID |
-| `$session.tokenExpiration` | string (ISO 8601) | `Identity.getTokenExpiration()` | Omitted if no expiration |
-| `$session.attributes` | object | `Identity.getAttributes()` | OIDC claims / token introspection claims |
-| `$session.attributes.sub` | string | (typical OIDC claim) | OIDC subject |
-| `$session.attributes.email` | string | (typical OIDC claim) | User email |
-| `$session.attributes.roles` | array | (typical OIDC claim, nested path) | Navigate with dot-path in JSLT |
-| `$session.oauth.clientId` | string | `OAuthTokenMetadata.getClientId()` | OAuth client ID |
-| `$session.oauth.scopes` | array | `OAuthTokenMetadata.getScopes()` | Granted OAuth scopes |
-| `$session.oauth.tokenType` | string | `OAuthTokenMetadata.getTokenType()` | e.g., "Bearer" |
-| `$session.oauth.realm` | string | `OAuthTokenMetadata.getRealm()` | OAuth realm |
-| `$session.sessionState` | object | `SessionStateSupport.getAttributes()` | Read-only snapshot of PA session state |
+| Path | Type | Source Layer | Notes |
+|------|------|-------------|-------|
+| `$session.subject` | string | L1: `Identity.getSubject()` | Authenticated principal (may be overridden by OIDC `sub` in L3) |
+| `$session.mappedSubject` | string | L1: `Identity.getMappedSubject()` | Mapped by IdentityMapping plugin |
+| `$session.trackingId` | string | L1: `Identity.getTrackingId()` | PA-generated tracking ID |
+| `$session.tokenId` | string | L1: `Identity.getTokenId()` | OAuth token ID |
+| `$session.tokenExpiration` | string (ISO) | L1: `Identity.getTokenExpiration()` | Omitted if no expiration |
+| `$session.clientId` | string | L2: `OAuthTokenMetadata.getClientId()` | OAuth client ID |
+| `$session.scopes` | array | L2: `OAuthTokenMetadata.getScopes()` | Granted scopes |
+| `$session.tokenType` | string | L2: `OAuthTokenMetadata.getTokenType()` | e.g., "Bearer" |
+| `$session.realm` | string | L2: `OAuthTokenMetadata.getRealm()` | OAuth realm |
+| `$session.tokenExpiresAt` | string (ISO) | L2: `OAuthTokenMetadata.getExpiresAt()` | Token expiration |
+| `$session.tokenRetrievedAt` | string (ISO) | L2: `OAuthTokenMetadata.getRetrievedAt()` | When token was fetched |
+| `$session.sub` | string | L3: OIDC claim | Standard OIDC subject claim |
+| `$session.email` | string | L3: OIDC claim | User email |
+| `$session.roles` | array | L3: OIDC claim | Custom roles claim |
+| `$session.*` | any | L3: (any OIDC claim) | All claims spread into flat namespace |
+| `$session.<key>` | any | L4: `SessionStateSupport` | Dynamic session state — can override any key |
 
-**`tokenExpiration` note:** `Identity.getTokenExpiration()` returns a `java.util.Date`.
-The adapter formats it as an ISO 8601 string (`Instant.toString()` format, e.g.
-`"2026-02-11T12:30:00Z"`). JSLT can compare this as a string for basic expiry
-checks. If the token has no expiration, the field is omitted.
+> **Example JSLT usage** with flat `$session`:
+>
+> ```jslt
+> // Scope-based conditional transform
+> if (contains($session.scopes, "admin"))
+>   { "user": $session.email, "role": "admin" }
+> else
+>   { "user": $session.sub, "role": "viewer" }
+>
+> // Access cached authorization from SessionStateSupport
+> let authz = $session.authzDecision
+> if ($authz == "PERMIT") ...
+> ```
 
-**OAuth metadata note:** `OAuthTokenMetadata` provides the OAuth client context
-(client ID, scopes, token type, realm). This enables scope-based JSLT transforms
-(e.g., `if (contains($session.oauth.scopes, "admin")) ...`). If `getOAuthTokenMetadata()`
-returns `null`, the `oauth` sub-object is omitted.
+**Collision handling:** Key collisions are expected and intentional. Common
+collisions:
+- `subject` (L1) vs `sub` (L3 OIDC) — both refer to the user principal but
+  use different keys, so no actual collision. If a custom claim is named
+  `subject`, the OIDC value (L3) wins.
+- Session state (L4) overriding any earlier value is the primary use case —
+  e.g., a rule sets `authzLevel` in session state, and JSLT reads the latest.
 
-**Session state note:** `SessionStateSupport` provides persistent key-value
-storage across requests within a PA session. The adapter reads these attributes
-as a **read-only snapshot** — the adapter does NOT write to session state.
-Session state attributes set by other PA rules (e.g., `ExternalAuthorizationRule`'s
-cached authorization responses) are available to JSLT transforms via
-`$session.sessionState.<key>`.
+**Null identity (unauthenticated):** If `exchange.getIdentity() == null`,
+`sessionContext` is `null` → `$session` evaluates to `null` in JSLT.
+Transforms MUST gracefully handle null `$session` (e.g., `if ($session != null) ...`).
 
 | Aspect | Detail |
 |--------|--------|
-| Success path | JSLT `$session.subject` resolves to authenticated user, `$session.oauth.clientId` to OAuth client |
+| Success path | `$session.email` resolves to OIDC claim, `$session.clientId` to OAuth client, `$session.authzCache` to dynamic state |
 | Failure path | No identity (unauthenticated) → `sessionContext = null` → `$session` is `null` in JSLT |
-| Failure path (OAuth) | No OAuth metadata → `$session.oauth` missing → `$session.oauth.clientId` evaluates to `null` |
+| Collision path | L4 session state key overrides L3 OIDC claim key (by design — dynamic > static) |
 | Status | ⬜ Not yet implemented |
 | Source | ADR-0030, FR-001-13, G-002-01 |
 
