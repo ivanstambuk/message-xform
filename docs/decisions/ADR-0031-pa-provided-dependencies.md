@@ -175,14 +175,13 @@ Positive:
 
 Negative / trade-offs:
 - Adapter is version-locked to PA's Jackson version. If PA ships a Jackson
-  version with a breaking change that JSLT can't handle, the adapter must
-  be updated. Mitigated by: Jackson's exceptional backwards compatibility
-  track record, and the runtime version guard.
+  version with a breaking change in the APIs the adapter uses (e.g.,
+  `Identity.getAttributes()`), the adapter must be updated. Mitigated by:
+  Jackson's exceptional backwards compatibility track record, and the runtime
+  version guard.
 - Adapter versions must track PA versions (e.g., adapter `9.0.x` for PA
   `9.0.y`). This is standard practice in plugin ecosystems (Elasticsearch,
   IntelliJ, Jenkins, Gradle).
-- Core engine's `implementation` dependency on Jackson must match PA's
-  version. Enforced by single version catalog entry.
 
 Validating evidence:
 - `docs/research/spike-pa-classloader-model.md` — full reverse-engineering log.

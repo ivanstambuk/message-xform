@@ -230,12 +230,6 @@ ADR-0031 remains **valid** for:
 - Runtime version guard (warns on PA dependency drift)
 - Script-based dependency extraction (`scripts/pa-extract-deps.sh`)
 
-ADR-0031 is **superseded** by ADR-0032 for:
-- ~~Core engine compiling against PA's Jackson version~~ → core uses its own
-- ~~`libs.versions.toml` Jackson version must match PA~~ → core's Jackson is
-  independent
-- ~~Single version catalog for Jackson~~ → core manages its own Jackson
-  version
 
 ## Consequences
 
@@ -268,7 +262,7 @@ Negative / trade-offs:
 
 
 References:
-- ADR-0031: PA-Provided Dependencies (partially superseded)
+- ADR-0031: PA-Provided Dependencies
 - ADR-0025: Adapter Lifecycle SPI
 - ADR-0030: Session Context Binding
 - Evans, E. (2003). *Domain-Driven Design*. Addison-Wesley. Ch. 14:

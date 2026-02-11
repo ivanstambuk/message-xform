@@ -187,14 +187,18 @@ See `docs/operations/quality-gate.md` for full pipeline documentation.
      6. ☐ Remove the resolved row from `docs/architecture/open-questions.md`.
      7. ☐ Commit all changes in a single atomic commit.
    - Then move to the next question.
-   - **ADRs are pure decision records**: ADRs contain only Context, Decision,
-     Consequences, and References. They must NOT contain Follow-ups, TODO lists,
-     task checklists, implementation status, or analysis that resulted from the
-     decision. When a Decision Card triggers follow-up discussion (capability
-     comparisons, trade-off deep dives, implementation planning), capture that
-     analysis in the relevant feature plan (`docs/architecture/features/NNN/plan.md`),
-     research doc (`docs/research/`), or open question — never in the ADR itself.
-     Plans, features, and tasks link *to* ADRs; ADRs never link back.
+   - **ADRs are pure decision records and source of truth**: ADRs contain only
+     Context, Decision, Consequences, and References. They must NOT contain
+     Follow-ups, TODO lists, task checklists, implementation status, or analysis
+     that resulted from the decision. When a Decision Card triggers follow-up
+     discussion (capability comparisons, trade-off deep dives, implementation
+     planning), capture that analysis in the relevant feature plan
+     (`docs/architecture/features/NNN/plan.md`), research doc (`docs/research/`),
+     or open question — never in the ADR itself. Plans, features, and tasks link
+     *to* ADRs; ADRs never link back. When a later ADR supersedes parts of an
+     earlier one, **remove** the stale content from the earlier ADR — do not
+     leave struck-out text or historical annotations. Every statement in an ADR
+     must be currently true. Git history preserves the evolution.
 9. **Decisions Must Be Testable**: Every ADR or resolved open question that changes the spec MUST produce at least one validating scenario in `scenarios.md`. Scenarios reference ADRs (via tags like `adr-0002`) and spec requirements (via `requires: [FR-001-10]`). The coverage matrix at the bottom of `scenarios.md` MUST be updated. When a discussion reveals a new edge case, add a scenario immediately — don't defer.
 10. **Spec Review Protocol**: When the agent reviews or critiques a spec, findings MUST be triaged and persisted — never left as chat-only output.
     - **🔴🟡 Decisions needed** (high/medium severity): Register as formal open questions in `docs/architecture/open-questions.md`. These require human input via Decision Cards before the spec is updated. Each question gets a severity tag in the Notes column (`severity: high` or `severity: medium`).
