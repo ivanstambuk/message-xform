@@ -1,15 +1,18 @@
 # PingAccess SDK Implementation Guide
 
 > Single-source reference for implementing PingAccess 9.0.1 SDK plugins.
-> Sourced from the official SDK Javadoc and sample rules shipped with PingAccess.
+> Sourced from the official SDK Javadoc, sample rules, and the PingAccess 9.0.x
+> documentation chapter "PingAccess Add-on SDK for Java".
 > This document is optimized for LLM context — each section is self-contained.
 > **Goal:** This guide should be sufficient without consulting the Javadoc directly.
+> **Completeness:** Incorporates all content from the official PingAccess 9.0.x
+> SDK documentation chapter. No external documentation dependency required.
 
 | Field | Value |
 |-------|-------|
 | SDK Version | `com.pingidentity.pingaccess:pingaccess-sdk:9.0.1.0` |
 | Java | 17 or 21 (Amazon Corretto, OpenJDK, Oracle JDK — 64-bit) |
-| Source | Official SDK Javadoc (`binaries/pingaccess-9.0.1/sdk/apidocs/`) + sample rules |
+| Source | Official SDK Javadoc (`binaries/pingaccess-9.0.1/sdk/apidocs/`) + sample rules + official docs chapter |
 | Related spec | `docs/architecture/features/002/spec.md` (co-located) |
 
 ---
@@ -34,6 +37,8 @@
 | 14 | [OAuth SDK](#14-oauth-sdk) | OAuthConstants, OAuthUtilities, WWW-Authenticate building | `OAuth`, `DPoP`, `RFC6750`, `constants` |
 | 15 | [Other Extension Points](#15-other-extension-points) | IdentityMapping, SiteAuthenticator, LoadBalancing, LocaleOverride, MasterKeyEncryptor | `extension`, `plugin`, `identity`, `encryption`, `locale` |
 | 16 | [Vendor-Built Plugin Analysis](#16-vendor-built-plugin-analysis) | Patterns from PA engine's built-in plugins | `vendor`, `internal`, `engine`, `built-in` |
+| 17 | [Development Setup & Plugin Creation](#17-development-setup--plugin-creation) | SDK directory structure, 7-step creation procedure, Maven/Gradle | `setup`, `Maven`, `Gradle`, `create`, `deploy` |
+| 18 | [Behavioral Notes](#18-behavioral-notes) | Request immutability in response phase, logging | `behavior`, `constraints`, `logging` |
 
 ---
 
@@ -88,6 +93,11 @@ expected denial errors to `Outcome.RETURN`**.
 response attached to the Exchange. Called on both CONTINUE and RETURN outcomes
 (in reverse chain order for RETURN).
 
+> ⚠️ **Request is read-only during response phase.** Any modifications to
+> `exchange.getRequest()` or its headers inside `handleResponse()` are
+> **silently ignored** by PingAccess. Only `exchange.getResponse()` may be
+> modified.
+
 ### Base class: `AsyncRuleInterceptorBase<T>`
 
 ```java
@@ -126,13 +136,88 @@ T getConfiguration();
 // Retrieves the configuration provided to this ConfigurablePlugin.
 ```
 
-### Lifecycle
+### Lifecycle (Official 7-Step Sequence)
 
-1. **Instantiation:** PA creates plugin via no-arg constructor.
-2. **Injection:** Setter methods called (`setHttpClient`, `setTemplateRenderer`).
-3. **Configuration:** `configure(T)` called with admin-provided config.
-4. **Runtime:** `handleRequest()` / `handleResponse()` called per request.
-5. **Teardown:** No explicit destroy — plugin is garbage-collected on PA restart.
+The official PingAccess documentation defines a precise 7-step initialization
+sequence before a plugin is available to process requests. Using `RuleInterceptor`
+as the example (identical for other plugin types):
+
+1. **Annotation interrogation:** The `@Rule` annotation on the `RuleInterceptor`
+   implementation class is read to determine which `PluginConfiguration` class
+   will be instantiated.
+2. **Spring initialization:** Both the `RuleInterceptor` and `PluginConfiguration`
+   beans are provided to Spring for:
+   - **Autowiring** (dependency injection via `@Inject`)
+   - **`@PostConstruct` initialization**
+   
+   > **Important:** The order in which the RuleInterceptor and PluginConfiguration
+   > are processed by Spring is **not defined**. Do not assume one is initialized
+   > before the other.
+3. **Name assignment:** `PluginConfiguration.setName(String)` is called with the
+   administrator-defined name.
+4. **JSON → Configuration mapping:** PingAccess maps the incoming JSON
+   configuration to the `PluginConfiguration` instance (via Jackson deserialization).
+   
+   > ⚠️ **Critical:** The JSON plugin configuration **must contain a JSON member
+   > for each field**, regardless of implied value. Failure to include a field in
+   > the JSON — even if the field has a default value in Java — can lead to errors.
+5. **`configure()` call:** `ConfigurablePlugin.configure(PluginConfiguration)` is
+   called, giving the plugin a chance to post-process configuration.
+6. **Validation:** `Validator.validate(Object, Class[])` is invoked on the
+   `PluginConfiguration`. Since PA 5.0, validation runs **before** `configure()`
+   was called in the old model. PingAccess now validates **before** `configure()`
+   is called, so constraint annotations on PluginConfiguration fields are
+   guaranteed to be enforced before the plugin receives them.
+7. **Available:** The instance is made available to service end-user requests via
+   `handleRequest(Exchange)` and `handleResponse(Exchange)`.
+
+**Teardown:** No explicit destroy lifecycle. Plugins are garbage-collected on PA
+restart. Clean up resources (if any) using `@PreDestroy` or finalizers.
+
+> **Logging:** Use the **SLF4j API** for all logging in your plugin module.
+> PingAccess ships its own SLF4J provider — do NOT bundle a second SLF4J
+> implementation (causes classpath conflict). See [§9 Deployment](#9-deployment--classloading).
+
+### Injection
+
+Before plugins are put into use, rules, SiteAuthenticators, and their
+`PluginConfiguration` instances are passed through Spring's Autowiring and
+initialization (see Lifecycle step 2 above).
+
+> ⚠️ **Future-proofing:** To protect your code against changes in PingAccess
+> internals, **do not use Spring as a direct dependency**. Use the annotation
+> `javax.inject.Inject` for any injection instead of Spring-specific annotations
+> like `@Autowired`.
+
+**Injectable classes (definitive, closed list):**
+
+| # | Class | Purpose |
+|---|-------|---------|
+| 1 | `com.pingidentity.pa.sdk.util.TemplateRenderer` | Renders HTML error/response templates |
+| 2 | `com.pingidentity.pa.sdk.accessor.tps.ThirdPartyServiceModel` | Handle to a third-party service (via `@OidcProvider` or `@Inject`) |
+| 3 | `com.pingidentity.pa.sdk.http.client.HttpClient` | Async HTTP client for third-party service calls |
+
+These are the **only** classes available for injection. No other PA-internal
+classes can be injected into plugins.
+
+**Injection pattern (from official docs):**
+
+```java
+public class MyPlugin extends AsyncRuleInterceptorBase<MyConfig> {
+    private HttpClient httpClient;
+
+    @Inject
+    public void setHttpClient(HttpClient httpClient) {
+        this.httpClient = httpClient;
+    }
+    // httpClient is set during Lifecycle step 2 (Spring initialization)
+}
+```
+
+> **Note:** `AsyncRuleInterceptorBase` already provides pre-wired setter
+> injection for `HttpClient` and `TemplateRenderer` via `setHttpClient()` and
+> `setTemplateRenderer()`. You only need explicit `@Inject` if you're
+> implementing the raw SPI interface without using a base class.
 
 ### @Rule Annotation
 
@@ -147,11 +232,40 @@ T getConfiguration();
 )
 ```
 
-> **`destination` attribute:** Controls where the rule can be applied. Default
-> is both `Site` and `Agent`. A rule with `destination = Site` (like the
-> `Clobber404ResponseRule` sample) can only be added to Site-type applications.
-> Agent-only rules cannot process responses because agents don't return
-> responses to PingAccess for post-processing.
+> **`destination` attribute:** Controls where the rule can be applied.
+
+### Agent vs Site Rule Differences
+
+Rules can be applied to applications associated with **agents** or **sites**.
+Some SDK features are not available to rules applied to agents. Rules that use
+site-only features should be explicitly marked.
+
+**Rules applied to Agents are limited in the following ways:**
+
+| Limitation | Detail |
+|-----------|--------|
+| **No `handleResponse`** | The `handleResponse` method is **not called** for agent rules. |
+| **No request body** | The request body is **not present** — `exchange.getRequest().getBody()` returns an empty body. |
+| **Empty destinations** | `Exchange.getDestinations()` list is empty. Modifying the destination list has **no effect**. |
+
+**Annotation patterns:**
+
+```java
+// Site-only rule (our adapter uses this — we need handleResponse + body access)
+@Rule(destination = { RuleInterceptorSupportedDestination.Site }, ...)
+
+// Agent-only rule
+@Rule(destination = { RuleInterceptorSupportedDestination.Agent }, ...)
+
+// Both (default if destination is omitted)
+@Rule(destination = { RuleInterceptorSupportedDestination.Site,
+                      RuleInterceptorSupportedDestination.Agent }, ...)
+```
+
+> **Our adapter's choice:** We use `destination = {Site}` because we require:
+> (1) `handleResponse()` for response-phase transforms, (2) request body access
+> for body-based transforms, and (3) destination host information. All three are
+> unavailable to Agent rules.
 
 ### RuleInterceptorCategory (enum)
 
@@ -1386,8 +1500,36 @@ Contains the FQCN of the plugin class. PingAccess discovers it via `ServiceLoade
 
 ### Deployment Path
 
-Drop the shadow JAR into `/opt/server/deploy/` on the PA server. On restart, PA
-scans this directory and loads all discovered plugins.
+#### The `<PA_HOME>/deploy` Directory
+
+The `<PA_HOME>/deploy` directory is the designated location for all third-party
+and custom plugin JAR files. Key characteristics:
+
+- **Auto-loaded at startup:** Contents are loaded by `run.sh` (Linux) or
+  `run.bat` (Windows) during PingAccess startup.
+- **Auto-migrated on upgrade:** When PingAccess is upgraded, files in the
+  `deploy` directory are **automatically migrated** to the new installation.
+  This is the critical difference from `<PA_HOME>/lib` — files in `lib` are NOT
+  migrated and are replaced by the new version's library set.
+- **PingAccess does not generate contents:** The directory starts empty; all
+  contents are user-provided.
+
+#### Deployment Procedure
+
+1. Build the shadow JAR (see §9 Shadow JAR Contents above).
+2. Copy the JAR to `<PA_HOME>/deploy/` on each PA node.
+3. **Restart PingAccess.**
+
+> ⚠️ **Mandatory Restart:** You **must** restart PingAccess after deploying any
+> custom plugin JAR. There is no hot-reload mechanism. This applies to initial
+> deployment, updates, and removal of plugin JARs.
+
+#### Our Adapter's Deployment
+
+For the message-xform adapter, the deployment path is:
+```
+/opt/server/deploy/message-xform-adapter-<version>-shadow.jar
+```
 
 ---
 
@@ -2244,19 +2386,69 @@ Reads a `custom-accept-language` cookie containing a BCP 47 language tag
 // Throws MasterKeyEncryptorException on errors.
 ```
 
-### SPI Registration Files per Extension Type
+### Complete SPI Reference (All Extension Points)
 
-Each extension type requires its own `META-INF/services/` file:
+The following is the definitive reference for all 5 plugin extension points,
+covering sync and async variants, SPI interfaces, base classes, annotations,
+and `META-INF/services/` provider-configuration files.
 
-| Extension Type | SPI Service File |
-|---------------|-----------------|
-| Async Rule | `com.pingidentity.pa.sdk.policy.AsyncRuleInterceptor` |
-| Sync Rule | `com.pingidentity.pa.sdk.policy.RuleInterceptor` |
-| Identity Mapping | `com.pingidentity.pa.sdk.identitymapping.IdentityMappingPlugin` |
-| Site Authenticator | `com.pingidentity.pa.sdk.siteauthenticator.SiteAuthenticatorInterceptor` |
-| Async Load Balancing | `com.pingidentity.pa.sdk.ha.lb.AsyncLoadBalancingPlugin` |
-| Sync Load Balancing | `com.pingidentity.pa.sdk.ha.lb.LoadBalancingPlugin` |
-| Locale Override | `com.pingidentity.pa.sdk.localization.LocaleOverrideService` |
+#### Sync vs Async Decision
+
+> **When to use Async:** Use async variants (`AsyncRuleInterceptor`,
+> `AsyncSiteAuthenticatorInterceptor`, etc.) **only when** the plugin logic
+> requires integrating with a third-party service via `HttpClient`. Async base
+> classes provide `getHttpClient()`. If no `HttpClient` is needed, use the
+> sync variant.
+
+#### Extension Point Matrix
+
+| Extension Point | Variant | SPI Interface | Base Class | Annotation |
+|----------------|---------|---------------|------------|------------|
+| **Rule** | Sync | `RuleInterceptor<T>` | `RuleInterceptorBase<T>` | `@Rule` |
+| | Async | `AsyncRuleInterceptor<T>` | `AsyncRuleInterceptorBase<T>` | `@Rule` |
+| **Site Authenticator** | Sync | `SiteAuthenticatorInterceptor<T>` | `SiteAuthenticatorInterceptorBase<T>` | `@SiteAuthenticator` |
+| | Async | `AsyncSiteAuthenticatorInterceptor<T>` | `AsyncSiteAuthenticatorInterceptorBase<T>` | `@SiteAuthenticator` |
+| **Identity Mapping** | Sync | `IdentityMappingPlugin<T>` | `IdentityMappingPluginBase<T>` | `@IdentityMapping` |
+| | Async | `AsyncIdentityMappingPlugin<T>` | `AsyncIdentityMappingPluginBase<T>` | `@IdentityMapping` |
+| **Load Balancing** | Sync | `LoadBalancingPlugin<H,T>` | `LoadBalancingPluginBase<H,T>` | `@LoadBalancingStrategy` |
+| | Async | `AsyncLoadBalancingPlugin<H,T>` | `AsyncLoadBalancingPluginBase<H,T>` | `@LoadBalancingStrategy` |
+| **Locale Override** | Sync only | `LocaleOverrideService` | *(none)* | *(none)* |
+
+> ⚠️ **LocaleOverrideService limitation:** The LocaleOverrideService **cannot**
+> use third-party service integration. There is no async variant and no base
+> class with `HttpClient` access. This is the only extension point with this
+> restriction.
+
+#### Additional base class: `HeaderIdentityMappingPlugin`
+
+For Identity Mapping plugins that need to set headers from identity attributes,
+the SDK provides `HeaderIdentityMappingPlugin` as a convenience base class
+(extends `IdentityMappingPluginBase`). It handles the common pattern of mapping
+identity attributes to request headers via `AttributeHeaderPair` configuration.
+
+#### SPI Registration Files (`META-INF/services/`)
+
+Each extension type requires its own provider-configuration file:
+
+| Extension Type | Provider-Configuration File |
+|---------------|-----------------------------|
+| Sync Rule | `META-INF/services/com.pingidentity.pa.sdk.policy.RuleInterceptor` |
+| Async Rule | `META-INF/services/com.pingidentity.pa.sdk.policy.AsyncRuleInterceptor` |
+| Sync Site Authenticator | `META-INF/services/com.pingidentity.pa.sdk.siteauthenticator.SiteAuthenticatorInterceptor` |
+| Async Site Authenticator | `META-INF/services/com.pingidentity.pa.sdk.siteauthenticator.AsyncSiteAuthenticatorInterceptor` |
+| Sync Identity Mapping | `META-INF/services/com.pingidentity.pa.sdk.identitymapping.IdentityMappingPlugin` |
+| Async Identity Mapping | `META-INF/services/com.pingidentity.pa.sdk.identitymapping.AsyncIdentityMappingPlugin` |
+| Sync Load Balancing | `META-INF/services/com.pingidentity.pa.sdk.ha.lb.LoadBalancingPlugin` |
+| Async Load Balancing | `META-INF/services/com.pingidentity.pa.sdk.ha.lb.AsyncLoadBalancingPlugin` |
+| Locale Override | `META-INF/services/com.pingidentity.pa.sdk.localization.LocaleOverrideService` |
+
+#### SiteAuthenticatorInterceptor Interface Change (post-5.0)
+
+The `SiteAuthenticatorInterceptor` interface no longer extends
+`RequestInterceptor` and `ResponseInterceptor` (as it did pre-5.0), but it
+still defines `handleRequest(Exchange)` and `handleResponse(Exchange)` directly.
+Both methods now throw only `AccessException` (not `IOException` or
+`InterruptedException` as in earlier versions).
 
 ---
 
@@ -2359,6 +2551,222 @@ The following are used by vendor plugins but are **not** part of the public SDK:
 | `RejectionHandlerAccessor` | Rejection handler dropdown | N/A |
 | `BundleSupport` | ResourceBundle for plugin | `TemplateRenderer.getLocalizedMessageResolver()` |
 | `ConflictAwareRuleInterceptor` | Rule conflict detection | N/A |
+
+---
+
+## 17. Development Setup & Plugin Creation
+
+> **Tags:** `setup`, `Maven`, `Gradle`, `create`, `deploy`, `directory`
+
+### SDK Directory Structure
+
+The PingAccess SDK is located at `<PA_HOME>/sdk` alongside the `<PA_HOME>/deploy`
+directory. The following files and directories are provided:
+
+| Path | Description |
+|------|-------------|
+| `<PA_HOME>/deploy/` | Deployment directory for custom plugin JARs (auto-migrated on upgrade) |
+| `<PA_HOME>/sdk/README.md` | Overview of the SDK contents |
+| `<PA_HOME>/sdk/apidocs/` | SDK Javadocs (open `index.html` to browse) |
+| `<PA_HOME>/sdk/samples/Rules/` | Maven project with example rule plugin implementations |
+| `<PA_HOME>/sdk/samples/SiteAuthenticator/` | Maven project with example site authenticator plugins |
+| `<PA_HOME>/sdk/samples/IdentityMappings/` | Maven project with example identity mapping plugins |
+| `<PA_HOME>/sdk/samples/LoadBalancingStrategies/` | Maven project with example load balancing plugins |
+| `<PA_HOME>/sdk/samples/LocaleOverrideService/` | Maven project with example locale override plugin |
+
+Each `samples/` subdirectory contains its own `README.md` with sample-specific details.
+
+### Creating a Plugin From Scratch (Official 7-Step Procedure)
+
+The following is the official procedure from the PingAccess documentation:
+
+1. **Create a new, empty Maven project.** The root directory is referred to
+   as `<PLUGIN_HOME>`.
+
+2. **Copy the `pom.xml`** from the appropriate SDK sample in
+   `<PA_HOME>/sdk/samples/`. For example, to create a rule, copy from
+   `<PA_HOME>/sdk/samples/Rules/`.
+
+3. **Modify the `pom.xml`:** Update `groupId`, `artifactId`, `name`, and
+   `version` as appropriate for your plugin.
+
+4. **Create a Java class** that implements the plugin SPI from the SDK, in
+   `<PLUGIN_HOME>/src/main/java/com/yourpackagename/`. For each SPI, base
+   classes are provided that simplify the implementation:
+
+   | Plugin Type | SPI Interface | Base Class |
+   |-------------|--------------|------------|
+   | Sync rule | `RuleInterceptor` | `RuleInterceptorBase` |
+   | Async rule | `AsyncRuleInterceptor` | `AsyncRuleInterceptorBase` |
+   | Site authenticator | `SiteAuthenticatorInterceptor` | `SiteAuthenticatorInterceptorBase` |
+   | Identity mapping | `IdentityMappingPlugin` | `IdentityMappingPluginBase` |
+   | Load balancing | `LoadBalancingPlugin` | `LoadBalancingPluginBase` |
+
+5. **Create a provider-configuration file** (SPI services file) for the plugin.
+   The file name is the FQCN of the SPI interface, and its contents are the FQCN
+   of your implementation class:
+   ```
+   <PLUGIN_HOME>/src/main/resources/META-INF/services/com.pingidentity.pa.sdk.policy.RuleInterceptor
+   ```
+   **Contents:** `com.yourpackagename.YourCustomRule`
+
+6. **Build the Maven project** to obtain a JAR:
+   ```bash
+   cd <PLUGIN_HOME>
+   mvn install
+   ```
+   This builds the plugin, runs tests, and installs the JAR to the local
+   Maven repository.
+
+7. **Deploy the JAR** to `<PA_HOME>/deploy/` and **restart PingAccess**
+   (see [§9 Deployment Path](#deployment-path)).
+
+### Installing the SDK Samples
+
+To install and test the provided SDK samples:
+
+```bash
+# From the sample directory, e.g.:
+cd <PA_HOME>/sdk/samples/Rules
+mvn install
+# This builds, tests, and copies the JAR to <PA_HOME>/lib
+```
+
+### SDK Prerequisites
+
+The following prerequisites must be met before using the Add-on SDK:
+
+**Required tools:**
+- **Java SDK** — 17 or 21 (see Java Version Compatibility below)
+- **Apache Maven** (for official samples) or **Gradle** (for our project)
+
+**Ping Identity Maven Repository:**
+
+The SDK samples reference Ping Identity's public Maven repository:
+
+```
+http://maven.pingidentity.com/release
+```
+
+> **Note:** This Maven repository **cannot be accessed through a browser** — it
+> is designed solely for backend use (Maven/Gradle dependency resolution).
+
+**Maven `pom.xml` configuration:**
+
+```xml
+<repositories>
+    <repository>
+        <releases>
+            <enabled>true</enabled>
+            <updatePolicy>always</updatePolicy>
+            <checksumPolicy>warn</checksumPolicy>
+        </releases>
+        <id>PingIdentityMaven</id>
+        <name>PingIdentity Release</name>
+        <url>http://maven.pingidentity.com/release/</url>
+        <layout>default</layout>
+    </repository>
+</repositories>
+```
+
+**Offline / no-internet fallback (Maven):**
+
+If Internet access is unavailable, update the SDK dependency in `pom.xml` to
+point to the local PingAccess installation using `system` scope. Replace
+`<PA_HOME>` with the actual path:
+
+```xml
+<dependency>
+    <groupId>com.pingidentity.pingaccess</groupId>
+    <artifactId>pingaccess-sdk</artifactId>
+    <version>9.0.1.0</version>
+    <scope>system</scope>
+    <systemPath><PA_HOME>/lib/pingaccess-sdk-9.0.1.0.jar</systemPath>
+</dependency>
+<dependency>
+    <groupId>javax.validation</groupId>
+    <artifactId>validation-api</artifactId>
+    <version>1.0.0.GA</version>
+    <scope>system</scope>
+    <systemPath><PA_HOME>/lib/validation-api-1.0.0.GA.jar</systemPath>
+</dependency>
+<dependency>
+    <groupId>org.slf4j</groupId>
+    <artifactId>slf4j-api</artifactId>
+    <version>1.7.4</version>
+    <scope>system</scope>
+    <systemPath><PA_HOME>/lib/slf4j-api-1.7.4.jar</systemPath>
+</dependency>
+<dependency>
+    <groupId>org.slf4j</groupId>
+    <artifactId>slf4j-log4j12</artifactId>
+    <version>1.7.4</version>
+    <scope>system</scope>
+    <systemPath><PA_HOME>/lib/slf4j-log4j12-1.7.4.jar</systemPath>
+</dependency>
+```
+
+> **Version note:** The `systemPath` versions above are from the official docs
+> (PA 4.x era). For PA 9.0.1.0, the actual JAR filenames in `<PA_HOME>/lib/`
+> may differ. Always verify the exact filenames.
+
+### Gradle Adaptation (Our Project)
+
+Our message-xform adapter uses **Gradle** instead of Maven. The core steps are
+analogous but differ in tooling:
+
+| Maven Step | Gradle Equivalent |
+|-----------|-------------------|
+| `pom.xml` with SDK dependency | `build.gradle.kts` with `compileOnly` SDK dependency |
+| `mvn install` | `./gradlew shadowJar` (produces shadow JAR) |
+| Copy JAR to `deploy/` | CI/CD copies shadow JAR to `<PA_HOME>/deploy/` |
+| Ping Maven repo in `<repositories>` | `maven { url = "http://maven.pingidentity.com/release" }` in `repositories {}` |
+| System-scope local JAR | `compileOnly(files("<PA_HOME>/lib/pingaccess-sdk-9.0.1.0.jar"))` |
+
+See [§9 Deployment](#9-deployment--classloading) for shadow JAR contents and
+Jackson relocation requirements.
+
+---
+
+## 18. Behavioral Notes
+
+> **Tags:** `behavior`, `constraints`, `logging`
+
+### Request Immutability During Response Phase
+
+Any modifications to `exchange.getRequest()` or its headers inside
+`handleResponse()` are **silently ignored** by PingAccess (a warning is logged).
+Only `exchange.getResponse()` may be modified during response processing.
+
+```java
+// ❌ WRONG — silently ignored
+@Override
+public CompletionStage<Void> handleResponse(Exchange exchange) {
+    exchange.getRequest().getHeaders().add("X-Debug", "true");  // IGNORED
+    return CompletableFuture.completedFuture(null);
+}
+
+// ✅ CORRECT — modify the response only
+@Override
+public CompletionStage<Void> handleResponse(Exchange exchange) {
+    exchange.getResponse().getHeaders().add("X-Debug", "true");  // OK
+    return CompletableFuture.completedFuture(null);
+}
+```
+
+### Logging
+
+Use the **SLF4j API** for all logging in plugin modules:
+
+```java
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+private static final Logger LOG = LoggerFactory.getLogger(MyPlugin.class);
+```
+
+PingAccess ships its own SLF4J provider — do **not** bundle SLF4J in your
+plugin JAR (see [§9 Deployment](#9-deployment--classloading)).
 
 ---
 
