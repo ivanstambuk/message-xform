@@ -242,18 +242,25 @@ console's rule type list.
 ## S-002-22: Cookie Access in JSLT
 
 **Given** a request contains cookie `session_token=abc123`,
-**and** a transform spec uses `$context.cookies.session_token`,
+**and** a transform spec uses `$cookies.session_token`,
 **when** `handleRequest()` processes the exchange,
 **then** the JSLT expression resolves to `"abc123"`.
+
+> **Note:** The JSLT engine binds cookies as a top-level `$cookies` variable,
+> not nested under `$context`. See `TransformContext.cookiesAsJson()` for the
+> binding implementation.
 
 ---
 
 ## S-002-23: Query Param Access in JSLT
 
 **Given** a request to `/api/users?page=2&limit=10`,
-**and** a transform spec uses `$context.queryParams.page`,
+**and** a transform spec uses `$queryParams.page`,
 **when** `handleRequest()` processes the exchange,
 **then** the JSLT expression resolves to `"2"`.
+
+> **Note:** The JSLT engine binds query params as a top-level `$queryParams`
+> variable, not nested under `$context`. See `TransformContext.queryParamsAsJson()`.
 
 ---
 

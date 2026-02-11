@@ -251,6 +251,30 @@ All wrap methods create **deep copies** of the native data (ADR-0013).
 | Status | ⬜ Not yet implemented |
 | Source | G-002-01, SPI-001-04/05/06 |
 
+#### JSON Parse Failure Strategy
+
+Unlike the `StandaloneAdapter` (which throws `IllegalArgumentException` on bad
+JSON and provides separate `wrapRequestRaw()`/`wrapResponseRaw()` methods), the
+PingAccess adapter handles parse failures **internally** in `wrapRequest()` and
+`wrapResponse()`:
+
+1. Attempt to parse `Body.getContent()` as JSON via `ObjectMapper.readTree()`.
+2. On parse failure (malformed JSON, non-JSON content type): **return `NullNode`
+   as the body** and log a warning. Do NOT throw.
+3. The returned `Message` has all other fields (headers, path, method, etc.)
+   populated normally.
+
+**Rationale:** In PingAccess, the adapter does not control the top-level
+orchestration flow (unlike `ProxyHandler` in standalone mode). The
+`MessageTransformRule` receives the `Message` from `wrapRequest()` and passes
+it directly to the engine. Throwing would require the rule to catch and
+reconstruct — swallowing inside `wrapRequest()` is cleaner.
+
+**Impact on profile matching:** A `NullNode` body still allows profile matching
+on path/method/headers. If a profile matches and attempts a body transformation,
+the JSLT expression receives `null` as input — this is handled gracefully by
+JSLT (returns `null` for property access on null).
+
 #### wrapRequest Mapping
 
 | Message Field | Source |
@@ -313,6 +337,30 @@ method-local parameter. Two concrete approaches:
 > REQUEST phase. `statusCode` changes are only applied during RESPONSE phase.
 > Attempting to write request fields during RESPONSE is silently ignored by
 > PingAccess (Constraint #3).
+
+#### Header Application Strategy
+
+The core engine's `Message.headers()` contains the **final** header map after
+transformation. The adapter cannot simply call `setValues()` for each header —
+it must also **remove** pre-existing headers that were dropped by the transform.
+
+The adapter uses a **diff-based** approach:
+
+1. **Capture original headers** at wrap time (snapshot the header names from
+   the native `Request`/`Response` before passing to the engine).
+2. **After transformation**, compare the original header names with the
+   transformed `Message.headers()` keyset.
+3. **Apply changes:**
+   - Headers in transformed but not in original → `headers.add(name, value)` (new).
+   - Headers in both → `headers.setValues(name, List.of(value))` (update).
+   - Headers in original but not in transformed → `headers.removeFields(name)` (remove).
+
+This ensures the PingAccess `Headers` object accurately reflects the transform
+result without leaking pre-existing headers that the spec intended to remove.
+
+> **Alternative considered:** Clear all headers then set new ones. Rejected
+> because PA may have internal/system headers that the adapter shouldn't
+> touch (e.g., hop-by-hop headers managed by the engine).
 
 ### FR-002-02: AsyncRuleInterceptor Plugin
 
@@ -390,10 +438,19 @@ method-local parameter. Two concrete approaches:
 | `profilesDir` | TEXT | Profiles Directory | No | `/profiles` | Path to directory of transform profiles |
 | `activeProfile` | TEXT | Active Profile | No | (empty) | Profile name to activate (empty = no profile) |
 | `errorMode` | SELECT | Error Mode | Yes | `PASS_THROUGH` | `PASS_THROUGH` or `DENY` — behaviour on transform failure |
-| `reloadIntervalSec` | TEXT | Reload Interval (s) | No | `0` | Spec reload interval in seconds (0 = disabled, manual reload via restart) |
+| `reloadIntervalSec` | TEXT | Reload Interval (s) | No | `0` | **Spec YAML file** reload interval in seconds (0 = disabled). See note below. |
 | `schemaValidation` | SELECT | Schema Validation | No | `LENIENT` | `STRICT` or `LENIENT` — schema validation mode |
 
 The configuration JSON maps directly to these fields via the PingAccess admin API.
+
+**`reloadIntervalSec` clarification:** This controls periodic re-reading of
+transform spec YAML files from `specsDir` and profiles from `profilesDir` —
+it does **not** hot-reload the adapter JAR itself (Constraint #2). When
+`reloadIntervalSec > 0`, the adapter starts a `ScheduledExecutorService`
+(single daemon thread) that calls `TransformEngine.reload()` at the specified
+interval. This allows ops to update transform specs on disk without restarting
+PingAccess. When `reloadIntervalSec = 0` (default), specs are loaded only once
+during `configure()` and changes require a PA restart.
 
 | Aspect | Detail |
 |--------|--------|
@@ -710,8 +767,8 @@ TransformContext buildTransformContext(Exchange exchange, Direction direction) {
 | S-002-19 | **Plugin SPI registration:** JAR deployed to `/opt/server/deploy/` → PA restart → "Message Transform" rule type visible in admin. |
 | S-002-20 | **Thread safety:** Concurrent requests through the same rule instance → no data corruption. |
 | S-002-21 | **ExchangeProperty metadata:** Downstream rule reads transform result metadata (spec id, duration). |
-| S-002-22 | **Cookie access in JSLT:** JSLT expression uses `$context.cookies` → resolves from PA request cookies. |
-| S-002-23 | **Query param access in JSLT:** JSLT expression uses `$context.queryParams` → resolves from PA query string. |
+| S-002-22 | **Cookie access in JSLT:** JSLT expression uses `$cookies` → resolves from PA request cookies via `TransformContext.cookiesAsJson()`. |
+| S-002-23 | **Query param access in JSLT:** JSLT expression uses `$queryParams` → resolves from PA query string via `TransformContext.queryParamsAsJson()`. |
 | S-002-24 | **Shadow JAR correctness:** Deploy shadow JAR → no `ClassNotFoundException` at runtime (all deps bundled, PA SDK excluded). |
 
 ---

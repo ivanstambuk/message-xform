@@ -9,12 +9,12 @@ Created: 2026-02-11 | Session: spec self-critique and revision
 - [x] Gap 3: DENY error-mode in handleResponse — clarified as response rewrite, not pipeline halt
 - [x] Gap 4: Body.read() error handling — specified NullNode fallback on AccessException/IOException
 
-## Batch 2 — Medium (Gaps 5–8)
+## Batch 2 — Medium (Gaps 5–8) ✅
 
-- [ ] Gap 5: No wrapRaw fallback pattern — decide on approach and document
-- [ ] Gap 6: Header removal detection in applyChanges — specify diff strategy
-- [ ] Gap 7: Wrong JSLT variable names in S-002-22 / S-002-23 — fix to $cookies / $queryParams
-- [ ] Gap 8: reloadIntervalSec config — clarify scope (spec YAML only, not JAR)
+- [x] Gap 5: No wrapRaw fallback pattern — decided: swallow internally, return NullNode
+- [x] Gap 6: Header removal detection in applyChanges — specified diff-based strategy
+- [x] Gap 7: Wrong JSLT variable names in S-002-22 / S-002-23 — fixed to $cookies / $queryParams
+- [x] Gap 8: reloadIntervalSec config — clarified scope (spec YAML only) + ScheduledExecutorService
 
 ## Batch 3 — Medium (9–11) + Low (12–16)
 
