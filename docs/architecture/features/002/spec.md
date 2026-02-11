@@ -279,16 +279,40 @@ All wrap methods create **deep copies** of the native data (ADR-0013).
 | `queryString` | From original request URI |
 | `sessionContext` | See FR-002-06 |
 
-#### applyChanges Mapping
+#### applyChanges Direction Strategy
 
-| Transformed Field | Target |
-|--------------------|--------|
-| `body` | Serialize `JsonNode` → `byte[]` via `ObjectMapper.writeValueAsBytes()` → `exchange.getRequest/Response().setBodyContent(bytes)` (auto-updates Content-Length) |
-| `headers` (added/modified) | `exchange.getRequest/Response().getHeaders().setValues(name, values)` |
-| `headers` (removed) | `exchange.getRequest/Response().getHeaders().removeFields(name)` |
-| `statusCode` | `exchange.getResponse().setStatus(HttpStatus.forCode(statusCode))` |
-| `requestPath` (URL rewrite) | `exchange.getRequest().setUri(newUri)` (ADR-0027) |
-| `requestMethod` | `exchange.getRequest().setMethod(Method.forName(method))` |
+`applyChanges(Message, Exchange)` must apply to the correct side of the
+Exchange depending on which phase called it. The `GatewayAdapter<R>` SPI uses
+a single method signature with `R = Exchange`; the **caller** (`MessageTransformRule`)
+knows the direction and routes accordingly:
+
+- **During `handleRequest`:** caller passes `exchange` and the adapter writes
+  to `exchange.getRequest()` (body, headers, URI, method).
+- **During `handleResponse`:** caller passes `exchange` and the adapter writes
+  to `exchange.getResponse()` (body, headers, status code).
+
+**Implementation approach:** The adapter stores the current direction as a
+method-local parameter. Two concrete approaches:
+
+1. **Direction parameter on adapter** (preferred): Add a `Direction` enum
+   parameter as a private helper: `applyChanges(Message, Exchange, Direction)`.
+   The public `GatewayAdapter.applyChanges(Message, Exchange)` delegates by
+   defaulting to RESPONSE (backward-compatible with `StandaloneAdapter`).
+   `MessageTransformRule` calls the direction-aware overload directly.
+
+2. **Two methods**: `applyRequestChanges(Message, Exchange)` and
+   `applyResponseChanges(Message, Exchange)` as internal helpers. The SPI
+   `applyChanges()` delegates to the appropriate one.
+
+| Phase | Target Side | Fields Written |
+|-------|-------------|----------------|
+| REQUEST | `exchange.getRequest()` | body via `setBodyContent(bytes)`, headers via `setValues`/`removeFields`, URI via `setUri()`, method via `setMethod()` |
+| RESPONSE | `exchange.getResponse()` | body via `setBodyContent(bytes)`, headers via `setValues`/`removeFields`, status via `setStatus(HttpStatus.forCode())` |
+
+> **Note:** `requestPath` and `requestMethod` changes are only applied during
+> REQUEST phase. `statusCode` changes are only applied during RESPONSE phase.
+> Attempting to write request fields during RESPONSE is silently ignored by
+> PingAccess (Constraint #3).
 
 ### FR-002-02: AsyncRuleInterceptor Plugin
 
@@ -296,21 +320,35 @@ All wrap methods create **deep copies** of the native data (ADR-0013).
 `AsyncRuleInterceptorBase<MessageTransformConfig>` with:
 
 1. `handleRequest(Exchange)` → `CompletionStage<Outcome>`:
+   - Builds `TransformContext` via `PingAccessAdapter.buildTransformContext()` (FR-002-13).
    - Wraps request via `PingAccessAdapter.wrapRequest()`.
-   - Resolves the matching spec for the request direction.
-   - Transforms via `TransformEngine.transform()`.
-   - If matched: applies changes via `PingAccessAdapter.applyChanges()`.
-   - Returns `Outcome.CONTINUE`.
+   - Transforms via `TransformEngine.transform(message, Direction.REQUEST, transformContext)`
+     (**3-arg overload** — required for `$cookies`, `$queryParams`, `$session` injection).
+   - Dispatches on `TransformResult.type()`:
+     - `SUCCESS` → applies changes via `PingAccessAdapter.applyChanges()` with REQUEST direction.
+     - `PASSTHROUGH` → no-op (exchange untouched).
+     - `ERROR` → see FR-002-11 error-mode dispatch.
+   - Returns `Outcome.CONTINUE` (or `Outcome.RETURN` in DENY mode on error).
 2. `handleResponse(Exchange)` → `CompletionStage<Void>`:
    - Wraps response via `PingAccessAdapter.wrapResponse()`.
-   - Resolves the matching spec for the response direction.
-   - Transforms and applies changes.
+   - Transforms via `TransformEngine.transform(message, Direction.RESPONSE, transformContext)`.
+   - Dispatches on `TransformResult.type()`:
+     - `SUCCESS` → applies changes via `PingAccessAdapter.applyChanges()` with RESPONSE direction.
+     - `PASSTHROUGH` → no-op.
+     - `ERROR` → see FR-002-11 error-mode dispatch.
+   - Returns completed `CompletionStage<Void>`.
+3. `getErrorHandlingCallback()` → `ErrorHandlingCallback`:
+   - **This method is abstract on `AsyncRuleInterceptor` and MUST be implemented.**
+   - Returns `new RuleInterceptorErrorHandlingCallback(getTemplateRenderer(), errorConfig)`
+     using the SDK's provided implementation. This callback writes a PA-formatted
+     error response when an unhandled exception escapes `handleRequest()`/`handleResponse()`.
 
 | Aspect | Detail |
 |--------|--------|
 | Success path | Request body transformed, response body transformed, both directions independent |
 | Failure path | Transform error → log warning, return original untouched exchange (ADR-0013 copy-on-wrap safety), continue pipeline |
-| Error mode | Configurable: `PASS_THROUGH` (default, continue with original) or `DENY` (return `Outcome.RETURN` with error response) |
+| Error mode (request) | `PASS_THROUGH` → `Outcome.CONTINUE` with original. `DENY` → `Outcome.RETURN` with RFC 9457 error response body written to exchange. |
+| Error mode (response) | `PASS_THROUGH` → original response untouched. `DENY` → **rewrite** the response body/status to a 502 RFC 9457 error (there is no pipeline-halt mechanism for responses — `handleResponse` returns `Void`, not `Outcome`). |
 | Thread safety | Plugin instances may be shared across threads — all adapter state is method-local |
 | Status | ⬜ Not yet implemented |
 | Source | G-002-02 |
@@ -498,20 +536,41 @@ Gradle subproject with:
 ### FR-002-11: Error Handling
 
 **Requirement:** The adapter MUST handle transform errors according to the
-configured error mode:
+configured error mode. Transform errors include: JSLT evaluation failures,
+spec parse errors at runtime, eval budget exceeded, and output size exceeded.
 
 | Error Mode | handleRequest Behaviour | handleResponse Behaviour |
 |------------|------------------------|--------------------------|
 | `PASS_THROUGH` | Log warning, return `Outcome.CONTINUE` (original untouched request continues to backend) | Log warning, leave original response untouched |
-| `DENY` | Return `Outcome.RETURN` with an RFC 9457 error response body (from `ErrorResponseBuilder`) | Set error response body on the `Exchange`, leave status as 502 |
+| `DENY` | Write RFC 9457 error body to `exchange.getResponse()` via `setBodyContent()` + `setStatus(HttpStatus.forCode(502))`, return `Outcome.RETURN` to halt pipeline | **Rewrite** response: `exchange.getResponse().setBodyContent()` with RFC 9457 error body + `setStatus(502)`. There is **no pipeline-halt** for responses (returns `Void`, not `Outcome`). The error response replaces the backend response. |
+
+**DENY mode detailed behaviour:**
+
+1. **In `handleRequest`:** The engine returns `TransformResult.ERROR` with
+   `errorResponse` (RFC 9457 JSON) and `errorStatusCode` (typically 502).
+   The adapter writes this error body to the exchange's response via
+   `exchange.getResponse().setBodyContent(errorBytes)` and sets status to
+   `HttpStatus.forCode(502)`. Then returns `Outcome.RETURN` — PingAccess
+   short-circuits and returns the error response to the client without
+   forwarding to the backend.
+
+2. **In `handleResponse`:** The engine returns `TransformResult.ERROR`.
+   Since `handleResponse()` returns `CompletionStage<Void>` (no `Outcome`
+   mechanism), the adapter writes the error body to
+   `exchange.getResponse().setBodyContent(errorBytes)` and sets status
+   to 502 via `setStatus()`. The client receives the error response
+   instead of the original backend response. **This is a body/status
+   rewrite, not a pipeline halt.**
 
 The adapter MUST NOT throw `AccessException` for transform failures — transform
-errors are non-fatal by default (adapter continues the pipeline).
+errors are non-fatal by default (adapter continues the pipeline). Unhandled
+exceptions are caught by `getErrorHandlingCallback()` (FR-002-02).
 
 | Aspect | Detail |
 |--------|--------|
 | Success path (PASS_THROUGH) | Malformed JSON body → log + continue with original body |
-| Success path (DENY) | Malformed JSON body → return 502 error response |
+| Success path (DENY, request) | JSLT error → write 502 error to exchange response → `Outcome.RETURN` |
+| Success path (DENY, response) | JSLT error → rewrite response body/status to 502 error |
 | Status | ⬜ Not yet implemented |
 | Source | ADR-0022, ADR-0024 |
 
@@ -542,6 +601,75 @@ code is complete. It is listed here for traceability.
 | Success path | `./scripts/pa-e2e-test.sh` → builds + configures PA + runs assertions + exits 0 |
 | Status | ⬜ Not yet implemented (planned, implementation deferred) |
 | Source | G-002-05 |
+
+### FR-002-13: TransformContext Construction
+
+**Requirement:** The adapter MUST build a `TransformContext` from the PingAccess
+`Exchange` and pass it to the 3-arg `TransformEngine.transform()` overload.
+Without this, JSLT variables `$cookies`, `$queryParams`, `$headers`, `$status`,
+and `$session` would be null/empty.
+
+The adapter MUST provide a `buildTransformContext(Exchange)` method (not part
+of the `GatewayAdapter` SPI — adapter-specific helper) that maps:
+
+| TransformContext Field | Source | Notes |
+|------------------------|--------|-------|
+| `headers` | `exchange.getRequest().getHeaders().getAllHeaderFields()` → single-value map (first value per name, lowercase keys) | Same normalization as `wrapRequest` |
+| `headersAll` | Same source → multi-value map | Same normalization |
+| `status` | `null` for REQUEST direction, `exchange.getResponse().getStatusCode()` for RESPONSE | Set by the caller (`MessageTransformRule`) based on direction |
+| `queryParams` | `exchange.getRequest().getQueryStringParams()` → flatten `Map<String, String[]>` to `Map<String, String>` using first-value semantics | Values are URL-decoded by the PA SDK. On `URISyntaxException`: log warning, use empty map. |
+| `cookies` | `exchange.getRequest().getHeaders().getCookies()` → flatten `Map<String, String[]>` to `Map<String, String>` using first-value semantics | Cookie values are URL-decoded |
+| `sessionContext` | See FR-002-06 (`Exchange.getIdentity()` → build `JsonNode`) | `null` if no identity (unauthenticated) |
+
+**Query param multi-value handling:** PingAccess's `getQueryStringParams()` returns
+`Map<String, String[]>`. The adapter uses **first-value semantics** (take `values[0]`
+for each key), matching the `StandaloneAdapter` pattern (FR-004-39). Multi-value
+query params are available in full via `$headers_all` if the gateway transmits them
+as headers, but the `$queryParams` variable uses single-value.
+
+**`URISyntaxException` handling:** `Request.getQueryStringParams()` can throw
+`URISyntaxException` for malformed URIs. On this exception, the adapter logs a
+warning and returns an empty `queryParams` map. The transform proceeds with
+`$queryParams` as an empty object — JSLT expressions referencing query params
+evaluate to `null` gracefully.
+
+**Lifecycle note:** `buildTransformContext()` is called **once per request** at
+the start of `handleRequest()`. The same `TransformContext` is reused for both
+request and response phases of the same exchange (with `status` updated for the
+response phase). This avoids re-parsing cookies/query params in `handleResponse()`.
+
+```java
+// Pseudocode — illustrative
+TransformContext buildTransformContext(Exchange exchange, Direction direction) {
+    Map<String, String> headers = normalizeHeaders(exchange.getRequest().getHeaders());
+    Map<String, List<String>> headersAll = extractMultiValueHeaders(exchange.getRequest().getHeaders());
+
+    Map<String, String> queryParams;
+    try {
+        queryParams = flattenFirstValue(exchange.getRequest().getQueryStringParams());
+    } catch (URISyntaxException e) {
+        LOG.warn("Malformed URI, query params unavailable: {}", e.getMessage());
+        queryParams = Map.of();
+    }
+
+    Map<String, String> cookies = flattenFirstValue(exchange.getRequest().getHeaders().getCookies());
+
+    Integer status = direction == Direction.RESPONSE
+            ? exchange.getResponse().getStatusCode() : null;
+
+    JsonNode sessionContext = buildSessionContext(exchange.getIdentity()); // FR-002-06
+
+    return new TransformContext(headers, headersAll, status, queryParams, cookies, sessionContext);
+}
+```
+
+| Aspect | Detail |
+|--------|--------|
+| Success path | `TransformContext` populated with headers, cookies, query params, session → JSLT `$cookies.sessionToken` resolves correctly |
+| Failure path (URI) | Malformed query string → empty `queryParams` → JSLT `$queryParams.page` evaluates to `null` |
+| Failure path (no identity) | Unauthenticated → `sessionContext = null` → `$session` is `null` in JSLT |
+| Status | ⬜ Not yet implemented |
+| Source | G-002-01, FR-004-37 (StandaloneAdapter reference pattern) |
 
 ---
 
@@ -651,15 +779,23 @@ code is complete. It is listed here for traceability.
    mandatory. Agent rules cannot access request body or invoke `handleResponse`.
 2. **Restart required:** PingAccess must be restarted after deploying/updating
    the plugin JAR. There is no hot-reload for Java plugins (Groovy scripts
-   support hot-reload but are out of scope).
+   support hot-reload but are out of scope). Spec YAML files *can* be
+   reloaded without restart if `reloadIntervalSec > 0` (FR-002-04).
 3. **Response immutability (PA 6.1+):** Modifying *request* fields during
    `handleResponse()` processing is ignored (logged as warning by PA). The
    adapter MUST NOT attempt to modify request data in the response phase.
 4. **Thread safety:** Plugin instances may be shared across threads. All
    adapter state must be method-local or immutable.
 5. **Body.read() may be deferred:** The `Body.getContent()` call may trigger
-   a lazy read. The adapter SHOULD call `body.read()` if `!body.isRead()`
-   before accessing content.
+   a lazy read. The adapter MUST call `body.read()` if `!body.isRead()`
+   before accessing content. **On failure** (`AccessException` or `IOException`
+   from `body.read()`): treat as empty body (`NullNode`), log warning with
+   exception details. This is consistent with the "malformed JSON → NullNode"
+   fallback in FR-002-01.
+6. **No pipeline halt for responses:** `handleResponse()` returns
+   `CompletionStage<Void>`, not `Outcome`. The adapter cannot prevent
+   response delivery — it can only rewrite the response body/status.
+   This affects DENY error mode semantics (FR-002-11).
 
 ---
 
