@@ -1031,10 +1031,47 @@ sizes).
   - Uses standalone `Validation.buildDefaultValidatorFactory()` (Jakarta Bean
     Validation). This avoids Spring test context dependency.
 
+- **`SpiRegistrationTest`** — Verifies that the adapter plugin is correctly
+  registered via `META-INF/services/`. Uses `ServiceFactory.isValidImplName()`
+  (SDK guide §11):
+
+  ```java
+  @Test
+  void pluginIsRegisteredViaSpi() {
+      assertTrue(ServiceFactory.isValidImplName(
+          AsyncRuleInterceptor.class,
+          "io.messagexform.pingaccess.MessageTransformRule"
+      ));
+  }
+
+  @Test
+  void nonPluginClassIsNotRegistered() {
+      assertFalse(ServiceFactory.isValidImplName(
+          AsyncRuleInterceptor.class,
+          "io.messagexform.pingaccess.PingAccessAdapter"
+      ));
+  }
+  ```
+
 > **Mock patterns, config validation code, and dependency alignment table:**
 > See [SDK guide §11](pingaccess-sdk-guide.md#11-testing-patterns)
 > for the complete Mockito mock chain, `ArgumentCaptor` verification pattern,
 > standalone `Validator` setup, and SDK dependency versions.
+
+> **SDK test infrastructure (SDK guide §12):** When Mockito mocks are
+> insufficient (e.g., integration-level tests that need real `Body`,
+> `Headers`, or `ResponseBuilder` instances), use `ServiceFactory`:
+>
+> | Factory | Method | Creates |
+> |---------|--------|---------|
+> | `ServiceFactory.bodyFactory()` | `createBody(byte[])`, `createEmptyBody()` | Real `Body` instances |
+> | `ServiceFactory.headersFactory()` | `createHeaders()`, `createHeaders(List<HeaderField>)` | Real `Headers` instances |
+> | `ResponseBuilder` static factories | `newInstance(HttpStatus)`, `ok()`, etc. | Real `Response` instances |
+>
+> **Note:** Using `ServiceFactory` requires the PA SDK on the test classpath
+> (already available as `compileOnly` → add as `testCompileOnly` if needed).
+> For most unit tests, Mockito mocks are preferred. `ServiceFactory` is for
+> integration tests that exercise real SDK object behavior.
 
 
 ### Integration Tests
@@ -1072,6 +1109,7 @@ sizes).
 | SRC-002-04 | `adapter-pingaccess/src/test/java/io/messagexform/pingaccess/PingAccessAdapterTest.java` | Adapter unit tests |
 | SRC-002-05 | `adapter-pingaccess/src/test/java/io/messagexform/pingaccess/MessageTransformRuleTest.java` | Plugin lifecycle tests |
 | SRC-002-06 | `adapter-pingaccess/src/test/java/io/messagexform/pingaccess/MessageTransformConfigTest.java` | Config validation tests |
+| SRC-002-07 | `adapter-pingaccess/src/test/java/io/messagexform/pingaccess/SpiRegistrationTest.java` | SPI registration verification |
 
 ---
 
