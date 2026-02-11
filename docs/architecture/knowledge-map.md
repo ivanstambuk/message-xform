@@ -112,6 +112,7 @@ ADR-0031 (PA-Provided Deps)  governs ── FR-002-06, FR-002-09 (partially supe
 ADR-0032 (Core ACL)          governs ── FR-001-14, NFR-001-02, references ADR-0031, ADR-0033
 ADR-0033 (Port Value Objects) governs ── FR-001-14, references ADR-0032
 ADR-0034 (SLF4J Binding)     governs ── NFR-001-02, references ADR-0032, ADR-0033
+ADR-0035 (Version Parity)    governs ── FR-002-09, supersedes ADR-0031 §7-§8, references ADR-0031
 ```
 
 ## Feature → ADR → NFR Traceability
