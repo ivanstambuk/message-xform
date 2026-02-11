@@ -31,6 +31,8 @@
 | 11 | [Testing Patterns](#11-testing-patterns) | Mockito mock chains, config validation, dependency alignment | `test`, `Mockito`, `mock`, `Validator` |
 | 12 | [Supporting Types](#12-supporting-types) | Outcome, HttpStatus, Method, ExchangeProperty, ServiceFactory | `Outcome`, `HttpStatus`, `ServiceFactory` |
 | 13 | [SSL & Network Types](#13-ssl--network-types) | SslData, TargetHost, SetCookie | `SSL`, `TLS`, `cookie`, `network` |
+| 14 | [OAuth SDK](#14-oauth-sdk) | OAuthConstants, OAuthUtilities, WWW-Authenticate building | `OAuth`, `DPoP`, `RFC6750`, `constants` |
+| 15 | [Other Extension Points](#15-other-extension-points) | IdentityMapping, SiteAuthenticator, LoadBalancing, MasterKeyEncryptor | `extension`, `plugin`, `identity`, `encryption` |
 
 ---
 
@@ -56,6 +58,12 @@ sensible defaults.
 // Chain-of-responsibility pattern. This is a tagging interface to facilitate
 // organizing Interceptors in collections. Implementations should implement
 // a sub-interface (e.g., AsyncRuleInterceptor, RuleInterceptor).
+//
+// Sub-interfaces:
+//   RequestInterceptor  — adds handleRequest(Exchange)
+//   ResponseInterceptor — adds handleResponse(Exchange)
+//   RuleInterceptor<T>  — extends both + ConfigurablePlugin + DescribesUIConfigurable
+//   AsyncRuleInterceptor<T> — async equivalent of RuleInterceptor
 ```
 
 ### Interface: `AsyncRuleInterceptor<T>`
@@ -137,6 +145,12 @@ T getConfiguration();
     expectedConfiguration = MessageTransformConfig.class
 )
 ```
+
+> **`destination` attribute:** Controls where the rule can be applied. Default
+> is both `Site` and `Agent`. A rule with `destination = Site` (like the
+> `Clobber404ResponseRule` sample) can only be added to Site-type applications.
+> Agent-only rules cannot process responses because agents don't return
+> responses to PingAccess for post-processing.
 
 ### RuleInterceptorCategory (enum)
 
@@ -677,15 +691,22 @@ negligible in cost (<1ms for typical OIDC claim payloads).
 
 > **Tags:** `configuration`, `UIElement`, `admin`, `validation`, `ConfigurationBuilder`, `ConfigurationType`
 
-### PluginConfiguration (marker interface)
+### PluginConfiguration (interface)
 
 ```java
 // com.pingidentity.pa.sdk.policy.PluginConfiguration
-// Marker interface — all configuration classes must implement this.
-// No methods defined.
+// All configuration classes must implement this interface.
+String getName();      // the name defined by the PingAccess administrator
+void setName(String);  // called by PA during configuration (plugin should not call)
+```
 
-// SimplePluginConfiguration: a no-op implementation with no fields.
-// Use when your plugin needs no configuration.
+### SimplePluginConfiguration (base class)
+
+```java
+// com.pingidentity.pa.sdk.policy.SimplePluginConfiguration implements PluginConfiguration
+// Provides a no-op implementation of PluginConfiguration.
+// Use when your plugin has minimal configuration (just inherits getName/setName).
+// The HeaderRule sample extends this for its Configuration inner class.
 ```
 
 ### ConfigurationType Enum
@@ -735,7 +756,7 @@ RADIO_BUTTON        // Radio button group
 )
 ```
 
-### @Help and @Option Annotations
+### @Help, @Option, @ParentField, @DependentFieldOption Annotations
 
 ```java
 // com.pingidentity.pa.sdk.ui.Help
@@ -746,8 +767,134 @@ RADIO_BUTTON        // Radio button group
 )
 
 // com.pingidentity.pa.sdk.ui.Option
-@Option(name = "optionValue", label = "Display Label")
+@Option(value = "optionValue", label = "Display Label")
+//       ^^^^^ NOT "name" — the attribute is "value"
+
+// com.pingidentity.pa.sdk.ui.ParentField — conditional visibility
+@ParentField(
+    name = "parentFieldName",            // field name to depend on
+    dependentFieldOptions = {            // value-dependent option sets
+        @DependentFieldOption(value = "A", options = {@Option(value = "a1", label = "A1")}),
+        @DependentFieldOption(value = "B", options = {@Option(value = "b1", label = "B1")})
+    }
+)
 ```
+
+### Enum Auto-Discovery for SELECT Fields
+
+If a `SELECT` field's Java type is an `Enum` and no `@Option` annotations are
+specified, `ConfigurationBuilder.from()` **auto-generates** `ConfigurationOption`
+instances from the enum constants. It uses `Enum.name()` for the option value and
+`toString()` for the label.
+
+```java
+// From AllUITypesAnnotationRuleConfiguration sample
+@UIElement(label = "A SELECT field using an enum", type = SELECT, order = 42)
+public EnumField anEnumSelect = null;
+
+public enum EnumField {
+    OptionOne("Option One"),
+    OptionTwo("Option Two");
+    private final String label;
+    EnumField(String label) { this.label = label; }
+    @Override public String toString() { return label; }
+}
+// ConfigurationBuilder.from() generates:
+//   option(value="OptionOne", label="Option One")
+//   option(value="OptionTwo", label="Option Two")
+```
+
+### LIST Type — Open vs Closed Variants
+
+```java
+// OPEN list — user can type free-text items
+@UIElement(label = "An Open List", type = LIST,
+           defaultValue = "[\"One\", \"Two\", \"Three\"]", order = 90)
+public List<String> anOpenList = null;
+
+// CLOSED list — restricted to predefined options
+@UIElement(label = "A Closed List", type = LIST,
+           defaultValue = "[\"1\", \"2\", \"3\"]",
+           options = {
+               @Option(label = "One", value = "1"),
+               @Option(label = "Two", value = "2")
+           }, order = 100)
+public List<String> aClosedList = null;
+```
+
+> **Note:** The `defaultValue` for `LIST` fields is a **JSON array string**.
+
+### COMPOSITE Type — Inline Sub-Fields
+
+Similar to `TABLE` but displayed inline (not as a table with rows). Uses a
+sub-field class with `@UIElement`-annotated fields:
+
+```java
+@UIElement(label = "A Composite Field", type = COMPOSITE, order = 80)
+public CompositeRepresentation aComposite = null;
+
+public static class CompositeRepresentation {
+    @UIElement(label = "First field", type = TEXT, order = 1)
+    public String first;
+    @UIElement(label = "Second field", type = TEXT, order = 2)
+    public String second;
+}
+```
+
+### RADIO_BUTTON Mutual-Exclusion Groups
+
+Multiple `RADIO_BUTTON` fields with the same `buttonGroup` form a mutually
+exclusive group. Each field is a `Boolean` — only one in the group can be `true`.
+
+```java
+@UIElement(label = "Option A", type = RADIO_BUTTON, order = 110,
+           buttonGroup = "chooseOneGroup")
+@NotNull public Boolean radio1 = false;
+
+@UIElement(label = "Option B", type = RADIO_BUTTON, order = 111,
+           buttonGroup = "chooseOneGroup")
+@NotNull public Boolean radio2 = false;
+// Only one of radio1/radio2 will be true at any time
+```
+
+### ConfigurationModelAccessor — Dynamic Dropdowns
+
+For SELECT fields that pull options from PingAccess admin data (certificate
+groups, key pairs, third-party services), use a `ConfigurationModelAccessor`:
+
+```java
+// Annotation-driven — links to PA's built-in accessors
+@UIElement(label = "A Private Key", type = SELECT, order = 1,
+           modelAccessor = KeyPairAccessor.class)
+public KeyPairModel aPrivateKey = null;
+
+@UIElement(label = "Trusted Certs", type = SELECT, order = 5,
+           modelAccessor = TrustedCertificateGroupAccessor.class)
+public TrustedCertificateGroupModel trustedCerts = null;
+
+// Programmatic equivalent (ConfigurationBuilder)
+new ConfigurationBuilder()
+    .privateKeysConfigurationField("aPrivateKey", "A Private Key")
+        .required()
+    .trustedCertificatesConfigurationField("trustedCerts", "Trusted Certs")
+        .required()
+    .toConfigurationFields();
+```
+
+**Built-in accessors:** `KeyPairAccessor`, `TrustedCertificateGroupAccessor`,
+`ThirdPartyServiceAccessor`. Corresponding model types: `KeyPairModel`,
+`TrustedCertificateGroupModel`, `ThirdPartyServiceModel` (with subtypes
+`OAuthAuthorizationServer` and `OidcProvider` for OAuth AS / OIDC provider refs).
+
+The `ConfigurationModelAccessor<T>` interface has two methods:
+
+```java
+Collection<ConfigurationOption> options();  // options for the admin UI dropdown
+Optional<T> get(String id);                 // translate field value to model object
+```
+
+> **⚠️ Usage constraint:** `ConfigurationModelAccessor` instances must **only**
+> be used inside `configure()`, **never** during `handleRequest()`/`handleResponse()`.
 
 ### Configuration Field Discovery Patterns
 
@@ -812,6 +959,12 @@ buttonGroup(String);
 dynamicOptions(Class<? extends ConfigurationModelAccessor>);
 subFields(Set<ConfigurationField>);      // for TABLE type
 
+// Convenience methods for PingAccess admin model fields:
+privateKeysConfigurationField(String name, String label);
+    // Creates a SELECT with modelAccessor=KeyPairAccessor.class
+trustedCertificatesConfigurationField(String name, String label);
+    // Creates a SELECT with modelAccessor=TrustedCertificateGroupAccessor.class
+
 // Help
 help();                                  // create empty Help
 helpContent(String);
@@ -821,6 +974,53 @@ helpURL(String);
 // Output
 List<ConfigurationField> toConfigurationFields();
 clear();
+```
+
+### ConfigurationField (runtime model)
+
+```java
+// com.pingidentity.pa.sdk.ui.ConfigurationField
+// Constructors:
+ConfigurationField(String fieldName, String fieldLabel, ConfigurationType fieldType);
+ConfigurationField(String fieldName, String fieldLabel, ConfigurationType fieldType,
+                   Collection<ConfigurationOption> options);
+ConfigurationField(ConfigurationField other);  // COPY constructor
+
+// All fields are mutable (get/set):
+String getName();                              void setName(String);
+String getLabel();                             void setLabel(String);
+ConfigurationType getType();                   void setType(ConfigurationType);
+Collection<ConfigurationOption> getOptions();  void setOptions(Collection<ConfigurationOption>);
+ConfigurationParentField getParentField();     void setParentField(ConfigurationParentField);
+List<ConfigurationField> getFields();          void setFields(List<ConfigurationField>);
+ConfigurationField.Help getHelp();             void setHelp(ConfigurationField.Help);
+boolean isAdvanced();                          void setAdvanced(boolean);
+boolean isRequired();                          void setRequired(boolean);
+String getDefaultValue();                      void setDefaultValue(String);
+String getButtonGroup();                       void setButtonGroup(String);
+boolean isDeselectable();                      void setDeselectable(boolean);
+```
+
+### ConfigurationField.Help (inner class)
+
+```java
+// com.pingidentity.pa.sdk.ui.ConfigurationField.Help
+String getContent();     void setContent(String);
+String getTitle();       void setTitle(String);
+String getUrl();         void setUrl(String);
+```
+
+### ConfigurationOption
+
+```java
+// com.pingidentity.pa.sdk.ui.ConfigurationOption
+// Constructors:
+ConfigurationOption(String value);                       // value-only
+ConfigurationOption(String value, String label);         // value + label
+ConfigurationOption(Option option);                      // from @Option annotation
+
+String getLabel();     void setLabel(String);
+String getValue();     void setValue(String);
 ```
 
 > **Warning from Javadoc:** "You must provide a `configurationField` to perform
@@ -963,18 +1163,94 @@ exchange.getResponse().getHeaders().setContentType("application/problem+json");
 
 ### AccessException
 
-```java
-// com.pingidentity.pa.sdk.policy.AccessException extends Exception
-// Thrown to abort the interceptor pipeline and trigger ErrorHandlingCallback.
-// NOT for expected denials — use Outcome.RETURN instead.
-AccessException(String message);
-AccessException(String message, Throwable cause);
+`AccessException` is thrown to abort the interceptor pipeline. It implements
+`ErrorInfo`, which provides error information used to generate the HTTP response.
 
-// AccessExceptionContext: additional context for AccessException
-// (rarely used directly by plugins)
+> **Not for expected denials** — use `Outcome.RETURN` instead. Use
+> `AccessException` only for unexpected errors during processing.
+
+```java
+// com.pingidentity.pa.sdk.policy.AccessException extends Exception implements ErrorInfo
+// Constructors:
+AccessException(String message, HttpStatus status);
+AccessException(String message, HttpStatus status, Throwable cause);
+AccessException(AccessExceptionContext context);      // fluent builder pattern
+
+// ErrorInfo methods (via interface):
+HttpStatus       getErrorStatus();      // HTTP status for the error response
+LocalizedMessage getErrorMessage();     // localized end-user message (may be null)
+Throwable        getErrorCause();       // root cause (may be null)
 ```
 
-### ErrorHandlingCallback
+> **"Any" Ruleset caveat (from Javadoc):** Depending on the state of the
+> transaction, an `AccessException` may be ignored. For example, when a
+> `RuleInterceptor` is evaluated within an "Any" Ruleset, the failure of one
+> `RuleInterceptor` may be ignored (i.e., other rules in the set still proceed).
+
+### AccessExceptionContext (fluent builder)
+
+For richer error responses with localization support, use the builder pattern:
+
+```java
+// com.pingidentity.pa.sdk.policy.AccessExceptionContext
+static AccessExceptionContext create(HttpStatus status);   // factory method
+
+// Fluent setters (all return this):
+AccessExceptionContext exceptionMessage(String message);   // for logging (not shown to users)
+AccessExceptionContext cause(Throwable cause);             // root cause
+AccessExceptionContext errorDescription(LocalizedMessage message);  // end-user message
+
+// Usage:
+throw new AccessException(
+    AccessExceptionContext.create(HttpStatus.FORBIDDEN)
+        .exceptionMessage("Invalid value: " + value)   // for server logs
+        .cause(e)                                        // root exception
+        .errorDescription(new BasicLocalizedMessage("invalid.value.msg"))  // i18n
+);
+```
+
+> If `exceptionMessage` is not specified, the non-localized status message
+> (`HttpStatus.getMessage()`) is used for the exception message.
+
+### ErrorInfo (interface)
+
+```java
+// com.pingidentity.pa.sdk.policy.error.ErrorInfo
+// Information about an error used to generate an HTTP response.
+HttpStatus       getErrorStatus();    // status code + reason phrase
+LocalizedMessage getErrorMessage();   // localized message for response body (null if N/A)
+Throwable        getErrorCause();     // cause (null if unknown)
+// AccessException implements this interface.
+```
+
+### ErrorDescription (enum)
+
+```java
+// com.pingidentity.pa.sdk.localization.ErrorDescription
+ACCESS_DENIED      // Error description for access denied
+PAGE_NOT_FOUND_404 // Error description for 404 Page Not Found
+POLICY_ERROR       // Error description for a policy-related error
+
+String getLocalizationKey();                   // key for ResourceBundle lookup
+String getDescription(String... substitutions); // non-localized with placeholder replacement
+```
+
+### LocalizedMessage Hierarchy
+
+```java
+// com.pingidentity.pa.sdk.localization.LocalizedMessage (interface)
+String resolve(Locale locale, LocalizedMessageResolver resolver);
+
+// Implementations:
+FixedMessage                    // returns a fixed string, no localization
+BasicLocalizedMessage           // looked up via ResourceBundle key
+ParameterizedLocalizedMessage   // key + parameters for placeholder substitution
+```
+
+> Templates for ResourceBundle properties are located at `conf/localization/`
+> in the PingAccess installation directory.
+
+### ErrorHandlingCallback (interface)
 
 ```java
 // com.pingidentity.pa.sdk.policy.ErrorHandlingCallback
@@ -1000,12 +1276,25 @@ static final ExchangeProperty<String> POLICY_ERROR_INFO;
 // error context to the callback.
 ```
 
-### ErrorInfo
+### OAuthPolicyErrorHandlingCallback
+
+Writes OAuth 2.0 RFC 6750 compliant `WWW-Authenticate` error responses for
+OAuth-protected endpoints.
 
 ```java
-// com.pingidentity.pa.sdk.policy.error.ErrorInfo
-// Contains error information for error responses.
-// (Used internally by the error handling framework.)
+// com.pingidentity.pa.sdk.policy.error.OAuthPolicyErrorHandlingCallback
+OAuthPolicyErrorHandlingCallback(String realm, String scope);
+// Produces 401 responses with WWW-Authenticate: Bearer realm="...", scope="..."
+```
+
+### LocalizedInternalServerErrorCallback
+
+Localizes the internal server error message using the exchange's resolved locale:
+
+```java
+// com.pingidentity.pa.sdk.policy.error.LocalizedInternalServerErrorCallback
+LocalizedInternalServerErrorCallback(LocalizedMessageResolver resolver);
+// Constructs a callback that resolves the error message via ResourceBundle.
 ```
 
 ### SDK Sample References
@@ -1269,10 +1558,24 @@ String getName();
 
 ```java
 // com.pingidentity.pa.sdk.http.MediaType
-String getType();           // e.g., "application"
-String getSubtype();        // e.g., "json"
-String getFullType();       // e.g., "application/json"
-Map<String, String> getParameters();  // e.g., charset=utf-8
+static MediaType parse(String mediaTypeString);  // factory: throws IllegalArgumentException
+
+String getBaseType();          // e.g., "application/json" (primary + sub, no params)
+String getPrimaryType();       // e.g., "application"
+String getSubType();           // e.g., "json"
+
+boolean isPrimaryTypeWildcard();  // true if primary type is "*"
+boolean isSubTypeWildcard();      // true if subtype is "*"
+boolean match(MediaType other);   // wildcard-aware matching
+```
+
+### CommonMediaTypes
+
+```java
+// com.pingidentity.pa.sdk.http.CommonMediaTypes
+static final MediaType TEXT_HTML;            // text/html
+static final MediaType APPLICATION_JSON;     // application/json
+// (For common content-type checks without string-matching)
 ```
 
 ### ServiceFactory
@@ -1328,11 +1631,49 @@ LocalizedMessageResolver getLocalizedMessageResolver();
 
 ### HttpClient
 
+Available via `AsyncRuleInterceptorBase.getHttpClient()` after injection.
+Used for making outbound HTTP calls (e.g., to authorization servers).
+
 ```java
-// com.pingidentity.pa.sdk.http.HttpClient
-// Available via AsyncRuleInterceptorBase.getHttpClient() after injection.
-// Used for making outbound HTTP calls (e.g., to authorization servers).
-// See RiskAuthorizationRule sample for usage patterns.
+// com.pingidentity.pa.sdk.http.client.HttpClient
+ClientResponse send(ClientRequest request) throws HttpClientException;
+// Sends a synchronous HTTP request. Throws HttpClientException on I/O errors.
+```
+
+### ClientRequest
+
+```java
+// com.pingidentity.pa.sdk.http.client.ClientRequest
+ClientRequest(String url, Method method);             // basic
+ClientRequest(String url, Method method, Body body);  // with body
+ClientRequest(String url, Method method, Body body, Headers headers);  // full
+
+// Getters:
+String getUrl();
+Method getMethod();
+Body getBody();              // may be null
+Headers getHeaders();        // may be null
+```
+
+### ClientResponse
+
+```java
+// com.pingidentity.pa.sdk.http.client.ClientResponse
+int getStatusCode();
+Body getBody();
+Headers getHeaders();
+```
+
+### HttpClientException
+
+```java
+// com.pingidentity.pa.sdk.http.client.HttpClientException
+HttpClientException(String message, Exception e, Type type);
+
+Type getType();   // error classification
+
+// HttpClientException.Type enum:
+REQUEST_TIMEOUT, CONNECTION_TIMEOUT, GENERAL_IO_ERROR
 ```
 
 ---
@@ -1383,6 +1724,139 @@ long   getMaxAge();
 boolean isSecure();
 boolean isHttpOnly();
 String  getSameSite();
+```
+
+---
+
+## 14. OAuth SDK
+
+> **Tags:** `OAuth`, `DPoP`, `RFC6750`, `constants`, `WWW-Authenticate`
+
+### OAuthConstants
+
+Standard OAuth 2.0 string constants per RFC 6749, RFC 6750, and DPoP.
+
+```java
+// com.pingidentity.pa.sdk.oauth.OAuthConstants
+
+// Authentication schemes
+static final String AUTHENTICATION_SCHEME_BEARER; // "Bearer"
+static final String AUTHENTICATION_SCHEME_DPOP;   // "DPoP"
+
+// Header names
+static final String HEADER_NAME_WWW_AUTHENTICATE; // "WWW-Authenticate"
+static final String HEADER_NAME_DPOP_NONCE;       // "DPoP-Nonce"
+
+// WWW-Authenticate attributes
+static final String ATTRIBUTE_REALM;              // "realm"
+static final String ATTRIBUTE_SCOPE;              // "scope"
+static final String ATTRIBUTE_ERROR;              // "error"
+static final String ATTRIBUTE_ERROR_DESCRIPTION;  // "error_description"
+static final String ATTRIBUTE_ERROR_URI;          // "error_uri"
+
+// Error codes (RFC 6749/6750)
+static final String ERROR_CODE_INVALID_REQUEST;           // "invalid_request"
+static final String ERROR_CODE_UNAUTHORIZED_CLIENT;       // "unauthorized_client"
+static final String ERROR_CODE_ACCESS_DENIED;             // "access_denied"
+static final String ERROR_CODE_UNSUPPORTED_RESPONSE_TYPE; // "unsupported_response_type"
+static final String ERROR_CODE_INVALID_SCOPE;             // "invalid_scope"
+static final String ERROR_CODE_SERVER_ERROR;              // "server_error"
+static final String ERROR_CODE_TEMPORARILY_UNAVAILABLE;   // "temporarily_unavailable"
+static final String ERROR_CODE_INVALID_TOKEN;             // "invalid_token"
+static final String ERROR_CODE_INSUFFICIENT_SCOPE;        // "insufficient_scope"
+static final String ERROR_CODE_UNSUPPORTED_GRANT_TYPE;    // "unsupported_grant_type"
+static final String ERROR_CODE_INVALID_CLIENT;            // "invalid_client"
+// DPoP-specific
+static final String ERROR_CODE_INVALID_DPOP_PROOF;        // "invalid_dpop_proof"
+static final String ERROR_CODE_USE_DPOP_NONCE;            // "use_dpop_nonce"
+```
+
+### OAuthUtilities
+
+Builder utility for constructing RFC 6750 `WWW-Authenticate` response headers.
+
+```java
+// com.pingidentity.pa.sdk.oauth.OAuthUtilities
+static String getWwwAuthenticateHeaderValue(
+    String authenticationScheme,  // "Bearer" or "DPoP"
+    Map<String, String> attributes  // realm, scope, error, etc.
+);
+// Produces: Bearer realm="...", scope="...", error="invalid_token"
+```
+
+---
+
+## 15. Other Extension Points
+
+> **Tags:** `extension`, `plugin`, `identity`, `site-authenticator`, `load-balancing`, `encryption`
+>
+> These extension point interfaces exist in the SDK but are **not used** by the
+> message-xform adapter. Documented here for completeness.
+
+### IdentityMapping Plugins
+
+Maps the `Identity` subject to a backend-system identifier (e.g., LDAP DN).
+
+```java
+// com.pingidentity.pa.sdk.identitymapping.IdentityMapping (annotation)
+@IdentityMapping(type = "...", label = "...", expectedConfiguration = ...)
+
+// Sync interface:
+// com.pingidentity.pa.sdk.identitymapping.IdentityMappingPlugin<T>
+void handleMapping(Exchange exchange) throws IOException;
+// Base: IdentityMappingPluginBase<T>
+
+// Async interface:
+// com.pingidentity.pa.sdk.identitymapping.AsyncIdentityMappingPlugin<T>
+CompletionStage<Void> handleMapping(Exchange exchange);
+// Base: AsyncIdentityMappingPluginBase<T>
+```
+
+**HeaderIdentityMappingPlugin** — built-in implementation that copies identity
+attributes to request headers using `AttributeHeaderPair` mappings.
+
+### SiteAuthenticator Plugins
+
+Adds authentication headers when proxying to backend sites.
+
+```java
+// com.pingidentity.pa.sdk.siteauthenticator.SiteAuthenticator (annotation)
+@SiteAuthenticator(type = "...", label = "...", expectedConfiguration = ...)
+
+// Sync: SiteAuthenticatorInterceptor<T> / SiteAuthenticatorInterceptorBase<T>
+void handleRequest(Exchange exchange) throws AccessException;
+
+// Async: AsyncSiteAuthenticatorInterceptor<T> / AsyncSiteAuthenticatorInterceptorBase<T>
+CompletionStage<Void> handleRequest(Exchange exchange);
+```
+
+### LoadBalancing Plugins
+
+Custom load-balancing strategies for distributing traffic across sites.
+
+```java
+// com.pingidentity.pa.sdk.ha.lb.LoadBalancingStrategy (annotation)
+@LoadBalancingStrategy(type = "...", label = "...", expectedConfiguration = ...)
+
+// Sync: LoadBalancingPlugin<T> / LoadBalancingPluginBase<T>
+// Async: AsyncLoadBalancingPlugin<T> / AsyncLoadBalancingPluginBase<T>
+// Handler: LoadBalancingHandler / AsyncLoadBalancingHandler
+```
+
+### EntityScopedHandlerPlugin
+
+```java
+// com.pingidentity.pa.sdk.plugins.EntityScopedHandlerPlugin<T extends PluginConfiguration>
+// Interface for plugins scoped to a specific entity (site or application).
+// Extends ConfigurablePlugin<T> and DescribesUIConfigurable.
+```
+
+### MasterKeyEncryptor
+
+```java
+// com.pingidentity.sdk.key.MasterKeyEncryptor
+// Interface for custom key encryption providers.
+// Throws MasterKeyEncryptorException on errors.
 ```
 
 ---
