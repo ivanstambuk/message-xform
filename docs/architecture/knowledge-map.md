@@ -175,4 +175,5 @@ ADR-0034 (SLF4J Binding)     governs ── NFR-001-02, references ADR-0032, ADR
 | `docs/research/pingaccess-docker-and-sdk.md` | PingAccess Docker image, SDK samples, Java version | Feature 002 spec |
 | `docs/research/pingam-authentication-api.md` | PingAM /json/authenticate endpoint, callback format | Feature 002 scenarios |
 | `docs/architecture/features/002/pingaccess-sdk-guide.md` | Standalone PingAccess 9.0 SDK reference (19 sections, 112 classes) | Feature 002 spec, all adapter implementation |
+| `docs/architecture/features/002/deployment-architecture.md` | PA adapter deployment model: two-level matching, per-instance config, Docker/K8s layout | Feature 002 spec, ADR-0023, ADR-0006 |
 

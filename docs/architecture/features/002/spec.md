@@ -1418,6 +1418,7 @@ Client                    PingAccess                        Backend
 
 | Document | Relevance |
 |----------|-----------|
+| [`deployment-architecture.md`](deployment-architecture.md) | Two-level matching, per-instance config, Docker/K8s layout |
 | `docs/research/pingaccess-plugin-api.md` | SDK research (complete) |
 | `docs/research/pingaccess-docker-and-sdk.md` | Docker + SDK samples (complete) |
 | `docs/research/pingam-authentication-api.md` | PingAM callback format (transform target) |
