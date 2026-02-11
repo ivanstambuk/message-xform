@@ -1,6 +1,6 @@
 # Docs Style Guide
 
-Status: Draft | Last updated: 2026-02-07
+Status: Accepted | Last updated: 2026-02-12
 
 Use this guide when writing or updating Markdown docs in `docs/`. It complements
 the open questions format in `spec-guidelines/open-questions-format.md` and the
@@ -43,7 +43,7 @@ When referring to other normative docs, use a short, consistent citation style:
 - Wrap file paths, identifiers, and code in backticks:
   - `docs/architecture/roadmap.md`, `TransformSpec`, `NFR-001-08`.
 - For inline commands, use backticks; for multi-line examples, use fenced code
-  blocks with a language tag (`bash`, `yaml`, `json`, `java`, etc.).
+  blocks with a language tag (`bash`, `yaml`, `json`, `typescript`, etc.).
 
 ## 5. Terminology & wording
 
@@ -65,6 +65,39 @@ When referring to other normative docs, use a short, consistent citation style:
 - Non-functional requirements: `NFR-NNN-XX` (e.g., `NFR-001-08`).
 - Each requirement in a spec table MUST have: ID, Requirement text, Driver,
   Measurement, Dependencies, Source.
+
+## 6a. Type notation in specifications
+
+Specification type definitions (interfaces, records, enums, value objects) MUST
+use **TypeScript-style declarations** (`.d.ts`) as a **language-neutral notation**.
+The implementation language is Java, but specs are intentionally notation-agnostic.
+
+Conventions:
+
+| Notation | Meaning |
+|----------|--------|
+| `JsonTree` | Parsed JSON tree (Jackson `JsonNode` in the Java implementation) |
+| `T \| null` | Nullable type |
+| `readonly` | Immutable field |
+| `namespace Foo { ... }` | Factory / static methods on `Foo` |
+| `Uint8Array` | Byte array |
+| `Record<K, V>` | Typed map |
+| `unknown` | Any type (Java `Object`) |
+
+Example:
+
+```typescript
+type Message = {
+  readonly body: MessageBody;
+  readonly statusCode: number | null;
+  withBody(newBody: MessageBody): Message;
+};
+```
+
+**Exception — adapter specs:** Feature specs that bind to a language-specific SDK
+(e.g., Feature 002 / PingAccess) MAY use the SDK's native language for
+**SDK-owned types** (classes the project does not control). Project-owned types
+in the same spec SHOULD still use TypeScript notation where practical.
 
 ## 7. ADR format
 
