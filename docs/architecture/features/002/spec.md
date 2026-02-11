@@ -476,6 +476,29 @@ Executors.newSingleThreadScheduledExecutor(r -> {
 The daemon thread ensures PingAccess shutdown is not blocked by the reload
 scheduler. The thread name `mxform-spec-reload` aids diagnostics in thread dumps.
 
+**Shutdown:** The adapter MUST shut down the executor when the plugin is
+decommissioned. Two strategies are applied together (belt-and-suspenders):
+
+1. **`@PreDestroy` annotation** (preferred — orderly shutdown):
+   ```java
+   private ScheduledExecutorService reloadExecutor;  // set in configure()
+
+   @PreDestroy
+   void shutdown() {
+       if (reloadExecutor != null) {
+           reloadExecutor.shutdownNow();
+       }
+   }
+   ```
+
+2. **Daemon thread flag** (fallback safety net):
+   Already applied via `t.setDaemon(true)` in the thread factory above.
+   Ensures PA JVM shutdown is never blocked, even if `@PreDestroy` is not
+   invoked (e.g., ungraceful shutdown, kill -9).
+
+> **Note:** The `reloadExecutor` field is set once in `configure()` and
+> never reassigned — it is safe for concurrent reads (same thread-safety
+> model as other init-time fields per NFR-002-03).
 The executor calls `TransformEngine.reload()` at the specified interval. This
 allows ops to update transform specs on disk without restarting PingAccess.
 When `reloadIntervalSec = 0` (default), specs are loaded only once during
