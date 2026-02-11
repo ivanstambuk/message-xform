@@ -474,19 +474,64 @@ the adapter SHOULD validate these paths in `configure()` as defense-in-depth:
 ### FR-002-05: Plugin Lifecycle
 
 **Requirement:** The plugin MUST initialize and manage the core engine through
-the PingAccess plugin lifecycle:
+the PingAccess plugin lifecycle (official 7-step sequence from SDK guide §1):
 
-1. **Construction:** PingAccess instantiates the plugin via default constructor.
-2. **Dependency injection:** `@Inject` methods called (HttpClient, TemplateRenderer
-   — available but not needed for pure transforms).
-3. **Configuration:** `configure(MessageTransformConfig)` called with JSON-mapped
-   configuration fields. At this point, the plugin MUST:
+1. **Annotation interrogation:** The `@Rule` annotation on `MessageTransformRule`
+   is read to determine that `MessageTransformConfig` is the configuration class.
+2. **Spring initialization:** Both the `MessageTransformRule` and
+   `MessageTransformConfig` beans are provided to Spring for autowiring
+   (`@Inject` setter injection) and `@PostConstruct` initialization.
+
+   > ⚠️ **Order is undefined:** The order in which the rule and its
+   > configuration are processed by Spring is **not defined**. Do not assume
+   > the config is available before `configure()` is called.
+
+3. **Name assignment:** `MessageTransformConfig.setName(String)` is called with
+   the administrator-defined rule name.
+4. **JSON → Configuration mapping:** PingAccess maps the incoming JSON
+   configuration to the `MessageTransformConfig` instance via Jackson.
+
+   > ⚠️ **All-fields gotcha:** The JSON plugin configuration **must contain a
+   > JSON member for each field**, regardless of implied value. Failure to
+   > include a field — even if it has a Java default — can lead to errors.
+   > This affects the PA admin REST API contract: when creating/updating the
+   > rule, all config fields must be present in the JSON payload.
+
+5. **`configure()` call:** `configure(MessageTransformConfig)` is called. At
+   this point, the plugin MUST:
    - Initialize `SpecParser` with JSLT expression engine.
    - Initialize `TransformEngine`.
    - Load all specs from `specsDir`.
    - Optionally load profiles from `profilesDir`.
-4. **Runtime:** `handleRequest()` / `handleResponse()` called per request.
-5. **Teardown:** No explicit destroy — plugin is garbage-collected on PA restart.
+6. **Bean Validation:** `Validator.validate()` is invoked on the
+   `MessageTransformConfig`. Since PA 5.0+, validation runs **before**
+   `configure()` was called in the old model — PingAccess now validates
+   **before** `configure()` is called, so `@NotNull`, `@Size`, and other
+   constraint annotations on config fields are guaranteed to be enforced
+   before the plugin receives them. The adapter SHOULD NOT duplicate
+   constraint checks in `configure()` that are already covered by annotations.
+7. **Available:** The instance is made available to service end-user requests
+   via `handleRequest(Exchange)` and `handleResponse(Exchange)`.
+
+**Teardown:** No explicit destroy lifecycle. Plugins are garbage-collected on
+PA restart. For plugins with background threads (e.g., spec reload scheduler
+in FR-002-04), use `@PreDestroy` to release resources cleanly. The daemon
+thread flag provides a fallback safety net. See SDK guide §1.
+
+> **Injection constraints (SDK guide §1, definitive closed list):**
+> Only **3 classes** are available for injection into plugins:
+>
+> | # | Class | Purpose |
+> |---|-------|---------|
+> | 1 | `TemplateRenderer` | Renders HTML error/response templates |
+> | 2 | `ThirdPartyServiceModel` | Handle to a third-party service |
+> | 3 | `HttpClient` | Async HTTP client for third-party calls |
+>
+> No other PA-internal classes can be injected. Use `javax.inject.Inject`
+> — **NOT** Spring's `@Autowired` — to protect against PA internal changes.
+> `AsyncRuleInterceptorBase` already pre-wires `HttpClient` and
+> `TemplateRenderer` via setter injection, so explicit `@Inject` is only
+> needed if implementing the raw SPI interface without using the base class.
 
 | Aspect | Detail |
 |--------|--------|
