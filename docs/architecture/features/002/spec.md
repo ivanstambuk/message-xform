@@ -232,8 +232,11 @@ void applyResponseChanges(Message transformed, Exchange exchange)
 
 `MessageTransformRule` knows the current direction from the lifecycle phase
 (`handleRequest` vs `handleResponse`) and calls the appropriate helper directly.
-The public SPI method `applyChanges(Message, Exchange)` delegates to
-`applyResponseChanges()` as a reasonable default for general-purpose callers.
+The public SPI method `applyChanges(Message, Exchange)` throws
+`UnsupportedOperationException("Use applyRequestChanges() or
+applyResponseChanges() directly")`. This is a deliberate safety measure —
+the generic SPI method cannot infer direction, and silently defaulting to
+response-only would mask directional bugs during request-phase transforms.
 
 > **SPI contract note:** The `GatewayAdapter<R>` SPI does not mandate direction
 > awareness — this is adapter-specific. The `StandaloneAdapter` does not need
@@ -814,6 +817,28 @@ shade Jackson classes into a private package (e.g.
 > [SDK guide §9](pingaccess-sdk-guide.md#9-deployment--classloading)
 > for the full explanation and boundary conversion pattern.
 
+> **Dual ObjectMapper pattern (design decision):** Jackson relocation means
+> the adapter needs two `ObjectMapper` instances:
+>
+> 1. **`shadedMapper`** — our relocated Jackson (created in `configure()`).
+>    Used for all adapter-internal JSON operations (body parsing, session
+>    context building, error response serialization).
+> 2. **`paMapper`** — PA's native `ObjectMapper`. Used **solely** for boundary
+>    conversion in `buildSessionContext()` to serialize PA-classloader `JsonNode`
+>    values into `byte[]` before deserializing into shaded `JsonNode`.
+>
+> Since Jackson is relocated in the shadow JAR, `com.fasterxml.jackson.databind.
+> ObjectMapper` at compile time becomes `io.messagexform.shaded.jackson.databind.
+> ObjectMapper`. The PA-native ObjectMapper must be instantiated reflectively
+> or obtained via an unshaded utility class compiled separately.
+>
+> **Alternative:** If reflective instantiation is too fragile, bypass Jackson
+> entirely at the boundary — use PA's `Body.getContent()` / `Response.
+> setBodyContent()` which use `byte[]` (no Jackson types cross the boundary).
+> This is the preferred approach for body data; the ObjectMapper boundary
+> conversion is only needed for `Identity.getAttributes()` and
+> `SessionStateSupport.getAttributes()` in `buildSessionContext()`.
+
 **TelemetryListener:** The PA adapter does NOT register a custom
 `TelemetryListener` implementation. The core engine's built-in SLF4J logging
 is sufficient. PA's own monitoring (PingAccess admin → audit logs) captures
@@ -892,6 +917,19 @@ exceptions are caught by `getErrorHandlingCallback()` (FR-002-02).
 > `ErrorHandlerUtil.getConfigurationFields()` to `getConfigurationFields()`
 > and adding a `@JsonUnwrapped @Valid` error handler config field (see SDK
 > guide §7 for the pattern).
+
+> **`handleResponse` DENY error body clarification (design decision):**
+> In `handleResponse()` DENY mode, the error body comes from one of two paths:
+>
+> 1. **Normal path:** `TransformResult.errorResponse()` — the core engine
+>    produces an RFC 9457 `JsonNode` error body. The adapter serializes it via
+>    `objectMapper.writeValueAsBytes(result.errorResponse())`, sets it as the
+>    response body via `exchange.getResponse().setBodyContent()`, overwrites
+>    the status to 502, and sets Content-Type to `application/problem+json`.
+> 2. **Wrap-failure path:** If `wrapResponse()` itself fails (e.g., `IOException`
+>    during `body.read()`), the adapter constructs its own RFC 9457 error body
+>    with `type: urn:messagexform:error:adapter:wrap-failure` and status 502.
+>    This error body is built by the adapter, not the core engine.
 
 ### FR-002-12: Docker E2E Test Script
 
@@ -1184,6 +1222,14 @@ sizes).
    map to or from these codes. If the backend returns a non-standard status code,
    the adapter passes it through unchanged. Transform specs targeting status codes
    should only use standard HTTP status codes (100–599).
+10. **No compressed body support (v1):** The adapter does NOT decompress
+    `Content-Encoding: gzip/deflate/br` response bodies. If the backend sends
+    a compressed body, JSON parsing will fail and the body falls back to
+    `NullNode` (headers-only transform). PingAccess administrators SHOULD
+    configure sites to disable response compression for endpoints using this
+    rule, or place PA's built-in `OutboundContentRewriteInterceptor` upstream
+    to decompress before this rule runs. Compressed body support may be added
+    in a future version.
 
 ---
 

@@ -14,10 +14,10 @@
 | 3 | `javax.inject` vs `jakarta.inject` ambiguity | 🔴 Critical | 1 | ✅ Done |
 | 4 | Jackson boundary conversion missing in `buildSessionContext()` | 🟠 Significant | 1 | ✅ Done |
 | 5 | `SessionStateSupport.getAttributes()` boundary issue | 🟠 Significant | 1 | ✅ Done |
-| 6 | `applyChanges` direction default is dubious | 🟠 Significant | 2 | ⬜ Not started |
-| 7 | No `Content-Encoding` / compressed body handling | 🟠 Significant | 2 | ⬜ Not started |
-| 8 | Missing error response body for `handleResponse` DENY mode | 🟠 Significant | 2 | ⬜ Not started |
-| 9 | Two `ObjectMapper` instances not documented | 🟡 Moderate | 2 | ⬜ Not started |
+| 6 | `applyChanges` direction default is dubious | 🟠 Significant | 2 | ✅ Done |
+| 7 | No `Content-Encoding` / compressed body handling | 🟠 Significant | 2 | ✅ Done |
+| 8 | Missing error response body for `handleResponse` DENY mode | 🟠 Significant | 2 | ✅ Done |
+| 9 | Two `ObjectMapper` instances not documented | 🟡 Moderate | 2 | ✅ Done |
 | 10 | `reloadIntervalSec` TEXT type — input validation gap | 🟡 Moderate | 3 | ⬜ Not started |
 | 11 | `ExchangeProperty` equality semantics trap | 🟡 Moderate | 3 | ⬜ Not started |
 | 12 | `wrapRequest` deep copy body clarification | 🟡 Moderate | 3 | ⬜ Not started |
@@ -30,7 +30,7 @@
 | 19 | No metrics/counters for transform operations | 🔵 Minor | 5 | ⬜ Not started |
 | 20 | Ping Maven repo URL — HTTP vs HTTPS | 🔵 Minor | 5 | ⬜ Not started |
 
-**Progress: 5 / 20 complete**
+**Progress: 9 / 20 complete**
 
 ---
 
