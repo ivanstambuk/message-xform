@@ -568,8 +568,8 @@ Phase 0  ──► Phase 1 ──► Phase 2 ──► Phase 4 ──► Phase 3
 
 | Phase | Status | SDD Step |
 |-------|--------|----------|
-| **Phase 0** (Spec + Tasks) | ✅ Feature 001 spec updated (FR-001-14, NFR-001-02, DO catalogue). Tasks TBD. | Spec |
-| **Phase 1** (Port value objects) | 🔲 Not started | Implement |
+| **Phase 0** (Spec + Tasks) | ✅ Complete (FR-001-14, NFR-001-02, DO catalogue, tasks T-001-58..66) | Spec |
+| **Phase 1** (Port value objects) | ✅ Complete (MediaType, MessageBody, HttpHeaders, SessionContext + tests) | Implement |
 | **Phase 2** (Migrate core API) | 🔲 Not started | Implement |
 | **Phase 3** (Shadow/relocate) | 🔲 Not started | Implement |
 | **Phase 4** (SLF4J enforcement) | 🔲 Not started | Implement |

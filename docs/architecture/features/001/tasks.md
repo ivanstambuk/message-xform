@@ -1116,7 +1116,7 @@ Track long-running or shared commands with timestamps to avoid duplicate work.
 
 #### I11 — MediaType enum
 
-- [ ] **T-001-58** — MediaType test first (FR-001-14a, DO-001-08)
+- [x] **T-001-58** — MediaType test first (FR-001-14a, DO-001-08) ✅ 2026-02-11
   _Intent:_ TDD — write tests before implementation for the content type enum.
   _Test first:_ Write `MediaTypeTest` — assert:
   - `MediaType.JSON.value()` returns `"application/json"`.
@@ -1135,7 +1135,7 @@ Track long-running or shared commands with timestamps to avoid duplicate work.
   _Verification commands:_
   - Compilation check only — implementation in T-001-59.
 
-- [ ] **T-001-59** — MediaType implementation (FR-001-14a, DO-001-08)
+- [x] **T-001-59** — MediaType implementation (FR-001-14a, DO-001-08) ✅ 2026-02-11
   _Intent:_ Implement the `MediaType` enum per spec.
   _Implement:_ Create `MediaType.java` in `core/model/`. Pure enum with
   `value()` and `fromContentType(String)`. Zero dependencies.
@@ -1146,7 +1146,7 @@ Track long-running or shared commands with timestamps to avoid duplicate work.
 
 #### I12 — MessageBody record
 
-- [ ] **T-001-60** — MessageBody test first (FR-001-14b, DO-001-09)
+- [x] **T-001-60** — MessageBody test first (FR-001-14b, DO-001-09) ✅ 2026-02-11
   _Intent:_ TDD — write tests for the body value object.
   _Test first:_ Write `MessageBodyTest` — assert:
   - `MessageBody.json("{}".getBytes()).mediaType()` is `JSON`.
@@ -1163,7 +1163,7 @@ Track long-running or shared commands with timestamps to avoid duplicate work.
   _Verification commands:_
   - Compilation check only — implementation in T-001-61.
 
-- [ ] **T-001-61** — MessageBody implementation (FR-001-14b, DO-001-09)
+- [x] **T-001-61** — MessageBody implementation (FR-001-14b, DO-001-09) ✅ 2026-02-11
   _Intent:_ Implement `MessageBody` record with custom `equals`/`hashCode`.
   _Implement:_ Create `MessageBody.java` in `core/model/`. Record with
   override `equals`/`hashCode` using `Arrays.equals()`. Constructor normalizes
@@ -1176,7 +1176,7 @@ Track long-running or shared commands with timestamps to avoid duplicate work.
 
 #### I13 — HttpHeaders class
 
-- [ ] **T-001-62** — HttpHeaders test first (FR-001-14c, DO-001-10)
+- [x] **T-001-62** — HttpHeaders test first (FR-001-14c, DO-001-10) ✅ 2026-02-11
   _Intent:_ TDD — write tests for the case-insensitive header collection.
   _Test first:_ Write `HttpHeadersTest` — assert:
   - **Case-insensitive:** `HttpHeaders.of(Map.of("Content-Type", "json")).first("content-type")` returns `"json"`.
@@ -1192,7 +1192,7 @@ Track long-running or shared commands with timestamps to avoid duplicate work.
   _Verification commands:_
   - Compilation check only — implementation in T-001-63.
 
-- [ ] **T-001-63** — HttpHeaders implementation (FR-001-14c, DO-001-10)
+- [x] **T-001-63** — HttpHeaders implementation (FR-001-14c, DO-001-10) ✅ 2026-02-11
   _Intent:_ Implement `HttpHeaders` class with case-insensitive lookups.
   _Implement:_ Create `HttpHeaders.java` in `core/model/`. Final immutable
   class. Internal `TreeMap(String.CASE_INSENSITIVE_ORDER)` for consistent
@@ -1205,7 +1205,7 @@ Track long-running or shared commands with timestamps to avoid duplicate work.
 
 #### I14 — SessionContext class
 
-- [ ] **T-001-64** — SessionContext test first (FR-001-14d, DO-001-11)
+- [x] **T-001-64** — SessionContext test first (FR-001-14d, DO-001-11) ✅ 2026-02-11
   _Intent:_ TDD — write tests for the session context value object.
   _Test first:_ Write `SessionContextTest` (new file, not the existing
   `SessionContextMessageTest` which tests session in Message) — assert:
@@ -1223,7 +1223,7 @@ Track long-running or shared commands with timestamps to avoid duplicate work.
   _Verification commands:_
   - Compilation check only — implementation in T-001-65.
 
-- [ ] **T-001-65** — SessionContext implementation (FR-001-14d, DO-001-11)
+- [x] **T-001-65** — SessionContext implementation (FR-001-14d, DO-001-11) ✅ 2026-02-11
   _Intent:_ Implement `SessionContext` with safe `toString()` and singleton empty.
   _Implement:_ Create `SessionContext.java` in `core/model/`. Final immutable
   class. `empty()` returns singleton. `toString()` prints only key names.
@@ -1235,7 +1235,7 @@ Track long-running or shared commands with timestamps to avoid duplicate work.
 
 #### I15 — Phase 11 gate
 
-- [ ] **T-001-66** — Full quality gate (FR-001-14)
+- [x] **T-001-66** — Full quality gate (FR-001-14) ✅ 2026-02-11
   _Intent:_ Verify all port types pass together and don't break existing tests.
   _Verify:_ All tests pass, quality gate green.
   _Verification commands:_
