@@ -1,20 +1,256 @@
 # Spike A: PingAccess Classloader Model Discovery
 
-Status: **🔲 Not Started** | Created: 2026-02-11 | Feature: 002
+Status: **✅ Resolved (Static Analysis)** | Created: 2026-02-11 | Feature: 002
+
+> **Verdict:** PingAccess uses a **flat classpath** with **no classloader
+> isolation**. `lib/*` and `deploy/*` share the same
+> `jdk.internal.loader.ClassLoaders$AppClassLoader`. Jackson relocation is
+> **unnecessary and counterproductive**.
 
 ## Tracker
 
 | Step | Description | Status | Notes |
 |------|-------------|--------|-------|
-| A-1 | Create diagnostic plugin skeleton | 🔲 | Minimal `RuleInterceptor` |
-| A-2 | Implement classloader inspection in `configure()` | 🔲 | Log chain, visibility, identity |
-| A-3 | Implement runtime class identity tests | 🔲 | Same-class checks for Jackson types |
-| A-4 | Build diagnostic shadow JAR (minimal) | 🔲 | Only adapter + SDK, no relocation |
-| A-5 | Deploy to PA 9.0 Docker container | 🔲 | Mount JAR to `/opt/server/deploy/` |
-| A-6 | Collect and analyze logs | 🔲 | Extract classloader chain, visibility map |
-| A-7 | Document findings in SDK guide §9 | 🔲 | New "Classloader Model" subsection |
+| A-0 | Reverse-engineer PA startup and classloading from bytecode | ✅ | `run.sh` + `javap` decompilation — definitive answer |
+| A-1 | Create diagnostic plugin skeleton | ⏭️ Skipped | Not needed — static analysis answered the question |
+| A-2 | Implement classloader inspection in `configure()` | ⏭️ Skipped | See A-0 |
+| A-3 | Implement runtime class identity tests | ⏭️ Skipped | See A-0 |
+| A-4 | Build diagnostic shadow JAR (minimal) | ⏭️ Skipped | See A-0 |
+| A-5 | Deploy to PA 9.0 Docker container | 🔲 Optional | Runtime confirmation (recommended but not blocking) |
+| A-6 | Collect and analyze logs | 🔲 Optional | Only if A-5 is executed |
+| A-7 | Document findings in SDK guide §9 | 🔲 | New "Classloader Model (Verified)" subsection |
 | A-8 | Draft ADR on dependency strategy | 🔲 | ADR-0031 or next available |
-| A-9 | Determine spec impact | 🔲 | List of spec sections to amend |
+| A-9 | Determine spec impact | ✅ | Impact list finalized (see below) |
+
+---
+
+## Findings: Reverse-Engineering PA's Classloader Model
+
+### Method
+
+Instead of building and deploying a diagnostic plugin, we reverse-engineered
+PingAccess 9.0.1's startup code through:
+
+1. **Extracting `run.sh`** from the Docker image (`/opt/out/instance/bin/run.sh`)
+2. **Decompiling bytecode** with `javap -c -p` on PA's internal JARs:
+   - `pingaccess-cli-9.0.1.0.jar` — `Starter`, `Bootstrap` classes
+   - `pingaccess-engine-9.0.1.0.jar` — `PluginRegistry`, `BundleSupport`
+   - `pingaccess-sdk-9.0.1.0.jar` — `ServiceFactory`
+3. **Extracting `/opt/server/lib/`** contents (146 JARs) from Docker image
+4. **Analyzing Spring plugin config** — `ConfigurablePluginPostProcessor`,
+   `RulePluginPostProcessor`, `SimpleServiceLoaderBDRegistryPostProcessor`
+
+### Finding 1: Flat Classpath (No Classloader Isolation)
+
+**Source:** `run.sh` line 59
+
+```bash
+CLASSPATH="${CLASSPATH}:${SERVER_ROOT_DIR}/lib/*:${SERVER_ROOT_DIR}/deploy/*"
+```
+
+And the JVM launch (line 64, 93-94):
+
+```bash
+exec "${JAVA_HOME}"/bin/java ${JAVA_OPTS} ${JVM_OPTS} \
+    ...
+    -classpath "${CLASSPATH}" \
+    com.pingidentity.pa.cli.Starter "$@"
+```
+
+**This is a standard `-classpath` launch.** There is no custom classloader
+creation, no `URLClassLoader` wrapping, no OSGi, no module system. PA places
+**all** JARs — platform libs (`lib/*`) AND plugin JARs (`deploy/*`) — on
+the same flat classpath.
+
+**Implication:** The JVM's application classloader
+(`jdk.internal.loader.ClassLoaders$AppClassLoader`) loads **everything**.
+Plugin code and PA code share the **exact same classloader**. There is
+**zero classloader isolation**.
+
+### Finding 2: ServiceLoader Uses Default Classloader
+
+**Source:** `ServiceFactory.java` bytecode (SDK JAR)
+
+```
+// ServiceFactory.getImplClasses():
+invokestatic  #24  // Method java/util/ServiceLoader.load:(Ljava/lang/Class;)Ljava/util/ServiceLoader;
+```
+
+This is `ServiceLoader.load(Class<S>)` — the **single-argument** form. From
+the JavaDoc:
+
+> *"Uses the thread's context class loader as the class loader."*
+
+In a standard `-classpath` launch, the thread context classloader is the
+application classloader — which has visibility over **all** JARs on the
+classpath (`lib/*` + `deploy/*`).
+
+**Confirmation from `ConfigurablePluginPostProcessor`** (engine bytecode):
+
+```
+// ConfigurablePluginPostProcessor.getClasses():
+invokestatic  #56  // Method java/util/ServiceLoader.load:(Ljava/lang/Class;)Ljava/util/ServiceLoader;
+```
+
+Same pattern. PA discovers plugins via `ServiceLoader.load()` using the
+default classloader. No custom classloader is involved.
+
+### Finding 3: No Custom Classloader in Bootstrap
+
+**Source:** `Bootstrap.java` bytecode (CLI JAR)
+
+```java
+// Bootstrap.invokeMain():
+this.getClass().getClassLoader().loadClass(className);
+```
+
+The `Starter` class delegates to `Bootstrap`, which loads the router CLI
+class using its own classloader — `this.getClass().getClassLoader()`. Since
+`Bootstrap` is loaded from the application classpath, this is the application
+classloader. **No child classloader is created.**
+
+**Source:** Scanning all PA JARs for classloader-related classes:
+
+```bash
+jar tf pingaccess-cli-9.0.1.0.jar | grep -iE "classload|URLClass"
+# Only result: LocalizationResourceClassLoaderUtils.class (i18n resource loading only)
+jar tf pingaccess-engine-9.0.1.0.jar | grep -iE "classload|URLClass"
+# No results
+jar tf pingaccess-admin-9.0.1.0.jar | grep -iE "classload|URLClass"
+# No results
+```
+
+There is **no custom classloader class** anywhere in PA's codebase. The only
+`URLClassLoader` usage is `LocalizationResourceClassLoaderUtils` which is
+solely for loading localization resource bundles (`.properties` files), not
+for plugin isolation.
+
+### Finding 4: Plugin Classes Registered as Spring Prototype Beans
+
+**Source:** `ConfigurablePluginPostProcessor.consumePluginDescriptor()` bytecode
+
+```java
+// createBeanDefinition():
+BeanDefinitionBuilder.genericBeanDefinition(implClass)
+    .setScope("prototype")
+    .getBeanDefinition();
+```
+
+Discovered plugin implementation classes are registered as Spring prototype
+beans directly in the application context. **No classloader boundary.** PA's
+Spring context (`spring-context-6.2.11.jar`) manages plugin lifecycle using
+the same classloader that loaded the plugin classes.
+
+### Finding 5: Jackson 2.17.0 Ships in PA 9.0.1
+
+**Source:** Extracted `/opt/server/lib/` directory contents
+
+```
+jackson-annotations-2.17.0.jar        (78 KB)
+jackson-core-2.17.0.jar               (581 KB)
+jackson-databind-2.17.0.jar           (1.6 MB)
+jackson-datatype-jdk8-2.17.0.jar      (36 KB)
+jackson-datatype-jsr310-2.17.0.jar    (132 KB)
+third-party-jackson-core-2.17.131.jar (390 KB)  ← AWS SDK's shaded Jackson
+```
+
+Jackson **2.17.0** is PA's version. The `third-party-jackson-core` is
+AWS SDK's own shaded copy (package `software.amazon.awssdk.thirdparty.jackson`)
+and is irrelevant to plugins.
+
+### Finding 6: Full PA-Provided Library Inventory
+
+146 JARs live in `/opt/server/lib/`. Key plugin-relevant libraries:
+
+| Library | Version | Available to Plugins? |
+|---------|---------|----------------------|
+| **jackson-databind** | 2.17.0 | ✅ Yes (flat classpath) |
+| **jackson-core** | 2.17.0 | ✅ Yes |
+| **jackson-annotations** | 2.17.0 | ✅ Yes |
+| **jackson-datatype-jdk8** | 2.17.0 | ✅ Yes |
+| **jackson-datatype-jsr310** | 2.17.0 | ✅ Yes |
+| **slf4j-api** | 1.7.36 | ✅ Yes |
+| **log4j-api** | 2.24.3 | ✅ Yes (NOT Logback — Log4j2) |
+| **log4j-slf4j-impl** | 2.24.3 | ✅ Yes (SLF4J→Log4j2 bridge) |
+| **jakarta.validation-api** | 3.1.1 | ✅ Yes |
+| **jakarta.inject-api** | 2.0.1 | ✅ Yes |
+| **hibernate-validator** | 7.0.5.Final | ✅ Yes |
+| **commons-lang3** | 3.14.0 | ✅ Yes |
+| **guava** | 33.1.0-jre | ✅ Yes |
+| **spring-context** | 6.2.11 | ✅ Yes |
+| **spring-beans** | 6.2.11 | ✅ Yes |
+| **netty** (multiple) | 4.1.127.Final | ✅ Yes |
+| SnakeYAML | — | ❌ **Not shipped** |
+
+> **Important correction:** PA uses **Log4j2** (not Logback) as its logging
+> backend, with `log4j-slf4j-impl` bridging SLF4J 1.x → Log4j2. The SDK
+> guide §9 incorrectly stated Logback. Also note: PA uses **SLF4J 1.7.36**
+> (SLF4J 1.x API, not 2.x).
+
+### Classloader Model Diagram
+
+```
+┌─────────────────────────────────────────────────────────┐
+│              JVM Bootstrap Classloader                   │
+│    (java.base, java.lang, java.util, etc.)              │
+└───────────────────────┬─────────────────────────────────┘
+                        │
+┌───────────────────────▼─────────────────────────────────┐
+│     jdk.internal.loader.ClassLoaders$AppClassLoader      │
+│                                                          │
+│  Classpath:                                              │
+│    /opt/server/conf/                                     │
+│    /opt/server/resource/bc/non-fips/*    (BouncyCastle)  │
+│    /opt/server/lib/*                     (146 JARs)      │
+│    /opt/server/deploy/*                  (plugin JARs)   │
+│                                                          │
+│  ┌────────────────────┐  ┌──────────────────────┐       │
+│  │  PA Platform JARs  │  │  Plugin JARs         │       │
+│  │  (engine, admin,   │  │  (our adapter,       │       │
+│  │   sdk, jackson,    │  │   deployed to         │       │
+│  │   spring, netty,   │  │   /opt/server/deploy/) │       │
+│  │   log4j, ...)      │  │                       │       │
+│  └────────────────────┘  └──────────────────────┘       │
+│                                                          │
+│  SAME classloader → SAME Class objects → NO isolation   │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Conclusions
+
+### Answer to Each Original Question
+
+| # | Question | Answer |
+|---|----------|--------|
+| 1 | What classloader type does PA use for plugin JARs? | `jdk.internal.loader.ClassLoaders$AppClassLoader` (standard JVM application classloader) |
+| 2 | What is the parent classloader chain? | AppClassLoader → PlatformClassLoader → BootstrapClassLoader (standard JDK hierarchy) |
+| 3 | Can plugin code see PA's internal libraries? | **Yes, all of them.** Flat classpath means `lib/*` and `deploy/*` share the same classloader. |
+| 4 | Is `JsonNode` the same `Class` object for plugins and PA? | **Yes.** Single classloader → single `Class` instance per fully-qualified name. |
+| 5 | What is the delegation model? | **Standard parent-first** (default JVM behavior). No child-first, no OSGi, no custom delegation. |
+
+### Impact: Jackson Relocation is Unnecessary
+
+Since there is **no classloader isolation**, Jackson relocation would actually
+be **harmful**:
+
+1. If we bundle and relocate Jackson, our code uses
+   `io.messagexform.shaded.jackson.databind.JsonNode` — but `Identity.getAttributes()`
+   returns `com.fasterxml.jackson.databind.JsonNode`. These are **different
+   classes** and we'd get `ClassCastException` at the boundary.
+
+2. The "boundary conversion" pattern (serialize to `byte[]`, deserialize back)
+   was designed to work around this — but it's solving a problem **that
+   doesn't exist** on PA's flat classpath.
+
+3. If we bundle Jackson **without** relocating, we create a version conflict:
+   two copies of `com.fasterxml.jackson.databind.ObjectMapper` on the
+   classpath (PA's and ours). The JVM loads whichever it finds first — which
+   is unpredictable and fragile.
+
+**The correct approach is `compileOnly` — don't bundle Jackson at all.**
+PA provides it, plugins share it, and the SDK API is designed around this.
 
 ---
 
@@ -44,7 +280,7 @@ Jackson relocation introduces significant complexity:
 | Increased JAR size | Bundled Jackson adds ~2-3 MB to the shadow JAR. |
 | Code complexity | The `buildSessionContext()` method (FR-002-06) requires boundary conversion for `Identity.getAttributes()` and `SessionStateSupport.getAttributes()` — 4 extra code paths. |
 
-### The Hypothesis
+### The Hypothesis ✅ CONFIRMED
 
 The PingAccess SDK API **directly exposes Jackson types** in its public
 interfaces:
@@ -55,21 +291,18 @@ interfaces:
 - PA's `configure()` step does Jackson deserialization of the config JSON
   into the plugin's config class
 
-This strongly implies that **PA expects plugins to share its Jackson instance**.
-If PA intended plugins to shade Jackson, it would not expose `JsonNode` in
-its public API — it would use `byte[]` or `String` at the boundary.
+This strongly implies — and static analysis now **confirms** — that **PA
+expects plugins to share its Jackson instance**. There is no classloader
+isolation; plugins and PA share the same flat classpath.
 
-### Goal
+### Original Goal (Superseded)
 
 Deploy a minimal diagnostic plugin to PA 9.0 Docker and **definitively
-answer** these questions:
+answer** class loading questions.
 
-1. What classloader type does PA use for plugin JARs in `/deploy/`?
-2. What is the parent classloader chain?
-3. Can plugin code see PA's internal libraries (Jackson, SnakeYAML, SLF4J, etc.)?
-4. Is `JsonNode` loaded by the plugin the **same `Class` object** as `JsonNode`
-   used by PA's `Identity.getAttributes()`?
-5. What is the delegation model — parent-first or child-first?
+**Status:** All questions answered via static analysis (reverse-engineering
+`run.sh` and `javap` decompilation). A runtime diagnostic plugin deployment
+is optional for further confirmation but is not blocking.
 
 ---
 

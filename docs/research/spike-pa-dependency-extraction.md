@@ -1,14 +1,18 @@
 # Spike B: PingAccess Dependency Version Extraction & Build Alignment
 
-Status: **🔲 Not Started** | Created: 2026-02-11 | Feature: 002
+Status: **🔄 In Progress** | Created: 2026-02-11 | Feature: 002
+
+> **Spike A resolved.** Classloader model confirmed (flat classpath, no isolation).
+> PA ships Jackson 2.17.0, SLF4J 1.7.36, Log4j2 2.24.3. SnakeYAML not shipped.
+> Remaining: script automation, build integration, version guard.
 
 ## Tracker
 
 | Step | Description | Status | Notes |
 |------|-------------|--------|-------|
 | B-1 | Create extraction script (`scripts/pa-extract-deps.sh`) | 🔲 | Docker-based, outputs structured list |
-| B-2 | Run against PA 9.0.1 Docker image | 🔲 | Generate `pa-9.0-provided-dependencies.toml` |
-| B-3 | Analyze extracted dependencies | 🔲 | Identify PA-provided vs. plugin-bundled |
+| B-2 | Run against PA 9.0.1 Docker image | ✅ Manual | Versions confirmed from Spike A extraction |
+| B-3 | Analyze extracted dependencies | ✅ | 146 JARs categorized; see Spike A findings |
 | B-4 | Design build integration strategy | 🔲 | Gradle platform, compileOnly, version catalog |
 | B-5 | Create Gradle platform module or TOML overlay | 🔲 | `pa-platform-9.0/` or `gradle/pa-provided.toml` |
 | B-6 | Prototype adapter build with `compileOnly` Jackson | 🔲 | Validate compilation, test execution |
@@ -83,38 +87,49 @@ This is standard practice in mature plugin ecosystems:
 | `gradle/libs.versions.toml` | Current version catalog (core project) |
 | `docs/reference/pingaccess-sdk/pingaccess-sdk-9.0.1.0.jar` | SDK JAR |
 
-### PA Docker Image Layout
+### PA Docker Image Layout (Verified)
 
 ```
 /opt/server/
 ├── bin/                    # PA startup scripts (run.sh)
 ├── conf/                   # Configuration files
 ├── deploy/                 # Plugin JARs (our target)
-├── lib/                    # Platform libraries ← THIS IS WHAT WE EXTRACT
+├── lib/                    # Platform libraries — 146 JARs (VERIFIED)
 │   ├── pingaccess-sdk-9.0.1.0.jar
-│   ├── jackson-databind-2.x.y.jar      (version unknown)
-│   ├── jackson-core-2.x.y.jar          (version unknown)
-│   ├── jackson-annotations-2.x.y.jar   (version unknown)
-│   ├── snakeyaml-x.y.jar               (version unknown)
-│   ├── slf4j-api-x.y.z.jar             (version unknown)
-│   ├── logback-classic-x.y.z.jar       (version unknown)
-│   ├── ... (hundreds of JARs)
-│   └── pingaccess-runtime-9.0.1.0.jar
+│   ├── jackson-databind-2.17.0.jar     ✅ CONFIRMED
+│   ├── jackson-core-2.17.0.jar         ✅ CONFIRMED
+│   ├── jackson-annotations-2.17.0.jar  ✅ CONFIRMED
+│   ├── jackson-datatype-jdk8-2.17.0.jar
+│   ├── jackson-datatype-jsr310-2.17.0.jar
+│   ├── slf4j-api-1.7.36.jar            ✅ CONFIRMED (SLF4J 1.x, not 2.x)
+│   ├── log4j-api-2.24.3.jar            ✅ CONFIRMED (Log4j2, NOT Logback)
+│   ├── log4j-slf4j-impl-2.24.3.jar     ✅ (SLF4J→Log4j2 bridge)
+│   ├── ❌ SnakeYAML NOT shipped
+│   ├── ... (146 total JARs)
+│   └── pingaccess-engine-9.0.1.0.jar
 ├── log/                    # Log files (or /opt/out/instance/log/)
 └── upgrade/                # Upgrade scripts
 ```
 
-### Known PA Dependencies (From SDK POM, Unverified Versions)
+### PA Dependencies (Verified from Docker Image Extraction)
 
-The SDK JAR's POM declares dependencies on:
+Confirmed versions from Spike A extraction of `/opt/server/lib/`:
 
-- `com.fasterxml.jackson.core:jackson-databind`
-- `jakarta.validation:jakarta.validation-api`
-- `jakarta.inject:jakarta.inject-api`
-- `org.slf4j:slf4j-api`
-
-Exact versions are not specified in the SDK POM (they come from PA's internal
-BOM). This spike will determine the exact versions.
+| Library | Version | Status |
+|---------|---------|--------|
+| `com.fasterxml.jackson.core:jackson-databind` | **2.17.0** | ✅ Confirmed |
+| `com.fasterxml.jackson.core:jackson-core` | **2.17.0** | ✅ Confirmed |
+| `com.fasterxml.jackson.core:jackson-annotations` | **2.17.0** | ✅ Confirmed |
+| `com.fasterxml.jackson.datatype:jackson-datatype-jdk8` | **2.17.0** | ✅ Confirmed |
+| `com.fasterxml.jackson.datatype:jackson-datatype-jsr310` | **2.17.0** | ✅ Confirmed |
+| `jakarta.validation:jakarta.validation-api` | **3.1.1** | ✅ Confirmed |
+| `jakarta.inject:jakarta.inject-api` | **2.0.1** | ✅ Confirmed |
+| `org.slf4j:slf4j-api` | **1.7.36** | ✅ Confirmed (SLF4J 1.x API) |
+| `org.apache.logging.log4j:log4j-api` | **2.24.3** | ✅ Confirmed |
+| `org.apache.commons:commons-lang3` | **3.14.0** | ✅ Confirmed |
+| `com.google.guava:guava` | **33.1.0-jre** | ✅ Confirmed |
+| `org.yaml:snakeyaml` | ❌ | **Not shipped** — must bundle |
+| `ch.qos.logback:logback-classic` | ❌ | **Not shipped** — PA uses Log4j2 |
 
 ---
 
@@ -244,20 +259,23 @@ sort -t'|' -k1,1 -k2,2 "$RESULTS_FILE" > "$TEMP_DIR/sorted.txt"
 echo "✅ Extraction complete. $JAR_COUNT JARs processed."
 ```
 
-#### Key Libraries to Highlight
+#### Key Libraries to Highlight (Updated with Confirmed Status)
 
 The script should flag these **plugin-relevant** libraries with special markers:
 
-| Category | Libraries | Why Relevant |
-|----------|----------|--------------|
-| **Jackson** | `jackson-databind`, `jackson-core`, `jackson-annotations`, `jackson-dataformat-yaml` | Core dependency — central question of this spike |
-| **Logging** | `slf4j-api`, `logback-classic`, `logback-core` | Must be `compileOnly` — PA provides the logging impl |
-| **Validation** | `jakarta.validation-api`, `hibernate-validator` | `compileOnly` — PA provides Bean Validation |
-| **DI** | `jakarta.inject-api` | `compileOnly` — PA's Spring context provides injection |
-| **YAML** | `snakeyaml` | Potentially PA-provided (PA uses YAML for config) |
-| **HTTP** | `jetty-*` | PA's HTTP server — might be visible or not |
-| **Commons** | `commons-lang3`, `guava` | Common utility libs — might be available |
-| **PA Internal** | `pingaccess-*` | PA's own libs — definitely visible |
+| Category | Libraries | PA 9.0.1 Status | Build Scope |
+|----------|----------|-----------------|-------------|
+| **Jackson** | `jackson-databind`, `jackson-core`, `jackson-annotations` (2.17.0) | ✅ Shipped | `compileOnly` |
+| **Jackson extras** | `jackson-datatype-jdk8`, `jackson-datatype-jsr310` (2.17.0) | ✅ Shipped | `compileOnly` |
+| **Jackson YAML** | `jackson-dataformat-yaml` | ❌ Not shipped | Bundle if needed |
+| **Logging API** | `slf4j-api` (1.7.36) | ✅ Shipped | `compileOnly` |
+| **Logging Impl** | `log4j-api`, `log4j-core`, `log4j-slf4j-impl` (2.24.3) | ✅ Shipped | `compileOnly` |
+| **Validation** | `jakarta.validation-api` (3.1.1), `hibernate-validator` (7.0.5) | ✅ Shipped | `compileOnly` |
+| **DI** | `jakarta.inject-api` (2.0.1) | ✅ Shipped | `compileOnly` |
+| **YAML** | `snakeyaml` | ❌ **Not shipped** | `implementation` (bundle) |
+| **HTTP** | `netty-*` (4.1.127.Final) | ✅ Shipped (not Jetty) | N/A |
+| **Commons** | `commons-lang3` (3.14.0), `guava` (33.1.0-jre) | ✅ Shipped | `compileOnly` |
+| **PA Internal** | `pingaccess-*` (9.0.1.0) | ✅ Shipped | `compileOnly` |
 
 ### B-2: Run Against PA 9.0.1
 
@@ -267,52 +285,52 @@ The script should flag these **plugin-relevant** libraries with special markers:
 
 Expected output: `gradle/pa-9.0-provided-dependencies.toml`
 
-Example TOML format:
+Example TOML format (now using **confirmed** versions):
 ```toml
 # PingAccess 9.0.1 — Provided Dependencies
-# Generated: 2026-02-XX by scripts/pa-extract-deps.sh
-# Source image: pingidentity/pingaccess:9.0.1-latest
+# Generated: 2026-02-11 by Spike A reverse engineering + scripts/pa-extract-deps.sh
+# Source image: pingidentity/pingaccess:latest (9.0.1.0)
 #
 # These libraries are available on the PA runtime classpath.
 # Adapter modules should declare them as compileOnly with these exact versions.
 
 [metadata]
 pa-version = "9.0.1"
-image = "pingidentity/pingaccess:9.0.1-latest"
-extracted = "2026-02-XX"
-jar-count = 150  # approximate
+image = "pingidentity/pingaccess:latest"
+extracted = "2026-02-11"
+jar-count = 146
 
 [versions]
-# Jackson
-jackson-databind = "2.17.0"       # EXAMPLE — actual version TBD
-jackson-core = "2.17.0"
-jackson-annotations = "2.17.0"
-jackson-dataformat-yaml = "2.17.0"
+# Jackson — CONFIRMED from Docker extraction
+jackson = "2.17.0"
 
-# Logging
-slf4j-api = "2.0.12"
-logback-classic = "1.5.3"
-logback-core = "1.5.3"
+# Logging — CONFIRMED (Log4j2, NOT Logback)
+slf4j-api = "1.7.36"       # SLF4J 1.x API
+log4j = "2.24.3"             # Log4j2 (with SLF4J bridge)
 
-# Validation
-jakarta-validation-api = "3.1.0"
-hibernate-validator = "8.0.1.Final"
+# Validation — CONFIRMED
+jakarta-validation-api = "3.1.1"
+hibernate-validator = "7.0.5.Final"
 
-# DI
+# DI — CONFIRMED
 jakarta-inject-api = "2.0.1"
 
-# YAML
-snakeyaml = "2.2"
+# SnakeYAML — NOT SHIPPED (must bundle)
+# snakeyaml = NOT AVAILABLE
 
-# Commons
+# Commons — CONFIRMED
 commons-lang3 = "3.14.0"
-guava = "33.0.0-jre"
+guava = "33.1.0-jre"
 
 [libraries]
-# Format: alias = { group = "...", name = "...", version.ref = "..." }
-jackson-databind = { group = "com.fasterxml.jackson.core", name = "jackson-databind", version.ref = "jackson-databind" }
-jackson-core = { group = "com.fasterxml.jackson.core", name = "jackson-core", version.ref = "jackson-core" }
-# ... etc
+jackson-databind = { group = "com.fasterxml.jackson.core", name = "jackson-databind", version.ref = "jackson" }
+jackson-core = { group = "com.fasterxml.jackson.core", name = "jackson-core", version.ref = "jackson" }
+jackson-annotations = { group = "com.fasterxml.jackson.core", name = "jackson-annotations", version.ref = "jackson" }
+jackson-datatype-jdk8 = { group = "com.fasterxml.jackson.datatype", name = "jackson-datatype-jdk8", version.ref = "jackson" }
+jackson-datatype-jsr310 = { group = "com.fasterxml.jackson.datatype", name = "jackson-datatype-jsr310", version.ref = "jackson" }
+slf4j-api = { group = "org.slf4j", name = "slf4j-api", version.ref = "slf4j-api" }
+jakarta-validation = { group = "jakarta.validation", name = "jakarta.validation-api", version.ref = "jakarta-validation-api" }
+jakarta-inject = { group = "jakarta.inject", name = "jakarta.inject-api", version.ref = "jakarta-inject-api" }
 ```
 
 ### B-3: Analyze Extracted Dependencies
@@ -346,16 +364,17 @@ Extend the existing `gradle/libs.versions.toml` with a `[pa-provided]` section:
 
 # --- PA-provided versions (from scripts/pa-extract-deps.sh) ---
 [versions]
-pa-jackson = "2.17.0"  # PA 9.0.1 ships this version
-pa-slf4j = "2.0.12"
-pa-logback = "1.5.3"
-pa-jakarta-validation = "3.1.0"
-pa-jakarta-inject = "2.0.1"
-pa-snakeyaml = "2.2"
+pa-jackson = "2.17.0"              # PA 9.0.1 — CONFIRMED
+pa-slf4j = "1.7.36"                 # PA 9.0.1 — CONFIRMED (SLF4J 1.x)
+pa-jakarta-validation = "3.1.1"     # PA 9.0.1 — CONFIRMED
+pa-jakarta-inject = "2.0.1"         # PA 9.0.1 — CONFIRMED
+# NOTE: SnakeYAML NOT in PA — must be implementation, not compileOnly
+# NOTE: PA uses Log4j2 2.24.3, NOT Logback
 
 [libraries]
 pa-jackson-databind = { group = "com.fasterxml.jackson.core", name = "jackson-databind", version.ref = "pa-jackson" }
 pa-jackson-core = { group = "com.fasterxml.jackson.core", name = "jackson-core", version.ref = "pa-jackson" }
+pa-jackson-annotations = { group = "com.fasterxml.jackson.core", name = "jackson-annotations", version.ref = "pa-jackson" }
 pa-slf4j-api = { group = "org.slf4j", name = "slf4j-api", version.ref = "pa-slf4j" }
 pa-jakarta-validation = { group = "jakarta.validation", name = "jakarta.validation-api", version.ref = "pa-jakarta-validation" }
 pa-jakarta-inject = { group = "jakarta.inject", name = "jakarta.inject-api", version.ref = "pa-jakarta-inject" }
@@ -571,32 +590,32 @@ conditional on both spikes confirming the approach.
 
 These determine whether the adapter can drop Jackson relocation:
 
-| Library | Question | Impact |
-|---------|----------|--------|
-| `jackson-databind` | Exact version in PA 9.0? | Core dependency for JSON processing |
-| `jackson-core` | Exact version? | Transitive dep of `jackson-databind` |
-| `jackson-annotations` | Exact version? | Transitive dep of `jackson-databind` |
-| `jackson-dataformat-yaml` | Present in PA? | If yes, SnakeYAML integration is free |
+| Library | Version | Status |
+|---------|---------|--------|
+| `jackson-databind` | **2.17.0** | ✅ Confirmed |
+| `jackson-core` | **2.17.0** | ✅ Confirmed |
+| `jackson-annotations` | **2.17.0** | ✅ Confirmed |
+| `jackson-dataformat-yaml` | ❌ | **Not shipped** |
 
-### Should Resolve (Build Optimization)
+### Should Resolve (Build Optimization) — ✅ Resolved
 
-| Library | Question | Impact |
-|---------|----------|--------|
-| `snakeyaml` | Present in PA? | If yes, don't bundle (saves ~300 KB) |
-| `slf4j-api` | Exact version? | Already `compileOnly`, but good to pin |
-| `jakarta.validation-api` | Exact version? | Already `compileOnly` |
-| `jakarta.inject-api` | Exact version? | Already `compileOnly` |
-| `logback-classic` / `logback-core` | Present? | Confirms SLF4J backend |
+| Library | Version | Status |
+|---------|---------|--------|
+| `snakeyaml` | ❌ | **Not shipped** — must bundle |
+| `slf4j-api` | **1.7.36** | ✅ Confirmed (SLF4J 1.x) |
+| `jakarta.validation-api` | **3.1.1** | ✅ Confirmed |
+| `jakarta.inject-api` | **2.0.1** | ✅ Confirmed |
+| `logback-classic` / `logback-core` | ❌ | **Not shipped** — PA uses Log4j2 2.24.3 |
 
-### Nice to Know (Future Adapters)
+### Nice to Know (Future Adapters) — ✅ Resolved
 
-| Library | Question | Impact |
-|---------|----------|--------|
-| `guava` | Present? Version? | Useful if we need `ImmutableList`, etc. |
-| `commons-lang3` | Present? Version? | Common utility |
-| `jetty-*` | Version? | May matter for advanced HTTP handling |
-| `spring-*` | Which Spring modules? | PA uses Spring internally |
-| `bouncy-castle` | Present? | Crypto operations |
+| Library | Version | Status |
+|---------|---------|--------|
+| `guava` | **33.1.0-jre** | ✅ Confirmed |
+| `commons-lang3` | **3.14.0** | ✅ Confirmed |
+| `netty-*` (not Jetty) | **4.1.127.Final** | ✅ Confirmed (PA uses Netty, not Jetty) |
+| `spring-*` | **6.2.11** | ✅ Confirmed (spring-context, -beans, -core, etc.) |
+| `bouncy-castle` | via `resource/bc/` dir | ✅ Confirmed (separate from lib/) |
 
 ---
 
@@ -678,13 +697,11 @@ At runtime, these classes resolve from PA's classloader instead.
 
 ## Dependencies
 
-- **Spike A** (Classloader Model) — confirms that PA-provided libraries are
-  **visible** to plugin code. Without this, `compileOnly` won't work.
-  Recommended execution order: Spike A first, then Spike B. But both can be
-  prepared independently.
+- **Spike A** (Classloader Model) — ✅ **Resolved.** Confirmed flat classpath
+  with no classloader isolation. `compileOnly` will work. All PA libraries
+  are visible to plugins.
 - **Docker** — must be available to pull/run PA image.
-- **PA Docker image** — `pingidentity/pingaccess:9.0.1-latest`.
-  Fallback: extract from local `binaries/pingaccess-9.0.1.zip`.
+- **PA Docker image** — `pingidentity/pingaccess:latest` (currently 9.0.1.0).
 
 ---
 
