@@ -759,7 +759,7 @@ Add a logging note after the wrapResponse mapping table:
 - [x] Apply IMP-5 fix (ExchangeProperty schema)
 - [x] Apply IMP-2 fix (async justification)
 - [x] Apply IMP-3 fix (logging note)
-- [ ] Commit: `fix(spec-002): trust model, ExchangeProperty schema, async justification, logging`
+- [x] Commit: `fix(spec-002): documentation, trust model and polish` (`10a13f8`)
 
 ---
 
@@ -772,6 +772,6 @@ Add a logging note after the wrapResponse mapping table:
 | **B3** Scenario matrix | BUG-2, BUG-3, IMP-4 | ✅ Done | `fefa78e` |
 | **B4** Body handling & headers | GAP-2, GAP-5, IMP-1 | ✅ Done | `9dd0a8e` |
 | **B5** Config, reload & reliability | GAP-3, SEC-2, SEC-3, SEC-4 | ✅ Done | `d1632e0` |
-| **B6** Documentation & polish | SEC-1, BUG-7, IMP-2, IMP-3, IMP-5 | ✅ Done | pending commit |
+| **B6** Documentation & polish | SEC-1, BUG-7, IMP-2, IMP-3, IMP-5 | ✅ Done | `10a13f8` |
 
 **Total: 22 items across 6 batches.**
