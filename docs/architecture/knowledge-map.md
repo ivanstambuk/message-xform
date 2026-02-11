@@ -169,3 +169,4 @@ ADR-0030 (Session Context)   governs ── FR-001-13, references ADR-0021, ADR-
 | `docs/research/pingaccess-plugin-api.md` | PingAccess Add-on SDK, RuleInterceptor SPI, Exchange model | Feature 002 spec |
 | `docs/research/pingaccess-docker-and-sdk.md` | PingAccess Docker image, SDK samples, Java version | Feature 002 spec |
 | `docs/research/pingam-authentication-api.md` | PingAM /json/authenticate endpoint, callback format | Feature 002 scenarios |
+| `docs/architecture/features/002/pingaccess-sdk-guide.md` | Standalone PingAccess 9.0 SDK reference (18 sections, 112 classes) | Feature 002 spec, all adapter implementation |
