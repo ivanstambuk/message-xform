@@ -3,12 +3,13 @@
 | Field | Value |
 |-------|-------|
 | Status | Spec Ready |
-| Last updated | 2026-02-11 |
+| Last updated | 2026-02-12 |
 | Owners | Ivan |
 | Linked plan | `docs/architecture/features/002/plan.md` |
 | Linked tasks | `docs/architecture/features/002/tasks.md` |
 | Roadmap entry | #2 – PingAccess Adapter |
 | Depends on | Feature 001 (core engine) |
+| Linked architecture | [`deployment-architecture.md`](deployment-architecture.md) |
 
 > Guardrail: This specification is the single normative source of truth for the feature.
 > Track questions in `docs/architecture/open-questions.md`, encode resolved answers
@@ -637,7 +638,8 @@ thread flag provides a fallback safety net. See SDK guide §1.
 **Requirement:** The adapter MUST populate the `sessionContext` field of the
 `Message` record from the PingAccess `Identity` object (ADR-0030, FR-001-13).
 
-**Design principle:** The `$session` JsonNode is a **flat merged object** that
+**Design principle:** The `$session` context (spec notation: `JsonTree`; runtime
+type: Jackson `JsonNode`) is a **flat merged object** that
 combines all identity sources into a single hierarchy. This allows JSLT
 expressions to access any session attribute uniformly (e.g., `$session.email`,
 `$session.clientId`, `$session.authzCache`) without navigating nested sub-objects.
@@ -1025,8 +1027,8 @@ warning and returns an empty `queryParams` map. The transform proceeds with
 `$queryParams` as an empty object — JSLT expressions referencing query params
 evaluate to `null` gracefully.
 
-**Lifecycle note:** `TransformContext` is an immutable record (`public record
-TransformContext(...)`). Two instances are built per exchange:
+**Lifecycle note:** `TransformContext` is an immutable type (see Feature 001
+FR-001-02 for the interface definition). Two instances are built per exchange:
 
 1. **Request phase:** `buildTransformContext(exchange, null)` — `status` is
    `null` (no response yet).
