@@ -1,44 +1,41 @@
 # Current Session State
 
-**Date:** 2026-02-09
-**Focus:** Feature 001 Phase 10 — Session Context Binding (FR-001-13, ADR-0030)
+**Date:** 2026-02-11
+**Focus:** Feature 002 — PingAccess SDK Guide enrichment (documentation-only session)
 
 ## Completed This Session
 
-1. **Open question + ADR** (`86e5ff5`, `000e910`)
-   - Q-044: session context binding design question
-   - ADR-0030: session context binding (`$session`) — Accepted
-   - Follows ADR-0021 precedent for `$queryParams`/`$cookies`
+1. **SDK sample review** (`ff2e129`)
+   - Reviewed all 33 SDK sample files across 5 modules
+   - Fixed critical HttpClient/ClientRequest/ClientResponse API signatures
+   - Enriched §11 Testing with HttpClient mocking, async testing, session state verification
+   - Extended §15 with full SiteAuthenticator/LoadBalancing/LocaleOverride lifecycle patterns
 
-2. **Phase 10 planning** (`615a342`, `2042580`, `9f09ad1`)
-   - Added Increment I17 (4 tasks: T-001-54..57) to plan.md and tasks.md
-   - Codified Rule 19 (Spec Amendment Cascade) in AGENTS.md
-   - Spec status: Ready → Amended → Ready (lifecycle complete)
+2. **Vendor plugin analysis** (`2aa20bd`)
+   - Analyzed class signatures and SPI files from `pingaccess-engine-9.0.1.0.jar`
+   - Documented 50+ built-in plugins across 10 extension types
+   - Key finding: vendor's `PingAuthorizePolicyDecisionAccessControl` uses same SDK
+     base class (`AsyncRuleInterceptorBase`) as our adapter — validates our design
+   - Identified 8 internal-only APIs with their SDK alternatives
+   - Documented 5 previously missing SDK classes → 112/112 (100% coverage)
 
-3. **Implementation** (`768c1cc`)
-   - `Message.java`: added `sessionContext` field (9-arg canonical, backward-compatible)
-   - `TransformContext.java`: added `sessionContext` field + `sessionContextAsJson()`
-   - `JsltExpressionEngine.java`: bind `$session` variable
-   - `TransformEngine.java`: wire `message.sessionContext()` into context
-   - `ScenarioLoader.java` + `ScenarioSuiteTest.java`: parse/wire `session_context` from YAML
-   - 19 new tests across 4 test classes (all GREEN)
-   - Bug fix: S-001-83 JSLT `contains()` arg order corrected
+3. **Test pattern enrichment** (`e5213e9`)
+   - SPI registration verification via `ServiceFactory.isValidImplName()`
+   - Configuration deserialization test pattern (Jackson `readerForUpdating()`)
+   - Test infrastructure helpers (MockHeadersFactory, ConfigurationModelAccessorFactory)
+   - Sanitized vendor analysis language (no decompilation references)
 
-4. **Documentation cascade**
-   - Feature 001 status: 🔨 In Progress → ✅ Complete (all 10 phases done)
-   - Roadmap + AGENTS.md mirror synced
-   - Coverage matrix: FR-001-13 mapped to S-001-82..85
-   - JSLT `contains()` pitfall documented in Known Pitfalls
+4. **Housekeeping** (`6b05701`)
+   - Added `.sdk-decompile/` to `.gitignore`
 
 ## Key Decisions
 
-- Session context is a nullable `JsonNode` — null when gateway doesn't provide one
-- JSLT absent-field behavior: `$session.sub` on null session → field omitted (not null)
-- JOLT rejection is covered by existing `resolveEngine()` — no JOLT engine registered
-- Rule 19: spec amendments now require a 6-step cascade (mandatory, non-negotiable)
+- PingAccess `deploy/` directory is empty — no drop-in vendor plugins like PingFederate
+- All vendor built-in plugins are compiled into `pingaccess-engine-9.0.1.0.jar`
+- SDK guide now at 2394 lines with 16 sections and 100% SDK class coverage
 
 ## What's Next
 
+- Feature 002 implementation — SDK guide is now comprehensive enough to begin coding
 - Feature 009 (Toolchain & Quality) — spec ready, could begin planning
-- Feature 002/003 (PingAccess/PingGateway adapters) — now unblocked
 - Feature 004 follow-up — session context adapter-side population for proxy

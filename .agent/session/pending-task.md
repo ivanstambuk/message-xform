@@ -1,20 +1,16 @@
 # Pending Task
 
-**Focus**: Feature 001 — Session Context Binding (Phase 10)
-**Status**: ✅ Complete — all 4 tasks (T-001-54..57) implemented, tested, documented, committed.
-**Next Step**: No pending implementation work for Feature 001. Feature is fully complete.
+**Focus**: Feature 002 — PingAccess SDK Guide documentation
+**Status**: SDK guide enrichment complete (2394 lines, 16 sections, 100% class coverage)
+**Next Step**: Begin Feature 002 adapter implementation or continue to another feature
 
 ## Context Notes
-- Feature 001 is now ✅ Complete across all 10 phases (57 tasks, 84+ scenarios).
-- JSLT `contains()` gotcha documented in AGENTS.md Known Pitfalls.
-- Rule 19 (Spec Amendment Cascade) codified as a new governance rule.
-- `git filter-branch` was running in background during this session (email rewrite).
-
-## Suggested Next Session Options
-1. **Feature 009 (Toolchain & Quality)** — spec is ready, could begin planning/implementation.
-2. **Feature 002 or 003** — PingAccess/PingGateway adapters now unblocked by Feature 001 completion.
-3. **Feature 004 follow-up** — session context adapter-side population for standalone proxy.
-4. **Documentation polish** — README, architecture diagrams, or other user-facing docs.
+- SDK guide is at `docs/architecture/features/002/pingaccess-sdk-guide.md`
+- All 112 public SDK classes are documented
+- Vendor plugin analysis (§16) confirms our design approach of extending `AsyncRuleInterceptorBase`
+- HttpClient API signatures were corrected based on SDK sample review
+- PingAccess `deploy/` directory is empty — no drop-in vendor plugins
+- Temp analysis artifacts in `/tmp/pa-explore/` — can be cleaned up
 
 ## SDD Gaps (if any)
-- None — all retro findings resolved.
+- None — all retro checks passed
