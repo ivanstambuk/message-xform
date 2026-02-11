@@ -559,7 +559,7 @@ existing `ALLOWED_GROUPS` already include `com.fasterxml.jackson.*` and
 
 | # | Task | Status | Task ID |
 |---|------|--------|---------|
-| 7.1 | Revert Jackson version | 🔲 Deferred | — |
+| 7.1 | Revert Jackson version | ✅ Done (2.17.0 → 2.21.0 LTS) | — |
 | 7.2 | Remove `net.bytebuddy` from `StandaloneDependencyTest` | ✅ Not needed | — |
 | 7.3 | Update ADR-0031 | ✅ Done | — |
 | 7.4 | Update PLAN.md | ✅ Done | — |
@@ -568,7 +568,9 @@ existing `ALLOWED_GROUPS` already include `com.fasterxml.jackson.*` and
 
 ### 7.1 — Revert Jackson version
 
-`libs.versions.toml` Jackson reverts to latest (e.g., `2.18.4`).
+`libs.versions.toml` Jackson upgraded to 2.21.0 (LTS, Jan 2026). Safe because
+core now relocates Jackson inside its shadow JAR — no conflict with PA's 2.17.0.
+Deprecated `fields()` calls replaced with `properties()` (5 sites).
 
 ### 7.2 — Remove `net.bytebuddy` from `StandaloneDependencyTest`
 
@@ -644,7 +646,7 @@ Phase 0  ──► Phase 1 ──► Phase 2 ──► Phase 4 ──► Phase 3
 | **Phase 3** (Shadow/relocate) | ✅ Complete (1173 relocated Jackson classes, 3.6 MB JAR, 0 leakage) | Implement |
 | **Phase 4** (SLF4J enforcement) | ✅ Complete (source-scan guard in build.gradle.kts, fluent API removal) | Implement |
 | **Phase 5** (Adapters) | 🔧 5.1 Done (standalone), 5.2 deferred (PA), 5.3 not needed | Implement |
-| **Phase 7** (Cleanup) | 🔧 In progress (7.1 deferred, rest done) | Verify |
+| **Phase 7** (Cleanup) | ✅ Complete (Jackson 2.21.0 LTS, docs updated) | Verify |
 
 **Rationale:**
 0. **Phase 0** (spec + tasks) MUST come first — SDD Principle 1 (Specifications Lead Execution).
