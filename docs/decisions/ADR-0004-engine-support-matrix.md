@@ -62,11 +62,6 @@ Negative / trade-offs:
 - Future engines (jq, jsonata, dataweave) added as adapter plugins — the matrix must
   be extended.
 
-Follow-ups:
-- The `ExpressionEngine` SPI should be extended with a `capabilities()` method that
-  returns supported operations, enabling dynamic matrix validation.
-- Consider a CLI/lint tool that validates spec compatibility against engine capabilities.
-
 References:
 - Feature 001 spec: `docs/architecture/features/001/spec.md` (FR-001-02, engine matrix)
 - Prior art research: `docs/research/journeyforge-dsl-patterns.md`

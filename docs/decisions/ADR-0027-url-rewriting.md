@@ -146,20 +146,6 @@ Negative / trade-offs:
 - Adapter SPI must support path and method mutation. All major gateways (PingAccess,
   PingGateway, Kong, standalone) support this natively.
 
-Follow-ups:
-- spec.md: add FR-001-12 (URL Rewriting).
-- spec.md: update Message interface (FR-001-04) with `setRequestPath`, `setRequestMethod`.
-- spec.md: update processing order.
-- spec.md: update DO-001-02 (TransformSpec) with `url` field.
-- spec.md: update Spec DSL section.
-- plan.md: add URL rewriting increment to Phase 6.
-- tasks.md: add URL rewriting tasks to Phase 6.
-- scenarios.md: add URL rewriting scenarios.
-- terminology.md: add URL rewriting terms.
-- knowledge-map.md: add ADR-0027.
-- llms.txt: add ADR-0027.
-- open-questions.md: remove Q-028, Q-029.
-
 Validating scenarios:
 - S-001-38a: URL path rewrite — de-polymorphize dispatch (original-body context)
 - S-001-38b: URL query parameter add/remove

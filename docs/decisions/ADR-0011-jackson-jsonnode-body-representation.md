@@ -115,6 +115,3 @@ Negative / trade-offs:
   a major version bump. This is unlikely given Jackson's dominance in the Java JSON
   ecosystem.
 
-Follow-ups:
-- None — decision is already fully implemented in the spec (FR-001-04, DO-001-01,
-  DO-001-04, SPI-001-03).

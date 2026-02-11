@@ -64,13 +64,6 @@ Negative / trade-offs:
 - One additional library (`json-schema-validator`) in the core module. Must be
   Jackson-native (operates on `JsonNode`) for consistency.
 
-Follow-ups:
-- NFR-001-02 updated to include JSON Schema validator in allowed dependencies.
-- FR-001-09 added to encode this requirement.
-- DO-001-02 (`TransformSpec`) updated with `inputSchema` and `outputSchema` fields.
-
-- Validating scenarios: *Pending — FR-001-09 schema validation scenarios not yet authored*
-
 References:
 - Feature 001 spec: `docs/architecture/features/001/spec.md` (FR-001-09, NFR-001-02)
 - Prior art research (inline schema pattern): `docs/research/journeyforge-dsl-patterns.md`, lines 333–358

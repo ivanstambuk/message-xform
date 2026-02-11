@@ -184,16 +184,6 @@ Negative / trade-offs:
 - Core engine's `implementation` dependency on Jackson must match PA's
   version. Enforced by single version catalog entry.
 
-Follow-ups:
-- spec.md: update FR-002-06 (remove boundary conversion), FR-002-09 (remove
-  relocation mandate), NFR-002-02 (tighten JAR size limit).
-- pingaccess-sdk-guide.md: rewrite §6 boundary conversion section, rewrite
-  §9 classloading section with verified model.
-- knowledge-map.md: add ADR-0031 to FR-002-09, FR-002-06.
-- PLAN.md: mark Spike A complete (done).
-- Spike B: complete build integration (extraction script, version catalog,
-  version guard).
-
 Validating evidence:
 - `docs/research/spike-pa-classloader-model.md` — full reverse-engineering log.
 - `docs/research/spike-pa-dependency-extraction.md` — dependency inventory.

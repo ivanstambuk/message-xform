@@ -87,14 +87,6 @@ Negative / trade-offs:
   will document the specific lifecycle integration.
 - Slightly more documentation burden per adapter feature spec.
 
-Follow-ups:
-- spec.md: add "Adapter Lifecycle Guidance" note to Gateway Adapter SPI section.
-- open-questions.md: remove Q-026.
-- knowledge-map.md: add ADR-0025 to traceability table.
-- llms.txt: add ADR-0025.
-- No new scenarios needed — this decision preserves existing behaviour and adds
-  non-normative guidance only.
-
 References:
 - Feature 001 spec: `docs/architecture/features/001/spec.md` (SPI-001-04/05/06, API-001-01–05, NFR-001-05)
 - Q-026: GatewayAdapter SPI lifecycle gaps (resolved by this ADR)

@@ -64,10 +64,6 @@ Negative / trade-offs:
 - Dynamic header `expr` evaluated against the **transformed** body — could return non-string
   values that need coercion.
 
-Follow-ups:
-- FR-001-10 added to encode this requirement.
-- Multi-value header access defined in ADR-0026 (`$headers_all`).
-
 References:
 - Feature 001 spec: `docs/architecture/features/001/spec.md` (FR-001-10)
 - Kong transformer pattern: `docs/research/transformation-patterns.md`

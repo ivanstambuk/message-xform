@@ -161,17 +161,6 @@ Negative / trade-offs:
 - Eight named types is more surface area than the original two. However, each
   type is directly observable in production — the specificity aids diagnostics.
 
-Follow-ups:
-- spec.md: add Error Catalogue section after FR-001-07.
-- spec.md: update FR-001-02 to reference the catalogue for `throws` declarations.
-- spec.md: update FR-001-07 to reference the catalogue.
-- scenarios.md: add S-001-66 (load-time error type discrimination).
-- scenarios.md: update existing error scenarios to reference specific types.
-- terminology.md: no new terms needed (load time/evaluation time already defined).
-- knowledge-map.md: add ADR-0024 to traceability table.
-- llms.txt: add ADR-0024.
-- open-questions.md: remove Q-024.
-
 References:
 - Feature 001 spec: `docs/architecture/features/001/spec.md` (FR-001-02, FR-001-07)
 - ADR-0022: Error Response on Transform Failure

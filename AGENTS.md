@@ -191,6 +191,10 @@ See `docs/operations/quality-gate.md` for full pipeline documentation.
      (e.g., capability comparisons, use-case explorations, trade-off deep dives), capture
      that analysis as dedicated sections in the ADR — not only in chat. ADRs are the
      permanent record; chat is ephemeral.
+   - **No implementation tracking in ADRs**: ADRs must NOT contain Follow-ups, TODO lists,
+     task checklists, or implementation status markers. ADRs record *decisions* — the why
+     and what. Implementation plans, features, and tasks link *to* ADRs, never the reverse.
+     This prevents ADRs from becoming stale when implementation state changes.
 9. **Decisions Must Be Testable**: Every ADR or resolved open question that changes the spec MUST produce at least one validating scenario in `scenarios.md`. Scenarios reference ADRs (via tags like `adr-0002`) and spec requirements (via `requires: [FR-001-10]`). The coverage matrix at the bottom of `scenarios.md` MUST be updated. When a discussion reveals a new edge case, add a scenario immediately — don't defer.
 10. **Spec Review Protocol**: When the agent reviews or critiques a spec, findings MUST be triaged and persisted — never left as chat-only output.
     - **🔴🟡 Decisions needed** (high/medium severity): Register as formal open questions in `docs/architecture/open-questions.md`. These require human input via Decision Cards before the spec is updated. Each question gets a severity tag in the Notes column (`severity: high` or `severity: medium`).

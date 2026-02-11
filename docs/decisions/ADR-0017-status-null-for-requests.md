@@ -79,6 +79,3 @@ Negative / trade-offs:
 - Authors must be aware `$status` can be `null`. FR-001-11 documentation must call
   this out prominently.
 
-Follow-ups:
-- Update FR-001-11 in spec.md with normative `$status` = `null` for requests.
-- Fix inconsistent `-1` reference in spec.md line 886.

@@ -110,17 +110,6 @@ Negative / trade-offs:
   Mitigated by clear naming: `$headers` = simple/first, `$headers_all` = full/array.
 - Engine must bind both variables at evaluation time — negligible performance impact.
 
-Follow-ups:
-- spec.md: update FR-001-10 to document `$headers_all`.
-- spec.md: update TransformContext (DO-001-07) and Spec DSL.
-- spec.md: update engine support matrix column header.
-- scenarios.md: add scenarios for multi-value header access.
-- terminology.md: add `$headers_all` definition.
-- ADR-0002: update "deferred" note to reference ADR-0026.
-- knowledge-map.md: add ADR-0026 to FR-001-10 row.
-- llms.txt: add ADR-0026.
-- open-questions.md: remove Q-023.
-
 References:
 - Feature 001 spec: `docs/architecture/features/001/spec.md` (FR-001-10)
 - Q-023: Multi-value header access (resolved by this ADR)

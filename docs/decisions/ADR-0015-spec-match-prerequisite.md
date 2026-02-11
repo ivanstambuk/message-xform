@@ -134,7 +134,3 @@ Negative / trade-offs:
 - Authors may need to check both spec and profile when debugging "why is my transform
   not applied?" — mitigated by structured logging (NFR-001-08).
 
-Follow-ups:
-- Update FR-001-01 to clarify spec `match` is a prerequisite.
-- Update FR-001-05 to note profile `content-type` is optional when spec provides it.
-- Ensure structured logging includes prerequisite check results.

@@ -111,13 +111,6 @@ Negative / trade-offs:
   prevent it, transforms may apply twice silently. This is the administrator's
   responsibility to prevent.
 
-Follow-ups:
-- ADR-0006 scope narrowed to intra-profile match resolution.
-- FR-001-05 updated with "Cross-profile routing is product-defined" paragraph.
-- Terminology codified: "gateway product", "deployment model", "product-defined".
-- Per-gateway adapter feature specs (future) should document how the gateway
-  product's deployment model interacts with profile selection.
-
 References:
 - ADR-0006 – Most-Specific-Wins Profile Match Resolution (intra-profile scope)
 - Feature 001 spec: `docs/architecture/features/001/spec.md` (FR-001-05)

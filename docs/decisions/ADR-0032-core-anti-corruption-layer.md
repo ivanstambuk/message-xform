@@ -266,13 +266,6 @@ Negative / trade-offs:
 - **Debugging** — stack traces show relocated package names
   (`io.messagexform.internal.jackson`). Mitigated by clear naming convention.
 
-## Follow-ups
-
-1. **Core API refactor** — ✅ Complete (Phases 0–4, 5.1, 7)
-2. **Update ADR-0031** — ✅ Done (partial supersession note added)
-3. **Update Feature 001 spec** — ✅ Done (FR-001-14)
-4. **Update Feature 002 spec** — deferred to Feature 002 implementation
-5. **Revert `libs.versions.toml`** — ✅ Done (Jackson upgraded to 2.21.0 LTS)
 
 References:
 - ADR-0031: PA-Provided Dependencies (partially superseded)

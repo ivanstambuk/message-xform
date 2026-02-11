@@ -115,5 +115,3 @@ Negative / trade-offs:
   preferred engine via the SPI.
 - JSLT's smaller community means fewer third-party resources compared to jq.
 
-Follow-ups:
-- None — decision is already fully implemented in the spec.

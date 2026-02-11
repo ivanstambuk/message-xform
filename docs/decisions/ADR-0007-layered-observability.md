@@ -120,11 +120,6 @@ Negative / trade-offs:
 - Adapters must implement `TelemetryListener` — adds work per gateway integration.
 - Operators must configure telemetry backend (Prometheus, OTLP) at deployment level.
 
-Follow-ups:
-- NFR-001-02 updated: `TelemetryListener` is a core interface, no external deps.
-- Define the stable metric name vocabulary in an appendix or operator guide.
-- Add `TelemetryListener` to the domain objects section of spec.md.
-
 References:
 - Feature 001 spec: `docs/architecture/features/001/spec.md` (NFR-001-08, NFR-001-09)
 - Validating scenarios: S-001-47, S-001-48

@@ -62,11 +62,6 @@ Negative / trade-offs:
 - Predicate evaluates against the **transformed** body, which may confuse authors who
   expect it to reference the original input.
 
-Follow-ups:
-- FR-001-11 added to encode this requirement.
-- Consider whether `when` predicates should also be subject to engine capability
-  validation (ADR-0004).
-
 References:
 - Feature 001 spec: `docs/architecture/features/001/spec.md` (FR-001-11)
 - Header pattern precedent: ADR-0002

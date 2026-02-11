@@ -136,17 +136,6 @@ Negative / trade-offs:
 - Adapter responsibility increases: adapters must handle the error response signal
   from the engine and return an appropriate HTTP error to the caller.
 
-Follow-ups:
-- FR-001-07 rewritten to reflect error-response-on-failure semantics.
-- CFG-001-03 (`error-mode`) removed from the spec.
-- FR-001-06 (Passthrough) narrowed to non-matching requests only.
-- Scenarios S-001-24, S-001-55, S-001-56, S-001-58 updated to expect error responses
-  instead of passthrough.
-- New scenario added for configurable error response format.
-- Terminology updated: abort-on-failure → error-response-on-failure.
-- All failure-path rows in FR-001-02, FR-001-03, FR-001-04, FR-001-05, FR-001-09
-  updated from "pass through" to "return error response."
-
 References:
 - Feature 001 spec: `docs/architecture/features/001/spec.md` (FR-001-07, CFG-001-03)
 - RFC 9457: Problem Details for HTTP APIs

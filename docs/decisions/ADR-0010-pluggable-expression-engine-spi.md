@@ -102,5 +102,3 @@ Negative / trade-offs:
 - SPI implementations must handle `JsonNode` input/output. Engines with their own
   internal models (e.g., JSONata) incur a serialization roundtrip.
 
-Follow-ups:
-- None — SPI interfaces are already defined in `spec.md` FR-001-02.

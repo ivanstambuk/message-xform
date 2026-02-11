@@ -95,7 +95,3 @@ Negative / trade-offs:
 - Paths must be manually kept in sync with schema evolution. Mitigated by load-time
   validation (a path that matches nothing could produce a warning).
 
-Follow-ups:
-- Update FR-001-01 to include `sensitive` in the spec schema definition.
-- Update NFR-001-06 to reference this syntax.
-- Add scenarios for sensitive field redaction.

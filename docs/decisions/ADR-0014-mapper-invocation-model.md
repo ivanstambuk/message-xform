@@ -170,7 +170,3 @@ Negative / trade-offs:
 - Introduces a mini-pipeline within a single spec, which is conceptually similar to
   (but more limited than) profile-level chaining.
 
-Follow-ups:
-- Update FR-001-08 in spec.md with the `apply` directive syntax.
-- Update S-001-50 scenario to use the `apply` directive.
-- Add a new scenario for the `apply` ordering semantics (pre + expr + post).

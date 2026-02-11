@@ -78,13 +78,6 @@ Negative / trade-offs:
 - Equal-specificity ties with equal constraints → load-time error. This is strict
   but necessary; operators must resolve ambiguity explicitly.
 
-Follow-ups:
-- NFR-001-08 added: structured JSON log line for every profile match.
-- Consider a `--dry-run` mode that reports match resolution for a given request path
-  without executing the transform, for operator debugging.
-- Document the specificity scoring algorithm with examples in the operator guide.
-- Cross-profile conflict handling is product-defined (ADR-0023).
-
 References:
 - Feature 001 spec: `docs/architecture/features/001/spec.md` (FR-001-05, NFR-001-08)
 - Validating scenarios: S-001-44, S-001-45, S-001-46

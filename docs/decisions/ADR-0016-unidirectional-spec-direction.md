@@ -117,6 +117,3 @@ Negative / trade-offs:
   profile to understand usage. Mitigated by structured logging (NFR-001-08).
 - No auto-guard against binding a response-oriented spec to request phase.
 
-Follow-ups:
-- Update FR-001-03 to clarify direction semantics for unidirectional specs.
-- Ensure profile validation rejects entries without `direction`.

@@ -68,7 +68,3 @@ Negative / trade-offs:
 - If an adapter implementer forgets to configure gateway-level limits, the engine
   could receive very large JsonNodes. This is the adapter implementer's responsibility.
 
-Follow-ups:
-- Add a note to FR-001-04 clarifying that body buffering is an adapter concern.
-- Adapter feature specs (Feature 002+) SHOULD document their gateway's body-size
-  configuration.

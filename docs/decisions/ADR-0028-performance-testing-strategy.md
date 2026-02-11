@@ -113,12 +113,6 @@ Negative / trade-offs:
 - Feature 009 must be implemented before CI-grade performance gating is available.
   Mitigated: lightweight JUnit benchmarks provide immediate coverage.
 
-Follow-ups:
-- tasks.md: add T-001-53 (TransformEngineBenchmark — NFR-001-03 verification).
-- docs/operations/performance-testing.md: add supersession note pointing to Feature 009.
-- knowledge-map.md: add ADR-0028.
-- llms.txt: add ADR-0028.
-
 Validating scenarios:
 - S-001-79: TransformEngineBenchmark — identity JSLT transform p95 < 5ms for 1KB body
 - S-001-80: TransformEngineBenchmark — 5-field mapping p95 < 5ms for 10KB body

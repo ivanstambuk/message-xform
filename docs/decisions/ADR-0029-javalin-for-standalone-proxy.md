@@ -87,14 +87,6 @@ Negative / trade-offs:
   adapter is coupled to its gateway's native types (per ADR-0025).
 - Javalin 6 requires Java 17+ (we target 21, so no issue).
 
-Follow-ups:
-- Feature 004 spec: reference this ADR for HTTP server choice.
-- `adapter-standalone/build.gradle.kts`: add Javalin dependency.
-- `settings.gradle.kts`: include `adapter-standalone` module.
-- `llms.txt`: add ADR-0029.
-- `knowledge-map.md`: add ADR-0029 to traceability table.
-- Remove Q-029 from `open-questions.md`.
-
 References:
 - Research: `docs/research/standalone-proxy-http-server.md`
 - Feature 004 spec: `docs/architecture/features/004/spec.md`

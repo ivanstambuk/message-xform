@@ -135,18 +135,6 @@ Negative / trade-offs:
   `Message` field. If this becomes a pattern, ADR-0030 can be revisited with a
   generic extension map.
 
-Follow-ups:
-- spec.md: add FR-001-13 (Session Context Binding).
-- spec.md: update Message interface (FR-001-04) with `getSessionContext`/`setSessionContext`.
-- spec.md: update TransformContext (DO-001-07) with `sessionContext`.
-- spec.md: update engine support matrix with `$session` column.
-- spec.md: update processing order.
-- scenarios.md: add session context scenarios (S-001-82 through S-001-85).
-- terminology.md: add `Session context` term.
-- knowledge-map.md: add ADR-0030.
-- llms.txt: add ADR-0030.
-- open-questions.md: remove Q-044.
-
 Validating scenarios:
 - S-001-82: `$session.sub` injected into request body (request direction).
 - S-001-83: `$session.roles` used in conditional body transform (response direction).

@@ -68,11 +68,6 @@ Negative / trade-offs:
 - Bare `spec: id` (no version) is convenient but less predictable. Production profiles
   SHOULD always use explicit versions.
 
-Follow-ups:
-- Consider a CLI tool that reports which profiles reference which spec versions,
-  enabling migration audits.
-- Document the "latest resolution" algorithm (semver ordering) in spec.md.
-
 References:
 - Feature 001 spec: `docs/architecture/features/001/spec.md` (FR-001-05)
 - Validating scenarios: S-001-41 (concurrent versions), S-001-42 (missing version rejected),

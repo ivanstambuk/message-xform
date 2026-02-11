@@ -138,8 +138,3 @@ Negative / trade-offs:
 - Very long single expressions may benefit from external tooling (JSLT formatters,
   linters) for readability.
 
-Follow-ups:
-- Document profile-level chaining pattern in a "Cookbook" or usage guide when
-  implementation begins.
-- If demand for mixed-engine single-spec pipelines emerges from real usage, revisit
-  this ADR — but only with validated use cases.
