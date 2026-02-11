@@ -406,11 +406,38 @@ The configuration JSON maps directly to these fields via the PingAccess admin AP
 **`reloadIntervalSec` clarification:** This controls periodic re-reading of
 transform spec YAML files from `specsDir` and profiles from `profilesDir` —
 it does **not** hot-reload the adapter JAR itself (Constraint #2). When
-`reloadIntervalSec > 0`, the adapter starts a `ScheduledExecutorService`
-(single daemon thread) that calls `TransformEngine.reload()` at the specified
-interval. This allows ops to update transform specs on disk without restarting
-PingAccess. When `reloadIntervalSec = 0` (default), specs are loaded only once
-during `configure()` and changes require a PA restart.
+`reloadIntervalSec > 0`, the adapter starts a `ScheduledExecutorService` with
+a named daemon thread:
+
+```java
+Executors.newSingleThreadScheduledExecutor(r -> {
+    Thread t = new Thread(r, "mxform-spec-reload");
+    t.setDaemon(true);
+    return t;
+});
+```
+
+The daemon thread ensures PingAccess shutdown is not blocked by the reload
+scheduler. The thread name `mxform-spec-reload` aids diagnostics in thread dumps.
+
+The executor calls `TransformEngine.reload()` at the specified interval. This
+allows ops to update transform specs on disk without restarting PingAccess.
+When `reloadIntervalSec = 0` (default), specs are loaded only once during
+`configure()` and changes require a PA restart.
+
+**Reload failure semantics:** If `TransformEngine.reload()` throws during a
+scheduled reload (e.g., malformed YAML, file I/O error), the adapter logs a
+warning and retains the previous valid `TransformRegistry`. The failed reload
+does NOT disrupt in-flight requests — `TransformEngine`'s `AtomicReference`-
+based swap ensures that the old registry remains active until a successful
+reload replaces it (NFR-001-05).
+
+**Security note:** The `specsDir` and `profilesDir` fields accept arbitrary
+file system paths. While PingAccess admin access is a privileged context,
+the adapter SHOULD validate these paths in `configure()` as defense-in-depth:
+- Reject paths containing `..` segments.
+- Log the resolved absolute path at INFO level for audit trail.
+- Verify the directory exists and is readable.
 
 | Aspect | Detail |
 |--------|--------|
@@ -798,6 +825,8 @@ sizes).
 | S-002-26 | **Session state in JSLT:** JSLT expression uses `$session.authzCache` → resolves from `SessionStateSupport` (flat `$session` namespace, layer 4 merge). |
 | S-002-27 | **Prior rule URI rewrite:** Upstream ParameterRule rewrites `/old/path` to `/new/path` → MessageTransformRule wraps using `Request.getUri()` (rewritten URI) → spec matches on `/new/path` (validates URI choice per FR-002-01 note). |
 | S-002-28 | **DENY + handleResponse interaction:** `handleRequest()` returns `Outcome.RETURN` with DENY error body → `handleResponse()` is called (SDK contract) → adapter checks `TRANSFORM_DENIED` ExchangeProperty → skips response processing → client receives original DENY error (GAP-4 fix). |
+| S-002-29 | **Spec hot-reload (success):** `reloadIntervalSec=30` → spec YAML modified on disk → next poll reloads specs → new spec matches next request → transform uses updated spec. |
+| S-002-30 | **Spec hot-reload (failure):** `reloadIntervalSec=30` → malformed spec written to disk → reload fails with warning log → previous specs remain active → existing transforms unaffected. |
 
 ---
 
@@ -894,10 +923,22 @@ sizes).
    `CompletionStage<Void>`, not `Outcome`. The adapter cannot prevent
    response delivery — it can only rewrite the response body/status.
    This affects DENY error mode semantics (FR-002-11).
-7. **Body.isInMemory():** `body.isInMemory()` can be `false` for large
-   bodies (streamed from backend). `body.getContent()` reads the entire body
-   into memory. The adapter does not impose additional limits beyond the
-   core engine's `maxOutputSizeBytes` (NFR-001-07).
+7. **Body size and memory:** `body.isInMemory()` can be `false` for large
+   bodies (streamed from backend). The adapter calls `body.read()` to load
+   the body into memory before `getContent()`.
+
+   **Input body limit:** PingAccess enforces a configurable maximum body size
+   at the engine level (`body.read()` throws `AccessException` if exceeded).
+   The adapter does NOT impose an additional limit beyond PingAccess's built-in
+   enforcement. On `AccessException` from `body.read()`, the adapter falls back
+   to `NullNode` (per FR-002-01 body read failure strategy).
+
+   **Output body limit:** The core engine's `maxOutputSizeBytes` (NFR-001-07)
+   limits the transformed output size.
+
+   **Recommendation:** Administrators SHOULD configure PingAccess's engine-level
+   body size limit to prevent excessive memory consumption. The default PA limit
+   applies to all rules, not just this adapter.
 8. **Identity may be null:** For unauthenticated/anonymous resources,
    `exchange.getIdentity()` returns `null`. The adapter MUST check for null
    before accessing identity fields. See FR-002-06 null-identity handling.

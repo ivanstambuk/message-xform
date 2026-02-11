@@ -6,7 +6,7 @@
 | Reviewer | Agent (deep dive analysis) |
 | Target | `docs/architecture/features/002/spec.md` |
 | Cross-ref | `docs/architecture/features/002/pingaccess-sdk-guide.md` |
-| Status | 🔨 In Progress (B1–B4 done) |
+| Status | 🔨 In Progress (B1–B5 done) |
 
 > This document tracks all findings from the spec deep-dive analysis and
 > organizes them into implementation batches. Each batch is a logical unit of
@@ -34,7 +34,7 @@
 | **B2** | Lifecycle & control flow (runtime crashes) | GAP-4, IMP-6, BUG-6, BUG-4 | 🔴 Critical | ✅ Done |
 | **B3** | Scenario matrix corrections | BUG-2, BUG-3, IMP-4 | 🟡 Medium | ✅ Done |
 | **B4** | Body handling & headers | GAP-2, GAP-5, IMP-1 | 🟡 Medium | ✅ Done |
-| **B5** | Configuration, reload & reliability | GAP-3, SEC-2, SEC-3, SEC-4 | 🟡 Medium | ⬜ Not started |
+| **B5** | Configuration, reload & reliability | GAP-3, SEC-2, SEC-3, SEC-4 | 🟡 Medium | ✅ Done |
 | **B6** | Documentation, trust model & polish | SEC-1, BUG-7, IMP-2, IMP-3, IMP-5 | 💡 Low | ⬜ Not started |
 
 ---
@@ -458,7 +458,7 @@ Add to the "Protected headers" note from GAP-5:
 - [x] Apply GAP-2 fix (body serialization note)
 - [x] Apply GAP-5 fix (protected headers note)
 - [x] Apply IMP-1 fix (Transfer-Encoding handling)
-- [ ] Commit: `fix(spec-002): body serialization charset, protected headers, Transfer-Encoding`
+- [x] Commit: `fix(spec-002): body serialization and header safety` (`9dd0a8e`)
 
 ---
 
@@ -473,7 +473,7 @@ Add to the "Protected headers" note from GAP-5:
 |-------|-------|
 | ID | GAP-3 |
 | Severity | 🟡 Medium |
-| Status | ⬜ Not started |
+| Status | ✅ Done |
 | Affected lines | spec.md FR-002-04 (L326–333), scenario matrix |
 
 **Fix:**
@@ -502,7 +502,7 @@ Add to the "Protected headers" note from GAP-5:
 |-------|-------|
 | ID | SEC-2 |
 | Severity | 🔐 Low |
-| Status | ⬜ Not started |
+| Status | ✅ Done |
 | Affected lines | spec.md FR-002-04 (L317) |
 
 **Fix:**
@@ -524,7 +524,7 @@ Add a validation note after the configuration table in FR-002-04:
 |-------|-------|
 | ID | SEC-3 |
 | Severity | 🔐 Medium |
-| Status | ⬜ Not started |
+| Status | ✅ Done |
 | Affected lines | spec.md FR-002-04 (L329–333) |
 
 **Fix:**
@@ -556,7 +556,7 @@ New:
 |-------|-------|
 | ID | SEC-4 |
 | Severity | 🔐 Medium |
-| Status | ⬜ Not started |
+| Status | ✅ Done |
 | Affected lines | spec.md Constraint #7 (L806–809) |
 
 **Fix:**
@@ -591,10 +591,10 @@ New:
 
 ### B5 Commit Plan
 
-- [ ] Apply GAP-3 fixes (reload failure semantics + 2 scenarios)
-- [ ] Apply SEC-2 fix (path validation note)
-- [ ] Apply SEC-3 fix (daemon thread executor detail)
-- [ ] Apply SEC-4 fix (body size constraint rewrite)
+- [x] Apply GAP-3 fixes (reload failure semantics + 2 scenarios)
+- [x] Apply SEC-2 fix (path validation note)
+- [x] Apply SEC-3 fix (daemon thread executor detail)
+- [x] Apply SEC-4 fix (body size constraint rewrite)
 - [ ] Commit: `fix(spec-002): hot-reload lifecycle, path validation, body size limits`
 
 ---
@@ -770,8 +770,8 @@ Add a logging note after the wrapResponse mapping table:
 | **B1** SDK API corrections | BUG-1, GAP-1, BUG-5 | ✅ Done | `0861a24` |
 | **B2** Lifecycle & control flow | GAP-4, IMP-6, BUG-6, BUG-4 | ✅ Done | `09d18a1` |
 | **B3** Scenario matrix | BUG-2, BUG-3, IMP-4 | ✅ Done | `fefa78e` |
-| **B4** Body handling & headers | GAP-2, GAP-5, IMP-1 | ✅ Done | pending commit |
-| **B5** Config, reload & reliability | GAP-3, SEC-2, SEC-3, SEC-4 | ⬜ Not started | — |
+| **B4** Body handling & headers | GAP-2, GAP-5, IMP-1 | ✅ Done | `9dd0a8e` |
+| **B5** Config, reload & reliability | GAP-3, SEC-2, SEC-3, SEC-4 | ✅ Done | pending commit |
 | **B6** Documentation & polish | SEC-1, BUG-7, IMP-2, IMP-3, IMP-5 | ⬜ Not started | — |
 
 **Total: 22 items across 6 batches.**
