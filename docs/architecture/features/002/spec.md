@@ -130,11 +130,20 @@ JSON and provides separate `wrapRequestRaw()`/`wrapResponseRaw()` methods), the
 PingAccess adapter handles parse failures **internally** in `wrapRequest()` and
 `wrapResponse()`:
 
-1. Attempt to parse `Body.getContent()` as JSON via `ObjectMapper.readTree()`.
-2. On parse failure (malformed JSON, non-JSON content type): **return `NullNode`
+1. **Pre-read the body into memory:** If `!body.isRead()`, call `body.read()`.
+   On `AccessException` (body exceeds PA's configured maximum) or `IOException`:
+   return `NullNode` as the body and log a warning with exception details.
+2. Attempt to parse `body.getContent()` as JSON via `ObjectMapper.readTree()`.
+3. On parse failure (malformed JSON, non-JSON content type): **return `NullNode`
    as the body** and log a warning. Do NOT throw.
-3. The returned `Message` has all other fields (headers, path, method, etc.)
+4. The returned `Message` has all other fields (headers, path, method, etc.)
    populated normally.
+
+> **Why `body.read()` is mandatory:** PingAccess's `Body` is stateful. For
+> streamed bodies (`body.isInMemory() == false`), `body.getContent()` throws
+> `IllegalStateException` unless `body.read()` has been called first. The
+> `body.read()` method loads the body into memory, after which `getContent()`
+> returns the byte array. See SDK guide §4 for the Body state model.
 
 **Rationale:** In PingAccess, the adapter does not control the top-level
 orchestration flow (unlike `ProxyHandler` in standalone mode). The
@@ -151,11 +160,11 @@ JSLT (returns `null` for property access on null).
 
 | Message Field | Source |
 |---------------|--------|
-| `body` | `exchange.getRequest().getBody().getContent()` → parse as `JsonNode` (or `NullNode` if empty/non-JSON) |
-| `headers` | `exchange.getRequest().getHeaders().getAllHeaderFields()` → single-value map (first value per name, lowercase keys) |
-| `headersAll` | Same source → multi-value map (all values per name, lowercase keys) |
+| `body` | `exchange.getRequest().getBody()` → pre-read via `body.read()` if `!body.isRead()` → `body.getContent()` → parse as `JsonNode` (or `NullNode` on read failure / empty / non-JSON) |
+| `headers` | `exchange.getRequest().getHeaders().asMap()` → flatten `Map<String, String[]>` to single-value `Map<String, String>` (first value per name, lowercase keys) |
+| `headersAll` | `exchange.getRequest().getHeaders().asMap()` → convert `Map<String, String[]>` to `Map<String, List<String>>` (all values per name, lowercase keys) |
 | `statusCode` | `null` (requests have no status code, per ADR-0020) |
-| `contentType` | `exchange.getRequest().getHeaders().getContentType()` → `MediaType.toString()` |
+| `contentType` | `exchange.getRequest().getHeaders().getContentType()` → null-safe: `MediaType ct = ...; contentType = (ct != null) ? ct.toString() : null` |
 | `requestPath` | `exchange.getRequest().getUri()` (path portion only, strip query string) — see URI choice note below |
 | `requestMethod` | `exchange.getRequest().getMethod().getName()` → uppercase string |
 | `queryString` | `exchange.getRequest().getUri()` (query portion after `?`, or null) |
@@ -173,15 +182,25 @@ JSLT (returns `null` for property access on null).
 
 | Message Field | Source |
 |---------------|--------|
-| `body` | `exchange.getResponse().getBody().getContent()` → parse as `JsonNode` |
-| `headers` | `exchange.getResponse().getHeaders().getAllHeaderFields()` → same normalization |
-| `headersAll` | Same source → multi-value map |
+| `body` | `exchange.getResponse().getBody()` → pre-read via `body.read()` if `!body.isRead()` → `body.getContent()` → parse as `JsonNode` (or `NullNode` on read failure / empty / non-JSON) |
+| `headers` | `exchange.getResponse().getHeaders().asMap()` → flatten to single-value map (same normalization as request) |
+| `headersAll` | `exchange.getResponse().getHeaders().asMap()` → convert to multi-value map (same normalization as request) |
 | `statusCode` | `exchange.getResponse().getStatusCode()` |
-| `contentType` | `exchange.getResponse().getHeaders().getContentType()` → string |
+| `contentType` | `exchange.getResponse().getHeaders().getContentType()` → null-safe: `(ct != null) ? ct.toString() : null` |
 | `requestPath` | `exchange.getRequest().getUri()` (original request path for profile matching) |
 | `requestMethod` | `exchange.getRequest().getMethod().getName()` |
 | `queryString` | From original request URI |
 | `sessionContext` | See FR-002-06 |
+
+> **Header normalization pattern:** `Headers.asMap()` returns `Map<String, String[]>`.
+> The adapter produces two maps from this:
+> - **Single-value** (`headers`): iterate entries, `key.toLowerCase()` → `values[0]`.
+> - **Multi-value** (`headersAll`): iterate entries, `key.toLowerCase()` → `Arrays.asList(values)`.
+>
+> **Null Content-Type:** `Headers.getContentType()` returns `null` (not an empty
+> `MediaType`) when the Content-Type header is absent. The adapter MUST null-check
+> before calling `toString()`. This matches the `StandaloneAdapter` behavior where
+> Javalin's `ctx.contentType()` also returns `null` for absent Content-Type.
 
 #### applyChanges Direction Strategy
 
@@ -628,8 +647,8 @@ of the `GatewayAdapter` SPI — adapter-specific helper) that maps:
 
 | TransformContext Field | Source | Notes |
 |------------------------|--------|-------|
-| `headers` | `exchange.getRequest().getHeaders().getAllHeaderFields()` → single-value map (first value per name, lowercase keys) | Same normalization as `wrapRequest` |
-| `headersAll` | Same source → multi-value map | Same normalization |
+| `headers` | `exchange.getRequest().getHeaders().asMap()` → flatten to single-value map (first value per name, lowercase keys) | Same normalization pattern as `wrapRequest` |
+| `headersAll` | `exchange.getRequest().getHeaders().asMap()` → convert to multi-value map | Same normalization pattern |
 | `status` | `null` for REQUEST direction, `exchange.getResponse().getStatusCode()` for RESPONSE | Set by the caller (`MessageTransformRule`) based on direction |
 | `queryParams` | `exchange.getRequest().getQueryStringParams()` → flatten `Map<String, String[]>` to `Map<String, String>` using first-value semantics | Values are URL-decoded by the PA SDK. On `URISyntaxException`: log warning, use empty map. |
 | `cookies` | `exchange.getRequest().getHeaders().getCookies()` → flatten `Map<String, String[]>` to `Map<String, String>` using first-value semantics | Cookie values are URL-decoded |
