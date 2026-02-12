@@ -1,25 +1,21 @@
-# Current Session — 2026-02-12
+# Current Session — 2026-02-12 (late)
 
 ## Focus
-Spec notation standardization, ADR-0035 (adapter version parity), and
-adapter-pingaccess module scaffolding.
+F002 implementation plan review and refinement. Codified no-spikes governance rule.
 
 ## Key Decisions
-- TypeScript `.d.ts` notation adopted as language-neutral spec type notation (docs-style §6a)
-- ADR-0035: adapter version parity — adapter version mirrors gateway version
-- F002 Java code blocks retained per §6a exception (SDK-bound types)
+- I4 split into I4a (core lifecycle) + I4b (metadata/SPI/registration)
+- Phase 7 split into Phase 7 (packaging) + Phase 8 (quality gate)
+- specId/specVersion sourcing: extend TransformResult with nullable fields (core API change)
+- Constitution Principle 7: no research spikes in plans or tasks
 
 ## Commits This Session
-1. `d29fbb0` — PA deployment architecture guide
-2. `9f1189b` — Convert F001 type defs to TypeScript notation
-3. `88f268c` — Add type notation convention to docs-style.md
-4. `4a59ba5` — Align F002 spec with type notation convention
-5. `24dc3cf` — ADR-0035 adapter version parity
-6. `b4dff4c` — Scaffold adapter-pingaccess module
-7. (retro commit pending)
+1. `a1b3123` — Apply 13 plan review fixes + no-spikes rule
+2. `15f7da4` — Add S-002-35 (retro finding: Constraint 9 scenario gap)
 
 ## Status
-- Feature 001 spec: ✅ All type definitions converted to TypeScript notation
-- Feature 002 spec: ✅ Aligned with notation convention, minor fixes applied
-- Feature 002 build: ✅ Module scaffolded, compileOnly deps, shadow JAR excludes verified
-- ADR-0035: ✅ Accepted, cross-referenced from ADR-0031 and knowledge-map
+- Feature 002 plan: ✅ All 13 review fixes applied, plan ready for implementation
+- Feature 002 spec: ✅ Field sourcing note updated for specId decision
+- Feature 002 scenarios: ✅ 35 scenarios (S-002-35 added for Constraint 9)
+- Constitution: ✅ Principle 7 added
+- Plan template: ✅ No-spikes guardrail added
