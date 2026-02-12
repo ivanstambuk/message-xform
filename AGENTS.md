@@ -251,6 +251,7 @@ See `docs/operations/quality-gate.md` for full pipeline documentation.
 - **JDK `HttpClient` hostname verification** (2026-02-09): Disabling hostname verification on the JDK 21 `HttpClient` requires the system property `jdk.internal.httpclient.disableHostnameVerification=true` (not the older `javax.net.ssl` properties). This is an internal API and must be set *before* the `HttpClient` is built.
 - **Jetty 11 uses `jakarta.servlet`** (2026-02-09): Jetty 11 (bundled with Javalin 6) uses `jakarta.servlet.http.HttpServletRequest/Response`, not `javax.servlet`. Test mock backends using `AbstractHandler` must import from `jakarta.servlet`.
 - **Shadow JAR excludes vs relocated core deps** (2026-02-12): The `adapter-pingaccess` shadow JAR excludes `com/fasterxml/jackson/**` (PA-provided). This does NOT affect core's relocated Jackson under `io/messagexform/internal/jackson/**` — those are different packages and pass through correctly. When adding new shadow excludes, always verify with `jar tf ... | grep <pattern>` that core's relocated copies survive.
+- **Orphaned Antigravity/Pyrefly processes** (2026-02-12): Ungraceful SSH disconnects or IDE crashes can leave "ghost" processes (re-parented to PID 1) that consume resources. **Fix**: Use `scripts/cleanup-antigravity.sh` to detect/clean them. The `/init` workflow now includes this check.
 
 ## Pre-Implementation Checklist (Mandatory)
 

@@ -31,6 +31,14 @@ Check for previous session state (read in this order):
 - Run `git status` and `git log -5 --oneline` to understand recent activity.
 - Scan the repository structure for any new or changed files.
 
+### 3.3. Antigravity Health Check
+// turbo
+Check for orphaned IDE processes:
+```bash
+scripts/cleanup-antigravity.sh
+```
+Report any orphans or ghost processes in the summary.
+
 ### 3.5. Codebase Size Report
 // turbo
 Run the CLOC report script to show lines-of-code statistics:
