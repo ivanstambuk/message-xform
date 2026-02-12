@@ -3,7 +3,7 @@
 _Linked specification:_ `docs/architecture/features/002/spec.md`
 _Linked tasks:_ `docs/architecture/features/002/tasks.md`
 _Status:_ Ready
-_Last updated:_ 2026-02-12
+_Last updated:_ 2026-02-12 (post-review fixes applied)
 
 > Guardrail: Keep this plan traceable back to the governing spec. Reference
 > FR/NFR/Scenario IDs from `spec.md` where relevant, log any new high- or
@@ -105,6 +105,35 @@ Cross-check each completed increment's FR/NFR claims against the spec.
 
 _To be completed after implementation._
 
+#### FR Traceability Matrix
+
+| FR | Description | Implementation | Test Evidence |
+|----|-------------|----------------|---------------|
+| FR-002-01 | GatewayAdapter implementation | | |
+| FR-002-02 | AsyncRuleInterceptor plugin | | |
+| FR-002-03 | @Rule annotation | | |
+| FR-002-04 | Plugin configuration (admin UI) | | |
+| FR-002-05 | Plugin lifecycle | | |
+| FR-002-06 | Session context binding | | |
+| FR-002-07 | ExchangeProperty state | | |
+| FR-002-08 | SPI registration | | |
+| FR-002-09 | Deployment packaging | | |
+| FR-002-10 | Gradle module setup | | |
+| FR-002-11 | Error handling | | |
+| FR-002-12 | Docker E2E test script | _(deferred)_ | _(deferred)_ |
+| FR-002-13 | TransformContext construction | | |
+| FR-002-14 | JMX observability (opt-in) | | |
+
+#### NFR Verification
+
+| NFR | Target | Evidence | Status |
+|-----|--------|----------|--------|
+| NFR-002-01 | Adapter overhead < 10 ms for < 64 KB body | | ⬜ |
+| NFR-002-02 | Shadow JAR < 5 MB | | ⬜ |
+| NFR-002-03 | Thread-safe — no mutable per-request state | | ⬜ |
+| NFR-002-04 | No reflection | | ⬜ |
+| NFR-002-05 | Java 21 `-Xlint:all -Werror` | | ⬜ |
+
 ---
 
 ## Increment Map
@@ -181,6 +210,8 @@ _To be completed after implementation._
         - Status code → `exchange.getResponse().getStatusCode()`.
         - Headers → same normalization as request.
         - `requestPath` and `requestMethod` from original request.
+        - DEBUG log emitted: `"wrapResponse: {} {} → status={}"` (spec
+          lines 206–209).
      2. **Test first:** Write `PingAccessAdapterTest.applyRequestChanges*` tests:
         - Body serialized via `objectMapper.writeValueAsBytes()` →
           `setBodyContent()` called.
@@ -190,11 +221,17 @@ _To be completed after implementation._
         - URI rewrite → `setUri()` called.
         - Method override → `setMethod()` called.
         - `NullNode` body → `setBodyContent()` NOT called (passthrough).
+        - After `setBodyContent()`: Content-Type set to
+          `application/json; charset=utf-8` (FR-002-01, spec lines 271–274).
+          For `NullNode` body: Content-Type NOT modified.
      3. **Test first:** Write `applyResponseChanges*` tests:
         - Body → `setBodyContent()` on response.
         - Status code → `setStatus(HttpStatus.forCode())`.
         - Headers diff on response side.
         - `NullNode` body → passthrough.
+        - **Negative test (Constraint 3):** `applyResponseChanges()` does
+          NOT call `setUri()` or `setMethod()` — request-side writes are
+          invalid during response phase.
      4. **Test first:** Write test that `applyChanges()` (SPI method) throws
         `UnsupportedOperationException`.
      5. Implement `wrapResponse()`.
@@ -202,21 +239,25 @@ _To be completed after implementation._
         diff-based header strategy and protected header exclusion.
      7. Implement `applyChanges()` → throw `UnsupportedOperationException`.
      8. Run tests, verify all pass.
-   - _Requirements covered:_ FR-002-01 (wrapResponse, applyChanges), S-002-02,
-     S-002-04, S-002-05, S-002-06, S-002-32.
+   - _Requirements covered:_ FR-002-01 (wrapResponse, applyChanges),
+     Constraint 3, S-002-02, S-002-04, S-002-05, S-002-06, S-002-32.
    - _Commands:_ `./gradlew :adapter-pingaccess:test`,
      `./gradlew spotlessApply check`
    - _Exit:_ Complete adapter bridge: wrap + apply for both directions. Header
      diff works. Protected headers excluded.
 
-### Phase 3 — Plugin Rule: MessageTransformRule (≤2 × 90 min)
+### Phase 3 — Plugin Rule: MessageTransformRule (≤3 × 90 min)
 
-4. **I4 — MessageTransformRule core lifecycle** (≤90 min)
+4a. **I4a — MessageTransformRule core lifecycle** (≤90 min)
    - _Goal:_ Implement `MessageTransformRule` extending
      `AsyncRuleInterceptorBase<MessageTransformConfig>` with `configure()`,
-     `handleRequest()`, and `handleResponse()` for the SUCCESS and PASSTHROUGH
-     paths. Implement `@Rule` annotation, `ExchangeProperty` declarations,
-     `TransformResultSummary`, and SPI registration.
+     `handleRequest()`, `handleResponse()`, and `getErrorHandlingCallback()`
+     for the SUCCESS and PASSTHROUGH paths. Implement `@Rule` annotation.
+
+   > **Return type awareness (Constraint 6):** `handleRequest()` returns
+   > `CompletionStage<Outcome>` — can halt pipeline via `Outcome.RETURN`.
+   > `handleResponse()` returns `CompletionStage<Void>` — cannot halt, only
+   > rewrite. Error-mode dispatch (I7) depends on this distinction.
    - _Preconditions:_ I3 complete (adapter bridge works).
    - _Steps:_
      1. **Test first:** Write `MessageTransformRuleTest`:
@@ -228,37 +269,62 @@ _To be completed after implementation._
           `Outcome.CONTINUE`.
         - `handleResponse()` SUCCESS → response body/status transformed.
         - `handleResponse()` PASSTHROUGH → response untouched.
-        - `TransformResultSummary` set on `ExchangeProperty` after transform.
-     2. **Test first:** Write `SpiRegistrationTest`:
-        - `ServiceFactory.isValidImplName(AsyncRuleInterceptor.class, fqcn)`.
-        - `PingAccessAdapter` is NOT registered as SPI.
-     3. Implement `TransformResultSummary` record.
-     4. Implement `MessageTransformRule`:
+     2. **Test first:** Write test: `getErrorHandlingCallback()` returns a
+        valid `RuleInterceptorErrorHandlingCallback` instance and does not
+        throw (FR-002-02 — this method is abstract on `AsyncRuleInterceptor`
+        and MUST be implemented).
+     3. Implement `MessageTransformRule`:
         - `@Rule` annotation with `category`, `destination`, `label`,
           `type`, `expectedConfiguration`.
         - `configure()`: validate `specsDir`, init `SpecParser`, init
           `TransformEngine`, load specs, optionally load profiles.
         - `handleRequest()`: build context → wrap → transform → dispatch
-          (SUCCESS → apply, PASSTHROUGH → no-op) → set `ExchangeProperty`
-          → return `Outcome.CONTINUE`.
+          (SUCCESS → apply, PASSTHROUGH → no-op) → return
+          `Outcome.CONTINUE`.
         - `handleResponse()`: same flow for response direction.
         - `getErrorHandlingCallback()`: return
           `RuleInterceptorErrorHandlingCallback`.
-     5. Create SPI file: `META-INF/services/com.pingidentity.pa.sdk.policy.AsyncRuleInterceptor`.
-     6. Run tests, verify all pass.
-   - _Requirements covered:_ FR-002-02, FR-002-03, FR-002-05, FR-002-07,
-     FR-002-08, FR-002-10, S-002-01, S-002-02, S-002-03, S-002-09, S-002-10,
-     S-002-15, S-002-19, S-002-21.
+     4. Run tests, verify all pass.
+   - _Requirements covered:_ FR-002-02, FR-002-03, FR-002-05, FR-002-10,
+     S-002-01, S-002-02, S-002-03, S-002-09, S-002-10, S-002-15, S-002-18.
    - _Commands:_ `./gradlew :adapter-pingaccess:test`,
      `./gradlew spotlessApply check`
    - _Exit:_ Plugin configures, processes requests/responses for SUCCESS and
-     PASSTHROUGH paths. SPI registered. `TransformResultSummary` on exchange.
+     PASSTHROUGH paths. `getErrorHandlingCallback()` verified.
+
+4b. **I4b — ExchangeProperty metadata + SPI registration** (≤45 min)
+   - _Goal:_ Implement `TransformResultSummary` record, `ExchangeProperty`
+     declarations, `TRANSFORM_DENIED` property, and SPI service registration.
+     Wire `TransformResultSummary` into `handleRequest()`/`handleResponse()`.
+   - _Preconditions:_ I4a complete.
+   - _Steps:_
+     1. **Core API change:** Add `specId` (String, nullable) and `specVersion`
+        (String, nullable) fields to `TransformResult` record. The
+        `TransformEngine.transformWithSpec()` already has `spec.id()` and
+        `spec.version()` — thread these through to `TransformResult.success()`
+        and `TransformResult.error()`. `TransformResult.passthrough()` keeps
+        both null. Update existing core tests for the new fields.
+     2. Implement `TransformResultSummary` record (FR-002-07).
+     3. **Test first:** Write `MessageTransformRuleTest`:
+        - `TransformResultSummary` set on `ExchangeProperty` after transform.
+        - `TRANSFORM_DENIED` ExchangeProperty declared correctly.
+     4. **Test first:** Write `SpiRegistrationTest`:
+        - `ServiceFactory.isValidImplName(AsyncRuleInterceptor.class, fqcn)`.
+        - `PingAccessAdapter` is NOT registered as SPI.
+     5. Create SPI file: `META-INF/services/com.pingidentity.pa.sdk.policy.AsyncRuleInterceptor`.
+     6. Wire `TransformResultSummary` into handleRequest/handleResponse.
+     7. Run tests, verify all pass.
+   - _Requirements covered:_ FR-002-07, FR-002-08, S-002-19, S-002-21.
+   - _Commands:_ `./gradlew :adapter-pingaccess:test`,
+     `./gradlew spotlessApply check`
+   - _Exit:_ `TransformResultSummary` on exchange after each transform. SPI
+     registered. `TRANSFORM_DENIED` property available for I7.
 
 5. **I5 — TransformContext construction** (≤90 min)
    - _Goal:_ Implement `PingAccessAdapter.buildTransformContext()` mapping
      PA Exchange data to `TransformContext` (headers, cookies, query params,
      status). Wire into `MessageTransformRule.handleRequest/Response()`.
-   - _Preconditions:_ I4 complete.
+   - _Preconditions:_ I4b complete.
    - _Steps:_
      1. **Test first:** Write `PingAccessAdapterTest.buildTransformContext*`
         tests:
@@ -327,6 +393,13 @@ _To be completed after implementation._
      build RFC 9457 error response via `ResponseBuilder` (request phase) or
      rewrite response in-place (response phase). Implement the DENY guard in
      `handleResponse()`.
+
+   > **Return type awareness (Constraint 6):** `handleRequest()` returns
+   > `CompletionStage<Outcome>` — the adapter can halt the pipeline via
+   > `Outcome.RETURN`. `handleResponse()` returns `CompletionStage<Void>` —
+   > the adapter **cannot** prevent response delivery, only rewrite in-place.
+   > This is why DENY-response rewrites the body/status rather than returning
+   > an `Outcome`.
    - _Preconditions:_ I6 complete (full request/response path works).
    - _Steps:_
      1. **Test first:** Write `MessageTransformRuleTest.errorMode*` tests:
@@ -351,8 +424,12 @@ _To be completed after implementation._
         - On `TransformResult.ERROR`: check `errorMode`.
         - PASS_THROUGH → log warning, leave response untouched.
         - DENY → rewrite response body to RFC 9457, status to 502.
-     4. Run tests, verify all pass.
-   - _Requirements covered:_ FR-002-11, S-002-11, S-002-12, S-002-28.
+     4. **Test first:** Write test: PA-specific status codes 277 (`ALLOWED`)
+        and 477 (`REQUEST_BODY_REQUIRED`) from the backend are passed through
+        unchanged by the adapter — not mapped to or from (Constraint 9).
+     5. Run tests, verify all pass.
+   - _Requirements covered:_ FR-002-11, S-002-11, S-002-12, S-002-28,
+     Constraint 9.
    - _Commands:_ `./gradlew :adapter-pingaccess:test`,
      `./gradlew spotlessApply check`
    - _Exit:_ Both error modes work for both directions. DENY guard prevents
@@ -374,12 +451,19 @@ _To be completed after implementation._
           warning logged.
         - Concurrent reload during active transform → no corruption.
         - `@PreDestroy` → `shutdownNow()` called.
-     2. Implement reload scheduler in `configure()`:
-        - `newSingleThreadScheduledExecutor` with daemon thread and
-          `mxform-spec-reload` name.
-        - `scheduleAtFixedRate` with `reloadIntervalSec` interval.
-        - Reload task: scan `specsDir`/`profilesDir`, call
-          `engine.reload()`, catch + log exceptions.
+      2. Implement reload scheduler in `configure()`:
+         - `newSingleThreadScheduledExecutor` with daemon thread and
+           `mxform-spec-reload` name.
+         - `scheduleAtFixedRate` with `reloadIntervalSec` interval.
+         - Reload task calls `TransformEngine.reload(List<Path>, Path)`
+           (note: **not** zero-arg — the engine requires explicit paths):
+           - **Spec discovery:** `Files.walk(specsDir, 1)` filtered to
+             `.yaml`/`.yml` extensions, collected to `List<Path>`.
+           - **Profile resolution:** if `activeProfile` is non-empty,
+             resolve `profilesDir/<activeProfile>.yaml`; else pass `null`.
+         - Catch `SpecParseException`, `ExpressionCompileException`,
+           `ProfileResolveException`, and `IOException` → log warning,
+           retain previous registry.
      3. Implement `@PreDestroy shutdown()`: `executor.shutdownNow()`.
      4. Run tests, verify all pass.
    - _Requirements covered:_ FR-002-04 (reloadIntervalSec), FR-002-05
@@ -420,7 +504,7 @@ _To be completed after implementation._
    - _Exit:_ JMX MBean works when enabled. Zero overhead when disabled.
      All counters correct.
 
-### Phase 7 — Packaging, Thread Safety & Polish (≤2 × 90 min)
+### Phase 7 — Packaging & Thread Safety (≤2 × 90 min)
 
 10. **I10 — Shadow JAR verification + version guard** (≤90 min)
     - _Goal:_ Verify the shadow JAR is correct: contains adapter + core +
@@ -492,6 +576,8 @@ _To be completed after implementation._
       `./gradlew spotlessApply check`
     - _Exit:_ Path traversal rejected. Audit logging verified.
 
+### Phase 8 — Quality Gate & Documentation (≤2 × 90 min)
+
 13. **I13 — Full quality gate + scenario coverage audit** (≤45 min)
     - _Goal:_ Run the full quality gate across all modules. Update scenario
       coverage matrix. Verify no drift between spec and implementation.
@@ -532,27 +618,27 @@ _To be completed after implementation._
 
 | Scenario ID | Increment / Task Reference | Notes |
 |-------------|---------------------------|-------|
-| S-002-01 | I2, I4 | Request body transform |
-| S-002-02 | I3, I4 | Response body transform |
-| S-002-03 | I4 | Bidirectional transform |
+| S-002-01 | I2, I4a | Request body transform |
+| S-002-02 | I3, I4a | Response body transform |
+| S-002-03 | I4a | Bidirectional transform |
 | S-002-04 | I3 | Header transform |
 | S-002-05 | I3 | Status code transform |
 | S-002-06 | I3 | URL rewrite |
 | S-002-07 | I2 | Empty body |
 | S-002-08 | I2 | Non-JSON body |
-| S-002-09 | I4 | Profile matching |
-| S-002-10 | I4 | No matching spec |
+| S-002-09 | I4a | Profile matching |
+| S-002-10 | I4a | No matching spec |
 | S-002-11 | I7 | Error mode PASS_THROUGH |
 | S-002-12 | I7 | Error mode DENY |
 | S-002-13 | I6 | Session context in JSLT |
 | S-002-14 | I6 | No identity (unauthenticated) |
-| S-002-15 | I4 | Multiple specs loaded |
+| S-002-15 | I4a | Multiple specs loaded |
 | S-002-16 | I11 | Large body (64 KB) |
 | S-002-17 | I1 | Plugin configuration via admin UI |
-| S-002-18 | I1, I4 | Invalid spec directory |
-| S-002-19 | I4 | Plugin SPI registration |
+| S-002-18 | I1, I4a | Invalid spec directory |
+| S-002-19 | I4b | Plugin SPI registration |
 | S-002-20 | I11 | Thread safety |
-| S-002-21 | I4 | ExchangeProperty metadata |
+| S-002-21 | I4b | ExchangeProperty metadata |
 | S-002-22 | I5 | Cookie access in JSLT |
 | S-002-23 | I5 | Query param access in JSLT |
 | S-002-24 | I10 | Shadow JAR correctness |
@@ -569,7 +655,13 @@ _To be completed after implementation._
 
 ## Analysis Gate
 
-- _Pending — to be completed after plan review and before implementation begins._
+Run `docs/operations/analysis-gate-checklist.md` at two milestones:
+
+- **Phase 3 gate (after I5):** Adapter bridge + basic rule lifecycle working.
+  Verify core proxy cycle works end-to-end (wrap → transform → apply), SUCCESS
+  and PASSTHROUGH paths correct. ~40% of scenarios should pass.
+- **Phase 8 gate (after I14):** All code complete. Full scenario sweep, drift
+  gate, coverage matrix, FR/NFR traceability tables filled in.
 
 ## Exit Criteria
 

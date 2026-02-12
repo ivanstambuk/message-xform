@@ -84,6 +84,18 @@ the agent playbook in `AGENTS.md` before acting.
 - For every high- or medium-impact divergence, record an open question for user
   direction; remediate low-level drift (typos, formatting) directly.
 
+### Principle 7 – No Research Spikes in Plans or Tasks
+
+- Implementation plans and task lists must contain only **deterministic,
+  executable** steps. Research questions ("figure out how X works", "determine
+  the best approach") must be resolved _before_ they appear as assumptions in
+  increments or tasks.
+- If writing a plan increment requires unknown information, that signals a
+  **spec gap** — resolve it via a time-boxed research spike, update the spec
+  with the findings, then write the increment against the resolved spec.
+- This rule prevents unbounded work hiding inside time-budgeted increments and
+  ensures every increment's preconditions are fully known before execution.
+
 ## ADR Lifecycle
 
 | Status | Meaning |

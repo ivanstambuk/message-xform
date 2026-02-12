@@ -63,6 +63,11 @@ _Fill in after each drift gate run._
 Break the feature into ≤90-minute increments. Each increment should identify
 prerequisites, deliverables, tests, and commands. **Order tests before code.**
 
+> **No research spikes (Constitution Principle 7):** Every step in an increment
+> must be deterministic and executable. If an increment would require a
+> "Research:" or "Investigate:" step, the spec has a gap — resolve it via a
+> time-boxed spike _before_ writing the increment.
+
 1. **I1 — <Title>** (≤90 min)
    - _Goal:_ Brief description.
    - _Preconditions:_ Specs/tests that must already exist.

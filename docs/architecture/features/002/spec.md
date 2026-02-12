@@ -778,12 +778,13 @@ private static final ExchangeProperty<TransformResultSummary> TRANSFORM_RESULT =
 | `errorType` | `String` | Error type code (null if no error) |
 | `errorMessage` | `String` | Human-readable error message (null if no error) |
 
-> **Field sourcing:** `specId` and `specVersion` are populated from the
-> `TransformSpec` matched during profile resolution. The adapter tracks the
-> matched spec metadata from the `TransformRegistry` lookup (which returns
-> the matched spec alongside the result) and attaches it to the summary.
-> The core engine's `TransformResult` itself does not expose spec identification
-> — the adapter is responsible for correlating the result with its source spec.
+> **Field sourcing:** `specId` and `specVersion` are populated from
+> `TransformResult.specId()` and `TransformResult.specVersion()`. The core
+> `TransformResult` record is extended with nullable `specId`/`specVersion`
+> fields — `TransformEngine.transformWithSpec()` threads the matched
+> `TransformSpec.id()` and `TransformSpec.version()` through to
+> `TransformResult.success()` and `TransformResult.error()`.
+> `TransformResult.passthrough()` keeps both null.
 
 **Usage by downstream rules:**
 ```java
