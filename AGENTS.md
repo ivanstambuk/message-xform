@@ -446,6 +446,16 @@ silently evaluates to `false` because it checks whether the string `"admin"`
 contains the array `$session.roles` (which is nonsensical). The correct form
 is `contains("admin", $session.roles)`.
 
+### Docker Build in Multi-Module Projects
+The `adapter-standalone/Dockerfile` uses a `builder` stage that runs Gradle.
+Because `settings.gradle.kts` in root references all subprojects and dual
+version catalogs, the Docker build MUST copy root configuration files
+(`gradle/*.toml`, `gradle.properties`), local libs (`libs/`), and ALL
+included subprojects (at least their `build.gradle.kts` files) even if it
+only intends to build the standalone proxy. Failing to copy
+`adapter-pingaccess` or `libs/` will cause the Gradle configuration phase
+to fail inside the container.
+
 ---
 
 *Created: 2026-02-07*
