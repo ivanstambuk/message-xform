@@ -432,3 +432,19 @@ non-standard status,
 
 > **Constraint 9 coverage:** PingAccess uses non-standard HTTP status codes
 > internally. The adapter must not assume standard HTTP semantics for status codes.
+
+---
+
+## S-002-35a: Runtime Version Mismatch Warning
+
+**Given** the adapter was compiled for PingAccess `9.0.1` (from
+`pa-compiled-versions.properties`),
+**and** runtime PingAccess reports version `9.2.0`,
+**when** `MessageTransformRule.configure()` initializes `PaVersionGuard`,
+**then** the adapter logs a WARN message indicating compiled/runtime mismatch,
+**and** the warning includes remediation text to deploy adapter version
+`9.2.0.x` for that PingAccess instance,
+**and** the rule remains active (no fail-fast or startup abort).
+
+> **ADR-0035 coverage:** Validates the simplified misdeployment guard contract:
+> mismatch produces a WARN with clear remediation, not severity grading.

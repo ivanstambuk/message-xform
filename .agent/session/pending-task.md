@@ -1,17 +1,14 @@
 # Pending Task
 
-**Focus**: F002 — PingAccess Adapter implementation
-**Status**: Plan fully reviewed, refined, and ready. No code written yet.
-**Next Step**: Begin implementation with Increment I1 (PingAccessAdapter skeleton).
+**Focus**: Feature 002 implementation kickoff (adapter bridge)
+**Status**: Planning/docs are aligned; implementation has not started beyond completed Phase 1 config tasks.
+**Next Step**: Execute `T-002-03` (`wrapRequest()` URI split: path + query), test-first.
 
 ## Context Notes
-- Plan has 14 increments (I1–I14) across 8 phases, plus I4a/I4b split.
-- Time budget: ~12 × 90 min sessions.
-- specId/specVersion sourcing resolved: extend core `TransformResult` with
-  nullable fields — this is step 1 of I4b.
-- Constitution Principle 7 now bans research spikes inside plans/tasks.
-- adapter-pingaccess module already scaffolded (build.gradle.kts, shadow JAR
-  config, PA SDK deps). `./gradlew :adapter-pingaccess:compileJava` passes.
+- Feature 002 now tracks 36 scenarios (`S-002-01..S-002-35` + `S-002-35a`).
+- `S-002-35a` captures ADR-0035 runtime version mismatch WARN-remediation behavior.
+- Plan/spec/tasks/knowledge-map were synced during retro.
+- `open-questions.md` is empty.
 
 ## SDD Gaps (if any)
-- None — retro found and fixed one scenario gap (S-002-35 for Constraint 9).
+- None identified in this retro pass.

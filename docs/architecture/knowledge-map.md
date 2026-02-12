@@ -145,7 +145,7 @@ ADR-0035 (Version Parity)    governs ── FR-002-09, supersedes ADR-0031 §7-�
 | FR-002-06 (Session Context) | ADR-0030, ADR-0031 | — |
 | FR-002-07 (ExchangeProperty) | — | — |
 | FR-002-08 (SPI Registration) | — | — |
-| FR-002-09 (Deployment Packaging) | ADR-0031, ADR-0032 | NFR-002-02 |
+| FR-002-09 (Deployment Packaging) | ADR-0031, ADR-0032, ADR-0035 | NFR-002-02 |
 | FR-002-10 (Gradle Module) | — | NFR-002-05 |
 | FR-002-11 (Error Handling) | ADR-0022, ADR-0024 | — |
 | FR-002-12 (Docker E2E Test) | — | — |
@@ -177,4 +177,3 @@ ADR-0035 (Version Parity)    governs ── FR-002-09, supersedes ADR-0031 §7-�
 | `docs/research/pingam-authentication-api.md` | PingAM /json/authenticate endpoint, callback format | Feature 002 scenarios |
 | `docs/architecture/features/002/pingaccess-sdk-guide.md` | Standalone PingAccess 9.0 SDK reference (19 sections, 112 classes) | Feature 002 spec, all adapter implementation |
 | `docs/architecture/features/002/deployment-architecture.md` | PA adapter deployment model: two-level matching, per-instance config, Docker/K8s layout | Feature 002 spec, ADR-0023, ADR-0006 |
-

@@ -1224,6 +1224,7 @@ zero configuration.
 | S-002-33 | **JMX metrics opt-in:** Admin configures `enableJmxMetrics=true` → adapter registers MBean on `configure()` → JConsole shows `io.messagexform:type=TransformMetrics,instance=<name>` → counters increment per request → admin calls `resetMetrics()` via JConsole → counters zero. Toggle to `false` → MBean unregistered → JConsole no longer shows it. |
 | S-002-34 | **JMX metrics disabled (default):** Admin does not toggle `enableJmxMetrics` → no MBean registered → no JMX overhead → SLF4J logging still operational → `pingaccess_engine_audit.log` records transaction timing. |
 | S-002-35 | **PA-specific non-standard status codes passthrough:** Backend returns PingAccess-specific status `277` (`ALLOWED`) or `477` (`REQUEST_BODY_REQUIRED`) → adapter preserves status unchanged and does not map to/from these codes. |
+| S-002-35a | **Runtime version mismatch warning:** `PaVersionGuard` detects compiled-vs-runtime PingAccess version mismatch → logs WARN with remediation to deploy matching adapter version line (ADR-0035), without fail-fast shutdown. |
 
 ---
 

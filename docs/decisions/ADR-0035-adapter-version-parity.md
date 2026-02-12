@@ -150,7 +150,8 @@ Negative / trade-offs:
   (e.g., 9.0.1.x and 9.2.0.x). Mitigated by only supporting the latest PA
   minor release unless contractually required.
 
-Follow-ups:
-- Update ADR-0031 §7 to cross-reference this ADR.
-- Update Feature 002 spec (FR-002-09 or constraints) with the version scheme.
-- Implement the version scheme in `adapter-pingaccess/build.gradle.kts`.
+## References
+
+- `docs/architecture/features/002/spec.md` (FR-002-09)
+- `docs/architecture/features/002/scenarios.md` (S-002-35a)
+- `docs/decisions/ADR-0031-pa-provided-dependencies.md`

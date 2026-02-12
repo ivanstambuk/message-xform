@@ -16,7 +16,7 @@ _Last updated:_ 2026-02-12
 - [x] **C-002-02** — Implementation plan exists and is marked `Status: Ready`.
 - [x] **C-002-03** — `adapter-pingaccess` module scaffold exists.
 - [x] **C-002-04** — Open-question queue is empty for Feature 002.
-- [x] **C-002-05** — Scenarios include S-002-01 through S-002-35.
+- [x] **C-002-05** — Scenarios include S-002-01 through S-002-35 and S-002-35a.
 
 ## Task Checklist
 
@@ -232,7 +232,7 @@ _Last updated:_ 2026-02-12
 
 #### I10 — Shadow JAR + version guard (FR-002-09, FR-002-10, ADR-0035)
 
-- [ ] **T-002-29** — Runtime version guard warning semantics (ADR-0035)
+- [ ] **T-002-29** — Runtime version guard warning semantics (ADR-0035, S-002-35a)
   _Intent:_ Detect PA runtime/compiled version mismatch and log WARN remediation (no fail-fast).
   _Test first:_ `VersionGuardTest` for match and mismatch behavior.
   _Implement:_ Version mismatch detection and warning message.
@@ -282,7 +282,7 @@ _Last updated:_ 2026-02-12
 
 #### I13/I14 — Final audit and documentation sync
 
-- [ ] **T-002-34** — 35-scenario coverage audit (S-002-01..S-002-35)
+- [ ] **T-002-34** — 36-scenario coverage audit (S-002-01..S-002-35 + S-002-35a)
   _Intent:_ Prove all scenarios have executable test evidence.
   _Verify:_ Coverage matrix updated with test method mapping.
 

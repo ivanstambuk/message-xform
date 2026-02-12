@@ -1,6 +1,6 @@
 # message-xform – Terminology
 
-Status: Draft | Last updated: 2026-02-09
+Status: Draft | Last updated: 2026-02-12
 
 This document defines common terms used across the message-xform docs and specs so we
 can use consistent vocabulary. It is the golden source for terminology — any new
@@ -155,6 +155,12 @@ terminology agreements must be captured here immediately.
     gateway version exactly: `<GATEWAY_MAJOR>.<GATEWAY_MINOR>.<GATEWAY_PATCH>.<ADAPTER_PATCH>`.
     The first 3 segments signal compatibility; the 4th is the adapter's own
     patch counter. Applies to all gateway adapters (PingAccess, future Kong/Envoy).
+
+- **Misdeployment guard** (ADR-0035)
+  - A runtime safety check that compares the adapter's compiled-against gateway
+    version with the detected runtime gateway version.
+  - On mismatch, it logs a WARN with remediation to deploy the matching adapter
+    version line. It does not fail fast or abort plugin activation.
 
 ## Transform lifecycle
 
