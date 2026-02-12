@@ -45,6 +45,9 @@ dependencies {
     testImplementation(catalog.findLibrary("mockito-core").get())
     testImplementation(catalog.findLibrary("mockito-junit-jupiter").get())
     testImplementation(catalog.findLibrary("logback-classic").get())
+    testImplementation(catalog.findLibrary("archunit-junit5").get())
+    testImplementation(paProvided.findLibrary("pa-hibernate-validator").get())
+    testImplementation(paProvided.findLibrary("pa-jakarta-el").get())
     // Test needs Jackson and SDK on classpath
     testImplementation(paProvided.findLibrary("pa-jackson-databind").get())
     testImplementation(files(rootProject.file("libs/pingaccess-sdk/pingaccess-sdk-9.0.1.0.jar")))

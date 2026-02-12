@@ -28,8 +28,8 @@ jar-count = 146
 pa-jackson = "2.17.0"
 
 # Logging
-pa-slf4j = "1.7.36"       # SLF4J API version
-pa-log4j = "2.24.3"       # Log4j2 (PA's SLF4J backend)
+pa-slf4j = "1.7.36" # SLF4J API version
+pa-log4j = "2.24.3" # Log4j2 (PA's SLF4J backend)
 
 # Validation & DI
 pa-jakarta-validation = "3.1.1"
@@ -54,6 +54,8 @@ pa-jackson-datatype-jdk8 = { group = "com.fasterxml.jackson.datatype", name = "j
 pa-jackson-datatype-jsr310 = { group = "com.fasterxml.jackson.datatype", name = "jackson-datatype-jsr310", version.ref = "pa-jackson" }
 pa-slf4j-api = { group = "org.slf4j", name = "slf4j-api", version.ref = "pa-slf4j" }
 pa-jakarta-validation = { group = "jakarta.validation", name = "jakarta.validation-api", version.ref = "pa-jakarta-validation" }
+pa-hibernate-validator = { group = "org.hibernate.validator", name = "hibernate-validator", version.ref = "pa-hibernate-validator" }
+pa-jakarta-el = { group = "org.glassfish", name = "jakarta.el", version = "4.0.2" }
 pa-jakarta-inject = { group = "jakarta.inject", name = "jakarta.inject-api", version.ref = "pa-jakarta-inject" }
 
 # PA SDK — version extracted: 9.0.1.0

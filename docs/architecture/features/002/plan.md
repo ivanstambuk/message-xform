@@ -528,6 +528,7 @@ _To be completed after implementation._
            exists.
       2. Build shadow JAR: `./gradlew :adapter-pingaccess:shadowJar`.
       3. Verify via `jar tf` and file size check.
+         _Verification command:_ `jar tf adapter-pingaccess/build/libs/adapter-pingaccess-*-SNAPSHOT.jar | grep -vE "io/messagexform|META-INF|snakeyaml|jslt|networknt"` (should return nothing or only empty directory entries).
       4. Verify `PaVersionGuard` runs during `configure()` and logs version
          info at INFO level.
     - _Requirements covered:_ FR-002-09, FR-002-10, NFR-002-02, S-002-24.
@@ -575,6 +576,20 @@ _To be completed after implementation._
     - _Commands:_ `./gradlew :adapter-pingaccess:test`,
       `./gradlew spotlessApply check`
     - _Exit:_ Path traversal rejected. Audit logging verified.
+
+12a. **I12a — ArchUnit validation** (≤45 min)
+     - _Goal:_ Automate non-functional requirement enforcement (no reflection, no leakage) using ArchUnit.
+     - _Preconditions:_ I12 complete.
+     - _Steps:_
+       1. **Test first:** Write `AdapterArchTest` in `adapter-pingaccess`:
+          - Rule 1 (Reflections): `classes().should().notDependOnAnyClassesThat().resideInAPackage("java.lang.reflect..")`.
+          - Rule 2 (Leakage): Production classes should not depend on test classes.
+          - Rule 3 (PA SDK): Only allowed packages from PA SDK can be accessed (bridge pattern).
+       2. Run ArchUnit tests, verify compliance.
+       3. Fix any accidental architectural violations.
+     - _Requirements covered:_ NFR-002-04 (no reflection), NFR-002-02 (no leakage).
+     - _Commands:_ `./gradlew :adapter-pingaccess:test --tests "*AdapterArchTest*"`
+     - _Exit:_ Architecture verified automatically via tests.
 
 ### Phase 8 — Quality Gate & Documentation (≤2 × 90 min)
 
