@@ -830,6 +830,23 @@ This enables PingAccess's `ServiceLoader` discovery.
 The shadow JAR MUST **exclude** the PingAccess SDK classes — those are provided
 by the PA runtime (`/opt/server/lib/pingaccess-sdk-*.jar`).
 
+**Adapter version parity (ADR-0035):** The adapter module version MUST follow:
+
+`<PA_MAJOR>.<PA_MINOR>.<PA_PATCH>.<ADAPTER_PATCH>`
+
+Where:
+- The first three segments mirror the target PingAccess version exactly.
+- The fourth segment is the adapter patch counter for that exact PA version line.
+
+Examples:
+- Target PA `9.0.1` → first compatible adapter release `9.0.1.0`.
+- Subsequent adapter-only fixes on the same PA line: `9.0.1.1`, `9.0.1.2`, ...
+- PA upgrade to `9.2.0` starts a new adapter line at `9.2.0.0`.
+
+**Misdeployment guard:** At runtime, `PaVersionGuard` MUST warn when the adapter
+is running against a different PA version than it was compiled for, with a
+remediation message to deploy the matching adapter version line.
+
 **PA-provided dependencies (ADR-0031):** PingAccess uses a **flat classpath**
 — `lib/*` and `deploy/*` share the same JVM application classloader. Libraries
 in `/opt/server/lib/` are directly visible to plugin code. The following MUST
@@ -878,7 +895,7 @@ The JAR MUST be deployable by copying to `<PA_HOME>/deploy/` (Docker:
 | Success path | `cp adapter-pingaccess-*.jar /opt/server/deploy/ && restart PA` → plugin visible in admin UI |
 | Validation path | `./gradlew :adapter-pingaccess:shadowJar` produces a single JAR < 5 MB (no bundled Jackson/SLF4J) |
 | Status | ⬜ Not yet implemented |
-| Source | G-002-04 |
+| Source | G-002-04, ADR-0035 |
 
 ### FR-002-10: Gradle Module Setup
 
@@ -1204,6 +1221,7 @@ zero configuration.
 | S-002-32 | **Non-JSON response body:** Backend returns `text/html` response body → `wrapResponse()` attempts JSON parse, fails, falls back to `NullNode` body → response-direction transforms can still operate on headers and status code → body passthrough unmodified. Outcome: PASSTHROUGH for body transforms, SUCCESS for header-only transforms. |
 | S-002-33 | **JMX metrics opt-in:** Admin configures `enableJmxMetrics=true` → adapter registers MBean on `configure()` → JConsole shows `io.messagexform:type=TransformMetrics,instance=<name>` → counters increment per request → admin calls `resetMetrics()` via JConsole → counters zero. Toggle to `false` → MBean unregistered → JConsole no longer shows it. |
 | S-002-34 | **JMX metrics disabled (default):** Admin does not toggle `enableJmxMetrics` → no MBean registered → no JMX overhead → SLF4J logging still operational → `pingaccess_engine_audit.log` records transaction timing. |
+| S-002-35 | **PA-specific non-standard status codes passthrough:** Backend returns PingAccess-specific status `277` (`ALLOWED`) or `477` (`REQUEST_BODY_REQUIRED`) → adapter preserves status unchanged and does not map to/from these codes. |
 
 ---
 
@@ -1448,5 +1466,4 @@ Client                    PingAccess                        Backend
 > `handleResponse()` (SDK guide §7). While the adapter does not currently
 > use dynamic dropdowns, any future fields using `modelAccessor` must
 > respect this constraint.
-
 
