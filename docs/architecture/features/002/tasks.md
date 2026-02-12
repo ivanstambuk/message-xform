@@ -113,7 +113,7 @@ _Last updated:_ 2026-02-12
 
 - [ ] **T-002-13** — Engine initialization in `configure()` (FR-002-02, S-002-17)
   _Intent:_ Boot up the transformation engine from config.
-  _Test first:_ `RuleLifecycleTest.engineBoot()` — verify `TransformEngine` is instantiated and `loadSpec()` is called.
+  _Test first:_ `RuleLifecycleTest.engineBoot()` — verify `TransformEngine` is instantiated with correct `errorMode` and `schemaValidation` settings, and `loadSpec()` is called.
   _Implement:_ Implement `configure()` logic.
   _Verify:_ Test passes.
 
@@ -144,9 +144,9 @@ _Last updated:_ 2026-02-12
 
 #### I5 — TransformContext construction (FR-002-01, ADR-0030)
 
-- [ ] **T-002-17** — Map cookies and query params to context (S-002-22, S-002-23)
-  _Intent:_ Populate `$cookies` and `$queryParams` in JSLT.
-  _Test first:_ `ContextMappingTest` with various cookies and params.
+- [ ] **T-002-17** — Complete TransformContext construction (S-002-22, S-002-23, FR-002-13)
+  _Intent:_ Map PA `Exchange` to core `TransformContext` including headers, cookies, query params, request URI, method, and protocol.
+  _Test first:_ `ContextMappingTest` with various inputs.
   _Implement:_ Update `PingAccessAdapter.buildTransformContext()`.
   _Verify:_ Test passes.
 
@@ -248,11 +248,14 @@ _Last updated:_ 2026-02-12
   _Implement:_ Version check logic.
   _Verify:_ Test passes.
 
-- [ ] **T-002-30** — Shadow JAR leak verification (I10 Refinement, S-002-24)
-  _Verify:_ `jar tf` check for zero `com.fasterxml.jackson` or `org.slf4j` leakage.
+- [ ] **T-002-30** — Shadow JAR correctness verification (I10 Refinement, S-002-24)
+  _Verify:_ `jar tf` check for zero `com.fasterxml.jackson` / `org.slf4j` leakage AND presence of required deps.
   _Verification commands:_
   - `./gradlew :adapter-pingaccess:shadowJar`
-  - `jar tf adapter-pingaccess/build/libs/adapter-pingaccess-*-SNAPSHOT.jar | grep -vE "io/messagexform|META-INF|snakeyaml|jslt|networknt"`
+  - `jar tf adapter-pingaccess/build/libs/adapter-pingaccess-*-SNAPSHOT.jar > jar_contents.txt`
+  - `grep -q "io/messagexform/core" jar_contents.txt`
+  - `grep -q "com/schibsted/spt/data/jslt" jar_contents.txt`
+  - `grep -vE "io/messagexform|META-INF|snakeyaml|jslt|networknt" jar_contents.txt | grep . && exit 1 || echo "Clean JAR"`
 
 #### I11 — Thread safety + performance stress test (NFR-002-03, S-002-20)
 
