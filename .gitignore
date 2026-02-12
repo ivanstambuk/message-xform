@@ -40,3 +40,6 @@ binaries/
 # Docker
 docker-compose.override.yml
 .sdk-decompile/
+
+# Local vendor libraries — track structure/docs, ignore JARs
+libs/**/*.jar
