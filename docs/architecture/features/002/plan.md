@@ -207,6 +207,9 @@ _To be completed after implementation._
      1. **Test first:** Write `PingAccessAdapterTest.wrapResponse*` tests:
         - Normal JSON response body → parsed `JsonNode`.
         - Non-JSON response body → `NullNode` + warning.
+        - Compressed response body (`Content-Encoding: gzip`/`deflate`/`br`)
+          → no decompression in v1, parse fallback to `NullNode` + warning
+          (Constraint 10).
         - `body.read()` failure (`IOException` or `AccessException`) →
           `NullNode` + warning (Constraint 5 parity with request side).
         - Status code → `exchange.getResponse().getStatusCode()`.
@@ -242,7 +245,8 @@ _To be completed after implementation._
      7. Implement `applyChanges()` → throw `UnsupportedOperationException`.
      8. Run tests, verify all pass.
    - _Requirements covered:_ FR-002-01 (wrapResponse, applyChanges),
-     Constraint 3, S-002-02, S-002-04, S-002-05, S-002-06, S-002-32.
+     Constraint 3, Constraint 10, S-002-02, S-002-04, S-002-05, S-002-06,
+     S-002-32.
    - _Commands:_ `./gradlew :adapter-pingaccess:test`,
      `./gradlew spotlessApply check`
    - _Exit:_ Complete adapter bridge: wrap + apply for both directions. Header
@@ -578,6 +582,10 @@ _To be completed after implementation._
          - `specsDir = /opt/../etc/passwd` → `ValidationException`.
          - `specsDir = /opt/specs` → accepted.
          - `profilesDir` with `..` → `ValidationException`.
+         - `specsDir` points to a regular file (not directory) →
+           `ValidationException`.
+         - `specsDir`/`profilesDir` exists but unreadable →
+           `ValidationException`.
          - Resolved absolute path logged at INFO level.
       2. Implement path validation in `configure()`.
       3. Run tests, verify all pass.
@@ -616,7 +624,8 @@ _To be completed after implementation._
       4. Run drift gate checklist.
       5. Verify `./gradlew --no-daemon :adapter-pingaccess:compileJava`
          remains green with `-Xlint:all -Werror` (NFR-002-05).
-    - _Requirements covered:_ All FRs, all NFRs (verification pass).
+    - _Requirements covered:_ All in-scope FRs
+      (FR-002-01..11, FR-002-13, FR-002-14) and all NFRs (verification pass).
     - _Commands:_ `./gradlew --no-daemon spotlessApply check`,
       `./gradlew --no-daemon :adapter-pingaccess:compileJava`
     - _Exit:_ All tests green. Scenario coverage matrix complete. No drift.
