@@ -414,3 +414,21 @@ per request,
 **and** there is zero JMX overhead,
 **and** SLF4J logging remains operational (INFO-level transform results),
 **and** `pingaccess_engine_audit.log` records per-transaction timing automatically.
+
+---
+
+## S-002-35: PA-Specific Non-Standard Status Codes Passthrough
+
+**Given** a backend returns HTTP status 277 (`ALLOWED` — PingAccess internal) or
+477 (`REQUEST_BODY_REQUIRED` — PingAccess internal),
+**and** a response-direction transform spec is loaded,
+**when** `MessageTransformRule.handleResponse()` processes the exchange,
+**then** the adapter does NOT map, rewrite, or reject the non-standard status code,
+**and** the status code is passed through unchanged to downstream rules,
+**and** response body/header transforms (if any) apply normally alongside the
+non-standard status,
+**and** `$status` in JSLT expressions resolves to the non-standard integer value
+(277 or 477).
+
+> **Constraint 9 coverage:** PingAccess uses non-standard HTTP status codes
+> internally. The adapter must not assume standard HTTP semantics for status codes.

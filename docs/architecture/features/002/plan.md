@@ -29,7 +29,7 @@ The PingAccess Adapter bridges the message-xform core engine into PingAccess
 
 **Measurable signals:**
 
-- All 34 scenarios (S-002-01 through S-002-34) pass as unit tests.
+- All 35 scenarios (S-002-01 through S-002-35) pass as unit tests.
 - Shadow JAR < 5 MB (NFR-002-02).
 - Adapter transform overhead < 10 ms for < 64 KB body (NFR-002-01).
 - Zero PA SDK classes in shadow JAR — verified via `jar tf`.
@@ -40,7 +40,7 @@ The PingAccess Adapter bridges the message-xform core engine into PingAccess
 ## Scope Alignment
 
 - **In scope:** All FRs (FR-002-01 through FR-002-14), all NFRs (NFR-002-01
-  through NFR-002-05), all scenarios (S-002-01 through S-002-34), SPI
+  through NFR-002-05), all scenarios (S-002-01 through S-002-35), SPI
   registration, shadow JAR packaging.
 - **Out of scope:** Docker E2E test script (FR-002-12 — deferred to post-
   implementation, per spec). Agent deployment (N-002-01). Groovy scripts
@@ -428,7 +428,7 @@ _To be completed after implementation._
         and 477 (`REQUEST_BODY_REQUIRED`) from the backend are passed through
         unchanged by the adapter — not mapped to or from (Constraint 9).
      5. Run tests, verify all pass.
-   - _Requirements covered:_ FR-002-11, S-002-11, S-002-12, S-002-28,
+   - _Requirements covered:_ FR-002-11, S-002-11, S-002-12, S-002-28, S-002-35,
      Constraint 9.
    - _Commands:_ `./gradlew :adapter-pingaccess:test`,
      `./gradlew spotlessApply check`
@@ -652,6 +652,7 @@ _To be completed after implementation._
 | S-002-32 | I3 | Non-JSON response body |
 | S-002-33 | I9 | JMX metrics opt-in |
 | S-002-34 | I9 | JMX metrics disabled (default) |
+| S-002-35 | I7 | PA-specific status codes passthrough (Constraint 9) |
 
 ## Analysis Gate
 
