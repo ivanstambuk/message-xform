@@ -240,6 +240,10 @@ See `docs/operations/quality-gate.md` for full pipeline documentation.
       7. ☐ **`knowledge-map.md`** / **`llms.txt`**: Update if new ADRs or cross-cutting references were added.
     - **Key principle**: New tasks are always **additive**. Never modify completed tasks to absorb new work — add new task IDs that implement the delta. This preserves audit trail and keeps verification logs intact.
     - **Immediate actionability**: After the cascade, the feature MUST be in a state where the next agent session can pick up the new tasks and start implementing immediately — no ambiguity about what "In Progress" means.
+20. **Project-Scoped Skills Only** ⚡ **(NON-NEGOTIABLE)**: Custom skills for this repository MUST be project-scoped under `.agents/skills/`. Do **not** create or update custom global skills under `~/.codex/skills/` (except built-in `.system`), including when the user asks for a global install.
+    - Create/rename/update custom skills only in `.agents/skills/<skill-name>/`.
+    - Keep `.agents/` local-only via `.git/info/exclude` unless the owner explicitly asks to commit those files.
+    - If asked to install globally, implement the equivalent project-scoped skill and note the policy.
 
 ### Known Pitfalls
 
