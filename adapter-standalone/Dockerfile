@@ -9,14 +9,23 @@ COPY gradle/             gradle/
 COPY gradlew             gradlew
 COPY build.gradle.kts    build.gradle.kts
 COPY settings.gradle.kts settings.gradle.kts
-COPY gradle/libs.versions.toml gradle/libs.versions.toml
+COPY gradle.properties   gradle.properties
+
+# Copy PA SDK and other local libs (needed for Gradle configuration)
+COPY libs/               libs/
+
+# Subproject build files for better caching
+COPY core/build.gradle.kts               core/
+COPY adapter-standalone/build.gradle.kts adapter-standalone/
+COPY adapter-pingaccess/build.gradle.kts adapter-pingaccess/
 
 # Download dependencies (cached unless build files change)
-RUN chmod +x gradlew && ./gradlew --no-daemon dependencies || true
+RUN chmod +x gradlew && ./gradlew --no-daemon dependencies
 
 # Copy source
 COPY core/               core/
 COPY adapter-standalone/ adapter-standalone/
+COPY adapter-pingaccess/ adapter-pingaccess/
 
 # Build shadow JAR (tests skipped — already validated in CI)
 RUN ./gradlew --no-daemon :adapter-standalone:shadowJar -x test
