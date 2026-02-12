@@ -825,7 +825,9 @@ This enables PingAccess's `ServiceLoader` discovery.
 - The adapter classes (`io.messagexform.pingaccess.*`)
 - The core engine (`io.messagexform.core.*`)
 - `META-INF/services/com.pingidentity.pa.sdk.policy.AsyncRuleInterceptor`
-- All runtime dependencies (Jackson, JSLT, SnakeYAML, JSON Schema Validator)
+- Adapter runtime dependencies (JSLT, SnakeYAML, JSON Schema Validator)
+- Core-relocated dependencies required by `core` (including
+  `io/messagexform/internal/jackson/**`)
 
 The shadow JAR MUST **exclude** the PingAccess SDK classes — those are provided
 by the PA runtime (`/opt/server/lib/pingaccess-sdk-*.jar`).
@@ -1454,6 +1456,7 @@ Client                    PingAccess                        Backend
 | ADR-0024 | Error type catalogue |
 | ADR-0027 | URL rewriting |
 | ADR-0030 | Session context binding |
+| ADR-0035 | Adapter version parity |
 
 ### D. Configuration Patterns (SDK Reference)
 
@@ -1466,4 +1469,3 @@ Client                    PingAccess                        Backend
 > `handleResponse()` (SDK guide §7). While the adapter does not currently
 > use dynamic dropdowns, any future fields using `modelAccessor` must
 > respect this constraint.
-
