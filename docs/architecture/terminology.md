@@ -78,6 +78,12 @@ terminology agreements must be captured here immediately.
   - Resolved by the engine's Expression Engine registry; unknown ids MUST be rejected
     at load time.
 
+- **JsonTree**
+  - Language-neutral spec notation for a parsed JSON tree. In TypeScript-style
+    type definitions (docs-style §6a), `JsonTree` replaces implementation-specific
+    names like Jackson's `JsonNode`. The Java implementation maps `JsonTree` to
+    `com.fasterxml.jackson.databind.JsonNode`.
+
 ## Message envelope
 
 - **Message** (`Message`)
@@ -143,6 +149,12 @@ terminology agreements must be captured here immediately.
     pattern. Used for most-specific-wins resolution when multiple entries **within
     a single profile** match the same request (ADR-0006). Higher score = more
     specific = wins.
+
+- **Version parity** (ADR-0035)
+  - The convention that a gateway adapter module's version mirrors the target
+    gateway version exactly: `<GATEWAY_MAJOR>.<GATEWAY_MINOR>.<GATEWAY_PATCH>.<ADAPTER_PATCH>`.
+    The first 3 segments signal compatibility; the 4th is the adapter's own
+    patch counter. Applies to all gateway adapters (PingAccess, future Kong/Envoy).
 
 ## Transform lifecycle
 

@@ -1,33 +1,25 @@
-# Current Session State
+# Current Session — 2026-02-12
 
-**Date:** 2026-02-11 (late session)
-**Focus:** ADR cleanup, spike absorption, documentation hygiene
+## Focus
+Spec notation standardization, ADR-0035 (adapter version parity), and
+adapter-pingaccess module scaffolding.
 
-## Completed This Session
+## Key Decisions
+- TypeScript `.d.ts` notation adopted as language-neutral spec type notation (docs-style §6a)
+- ADR-0035: adapter version parity — adapter version mirrors gateway version
+- F002 Java code blocks retained per §6a exception (SDK-bound types)
 
-### ADR-0034 Created
-- SLF4J compile-time binding decision (no custom logging port)
-- Documents why SLF4J is used directly (API stability, binary compat)
-- Contrasts with Jackson approach (ADR-0032)
+## Commits This Session
+1. `d29fbb0` — PA deployment architecture guide
+2. `9f1189b` — Convert F001 type defs to TypeScript notation
+3. `88f268c` — Add type notation convention to docs-style.md
+4. `4a59ba5` — Align F002 spec with type notation convention
+5. `24dc3cf` — ADR-0035 adapter version parity
+6. `b4dff4c` — Scaffold adapter-pingaccess module
+7. (retro commit pending)
 
-### ADR Cleanup (0031/0032)
-- Removed stale struck-out content from ADR-0032
-- Removed stale consequences from ADR-0031 (core Jackson coupling)
-- Strengthened ADR purity rule in AGENTS.md
-
-### Spike Documents Deleted & Absorbed
-- Deleted `spike-pa-classloader-model.md` (654 lines) — Spike A
-- Deleted `spike-pa-dependency-extraction.md` (1013 lines) — Spike B
-- All valuable findings absorbed into ADR-0031:
-  - Bytecode evidence (Bootstrap, ServiceFactory, ConfigurablePluginPostProcessor)
-  - Spring prototype bean registration, LocalizationResourceClassLoaderUtils
-  - Full 20-library PA inventory with versions
-  - Build integration options (catalog overlay / platform module / generated TOML)
-  - Plugin ecosystem precedent (ES, Gradle, IntelliJ, Jenkins)
-  - Mismatch severity matrix, PA upgrade workflow
-  - Dual version catalog architecture
-- References in spec.md, SDK guide, knowledge-map, llms.txt updated
-
-## Next Session
-- Implement PA dependency build integration (Feature 002)
-- See `.agent/session/pending-task.md` for details
+## Status
+- Feature 001 spec: ✅ All type definitions converted to TypeScript notation
+- Feature 002 spec: ✅ Aligned with notation convention, minor fixes applied
+- Feature 002 build: ✅ Module scaffolded, compileOnly deps, shadow JAR excludes verified
+- ADR-0035: ✅ Accepted, cross-referenced from ADR-0031 and knowledge-map
