@@ -39,13 +39,13 @@ The PingAccess Adapter bridges the message-xform core engine into PingAccess
 
 ## Scope Alignment
 
-- **In scope:** All FRs (FR-002-01 through FR-002-14), all NFRs (NFR-002-01
-  through NFR-002-05), all scenarios (S-002-01 through S-002-35), SPI
-  registration, shadow JAR packaging.
-- **Out of scope:** Docker E2E test script (FR-002-12 — deferred to post-
-  implementation, per spec). Agent deployment (N-002-01). Groovy scripts
-  (N-002-02). Async HTTP calls (N-002-03). Third-party metrics frameworks
-  (N-002-05).
+- **In scope:** FR-002-01 through FR-002-11, FR-002-13, FR-002-14; all NFRs
+  (NFR-002-01 through NFR-002-05); all scenarios (S-002-01 through S-002-35);
+  SPI registration and shadow JAR packaging.
+- **Out of scope (for this implementation pass):** Docker E2E test script
+  (FR-002-12 — deferred to post-implementation, per spec). Agent deployment
+  (N-002-01). Groovy scripts (N-002-02). Async HTTP calls (N-002-03).
+  Third-party metrics frameworks (N-002-05).
 
 ## Prerequisites
 
@@ -207,6 +207,8 @@ _To be completed after implementation._
      1. **Test first:** Write `PingAccessAdapterTest.wrapResponse*` tests:
         - Normal JSON response body → parsed `JsonNode`.
         - Non-JSON response body → `NullNode` + warning.
+        - `body.read()` failure (`IOException` or `AccessException`) →
+          `NullNode` + warning (Constraint 5 parity with request side).
         - Status code → `exchange.getResponse().getStatusCode()`.
         - Headers → same normalization as request.
         - `requestPath` and `requestMethod` from original request.
@@ -263,6 +265,8 @@ _To be completed after implementation._
      1. **Test first:** Write `MessageTransformRuleTest`:
         - `configure()` with valid config → engine initialized, specs loaded.
         - `configure()` with invalid `specsDir` → `ValidationException`.
+        - `@Rule(destination = Site)` present (Constraint 1 — site-only
+          deployment).
         - `handleRequest()` SUCCESS → body/headers/URL transformed, changes
           applied to exchange, `Outcome.CONTINUE` returned.
         - `handleRequest()` PASSTHROUGH (no match) → exchange untouched,
@@ -412,6 +416,9 @@ _To be completed after implementation._
           `Outcome.RETURN`.
         - DENY + response error → response body/status rewritten to 502 +
           RFC 9457 JSON.
+        - DENY + `wrapResponse()` failure path (e.g., body read/parse
+          failure before engine call) → adapter-generated RFC 9457 error body
+          with status 502; no `AccessException` thrown.
         - DENY + `handleResponse()` after DENY `handleRequest()` → DENY
           guard fires, processing skipped, error response preserved.
      2. Implement error dispatch in `handleRequest()`:
@@ -504,7 +511,7 @@ _To be completed after implementation._
    - _Exit:_ JMX MBean works when enabled. Zero overhead when disabled.
      All counters correct.
 
-### Phase 7 — Packaging & Thread Safety (≤2 × 90 min)
+### Phase 7 — Packaging, Thread Safety & Hardening (≤4 × 90 min)
 
 10. **I10 — Shadow JAR verification + version guard** (≤90 min)
     - _Goal:_ Verify the shadow JAR is correct: contains adapter + core +
@@ -531,6 +538,8 @@ _To be completed after implementation._
          _Verification command:_ `jar tf adapter-pingaccess/build/libs/adapter-pingaccess-*-SNAPSHOT.jar | grep -vE "io/messagexform|META-INF|snakeyaml|jslt|networknt"` (should return nothing or only empty directory entries).
       4. Verify `PaVersionGuard` runs during `configure()` and logs version
          info at INFO level.
+         - Mismatch path (compiled vs runtime PA version) logs WARN with
+           remediation message per ADR-0035.
     - _Requirements covered:_ FR-002-09, FR-002-10, NFR-002-02, S-002-24.
     - _Commands:_ `./gradlew :adapter-pingaccess:shadowJar`,
       `./gradlew :adapter-pingaccess:test`,
@@ -577,7 +586,6 @@ _To be completed after implementation._
       `./gradlew spotlessApply check`
     - _Exit:_ Path traversal rejected. Audit logging verified.
 
-### Phase 7 & 8 — Packaging, Hardening & Final Handover
 
 12a. **I12a — ArchUnit validation** (≤45 min)
      - _Goal:_ Automate non-functional requirement enforcement (no reflection, no leakage) using ArchUnit.
@@ -589,19 +597,141 @@ _To be completed after implementation._
           - Rule 3 (PA SDK): Only allowed packages from PA SDK can be accessed (bridge pattern).
        2. Run ArchUnit tests, verify compliance.
        3. Fix any accidental architectural violations.
-     - _Requirements covered:_ NFR-002-04 (no reflection), NFR-002-02 (no leakage).
+     - _Requirements covered:_ NFR-002-04 (no reflection).
      - _Commands:_ `./gradlew :adapter-pingaccess:test --tests "*AdapterArchTest*"`
      - _Exit:_ Architecture verified automatically via tests.
 
-714: ## Follow-ups / Backlog
-715: 
-716: - [ ] **FR-002-12: Docker E2E test script** — Deferred to post-implementation.
-717:       Script-based, runs against real PingAccess 9.0 container.
-718: - [ ] **Compressed body support** (Constraint 10) — Decompress `gzip`/`deflate`/`br`
-719:       response bodies before JSON parsing. Requires adding `java.util.zip` handling.
-720: - [ ] **SessionContextFilter** — Selective `$session` field whitelisting for
-721:       multi-tenant spec authoring. Follow-up if needed.
-722: - [ ] **PA-native error handler integration** — Add `ErrorHandlerUtil`
-723:       configuration fields for PA HTML template-based error pages alongside
-724:       RFC 9457. Follow-up if requested.
+### Phase 8 — Quality Gate & Documentation (≤2 × 90 min)
 
+13. **I13 — Full quality gate + scenario coverage audit** (≤45 min)
+    - _Goal:_ Run the full quality gate across all modules. Update scenario
+      coverage matrix. Verify no drift between spec and implementation.
+    - _Preconditions:_ I12a complete.
+    - _Steps:_
+      1. Run `./gradlew --no-daemon spotlessApply check`.
+      2. Verify all tests pass across `core`, `adapter-standalone`,
+         `adapter-pingaccess`.
+      3. Update `scenarios.md` coverage matrix — map each S-002-XX to
+         its test class and method.
+      4. Run drift gate checklist.
+      5. Verify `./gradlew --no-daemon :adapter-pingaccess:compileJava`
+         remains green with `-Xlint:all -Werror` (NFR-002-05).
+    - _Requirements covered:_ All FRs, all NFRs (verification pass).
+    - _Commands:_ `./gradlew --no-daemon spotlessApply check`,
+      `./gradlew --no-daemon :adapter-pingaccess:compileJava`
+    - _Exit:_ All tests green. Scenario coverage matrix complete. No drift.
+
+14. **I14 — Documentation sync & roadmap update** (≤30 min)
+    - _Goal:_ Update `roadmap.md`, `AGENTS.md` mirror, `knowledge-map.md`,
+      `llms.txt`, and `_current-session.md` to reflect completed Feature 002
+      adapter implementation.
+    - _Preconditions:_ I13 complete.
+    - _Steps:_
+      1. Update `roadmap.md`: F002 → `✅ Complete` (or `🔨 In Progress` if
+         FR-002-12 Docker E2E is still deferred).
+      2. Sync `AGENTS.md` roadmap mirror.
+      3. Update `knowledge-map.md` with new source files.
+      4. Update `llms.txt` with adapter source files.
+      5. Update `_current-session.md`.
+      6. Commit all docs changes.
+    - _Requirements covered:_ Documentation sync (Rule 19).
+    - _Commands:_ N/A (documentation only).
+    - _Exit:_ All docs consistent. Feature ready for Docker E2E (FR-002-12)
+      as a follow-up.
+
+---
+
+## Scenario Tracking
+
+| Scenario ID | Increment / Task Reference | Notes |
+|-------------|---------------------------|-------|
+| S-002-01 | I2, I4a | Request body transform |
+| S-002-02 | I3, I4a | Response body transform |
+| S-002-03 | I4a | Bidirectional transform |
+| S-002-04 | I3 | Header transform |
+| S-002-05 | I3 | Status code transform |
+| S-002-06 | I3 | URL rewrite |
+| S-002-07 | I2 | Empty body |
+| S-002-08 | I2 | Non-JSON body |
+| S-002-09 | I4a | Profile matching |
+| S-002-10 | I4a | No matching spec |
+| S-002-11 | I7 | Error mode PASS_THROUGH |
+| S-002-12 | I7 | Error mode DENY |
+| S-002-13 | I6 | Session context in JSLT |
+| S-002-14 | I6 | No identity (unauthenticated) |
+| S-002-15 | I4a | Multiple specs loaded |
+| S-002-16 | I11 | Large body (64 KB) |
+| S-002-17 | I1 | Plugin configuration via admin UI |
+| S-002-18 | I1, I4a | Invalid spec directory |
+| S-002-19 | I4b | Plugin SPI registration |
+| S-002-20 | I11 | Thread safety |
+| S-002-21 | I4b | ExchangeProperty metadata |
+| S-002-22 | I5 | Cookie access in JSLT |
+| S-002-23 | I5 | Query param access in JSLT |
+| S-002-24 | I10 | Shadow JAR correctness |
+| S-002-25 | I6 | OAuth context in JSLT |
+| S-002-26 | I6 | Session state in JSLT |
+| S-002-27 | I2 | Prior rule URI rewrite |
+| S-002-28 | I7 | DENY + handleResponse interaction |
+| S-002-29 | I8 | Spec hot-reload (success) |
+| S-002-30 | I8 | Spec hot-reload (failure) |
+| S-002-31 | I8 | Concurrent reload during active transform |
+| S-002-32 | I3 | Non-JSON response body |
+| S-002-33 | I9 | JMX metrics opt-in |
+| S-002-34 | I9 | JMX metrics disabled (default) |
+| S-002-35 | I7 | PA-specific status codes passthrough (Constraint 9) |
+
+## Analysis Gate
+
+Run `docs/operations/analysis-gate-checklist.md` at two milestones:
+
+- **Phase 3 gate (after I5):** Adapter bridge + basic rule lifecycle working.
+  Verify core proxy cycle works end-to-end (wrap → transform → apply), SUCCESS
+  and PASSTHROUGH paths correct. ~40% of scenarios should pass.
+- **Phase 8 gate (after I14):** All code complete. Full scenario sweep, drift
+  gate, coverage matrix, FR/NFR traceability tables filled in.
+
+## Exit Criteria
+
+- [ ] All increments (I1–I14 plus I12a) completed and checked off
+- [ ] Quality gate passes (`./gradlew --no-daemon spotlessApply check`)
+- [ ] All 35 scenarios have corresponding test methods
+- [ ] Scenario coverage matrix in `scenarios.md` has no uncovered FRs/NFRs
+- [ ] Shadow JAR < 5 MB, no PA SDK classes
+- [ ] Thread safety test passes with 10 concurrent threads
+- [ ] Implementation Drift Gate report attached
+- [ ] Open questions resolved and removed from `open-questions.md`
+- [ ] Documentation synced (roadmap, knowledge-map, AGENTS.md, llms.txt)
+
+## Intent Log
+
+_To be filled during implementation._
+
+- **I1:** …
+- **I2:** …
+- **I3:** …
+- **I4a:** …
+- **I4b:** …
+- **I5:** …
+- **I6:** …
+- **I7:** …
+- **I8:** …
+- **I9:** …
+- **I10:** …
+- **I11:** …
+- **I12:** …
+- **I12a:** …
+- **I13:** …
+- **I14:** …
+
+## Follow-ups / Backlog
+
+- [ ] **FR-002-12: Docker E2E test script** — Deferred to post-implementation.
+      Script-based, runs against real PingAccess 9.0 container.
+- [ ] **Compressed body support** (Constraint 10) — Decompress `gzip`/`deflate`/`br`
+      response bodies before JSON parsing. Requires adding `java.util.zip` handling.
+- [ ] **SessionContextFilter** — Selective `$session` field whitelisting for
+      multi-tenant spec authoring. Follow-up if needed.
+- [ ] **PA-native error handler integration** — Add `ErrorHandlerUtil`
+      configuration fields for PA HTML template-based error pages alongside
+      RFC 9457. Follow-up if requested.
