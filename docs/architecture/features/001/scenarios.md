@@ -122,6 +122,8 @@ expected_output:
       type: "password"
       sensitive: true
 ```
+---
+
 
 ### S-001-02: PingAM Callback — Reverse (Frontend → PingAM)
 
@@ -194,6 +196,8 @@ expected_output:
         - name: "IDToken2"
           value: "Ch4ng31t"
 ```
+---
+
 
 ### S-001-03: PingAM Success Response — Strip Internals
 
@@ -231,6 +235,8 @@ expected_output:
   sessionToken: "AQIC5wM…TU3OQ*"
   realm: "/alpha"
 ```
+---
+
 
 ### S-001-04: PingAM Callback — Choice/Confirmation Types
 
@@ -312,6 +318,8 @@ expected_output:
       type: "confirm"
       # Note: JSLT omits keys whose value is null — no `options` key here
 ```
+---
+
 
 ### S-001-05: PingAM — No Callbacks (Simple Login Success)
 
@@ -403,6 +411,8 @@ expected_output:
   email: "bjensen@example.com"
   role: "admin"
 ```
+---
+
 
 ### S-001-07: Strip Internal Fields with Open-World Passthrough
 
@@ -450,6 +460,8 @@ expected_output:
   role: "admin"
   custom_field: "should be preserved"
 ```
+---
+
 
 ### S-001-08: Rename Fields (API Versioning)
 
@@ -495,6 +507,8 @@ expected_output:
   isActive: true
   createdAt: "2025-01-15T10:30:00Z"
 ```
+---
+
 
 ### S-001-09: Add Default Values
 
@@ -535,6 +549,8 @@ expected_output:
   tier: "free"
   metadata: {}
 ```
+---
+
 
 ### S-001-10: Add Gateway Metadata
 
@@ -643,6 +659,8 @@ expected_output:
   city: "Amsterdam"
   country: "NL"
 ```
+---
+
 
 ### S-001-12: Nest Flat Object
 
@@ -696,6 +714,8 @@ expected_output:
       email: "bjensen@example.com"
       phone: "+31-6-12345678"
 ```
+---
+
 
 ### S-001-13: Array-of-Objects Reshaping
 
@@ -770,6 +790,8 @@ expected_output:
       email: "jsmith@example.com"
       active: false
 ```
+---
+
 
 ### S-001-14: OAuth Token Response Normalization
 
@@ -875,6 +897,8 @@ expected_output:
     message: "The provided grant is invalid or expired"
     details: "Grant type 'authorization_code' requires a valid code"
 ```
+---
+
 
 ### S-001-16: Conditional Output Shape — Success Path
 
@@ -927,6 +951,8 @@ expected_output:
     name: "Bob Jensen"
     status: "active"
 ```
+---
+
 
 ### S-001-17: Value Mapping (Enum Translation)
 
@@ -977,6 +1003,8 @@ expected_output:
 ---
 
 ## Category 5: Edge Cases & Error Handling
+---
+
 
 ### S-001-18: Passthrough — No Matching Transform
 
@@ -1008,6 +1036,8 @@ expected_output:
   nested:
     data: [1, 2, 3]
 ```
+---
+
 
 ### S-001-19: Passthrough — Invalid JSON Body
 
@@ -1035,6 +1065,8 @@ input_raw: "<html><body>Not JSON</body></html>"
 expected_output_raw: "<html><body>Not JSON</body></html>"
 expected_transform_applied: false
 ```
+---
+
 
 ### S-001-20: Open-World — Extra Fields Preserved
 
@@ -1077,6 +1109,8 @@ expected_output:
   custom_field: "should survive"
   _new_field_from_v2: true
 ```
+---
+
 
 ### S-001-21: Empty Input Object
 
@@ -1110,6 +1144,8 @@ expected_output:
   name: "Anonymous"
   status: "unknown"
 ```
+---
+
 
 ### S-001-22: Null Values in Input
 
@@ -1148,6 +1184,8 @@ expected_output:
   # Note: JSLT omits keys whose value is null — no `email` key here
   hasEmail: false
 ```
+---
+
 
 ### S-001-23: Large Array Transformation
 
@@ -1192,6 +1230,8 @@ expected_output:
     - { id: "item-002", label: "Item 2", active: false }
     # ... (100 entries, no _internal field)
 ```
+---
+
 
 ### S-001-24: JSLT Evaluation Error → Error Response
 
@@ -1271,6 +1311,8 @@ expected_output:
   userName: "bjensen"
   emailAddress: "bjensen@example.com"
 ```
+---
+
 
 ### S-001-26: Multi-Engine — Simple Rename (JOLT)
 
@@ -1305,6 +1347,8 @@ expected_output:
   userName: "bjensen"
   emailAddress: "bjensen@example.com"
 ```
+---
+
 
 ### S-001-27: Multi-Engine — Simple Rename (jq)
 
@@ -1333,6 +1377,8 @@ expected_output:
   userName: "bjensen"
   emailAddress: "bjensen@example.com"
 ```
+---
+
 
 ### S-001-28: Unknown Engine — Rejected at Load Time
 
@@ -1362,6 +1408,8 @@ expected_error:
 ---
 
 ## Category 7: Bidirectional Round-Trip
+---
+
 
 ### S-001-29: Bidirectional Round-Trip — PingAM Callbacks
 
@@ -1466,6 +1514,8 @@ step_2_expected:
       output: [{ name: "prompt", value: "Password:" }]
       input: [{ name: "IDToken2", value: "Ch4ng31t" }]
 ```
+---
+
 
 ### S-001-30: Bidirectional — Flat ↔ Nested
 
@@ -1530,6 +1580,8 @@ step_2_expected:
 ---
 
 ## Category 8: Error Response Normalization
+---
+
 
 ### S-001-31: RFC 9457 Problem Details Normalization
 
@@ -1572,6 +1624,8 @@ expected_output:
   detail: "Field 'email' must be a valid email address"
   instance: "/requests/req-abc-123"
 ```
+---
+
 
 ### S-001-32: PingAM Error Normalization
 
@@ -1664,6 +1718,8 @@ expected_output:
   data: "some payload"
   status: "ok"
 ```
+---
+
 
 ### S-001-34: Body-to-Header Injection via Dynamic `expr`
 
@@ -1720,6 +1776,8 @@ expected_headers:
   X-Error-Code: "AUTH_REQUIRED"
   X-Transformed-By: "message-xform"
 ```
+---
+
 
 ### S-001-35: Missing Header — `$headers` Returns Null
 
@@ -1809,6 +1867,8 @@ expected_output:
 
 expected_status: 400
 ```
+---
+
 
 ### S-001-37: `$status` in Body Expression
 
@@ -1847,6 +1907,8 @@ expected_output:
 
 expected_status: 200
 ```
+---
+
 
 ### S-001-38: Unconditional Status Set
 
@@ -1988,6 +2050,8 @@ expected_output:
 
 expected_path: "/api/users/123"
 ```
+---
+
 
 ### S-001-38b: URL Query Parameter Add/Remove
 
@@ -2039,6 +2103,8 @@ expected_query_params:
   existing: "keep"
   # _debug and _internal removed by glob
 ```
+---
+
 
 ### S-001-38c: HTTP Method Override with Conditional Predicate
 
@@ -2081,6 +2147,8 @@ expected_output: {}
 expected_path: "/api/users/456"
 expected_method: "DELETE"
 ```
+---
+
 
 ### S-001-38d: URL Path Expr Returns Null — Error
 
@@ -2116,6 +2184,8 @@ expected_error:
   type: "expression-eval"
   message: "url.path.expr must return a string, got null"
 ```
+---
+
 
 ### S-001-38e: Invalid HTTP Method — Rejected at Load Time
 
@@ -2143,6 +2213,8 @@ expected_error:
   type: "spec-parse"
   message: "invalid HTTP method 'YOLO' — must be one of: GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS"
 ```
+---
+
 
 ### S-001-38f: URL Block on Response Transform — Ignored with Warning
 
@@ -2182,6 +2254,8 @@ expected_output:
 expected_path: "/original"    # unchanged — url block ignored
 expected_warning: "url block is ignored for response-direction transforms"
 ```
+---
+
 
 ### S-001-38g: URL-to-Body Extraction — Path Segment and Query Param into Nested Body
 
@@ -2289,6 +2363,8 @@ expected_error:
   type: "capability-violation"
   message: "engine 'jolt' does not support predicates — use 'jslt' or 'jq'"
 ```
+---
+
 
 ### S-001-40: JOLT Engine with `$headers` Reference — Rejected at Load Time
 
@@ -2376,6 +2452,8 @@ test_request_2:
   input: { data: "hello" }
   expected_output: { v: 2, payload: "hello" }
 ```
+---
+
 
 ### S-001-42: Missing Spec Version — Rejected at Load Time
 
@@ -2404,6 +2482,8 @@ expected_error:
   type: "spec-not-found"
   message: "spec 'callback-prettify@3.0.0' not found — available versions: 1.0.0"
 ```
+---
+
 
 ### S-001-43: Bare Spec Reference — Resolves to Latest Version
 
@@ -2481,6 +2561,8 @@ expected_match:
   profile: auth-specific
   reason: "specificity score 2 > 1"
 ```
+---
+
 
 ### S-001-45: Ambiguous Tie — Rejected at Load Time
 
@@ -2510,6 +2592,8 @@ expected_error:
   type: "ambiguous-match"
   message: "profiles 'profile-a' and 'profile-b' have identical specificity — resolve ambiguity"
 ```
+---
+
 
 ### S-001-46: Constraint Count Tie-Breaking
 
@@ -2595,6 +2679,8 @@ expected_telemetry_events:
     duration_ms: ">= 0"
     # MUST NOT contain: body, header values, sensitive data
 ```
+---
+
 
 ### S-001-48: Trace Context Propagation — X-Request-ID in Log Output
 
@@ -2788,6 +2874,8 @@ expected_output:
     transformedBy: "message-xform"
     specVersion: "1.0.0"
 ```
+---
+
 
 ### S-001-51: Missing mapperRef in Apply Directive Rejected at Load Time
 
@@ -2824,6 +2912,8 @@ expected_error:
   type: MapperResolutionError
   message_contains: "does-not-exist"
 ```
+---
+
 
 ### S-001-52: Duplicate mapperRef in Apply Directive Rejected at Load Time
 
@@ -2864,6 +2954,8 @@ expected_error:
   type: SpecParseException
   message_contains: "appears more than once in apply"
 ```
+---
+
 
 ### S-001-59: Apply Directive Without `expr` Rejected at Load Time
 
@@ -2955,6 +3047,8 @@ spec:
 
 expected_load_result: success
 ```
+---
+
 
 ### S-001-54: Invalid Schema Rejected at Load Time
 
@@ -2991,6 +3085,8 @@ expected_error:
   type: SchemaValidationError
   message_contains: "input.schema"
 ```
+---
+
 
 ### S-001-55: Strict-Mode Runtime Schema Validation Failure
 
@@ -3105,6 +3201,8 @@ expected_error_response:
   detail_contains: "chain aborted at step 1/2"
   spec_id: spec-a
 ```
+---
+
 
 ### S-001-57: TransformContext — $headers Available in Body Expression
 
@@ -3146,6 +3244,8 @@ expected_output:
   requestedBy: "frontend-app"
   correlationId: "abc-123"
 ```
+---
+
 
 ### S-001-58: Copy-on-Wrap — Failed Transform Returns Error Response
 
@@ -3603,6 +3703,8 @@ expected_error_3:
   parent_type: TransformLoadException
   message_contains: "schema"
 ```
+---
+
 
 ### S-001-67: Evaluation Budget Exceeded → EvalBudgetExceededException
 
@@ -3650,6 +3752,8 @@ expected_exception:
   parent_type: TransformEvalException
   chain_step: null
 ```
+---
+
 
 ### S-001-68: YAML Parse Error → SpecParseException with Source Path
 
@@ -3733,6 +3837,8 @@ expected_output:
   singleHeader: ["application/json"]
   data: "hello"
 ```
+---
+
 
 ### S-001-70: `$headers_all` Missing Header Returns Null
 
@@ -3771,6 +3877,8 @@ expected_output:
   hasMissing: false
   data: "test"
 ```
+---
+
 
 ### S-001-71: X-Forwarded-For Chain via `$headers_all`
 
@@ -3984,6 +4092,8 @@ phase_2_reload_with:
   expected_output: { new_name: "alice" }
   not_present: ["old_name"]
 ```
+---
+
 
 ### S-001-77: Fail-Safe Reload Preserves Old Registry on Error
 
@@ -4028,6 +4138,8 @@ phase_2_reload_with:
   post_reload_input: { name: "alice" }
   post_reload_expected_output: { result: "alice" }
 ```
+---
+
 
 ### S-001-78: Concurrent Reads During Swap See Consistent Snapshot
 
@@ -4107,6 +4219,8 @@ measured_iterations: 20000
 assert:
   p95_latency_ms: "< 5.0"
 ```
+---
+
 
 ### S-001-80: 5-Field Mapping JSLT Transform — p95 < 5ms (10KB body)
 
@@ -4141,6 +4255,8 @@ measured_iterations: 20000
 assert:
   p95_latency_ms: "< 5.0"
 ```
+---
+
 
 ### S-001-81: Complex Nested/Array Transform — p95 < 5ms (50KB body)
 
@@ -4237,6 +4353,8 @@ expected_output:
   userId: "bjensen"
   tenantId: "acme-corp"
 ```
+---
+
 
 ### S-001-83: Conditional Response Based on Session Roles
 
@@ -4286,6 +4404,8 @@ expected_output:
     lastLogin: "2026-02-09T08:00:00Z"
     failedAttempts: 0
 ```
+---
+
 
 ### S-001-84: Null Session Context — Null-Safe Access
 
@@ -4325,6 +4445,8 @@ expected_output:
   # Note: JSLT omits keys whose value is null — no userId key here
   amount: 99.50
 ```
+---
+
 
 ### S-001-85: JOLT Engine with $session Reference — Rejected at Load Time
 
