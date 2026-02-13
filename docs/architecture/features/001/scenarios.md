@@ -4405,6 +4405,7 @@ expected_error:
 | S-001-36 | conditional-status-error-body | Status Code | status, conditional, error, adr-0003 |
 | S-001-37 | status-in-body-expression | Status Code | status, body, variable, adr-0003 |
 | S-001-38 | unconditional-status-set | Status Code | status, unconditional, adr-0003 |
+| S-001-38i | status-when-predicate-error-keep | Status Code | status, error-handling, when-predicate |
 | S-001-38a | url-path-rewrite-dispatch | URL Rewriting | url, path-rewrite, de-polymorphize, adr-0027 |
 | S-001-38b | url-query-param-operations | URL Rewriting | url, query, add, remove, glob, adr-0027 |
 | S-001-38c | url-method-override-conditional | URL Rewriting | url, method, override, conditional, adr-0027 |
@@ -4467,16 +4468,17 @@ expected_error:
 | FR-001-01 (Spec Format) | S-001-01 through S-001-17, S-001-49 |
 | FR-001-02 (Expression Engine SPI) | S-001-25, S-001-26, S-001-27, S-001-28, S-001-39, S-001-40, S-001-57, S-001-63, S-001-64, S-001-65 |
 | FR-001-03 (Bidirectional) | S-001-02, S-001-29, S-001-30, S-001-60 |
-| FR-001-04 (Message Envelope) | S-001-19, S-001-58 |
+| FR-001-04 (Message Envelope) | S-001-19, S-001-21, S-001-22, S-001-58 |
 | FR-001-05 (Transform Profiles) | S-001-41, S-001-42, S-001-43, S-001-44, S-001-45, S-001-46, S-001-49, S-001-56, S-001-73 |
 | FR-001-06 (Passthrough) | S-001-18, S-001-19 |
-| FR-001-07 (Error Handling) | S-001-24, S-001-28, S-001-56, S-001-58, S-001-66, S-001-67, S-001-68 |
+| FR-001-07 (Error Handling) | S-001-24, S-001-28, S-001-31, S-001-32, S-001-56, S-001-58, S-001-66, S-001-67, S-001-68 |
 | FR-001-08 (Reusable Mappers) | S-001-50, S-001-51, S-001-52, S-001-59 |
 | FR-001-09 (Schema Validation) | S-001-53, S-001-54, S-001-55 |
 | FR-001-10 (Header Transforms) | S-001-33, S-001-34, S-001-35, S-001-57, S-001-69, S-001-70, S-001-71, S-001-72 |
 | FR-001-11 (Status Code Transforms) | S-001-36, S-001-37, S-001-38, S-001-38i, S-001-61, S-001-63 |
 | FR-001-12 (URL Rewriting) | S-001-38a, S-001-38b, S-001-38c, S-001-38d, S-001-38e, S-001-38f, S-001-38g |
 | FR-001-13 (Session Context Binding) | S-001-82, S-001-83, S-001-84, S-001-85 |
+| FR-001-14 (Port Value Objects) | *Verified by dependency analysis and ArchUnit rules, not scenario-testable* |
 | NFR-001-01 (Stateless) | All — implicit in test harness design |
 | NFR-001-03 (Latency <5ms) | S-001-23, S-001-79, S-001-80, S-001-81 |
 | NFR-001-04 (Open-world) | S-001-07, S-001-20 |
