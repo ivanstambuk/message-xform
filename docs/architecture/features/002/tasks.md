@@ -1,7 +1,7 @@
 # Feature 002 — PingAccess Adapter — Tasks
 
 _Status:_ Ready
-_Last updated:_ 2026-02-13
+_Last updated:_ 2026-02-14
 
 **Governing spec:** `docs/architecture/features/002/spec.md`
 **Implementation plan:** `docs/architecture/features/002/plan.md`
@@ -19,7 +19,7 @@ _Last updated:_ 2026-02-13
 - [x] **C-002-02** — Implementation plan exists and is marked `Status: Ready`.
 - [x] **C-002-03** — `adapter-pingaccess` module scaffold exists.
 - [x] **C-002-04** — Open-question queue is empty for Feature 002.
-- [x] **C-002-05** — Scenarios include S-002-01 through S-002-36.
+- [x] **C-002-05** — Scenarios include S-002-01 through S-002-36, plus suffixed variants (S-002-09b, S-002-15b, S-002-33b).
 
 ## Increment → Task Mapping
 
@@ -301,7 +301,7 @@ _Last updated:_ 2026-02-13
 
 #### I13/I14 — Final audit and documentation sync
 
-- [ ] **T-002-33** — 36-scenario coverage audit (NFR-002-05, S-002-01..S-002-36)
+- [ ] **T-002-33** — Full scenario coverage audit (NFR-002-05, all scenarios in `scenarios.md`)
   _Intent:_ Prove all scenarios have executable test evidence.
   _Verify:_ Coverage matrix updated with test method mapping.
 

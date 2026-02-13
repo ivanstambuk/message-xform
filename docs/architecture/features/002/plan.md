@@ -3,7 +3,7 @@
 _Linked specification:_ `docs/architecture/features/002/spec.md`
 _Linked tasks:_ `docs/architecture/features/002/tasks.md`
 _Status:_ Ready
-_Last updated:_ 2026-02-13 (audit fixes: ArchUnit → F009, PaVersionGuard reflection removed)
+_Last updated:_ 2026-02-14 (audit fixes: bodyParseFailed skip-guard, scenario count alignment)
 
 > Guardrail: Keep this plan traceable back to the governing spec. Reference
 > FR/NFR/Scenario IDs from `spec.md` where relevant, log any new high- or
@@ -29,7 +29,7 @@ The PingAccess Adapter bridges the message-xform core engine into PingAccess
 
 **Measurable signals:**
 
-- All 36 scenarios (S-002-01 through S-002-36) pass as unit tests.
+- All scenarios defined in `scenarios.md` pass as unit tests.
 - Shadow JAR < 5 MB (NFR-002-02).
 - Adapter transform overhead < 10 ms for < 64 KB body (NFR-002-01).
 - Zero PA SDK classes in shadow JAR — verified via `jar tf`.
@@ -40,7 +40,7 @@ The PingAccess Adapter bridges the message-xform core engine into PingAccess
 ## Scope Alignment
 
 - **In scope:** FR-002-01 through FR-002-11, FR-002-13, FR-002-14; all NFRs
-  (NFR-002-01 through NFR-002-05); all scenarios (S-002-01 through S-002-36);
+  (NFR-002-01 through NFR-002-05); all scenarios defined in `scenarios.md`;
   SPI registration and shadow JAR packaging.
 - **Out of scope (for this implementation pass):** Docker E2E test script
   (FR-002-12 — deferred to post-implementation, per spec). Agent deployment
@@ -182,6 +182,10 @@ _To be completed after implementation._
           `IOException`) → `MessageBody.empty()` + warning logged.
         - Body read failure (`AccessException` from `body.read()`) →
           `MessageBody.empty()` + warning logged.
+        - `bodyParseFailed` flag: `true` for non-JSON/read-failure, `false`
+          for valid JSON or genuinely empty body. Tracked as adapter-internal
+          state (e.g., field or wrapper record) for use in apply-phase
+          skip-guard (S-002-08).
         - Headers → `HttpHeaders.ofMulti()` from PA's `Map<String, String[]>`.
         - Request path → from `Request.getUri()` (path portion only).
         - Request method → from `Request.getMethod().getName()`.
@@ -189,7 +193,8 @@ _To be completed after implementation._
         - Status code → `null` (requests have no status, ADR-0020).
         - Session → `SessionContext.empty()` for now (FR-002-06 in Phase 4).
      2. Implement `PingAccessAdapter.wrapRequest()` with body pre-read,
-        JSON validation with `MessageBody.empty()` fallback, header normalization.
+        JSON validation with `MessageBody.empty()` fallback, `bodyParseFailed`
+        flag tracking, and header normalization.
      3. Run tests, verify all pass.
    - _Requirements covered:_ FR-002-01 (wrapRequest mapping table), S-002-01,
      S-002-07, S-002-08, S-002-27.
@@ -277,6 +282,9 @@ _To be completed after implementation._
           `Outcome.CONTINUE`.
         - `handleResponse()` SUCCESS → response body/status transformed.
         - `handleResponse()` PASSTHROUGH → response untouched.
+        - `handleRequest()` with `bodyParseFailed` → body JSLT expression
+          NOT evaluated, header/URL transforms still apply, original raw
+          bytes forwarded unchanged, `Outcome.CONTINUE` (S-002-08).
      2. **Test first:** Write test: `getErrorHandlingCallback()` returns a
         valid `RuleInterceptorErrorHandlingCallback` instance and does not
         throw (FR-002-02 — this method is abstract on `AsyncRuleInterceptor`
@@ -286,9 +294,11 @@ _To be completed after implementation._
           `type`, `expectedConfiguration`.
         - `configure()`: validate `specsDir`, init `SpecParser`, init
           `TransformEngine`, load specs, optionally load profiles.
-        - `handleRequest()`: build context → wrap → transform → dispatch
-          (SUCCESS → apply, PASSTHROUGH → no-op) → return
-          `Outcome.CONTINUE`.
+         - `handleRequest()`: build context → wrap → check `bodyParseFailed`:
+           if set, skip body expression, apply header/URL/method transforms,
+           forward original raw bytes unchanged (S-002-08); otherwise
+           transform → dispatch (SUCCESS → apply, PASSTHROUGH → no-op) →
+           return `Outcome.CONTINUE`.
         - `handleResponse()`: same flow for response direction.
         - `getErrorHandlingCallback()`: return
           `RuleInterceptorErrorHandlingCallback`.
@@ -682,6 +692,9 @@ _To be completed after implementation._
 | S-002-34 | I9 | JMX metrics disabled (default) |
 | S-002-35 | I7 | PA-specific status codes passthrough (Constraint 9) |
 | S-002-36 | I10 | Runtime PA version mismatch logs WARN remediation (ADR-0035) |
+| S-002-09b | I4a | Profile matching negative case — no match passthrough |
+| S-002-15b | I4a | Multiple specs reverse routing — Spec B triggered |
+| S-002-33b | I9 | JMX metrics reset behavior |
 
 ## Analysis Gate
 
@@ -697,7 +710,7 @@ Run `docs/operations/analysis-gate-checklist.md` at two milestones:
 
 - [ ] All increments (I1–I14) completed and checked off
 - [ ] Quality gate passes (`./gradlew --no-daemon spotlessApply check`)
-- [ ] All 36 scenarios have corresponding test methods
+- [ ] All scenarios defined in `scenarios.md` have corresponding test methods
 - [ ] Scenario coverage matrix in `scenarios.md` has no uncovered FRs/NFRs
 - [ ] Shadow JAR < 5 MB, no PA SDK classes
 - [ ] Thread safety test passes with 10 concurrent threads
