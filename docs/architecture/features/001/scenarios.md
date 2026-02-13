@@ -1485,7 +1485,7 @@ description: >
   Inject the X-Request-ID header value into the response body using the
   $headers read-only JSLT variable. Validates ADR-0002 header-to-body bridge.
 tags: [header, body, injection, adr-0002]
-requires: [FR-001-10]
+refs: [FR-001-10]
 
 transform:
   lang: jslt
@@ -1525,7 +1525,7 @@ description: >
   emit them as response headers using dynamic expr in the headers.add block.
   Validates ADR-0002 body-to-header bridge.
 tags: [header, body, injection, dynamic, adr-0002]
-requires: [FR-001-10]
+refs: [FR-001-10]
 
 transform:
   lang: jslt
@@ -1577,7 +1577,7 @@ description: >
   When $headers references a header that was not sent, JSLT returns null.
   The transform should handle this gracefully.
 tags: [header, edge-case, null, adr-0002]
-requires: [FR-001-10]
+refs: [FR-001-10]
 
 transform:
   lang: jslt
@@ -1617,7 +1617,7 @@ description: >
   the response to 400 when the error field is present.
   Validates ADR-0003 conditional when predicate.
 tags: [status, conditional, error, adr-0003]
-requires: [FR-001-11]
+refs: [FR-001-11]
 
 transform:
   lang: jslt
@@ -1657,7 +1657,7 @@ description: >
   Use $status to include the original HTTP status code in the transformed
   body. Validates ADR-0003 $status read-only variable.
 tags: [status, body, variable, adr-0003]
-requires: [FR-001-11]
+refs: [FR-001-11]
 
 transform:
   lang: jslt
@@ -1692,7 +1692,7 @@ description: >
   Set the response status code to 202 unconditionally, regardless of body.
   Validates ADR-0003 unconditional status set.
 tags: [status, unconditional, adr-0003]
-requires: [FR-001-11]
+refs: [FR-001-11]
 
 transform:
   lang: jslt
@@ -1729,7 +1729,7 @@ code and does NOT abort the entire transform — the body transform still succee
 scenario: S-001-38i
 title: Status when predicate evaluation error — keep original status
 category: Status Code Transforms
-requires: [FR-001-11]
+refs: [FR-001-11]
 references: [ADR-0003]
 tags: [status, error-handling, when-predicate]
 
@@ -1782,7 +1782,7 @@ description: >
   fields are available even though the body transform erases them.
   Validates ADR-0027 original-body evaluation context.
 tags: [url, path-rewrite, de-polymorphize, adr-0027]
-requires: [FR-001-12]
+refs: [FR-001-12]
 
 direction: request
 
@@ -1820,7 +1820,7 @@ description: >
   glob pattern. Dynamic query expr evaluates against the original body.
   Validates FR-001-12 url.query operations.
 tags: [url, query, add, remove, glob, adr-0027]
-requires: [FR-001-12]
+refs: [FR-001-12]
 
 direction: request
 
@@ -1868,7 +1868,7 @@ description: >
   action "delete" becomes DELETE /api/users/123. Validates ADR-0027
   method override with when predicate against original body.
 tags: [url, method, override, conditional, adr-0027]
-requires: [FR-001-12]
+refs: [FR-001-12]
 
 direction: request
 
@@ -1907,7 +1907,7 @@ description: >
   engine throws ExpressionEvalException. URL rewrite must produce a
   valid string.
 tags: [url, error, null, validation]
-requires: [FR-001-12]
+refs: [FR-001-12]
 
 direction: request
 
@@ -1938,7 +1938,7 @@ description: >
   A spec declares url.method.set with an invalid HTTP method. The engine
   must reject this at load time with SpecParseException.
 tags: [url, method, validation, load-time]
-requires: [FR-001-12]
+refs: [FR-001-12]
 
 url:
   method:
@@ -1963,7 +1963,7 @@ description: >
   is only meaningful for request transforms, the url block is ignored and
   a warning is logged at load time.
 tags: [url, direction, response, warning]
-requires: [FR-001-12]
+refs: [FR-001-12]
 
 direction: response
 
@@ -2006,7 +2006,7 @@ description: >
   constructs a simplified path and removes the extracted query param.
   Validates FR-001-12 + ADR-0021 ($queryParams) working together.
 tags: [url, body, extraction, path-segment, query-param, adr-0027, adr-0021]
-requires: [FR-001-12]
+refs: [FR-001-12]
 
 direction: request
 
@@ -2068,7 +2068,7 @@ description: >
   the spec at load time with a clear diagnostic.
   Validates ADR-0004 load-time capability validation.
 tags: [engine, capability, jolt, validation, adr-0004]
-requires: [FR-001-02]
+refs: [FR-001-02]
 
 transform:
   lang: jolt
@@ -2097,7 +2097,7 @@ description: >
   support context variables, the engine must reject at load time.
   Validates ADR-0004 load-time capability validation.
 tags: [engine, capability, jolt, validation, adr-0004]
-requires: [FR-001-02]
+refs: [FR-001-02]
 
 transform:
   lang: jolt
@@ -2132,7 +2132,7 @@ description: >
   Two profiles reference different versions of the same spec. Both must
   resolve independently at load time. Validates ADR-0005 concurrent versioning.
 tags: [version, profile, concurrent, adr-0005]
-requires: [FR-001-05]
+refs: [FR-001-05]
 
 loaded_specs:
   - id: callback-prettify
@@ -2175,7 +2175,7 @@ description: >
   The engine must reject the profile at load time.
   Validates ADR-0005 fail-fast version resolution.
 tags: [version, profile, validation, adr-0005]
-requires: [FR-001-05]
+refs: [FR-001-05]
 
 loaded_specs:
   - id: callback-prettify
@@ -2200,7 +2200,7 @@ description: >
   The engine must resolve to the latest loaded version (highest semver).
   Validates ADR-0005 latest-version fallback.
 tags: [version, profile, latest, adr-0005]
-requires: [FR-001-05]
+refs: [FR-001-05]
 
 loaded_specs:
   - id: callback-prettify
@@ -2239,7 +2239,7 @@ description: >
   Two profiles match the same request. The profile with more literal path
   segments wins. Validates ADR-0006 specificity scoring.
 tags: [profile, match, specificity, adr-0006]
-requires: [FR-001-05]
+refs: [FR-001-05]
 
 profiles:
   - id: catch-all
@@ -2268,7 +2268,7 @@ description: >
   The engine must reject both at load time as ambiguous.
   Validates ADR-0006 tie-breaking rules.
 tags: [profile, match, ambiguous, validation, adr-0006]
-requires: [FR-001-05]
+refs: [FR-001-05]
 
 profiles:
   - id: profile-a
@@ -2294,7 +2294,7 @@ description: >
   The profile with more constraints (method, content-type) wins.
   Validates ADR-0006 tie-breaking by constraint count.
 tags: [profile, match, tiebreaker, adr-0006]
-requires: [FR-001-05]
+refs: [FR-001-05]
 
 profiles:
   - id: broad
@@ -2337,7 +2337,7 @@ description: >
   but never body content or header values.
   Validates NFR-001-09 telemetry SPI.
 tags: [observability, telemetry, spi, adr-0007]
-requires: [NFR-001-09]
+refs: [NFR-001-09]
 
 setup:
   telemetry_listener: mock          # test double captures events
@@ -2370,7 +2370,7 @@ description: >
   log entries and telemetry events. No new traces are created.
   Validates NFR-001-10 trace correlation.
 tags: [observability, tracing, correlation, adr-0007]
-requires: [NFR-001-10]
+refs: [NFR-001-10]
 
 request:
   headers:
@@ -2403,7 +2403,7 @@ description: >
   logic and header-aware enrichment. Two separate specs, same route in profile.
   This is the sanctioned approach per ADR-0008 (no spec-level pipelines).
 tags: [profile-chaining, mixed-engine, jolt, jslt, adr-0008]
-requires: [FR-001-01, FR-001-05]
+refs: [FR-001-01, FR-001-05]
 
 # Spec 1: JOLT structural shift (rename user_id → userId, etc.)
 spec_1:
@@ -2488,7 +2488,7 @@ description: >
   steps in declaration order: strip-internal → expr → add-metadata.
   Validates FR-001-08 happy path and ADR-0014.
 tags: [mappers, mapperRef, apply, resolution, fr-001-08, adr-0014]
-requires: [FR-001-08]
+refs: [FR-001-08]
 
 spec:
   id: order-transform
@@ -2548,7 +2548,7 @@ description: >
   in the `mappers` block. The engine MUST reject the spec at load time with a
   descriptive error. Validates FR-001-08 validation path and ADR-0014.
 tags: [mappers, mapperRef, apply, validation, error, fr-001-08, adr-0014]
-requires: [FR-001-08]
+refs: [FR-001-08]
 
 spec:
   id: broken-spec
@@ -2585,7 +2585,7 @@ description: >
   accidental double-application.
   Validates FR-001-08 validation path and ADR-0014.
 tags: [mappers, mapperRef, duplicate, validation, error, fr-001-08, adr-0014]
-requires: [FR-001-08]
+refs: [FR-001-08]
 
 spec:
   id: duplicate-ref-spec
@@ -2618,7 +2618,7 @@ description: >
   but omits `expr`. The engine MUST reject at load time because `expr` must
   appear exactly once in the apply list. Validates FR-001-08 / ADR-0014.
 tags: [mappers, apply, validation, error, fr-001-08, adr-0014]
-requires: [FR-001-08]
+refs: [FR-001-08]
 
 spec:
   id: no-expr-spec
@@ -2659,7 +2659,7 @@ description: >
   The engine parses and stores the schemas at load time without error.
   Validates FR-001-09 and ADR-0001 happy path.
 tags: [schema, validation, load-time, fr-001-09, adr-0001]
-requires: [FR-001-09]
+refs: [FR-001-09]
 
 spec:
   id: validated-transform
@@ -2701,7 +2701,7 @@ description: >
   with a descriptive error.
   Validates FR-001-09 and ADR-0001 validation path.
 tags: [schema, validation, error, load-time, fr-001-09, adr-0001]
-requires: [FR-001-09]
+refs: [FR-001-09]
 
 spec:
   id: bad-schema-spec
@@ -2734,7 +2734,7 @@ description: >
   and passes the original message through.
   Validates FR-001-09 strict-mode runtime path and ADR-0001.
 tags: [schema, validation, strict-mode, runtime, fr-001-09, adr-0001]
-requires: [FR-001-09]
+refs: [FR-001-09]
 
 config:
   schema_validation: strict   # enable runtime validation
@@ -2794,7 +2794,7 @@ description: >
   undefined variable). The entire chain must abort — error response returned,
   spec-b never executes. Original message is NOT passed through (ADR-0022).
 tags: [profile-chaining, abort, error, adr-0012, adr-0013]
-requires: [FR-001-05, FR-001-07]
+refs: [FR-001-05, FR-001-07]
 
 profile:
   transforms:
@@ -2840,7 +2840,7 @@ description: >
   Validates DO-001-07 (TransformContext): the $headers variable is bound during
   JSLT body evaluation, allowing header values to be embedded in the output body.
 tags: [transform-context, headers, body, do-001-07]
-requires: [FR-001-02, FR-001-10]
+refs: [FR-001-02, FR-001-10]
 
 transform:
   lang: jslt
@@ -2880,7 +2880,7 @@ description: >
   and an error response is returned to the caller. The native gateway message
   is NOT forwarded.
 tags: [copy-on-wrap, abort, error-response, adr-0013, adr-0022]
-requires: [FR-001-04, FR-001-07]
+refs: [FR-001-04, FR-001-07]
 
 transform:
   lang: jslt
@@ -2922,7 +2922,7 @@ description: >
   and `direction: request` in the same profile. The engine applies the same expression
   in both phases. Validates ADR-0016.
 tags: [direction, agnostic, profile, adr-0016]
-requires: [FR-001-03]
+refs: [FR-001-03]
 
 spec:
   id: strip-debug
@@ -2975,7 +2975,7 @@ description: >
   `$status` is `null` because no HTTP status exists yet. The expression guards with
   `if ($status)`. Validates ADR-0017.
 tags: [status, null, request, direction, adr-0017]
-requires: [FR-001-11, FR-001-03]
+refs: [FR-001-11, FR-001-03]
 
 spec:
   id: status-aware
@@ -3016,7 +3016,7 @@ description: >
   `$` prefix). The engine MUST reject at load time with a descriptive error.
   Validates ADR-0019 / NFR-001-06.
 tags: [sensitive, validation, error, adr-0019, nfr-001-06]
-requires: [FR-001-01]
+refs: [FR-001-01]
 
 spec:
   id: bad-sensitive-spec
@@ -3050,7 +3050,7 @@ description: >
   The engine MUST accept the spec and store the paths on TransformSpec.sensitivePaths.
   Validates ADR-0019 / NFR-001-06 (happy path).
 tags: [sensitive, validation, load-time, adr-0019, nfr-001-06]
-requires: [FR-001-01]
+refs: [FR-001-01]
 
 spec:
   id: valid-sensitive-spec
@@ -3094,7 +3094,7 @@ description: >
   $status is null (not -1). The expression tests strict null equality.
   Validates ADR-0020 superseding int/-1 sentinel.
 tags: [status, null, nullable, integer, adr-0020]
-requires: [FR-001-11, FR-001-02]
+refs: [FR-001-11, FR-001-02]
 
 spec:
   id: status-type-check
@@ -3139,7 +3139,7 @@ description: >
   A spec references $queryParams to branch transformation logic based on the
   authIndexType query parameter. Validates ADR-0021.
 tags: [query-params, context, branching, adr-0021]
-requires: [FR-001-02]
+refs: [FR-001-02]
 
 spec:
   id: auth-type-aware
@@ -3187,7 +3187,7 @@ description: >
   A spec references $cookies to read the user's language preference from a
   request cookie and include it in the transformed output. Validates ADR-0021.
 tags: [cookies, context, adr-0021]
-requires: [FR-001-02]
+refs: [FR-001-02]
 
 spec:
   id: locale-aware-transform
@@ -3241,7 +3241,7 @@ description: >
   exception subtype of TransformLoadException, enabling the adapter to log and
   respond specifically. Validates ADR-0024 load-time tier.
 tags: [error-catalogue, load-time, exception-hierarchy, adr-0024]
-requires: [FR-001-07]
+refs: [FR-001-07]
 
 # Spec 1: Invalid YAML
 spec_yaml_broken:
@@ -3304,7 +3304,7 @@ description: >
   error response with URN type 'urn:message-xform:error:eval-budget-exceeded'.
   Validates ADR-0024 evaluation-time tier.
 tags: [error-catalogue, eval-time, budget, exception-hierarchy, adr-0024]
-requires: [FR-001-07]
+refs: [FR-001-07]
 
 config:
   engines:
@@ -3351,7 +3351,7 @@ description: >
   enabling the adapter to log exactly which file failed.
   Validates ADR-0024 common exception fields.
 tags: [error-catalogue, load-time, source-path, adr-0024]
-requires: [FR-001-07]
+refs: [FR-001-07]
 
 spec_path: "/config/specs/broken-spec.yaml"
 spec_content: |
@@ -3382,7 +3382,7 @@ description: >
   A response carries two Set-Cookie headers. $headers returns only the first
   value, while $headers_all returns both as an array. Validates ADR-0026.
 tags: [headers, multi-value, headers-all, set-cookie, adr-0026]
-requires: [FR-001-10]
+refs: [FR-001-10]
 
 transform:
   lang: jslt
@@ -3420,7 +3420,7 @@ description: >
   When a header is not present, $headers_all returns null (not an empty array).
   This is consistent with $headers behaviour. Validates ADR-0026.
 tags: [headers, multi-value, headers-all, null, edge-case, adr-0026]
-requires: [FR-001-10]
+refs: [FR-001-10]
 
 transform:
   lang: jslt
@@ -3456,7 +3456,7 @@ description: >
   exposes all values. The spec extracts the original client IP (first element).
   Validates ADR-0026.
 tags: [headers, multi-value, headers-all, x-forwarded-for, adr-0026]
-requires: [FR-001-10]
+refs: [FR-001-10]
 
 transform:
   lang: jslt
@@ -3484,6 +3484,8 @@ expected_output:
 
 ---
 
+### S-001-72: Header Case Normalization
+
 ```yaml
 scenario: S-001-72
 name: header-case-normalization
@@ -3492,7 +3494,7 @@ description: >
   JSLT expressions reference lowercase names regardless of the original casing
   provided by the gateway. Validates FR-001-10 header normalization rule.
 tags: [headers, case-insensitive, normalization, rfc9110]
-requires: [FR-001-10]
+refs: [FR-001-10]
 
 transform:
   lang: jslt
@@ -3519,6 +3521,8 @@ expected_output:
 
 ---
 
+### S-001-73: Chain Direction Conflict — Rejected at Load Time
+
 ```yaml
 scenario: S-001-73
 name: chain-direction-conflict-rejected
@@ -3527,7 +3531,7 @@ description: >
   conflicting directions (one 'request', one 'response') MUST be rejected
   at load time. Validates FR-001-05 direction consistency rule.
 tags: [profile, chain, direction, validation, error, load-time]
-requires: [FR-001-05]
+refs: [FR-001-05]
 
 profile:
   id: conflicting-directions
@@ -3565,7 +3569,7 @@ description: >
   profile_id. Start and completion events MUST also be logged.
   Validates NFR-001-08 chain-level logging.
 tags: [chain-step-logging, structured-logging, nfr-001-08, profile-chaining]
-requires: [FR-001-05]
+refs: [FR-001-05]
 
 profile:
   id: log-test-profile
@@ -3611,7 +3615,7 @@ description: >
   The old registry is entirely replaced, not merged.
   Validates NFR-001-05 (atomic registry swap).
 tags: [hot-reload, atomic-swap, registry, nfr-001-05]
-requires: [NFR-001-05]
+refs: [NFR-001-05]
 
 phase_1:
   specs:
@@ -3648,7 +3652,7 @@ description: >
   continues serving with the OLD registry — no data loss or broken state.
   Validates NFR-001-05 (fail-safe reload).
 tags: [hot-reload, fail-safe, error, registry, nfr-001-05]
-requires: [NFR-001-05]
+refs: [NFR-001-05]
 
 phase_1:
   specs:
@@ -3689,7 +3693,7 @@ description: >
   of old specs and new specs within a single transform call.
   Validates NFR-001-05 (thread-safe atomic swap).
 tags: [hot-reload, concurrent, thread-safety, atomic-swap, nfr-001-05]
-requires: [NFR-001-05]
+refs: [NFR-001-05]
 
 phase_1:
   specs:
@@ -3734,7 +3738,7 @@ description: >
   Measures p50, p90, p95, p99, max latency and throughput.
   p95 MUST be < 5ms per NFR-001-03.
 tags: [benchmark, performance, identity, nfr-001-03, adr-0028]
-requires: [NFR-001-03]
+refs: [NFR-001-03]
 
 transform:
   lang: jslt
@@ -3758,7 +3762,7 @@ description: >
   Representative of typical API versioning use cases.
   p95 MUST be < 5ms per NFR-001-03.
 tags: [benchmark, performance, field-mapping, nfr-001-03, adr-0028]
-requires: [NFR-001-03]
+refs: [NFR-001-03]
 
 transform:
   lang: jslt
@@ -3789,7 +3793,7 @@ description: >
   ~50KB payload — worst-case NFR-001-03 scenario.
   p95 MUST be < 5ms per NFR-001-03.
 tags: [benchmark, performance, complex, array, nfr-001-03, adr-0028]
-requires: [NFR-001-03]
+refs: [NFR-001-03]
 
 transform:
   lang: jslt
