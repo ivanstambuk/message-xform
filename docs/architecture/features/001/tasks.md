@@ -1281,7 +1281,7 @@ Track long-running or shared commands with timestamps to avoid duplicate work.
   toString with/without spec ref. Engine wired: `transformWithSpec` and `transformChain`
   thread `spec.id()`/`spec.version()`. All tests pass. BUILD SUCCESSFUL.
 
-- [ ] **T-001-68** — Update stale `GatewayAdapter.java` Javadoc (audit F-003)
+- [x] **T-001-68** — Update stale `GatewayAdapter.java` Javadoc (audit F-003) ✅ 2026-02-13
   _Intent:_ The `GatewayAdapter` SPI Javadoc still references pre-refactor types
   and fields: `{@code NullNode}` (now `MessageBody.empty()`), `{@code headersAll}`
   (now `HttpHeaders.toMultiValueMap()`), `{@code contentType}` (now
@@ -1291,6 +1291,9 @@ Track long-running or shared commands with timestamps to avoid duplicate work.
   _Stale locations:_ Lines 20, 55, 58, 61, 81, 83, 88.
   _Verify:_ `./gradlew :core:javadoc` succeeds with no warnings.
   _Source:_ Feature 002 audit report (2026-02-13), finding F-003.
+  _Status:_ ✅ Already fixed during audit session (2026-02-13). Javadoc now
+  references `MessageBody`, `HttpHeaders`, `SessionContext`, and current `Message`
+  field accessors. No stale references remain.
 
 ## Notes / TODOs
 
