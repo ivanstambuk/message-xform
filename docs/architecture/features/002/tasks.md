@@ -75,13 +75,14 @@ _Last updated:_ 2026-02-14
   _Implement:_ Convert `Map<String, String[]>` to `HttpHeaders.ofMulti(multiMap)` (provides both single-value and multi-value views).
   _Verify:_ Header normalization and first-value semantics tests pass.
 
-- [ ] **T-002-05** — Request body read + JSON parse fallback (FR-002-01, Constraint 5, S-002-01, S-002-07, S-002-08)
+- [ ] **T-002-05** — Request body read + JSON parse fallback + bodyParseFailed tracking (FR-002-01, Constraint 5, S-002-01, S-002-07, S-002-08)
   _Test first:_ `PingAccessAdapterRequestTest.bodyReadAndParseFallback()` covering:
   - `!body.isRead()` -> `body.read()` invoked.
   - `IOException`/`AccessException` from `body.read()` -> `MessageBody.empty()` + warning.
   - malformed/non-JSON -> `MessageBody.empty()` + warning.
-  _Implement:_ Body pre-read and parse strategy in `wrapRequest()`.
-  _Verify:_ Body fallback tests pass.
+  - `bodyParseFailed` flag: `true` for non-JSON/read-failure, `false` for valid JSON or empty body (S-002-08).
+  _Implement:_ Body pre-read, parse strategy, and `bodyParseFailed` flag tracking in `wrapRequest()`.
+  _Verify:_ Body fallback and flag tests pass.
 
 - [ ] **T-002-06** — Request metadata mapping: method, content-type, request status, session placeholder (FR-002-01)
   _Test first:_ `PingAccessAdapterRequestTest.requestMetadataMapping()`.
@@ -90,13 +91,13 @@ _Last updated:_ 2026-02-14
 
 #### I3 — `wrapResponse()` + apply helpers (FR-002-01)
 
-- [ ] **T-002-07** — Response wrap mapping + debug log (FR-002-01, S-002-02, S-002-32)
+- [ ] **T-002-07** — Response wrap mapping + debug log + bodyParseFailed tracking (FR-002-01, S-002-02, S-002-32)
   _Test first:_ `PingAccessAdapterResponseTest.wrapResponseMapping()` covering:
   - status/headers mapping
-  - non-JSON fallback
-  - `body.read()` failure (`IOException`/`AccessException`) fallback
+  - non-JSON fallback + `bodyParseFailed` flag set (parity with request side)
+  - `body.read()` failure (`IOException`/`AccessException`) fallback + `bodyParseFailed` flag set
   - DEBUG log `"wrapResponse: {} {} -> status={}"`
-  _Implement:_ `wrapResponse()` mapping behavior.
+  _Implement:_ `wrapResponse()` mapping behavior with `bodyParseFailed` tracking.
   _Verify:_ Wrap response tests pass.
 
 - [ ] **T-002-08** — Request-side apply logic (URL + method + body write path) (FR-002-01, S-002-06)
@@ -200,10 +201,14 @@ _Last updated:_ 2026-02-14
 
 #### I7 — PASS_THROUGH + DENY behavior (FR-002-11)
 
-- [ ] **T-002-20** — Request SUCCESS/PASSTHROUGH orchestration
-  _Test first:_ `TransformFlowTest.requestSuccessAndPassthrough()`.
-  _Implement:_ Request dispatch and `Outcome.CONTINUE` paths.
-  _Verify:_ Request success/passthrough tests pass.
+- [ ] **T-002-20** — Request SUCCESS/PASSTHROUGH/bodyParseFailed orchestration
+  _Test first:_ `TransformFlowTest.requestSuccessAndPassthrough()` +
+  `TransformFlowTest.bodyParseFailedSkipGuard()` (S-002-08):
+  - when `bodyParseFailed`: body JSLT expression NOT evaluated, header/URL
+    transforms still apply, original raw bytes forwarded unchanged,
+    original Content-Type preserved, `Outcome.CONTINUE`.
+  _Implement:_ Request dispatch, `Outcome.CONTINUE` paths, and `bodyParseFailed` skip-guard.
+  _Verify:_ Request success/passthrough/skip-guard tests pass.
 
 - [ ] **T-002-21** — Response SUCCESS/PASSTHROUGH orchestration
   _Test first:_ `TransformFlowTest.responseSuccessAndPassthrough()`.
