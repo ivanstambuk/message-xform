@@ -156,7 +156,8 @@ expressed in domain language rather than Java syntax.
 1. **No BDD prose.** Scenarios MUST use one of the two YAML schemas above.
    Free-form Given/When/Then paragraphs are not permitted.
 2. **One scenario per heading.** Each `## S-NNN-XX:` section contains exactly
-   one YAML code block.
+   one YAML code block. For large files (>20 scenarios), scenarios MAY be grouped
+   under `## Category N: Name` headings with scenarios at `### S-NNN-XX:` level.
 3. **Notes and rationale** may appear as markdown blockquotes (`> ...`) after
    the YAML block, but must be brief (1-3 lines).
 4. **Horizontal rules** (`---`) separate scenarios for readability.

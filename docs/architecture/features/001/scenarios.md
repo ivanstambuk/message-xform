@@ -1,14 +1,15 @@
-# Feature 001 – Scenarios
+# Feature 001 – Transform Engine: Scenarios
 
 | Field | Value |
 |-------|-------|
 | Status | Draft |
-| Last updated | 2026-02-07 |
+| Last updated | 2026-02-13 |
 | Linked spec | `docs/architecture/features/001/spec.md` |
+| Format | Data Transform (see `docs/architecture/spec-guidelines/scenarios-format.md`) |
 
-> Guardrail: Each scenario is a **testable contract**. The engine MUST produce the
-> exact `expected_output` given the `input` and `transform`. Scenarios serve as
-> integration test fixtures — they can be loaded directly by parameterized JUnit tests.
+> Guardrail: Each scenario is a **testable contract** expressed as structured
+> YAML. Scenarios serve as integration test fixtures — they can be loaded or
+> parsed directly by test infrastructure.
 
 ---
 
@@ -1760,7 +1761,7 @@ notes: >
 
 ---
 
-## Category 10a: URL Rewriting
+## Category 11: URL Rewriting
 
 Scenarios validating URL rewriting — path rewrite, query parameter operations,
 and HTTP method override (ADR-0027, FR-001-12).
@@ -2050,7 +2051,7 @@ expected_query_params:
 
 ---
 
-## Category 11: Engine Capability Validation
+## Category 12: Engine Capability Validation
 
 Scenarios validating engine support matrix enforcement (ADR-0004, FR-001-02).
 
@@ -2118,7 +2119,7 @@ expected_error:
 
 ---
 
-## Category 12: Version Pinning
+## Category 13: Version Pinning
 
 Scenarios validating profile-to-spec version pinning (ADR-0005, FR-001-05).
 
@@ -2225,7 +2226,7 @@ test_request:
 
 ---
 
-## Category 13: Profile Match Resolution
+## Category 14: Profile Match Resolution
 
 Scenarios validating most-specific-wins profile matching (ADR-0006, FR-001-05, NFR-001-08).
 
@@ -2320,7 +2321,7 @@ expected_match:
 
 ---
 
-## Category 14: Observability
+## Category 15: Observability
 
 Scenarios validating the telemetry SPI and trace correlation (ADR-0007, NFR-001-09, NFR-001-10).
 
@@ -2387,7 +2388,7 @@ expected_log_entry:
 
 ---
 
-## Category 10: Profile-Level Chaining (ADR-0008)
+## Category 16: Profile-Level Chaining (ADR-0008)
 
 Mixed-engine composition at the profile level — the sanctioned approach per ADR-0008.
 
@@ -2472,7 +2473,7 @@ expected_output:
 
 ---
 
-## Category 11: Reusable Mappers (FR-001-08)
+## Category 17: Reusable Mappers (FR-001-08)
 
 Mapper definitions and `mapperRef` resolution within transform specs.
 
@@ -2644,7 +2645,7 @@ expected_error:
 
 ---
 
-## Category 12: Schema Validation (FR-001-09 / ADR-0001)
+## Category 18: Schema Validation (FR-001-09 / ADR-0001)
 
 Input/output JSON Schema validation at load time and runtime.
 
@@ -2775,7 +2776,7 @@ expected_log:
 
 ---
 
-## Category 12: Pipeline Chaining & Message Semantics
+## Category 19: Pipeline Chaining & Message Semantics
 
 Scenarios validating profile-level chaining (ADR-0012), TransformContext (DO-001-07),
 and copy-on-wrap adapter semantics (ADR-0013).
@@ -3221,7 +3222,7 @@ expected_context:
 
 ---
 
-## Category 14: Error Type Catalogue (ADR-0024)
+## Category 20: Error Type Catalogue (ADR-0024)
 
 Scenarios validating that the engine exposes the correct exception types to adapters
 and that error responses carry the correct URN `type` values.
@@ -3368,7 +3369,7 @@ expected_error:
 
 ---
 
-## Category 15: Multi-Value Header Access (ADR-0026)
+## Category 21: Multi-Value Header Access (ADR-0026)
 
 Scenarios validating that `$headers_all` exposes all header values as arrays.
 
@@ -3594,7 +3595,7 @@ expected_log_entries:
 
 ---
 
-## Category 16: Hot Reload & Atomic Registry Swap (NFR-001-05)
+## Category 22: Hot Reload & Atomic Registry Swap (NFR-001-05)
 
 Scenarios validating the immutable `TransformRegistry` snapshot, atomic swap via
 `TransformEngine.reload()`, and fail-safe behaviour when reload encounters errors.
@@ -3716,7 +3717,7 @@ assertion: each_result_version_is_one_of ["v1", "v2"]
 
 ---
 
-## Category 17: Performance Benchmarks (NFR-001-03, ADR-0028)
+## Category 23: Performance Benchmarks (NFR-001-03, ADR-0028)
 
 Opt-in benchmark scenarios verifying NFR-001-03 (transformation p95 latency < 5ms
 for ≤ 50KB payloads). Enabled via `-Dio.messagexform.benchmark=true` or
@@ -4041,7 +4042,7 @@ assert:
 
 ---
 
-## Category 12: Session Context Binding
+## Category 24: Session Context Binding
 
 Scenarios for gateway-provided session context (`$session`). See ADR-0030.
 
