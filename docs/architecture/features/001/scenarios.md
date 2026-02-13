@@ -54,6 +54,7 @@ description: >
   Transform PingAM callback response with NameCallback + PasswordCallback
   into a clean JSON structure for frontend consumption.
 tags: [pingam, callback, structural, core]
+refs: [FR-001-01]
 
 transform:
   lang: jslt
@@ -125,6 +126,7 @@ description: >
   Reverse transform: convert clean frontend JSON with filled values back into
   PingAM callback format for submission.
 tags: [pingam, callback, reverse, bidirectional]
+refs: [FR-001-01, FR-001-03]
 
 transform:
   lang: jslt
@@ -193,6 +195,7 @@ description: >
   Transform PingAM authentication success response: keep tokenId, normalize
   realm, strip successUrl (internal AM URL not useful for frontend).
 tags: [pingam, success, remove-fields]
+refs: [FR-001-01]
 
 transform:
   lang: jslt
@@ -225,6 +228,7 @@ description: >
   Transform PingAM callbacks with ChoiceCallback (select from list) and
   ConfirmationCallback (confirm action) into clean frontend fields.
 tags: [pingam, callback, choice, structural]
+refs: [FR-001-01]
 
 transform:
   lang: jslt
@@ -302,6 +306,7 @@ description: >
   When PingAM returns a success response (no callbacks), the transform
   should correctly detect the non-challenge case.
 tags: [pingam, edge-case, conditional]
+refs: [FR-001-01]
 
 transform:
   lang: jslt
@@ -343,6 +348,7 @@ description: >
   Remove internal/debug fields from API response before exposing to consumer.
   Common gateway pattern: Kong remove operation equivalent.
 tags: [gateway, remove, security, kong-pattern]
+refs: [FR-001-01]
 
 transform:
   lang: jslt
@@ -383,6 +389,7 @@ description: >
   Remove specific internal fields while passing through ALL other fields
   unchanged. Tests JSLT's object matching pattern (* : .).
 tags: [gateway, remove, open-world, passthrough]
+refs: [FR-001-01, NFR-001-04]
 
 transform:
   lang: jslt
@@ -425,6 +432,7 @@ description: >
   Rename fields for API version migration. Common gateway pattern:
   v1 used snake_case, v2 uses camelCase. Transform backend v1 to frontend v2.
 tags: [gateway, rename, api-versioning, kong-pattern]
+refs: [FR-001-01]
 
 transform:
   lang: jslt
@@ -466,6 +474,7 @@ description: >
   Add default values for missing fields. Common gateway pattern:
   ensure consumer always gets a complete response shape.
 tags: [gateway, defaults, kong-pattern]
+refs: [FR-001-01]
 
 transform:
   lang: jslt
@@ -502,6 +511,7 @@ description: >
   Inject gateway metadata into the response body for traceability.
   Like Kong's add operation but for the body structure.
 tags: [gateway, enrichment, metadata]
+refs: [FR-001-01]
 
 transform:
   lang: jslt
@@ -546,6 +556,7 @@ description: >
   Flatten a deeply nested user profile into a flat structure for a
   simplified API consumer. Tests deep path access.
 tags: [structural, flatten, deep-path]
+refs: [FR-001-01]
 
 transform:
   lang: jslt
@@ -599,6 +610,7 @@ description: >
   Restructure a flat API response into a nested hierarchy for a richer
   frontend model. Reverse of S-001-11.
 tags: [structural, nesting, reverse]
+refs: [FR-001-01]
 
 transform:
   lang: jslt
@@ -648,6 +660,7 @@ description: >
   Transform SCIM-style user list response into a simplified list API
   format. Tests array iteration with [for ...].
 tags: [structural, array, scim]
+refs: [FR-001-01]
 
 transform:
   lang: jslt
@@ -718,6 +731,7 @@ description: >
   Normalize an OAuth2 token response from a specific IdP into a standard
   format. Tests conditional logic and default values.
 tags: [structural, oauth, conditional, normalization]
+refs: [FR-001-01]
 
 transform:
   lang: jslt
@@ -765,6 +779,7 @@ description: >
   Produce a different output shape depending on whether the upstream response
   indicates success or error. Tests if/else conditional logic.
 tags: [conditional, error-handling, structural]
+refs: [FR-001-01]
 
 transform:
   lang: jslt
@@ -812,6 +827,7 @@ description: >
   Same transform as S-001-15 but with a success response to verify the
   other branch of the conditional.
 tags: [conditional, structural]
+refs: [FR-001-01]
 
 transform:
   # Same transform as S-001-15
@@ -860,6 +876,7 @@ description: >
   Map backend status codes to frontend-friendly labels using conditional
   expressions. Common integration pattern.
 tags: [conditional, value-mapping, enum]
+refs: [FR-001-01]
 
 transform:
   lang: jslt
@@ -906,6 +923,7 @@ description: >
   When the input does not match any transform profile, it MUST be passed
   through completely unmodified.
 tags: [passthrough, edge-case, safety]
+refs: [FR-001-06]
 
 transform: null   # No transform matches
 
@@ -933,6 +951,7 @@ description: >
   When the message body is not valid JSON, the engine MUST pass through
   unmodified. No transformation, no error.
 tags: [passthrough, edge-case, safety]
+refs: [FR-001-06, FR-001-04]
 
 transform:
   lang: jslt
@@ -957,6 +976,7 @@ description: >
   those fields MUST be preserved in the output (open-world assumption).
   Tests JSLT's * : . object matching.
 tags: [open-world, passthrough, forward-compatibility]
+refs: [FR-001-01, NFR-001-04]
 
 transform:
   lang: jslt
@@ -994,6 +1014,7 @@ description: >
   Transform handles empty JSON object input without error.
   All derived fields should be null or use defaults.
 tags: [edge-case, empty, robustness]
+refs: [FR-001-01]
 
 transform:
   lang: jslt
@@ -1023,6 +1044,7 @@ description: >
   Transform correctly handles null values — they should be passed through
   as null, not dropped or converted to empty strings.
 tags: [edge-case, null, robustness]
+refs: [FR-001-01]
 
 transform:
   lang: jslt
@@ -1057,6 +1079,7 @@ description: >
   Transform a large array of objects. Tests that the engine handles
   non-trivial array sizes within the latency budget (<5ms).
 tags: [performance, array, large]
+refs: [FR-001-01, NFR-001-03]
 performance_budget_ms: 5
 
 transform:
@@ -1100,6 +1123,7 @@ description: >
   message is NOT passed through — the downstream service expects the transformed
   schema and would fail anyway.
 tags: [error, error-response, safety, adr-0022]
+refs: [FR-001-07]
 
 transform:
   lang: jslt
@@ -1136,6 +1160,7 @@ description: >
   Simple rename transform using JSLT engine.
   Part of multi-engine comparison set with S-001-26, S-001-27.
 tags: [multi-engine, jslt, rename]
+refs: [FR-001-02]
 
 transform:
   lang: jslt
@@ -1163,6 +1188,7 @@ description: >
   Same rename transform as S-001-25 but using JOLT engine.
   Validates engine SPI interchangeability.
 tags: [multi-engine, jolt, rename]
+refs: [FR-001-02]
 
 transform:
   lang: jolt
@@ -1193,6 +1219,7 @@ description: >
   Same rename transform as S-001-25 but using jq engine.
   Validates engine SPI interchangeability.
 tags: [multi-engine, jq, rename]
+refs: [FR-001-02]
 
 transform:
   lang: jq
@@ -1217,6 +1244,7 @@ description: >
   When a spec declares an unknown engine, it MUST be rejected at load
   time with a clear error message.
 tags: [multi-engine, error, validation]
+refs: [FR-001-02]
 
 transform:
   lang: nonexistent-engine
@@ -1248,6 +1276,7 @@ description: >
   3. Forward again: PingAM → Clean JSON (values preserved)
   Tests referential integrity of the transform pair.
 tags: [bidirectional, round-trip, pingam, integration]
+refs: [FR-001-03]
 
 forward:
   lang: jslt
@@ -1342,6 +1371,7 @@ description: >
   Bidirectional transform between flat API format and nested domain model.
   Forward: flat → nested. Reverse: nested → flat.
 tags: [bidirectional, structural, round-trip]
+refs: [FR-001-03]
 
 forward:
   lang: jslt
@@ -1402,6 +1432,7 @@ description: >
   Transform a backend-specific error response into RFC 9457 Problem Details
   format. Common gateway use case for error format standardization.
 tags: [error-normalization, rfc9457, structural]
+refs: [FR-001-07]
 
 transform:
   lang: jslt
@@ -1440,6 +1471,7 @@ description: >
   PingAM returns errors in a non-standard format. Normalize to a consistent
   error envelope for the frontend.
 tags: [pingam, error-normalization, structural]
+refs: [FR-001-07]
 
 transform:
   lang: jslt
@@ -4063,6 +4095,7 @@ description: >
   it into the request body as userId. Tests basic $session binding in request
   direction.
 tags: [session, inject, request, adr-0030]
+refs: [FR-001-13, ADR-0030]
 
 transform:
   lang: jslt
@@ -4104,6 +4137,7 @@ description: >
   sensitive admin fields in the response only when the session has the admin
   role. Tests $session in response direction with conditional logic.
 tags: [session, conditional, response, adr-0030]
+refs: [FR-001-13, ADR-0030]
 
 transform:
   lang: jslt
@@ -4149,6 +4183,7 @@ description: >
   gracefully handles null session — JSLT null-access returns null, which
   JSLT omits from output. Tests null-safety of $session binding.
 tags: [session, null, edge-case, adr-0030]
+refs: [FR-001-13, ADR-0030]
 
 transform:
   lang: jslt
@@ -4183,6 +4218,7 @@ description: >
   Spec declares lang: jolt but the expression references $session. JOLT does
   not support context variables. Engine MUST reject at load time.
 tags: [session, jolt, validation, load-time, adr-0030]
+refs: [FR-001-13, ADR-0030]
 
 transform:
   lang: jolt
