@@ -515,7 +515,11 @@ public final class TransformEngine {
         }
 
         LOG.info("Chain execution complete: profile_id={}, steps={}", profileId, totalSteps);
-        return TransformResult.success(current);
+        // T-001-67: Use last step's spec for provenance (chain result reflects
+        // the final transform)
+        ProfileEntry lastEntry = chain.get(chain.size() - 1);
+        return TransformResult.success(
+                current, lastEntry.spec().id(), lastEntry.spec().version());
     }
 
     /**
@@ -627,7 +631,7 @@ public final class TransformEngine {
                 }
             }
 
-            return TransformResult.success(transformedMessage);
+            return TransformResult.success(transformedMessage, spec.id(), spec.version());
         } catch (TransformEvalException e) {
             long failedMs = (System.nanoTime() - startNanos) / 1_000_000;
             // T-001-42: Notify telemetry listener of transform failure
@@ -635,7 +639,7 @@ public final class TransformEngine {
             // ADR-0022: Never pass through the original message on eval error.
             // Build an RFC 9457 error response instead.
             MessageBody errorBody = errorResponseBuilder.buildErrorResponse(e, message.requestPath());
-            return TransformResult.error(errorBody, errorResponseBuilder.status());
+            return TransformResult.error(errorBody, errorResponseBuilder.status(), spec.id(), spec.version());
         }
     }
 

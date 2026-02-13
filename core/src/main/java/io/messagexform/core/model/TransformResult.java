@@ -30,29 +30,58 @@ public final class TransformResult {
     private final Message message;
     private final MessageBody errorResponse;
     private final Integer errorStatusCode;
+    private final String specId;
+    private final String specVersion;
 
-    private TransformResult(Type type, Message message, MessageBody errorResponse, Integer errorStatusCode) {
+    private TransformResult(
+            Type type,
+            Message message,
+            MessageBody errorResponse,
+            Integer errorStatusCode,
+            String specId,
+            String specVersion) {
         this.type = type;
         this.message = message;
         this.errorResponse = errorResponse;
         this.errorStatusCode = errorStatusCode;
+        this.specId = specId;
+        this.specVersion = specVersion;
     }
 
-    /** Creates a SUCCESS result with the transformed message. */
+    /** Creates a SUCCESS result with the transformed message (no spec metadata). */
     public static TransformResult success(Message transformedMessage) {
         Objects.requireNonNull(transformedMessage, "transformedMessage must not be null for SUCCESS");
-        return new TransformResult(Type.SUCCESS, transformedMessage, null, null);
+        return new TransformResult(Type.SUCCESS, transformedMessage, null, null, null, null);
     }
 
-    /** Creates an ERROR result with an error response body and HTTP status code. */
+    /**
+     * Creates a SUCCESS result with the transformed message and spec provenance
+     * (T-001-67).
+     */
+    public static TransformResult success(Message transformedMessage, String specId, String specVersion) {
+        Objects.requireNonNull(transformedMessage, "transformedMessage must not be null for SUCCESS");
+        return new TransformResult(Type.SUCCESS, transformedMessage, null, null, specId, specVersion);
+    }
+
+    /**
+     * Creates an ERROR result with an error response body and HTTP status code (no
+     * spec metadata).
+     */
     public static TransformResult error(MessageBody errorResponse, int errorStatusCode) {
         Objects.requireNonNull(errorResponse, "errorResponse must not be null for ERROR");
-        return new TransformResult(Type.ERROR, null, errorResponse, errorStatusCode);
+        return new TransformResult(Type.ERROR, null, errorResponse, errorStatusCode, null, null);
+    }
+
+    /** Creates an ERROR result with spec provenance metadata (T-001-67). */
+    public static TransformResult error(
+            MessageBody errorResponse, int errorStatusCode, String specId, String specVersion) {
+        Objects.requireNonNull(errorResponse, "errorResponse must not be null for ERROR");
+        return new TransformResult(Type.ERROR, null, errorResponse, errorStatusCode, specId, specVersion);
     }
 
     /** Creates a PASSTHROUGH result indicating no transform was applied. */
     public static TransformResult passthrough() {
-        return new TransformResult(Type.PASSTHROUGH, null, null, null);
+        return new TransformResult(Type.PASSTHROUGH, null, null, null, null, null);
     }
 
     public Type type() {
@@ -78,6 +107,22 @@ public final class TransformResult {
         return errorStatusCode;
     }
 
+    /**
+     * Returns the matched spec id, or {@code null} if unavailable
+     * (PASSTHROUGH or backward-compatible factory).
+     */
+    public String specId() {
+        return specId;
+    }
+
+    /**
+     * Returns the matched spec version, or {@code null} if unavailable
+     * (PASSTHROUGH or backward-compatible factory).
+     */
+    public String specVersion() {
+        return specVersion;
+    }
+
     public boolean isSuccess() {
         return type == Type.SUCCESS;
     }
@@ -92,9 +137,10 @@ public final class TransformResult {
 
     @Override
     public String toString() {
+        String specRef = specId != null ? ", spec=" + specId + "@" + specVersion : "";
         return switch (type) {
-            case SUCCESS -> "TransformResult[SUCCESS]";
-            case ERROR -> "TransformResult[ERROR, status=" + errorStatusCode + "]";
+            case SUCCESS -> "TransformResult[SUCCESS" + specRef + "]";
+            case ERROR -> "TransformResult[ERROR, status=" + errorStatusCode + specRef + "]";
             case PASSTHROUGH -> "TransformResult[PASSTHROUGH]";
         };
     }

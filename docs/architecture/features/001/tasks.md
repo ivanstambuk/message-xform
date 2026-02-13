@@ -1258,7 +1258,7 @@ Track long-running or shared commands with timestamps to avoid duplicate work.
 
 #### I16 — TransformResult `specId` / `specVersion` extension
 
-- [ ] **T-001-67** — Add `specId` and `specVersion` to `TransformResult` (DO-001-05)
+- [x] **T-001-67** — Add `specId` and `specVersion` to `TransformResult` (DO-001-05) ✅ 2026-02-14
   _Intent:_ Thread the matched spec's identity through the transform result so
   adapters can surface provenance metadata (e.g., `TransformResultSummary` in
   Feature 002, structured logs in standalone adapter).
@@ -1276,6 +1276,10 @@ Track long-running or shared commands with timestamps to avoid duplicate work.
   - `./gradlew :core:test --tests "*TransformResultSpecMetadataTest*"`
   - `./gradlew :core:test`
   - `./gradlew spotlessApply check`
+  _Status:_ ✅ Complete (2026-02-14). 7 new tests pass: SUCCESS/ERROR with spec
+  metadata, PASSTHROUGH null metadata, backward-compat factories (SUCCESS/ERROR),
+  toString with/without spec ref. Engine wired: `transformWithSpec` and `transformChain`
+  thread `spec.id()`/`spec.version()`. All tests pass. BUILD SUCCESSFUL.
 
 - [ ] **T-001-68** — Update stale `GatewayAdapter.java` Javadoc (audit F-003)
   _Intent:_ The `GatewayAdapter` SPI Javadoc still references pre-refactor types
