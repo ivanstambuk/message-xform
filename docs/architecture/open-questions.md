@@ -22,6 +22,8 @@ Hard rules:
 | ID | Owner | Question | Options (A preferred) | Status | Asked | Notes |
 |----|-------|----------|------------------------|--------|-------|-------|
 
+| Q-002 | F-002 | FR-002-09: When does adapter version parity (ADR-0035) take effect? | A: Release-time only (dev uses 0.1.0-SNAPSHOT), B: Apply parity now in build | Open | 2026-02-13 | severity: medium |
+
 
 
 

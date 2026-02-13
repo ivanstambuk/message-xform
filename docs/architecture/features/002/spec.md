@@ -918,14 +918,14 @@ Gradle subproject with:
 4. Dependency on `jakarta.inject:jakarta.inject-api:2.0.1` (compileOnly).
 5. Shadow JAR plugin configured to exclude the `compileOnly` dependencies.
 6. Java 21 toolchain (same as core).
-7. The PingAccess Maven repository
-   (`http://maven.pingidentity.com/release/`) added as a repository. Fallback:
-   local JAR at `docs/reference/vendor/pingaccess-sdk/pingaccess-sdk-9.0.1.0.jar` via
-   `files()` dependency if the Maven repo is unreachable.
+7. The PingAccess SDK JAR resolved locally via `flatDir` repository pointing
+   to `libs/pingaccess-sdk/`. No external Maven repository is required.
 
-   > **HTTP not HTTPS:** The Ping Identity Maven repository uses HTTP per the
-   > official SDK documentation. If your organization requires HTTPS-only
-   > repositories, mirror the SDK artifacts to an internal repository manager.
+   > **Why local-only:** The Ping Identity Maven repository uses HTTP (not
+   > HTTPS) and has no availability SLA. Using a local JAR ensures
+   > deterministic, offline-capable builds with zero supply-chain risk.
+   > On PA version upgrades, replace the JAR via `scripts/pa-extract-deps.sh`
+   > (see ADR-0031, ADR-0035).
 
 | Aspect | Detail |
 |--------|--------|
@@ -1403,14 +1403,14 @@ zero configuration.
 ```kotlin
 // Gradle (Kotlin DSL) — in adapter-pingaccess/build.gradle.kts
 repositories {
-    maven { url = uri("http://maven.pingidentity.com/release/") }  // HTTP per official SDK docs
+    flatDir { dirs(rootProject.file("libs/pingaccess-sdk")) }
 }
 
 dependencies {
     implementation(project(":core"))
 
-    // PA SDK — provided at runtime by PingAccess
-    compileOnly("com.pingidentity.pingaccess:pingaccess-sdk:9.0.1.0")
+    // PA SDK — local JAR, provided at runtime by PingAccess
+    compileOnly(files(rootProject.file("libs/pingaccess-sdk/pingaccess-sdk-9.0.1.0.jar")))
     compileOnly("jakarta.validation:jakarta.validation-api:3.1.1")
     compileOnly("jakarta.inject:jakarta.inject-api:2.0.1")
 }
