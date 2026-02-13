@@ -776,12 +776,11 @@ private static final ExchangeProperty<TransformResultSummary> TRANSFORM_RESULT =
 | `errorMessage` | `String` | Human-readable error message (null if no error) |
 
 > **Field sourcing:** `specId` and `specVersion` are populated from
-> `TransformResult.specId()` and `TransformResult.specVersion()`. The core
-> `TransformResult` record is extended with nullable `specId`/`specVersion`
-> fields — `TransformEngine.transformWithSpec()` threads the matched
-> `TransformSpec.id()` and `TransformSpec.version()` through to
-> `TransformResult.success()` and `TransformResult.error()`.
-> `TransformResult.passthrough()` keeps both null.
+> `TransformResult.specId()` and `TransformResult.specVersion()`. These fields
+> are added to the core `TransformResult` under Feature 001 (DO-001-05,
+> T-001-67) per Principle 8 (Feature Ownership Boundaries). Feature 002
+> **consumes** these fields but does not own or implement the core API
+> change. `TransformResult.passthrough()` keeps both null.
 
 **Usage by downstream rules:**
 ```java
@@ -1026,11 +1025,11 @@ of the `GatewayAdapter` SPI — adapter-specific helper) that maps:
 | TransformContext Field | Source | Notes |
 |------------------------|--------|-------|
 | `headers` | `exchange.getRequest().getHeaders().asMap()` → flatten to single-value map (first value per name, lowercase keys) | Same normalization pattern as `wrapRequest` |
-| `headersAll` | `exchange.getRequest().getHeaders().asMap()` → convert to multi-value map → provided by `HttpHeaders.toMultiValueMap()` | Same normalization pattern |
+| `headersAll` _(derived)_ | Not a `TransformContext` field — derived at evaluation time via `TransformContext.headers().toMultiValueMap()` | The JSLT `$headers_all` variable is produced by the engine from `HttpHeaders`, not from a separate context field |
 | `status` | `null` for REQUEST direction, `exchange.getResponse().getStatusCode()` for RESPONSE | Set by the caller (`MessageTransformRule`) based on direction |
 | `queryParams` | `exchange.getRequest().getQueryStringParams()` → flatten `Map<String, String[]>` to `Map<String, String>` using first-value semantics | Values are URL-decoded by the PA SDK. On `URISyntaxException`: log warning, use empty map. |
 | `cookies` | `exchange.getRequest().getHeaders().getCookies()` → flatten `Map<String, String[]>` to `Map<String, String>` using first-value semantics | Cookie values are URL-decoded |
-| `sessionContext` | See FR-002-06 (`Exchange.getIdentity()` → build `SessionContext`) | `SessionContext.empty()` if no identity (unauthenticated) |
+| `session` | See FR-002-06 (`Exchange.getIdentity()` → build `SessionContext`) | `SessionContext.empty()` if no identity (unauthenticated) |
 
 **Query param multi-value handling:** PingAccess's `getQueryStringParams()` returns
 `Map<String, String[]>`. The adapter uses **first-value semantics** (take `values[0]`

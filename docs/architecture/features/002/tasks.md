@@ -130,10 +130,13 @@ _Last updated:_ 2026-02-12
 
 #### I4b — ExchangeProperty metadata + SPI registration (FR-002-07, FR-002-08)
 
-- [ ] **T-002-15** — Core API thread-through for `specId` / `specVersion` (FR-002-07)
-  _Test first:_ core tests validating `TransformResult.success/error/passthrough` spec metadata semantics.
-  _Implement:_ Extend `TransformResult` and thread fields from engine matched spec.
-  _Verify:_ Core tests pass with new metadata contract.
+- [ ] **T-002-15** — **Prerequisite gate:** `TransformResult.specId()`/`.specVersion()` available (FR-002-07)
+  _Depends on:_ **T-001-67 (Feature 001)** — per Principle 8 (Feature Ownership
+  Boundaries), the core `TransformResult` extension is owned and implemented by
+  Feature 001. This task is blocked until T-001-67 is complete.
+  _Verify:_ `TransformResult.specId()` and `.specVersion()` exist in the core API.
+  _Verification commands:_
+  - `./gradlew :core:test --tests "*TransformResultSpecMetadataTest*"`
 
 - [ ] **T-002-15a** — `TransformResultSummary` + exchange properties (FR-002-07, S-002-21)
   _Test first:_ `ExchangePropertyTest.transformResultSummary()`.

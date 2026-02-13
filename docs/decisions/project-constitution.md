@@ -1,9 +1,9 @@
 # message-xform Project Constitution
 
 ## Metadata
-- Constitution Version: 1.0.0
+- Constitution Version: 1.1.0
 - Ratified On: 2026-02-07
-- Last Amended On: 2026-02-07
+- Last Amended On: 2026-02-13
 - Maintainer: Ivan (project owner)
 
 ## Preamble
@@ -95,6 +95,25 @@ the agent playbook in `AGENTS.md` before acting.
   with the findings, then write the increment against the resolved spec.
 - This rule prevents unbounded work hiding inside time-budgeted increments and
   ensures every increment's preconditions are fully known before execution.
+
+### Principle 8 – Feature Ownership Boundaries
+
+- Every domain type, module, and code artefact is **owned by exactly one
+  feature**. Ownership is determined by the feature whose specification
+  introduced the type (e.g., `TransformResult` is owned by Feature 001 because
+  DO-001-05 defines it).
+- When Feature B needs a change to a type or module owned by Feature A, it MUST
+  NOT embed the change inside Feature B's plan, tasks, or code. Instead:
+  1. **Update Feature A's specification** to add or extend the requirement.
+  2. **Create a task in Feature A's task list** to implement the change.
+  3. **Declare a prerequisite** in Feature B's plan: "requires T-001-XX
+     (Feature 001) to be complete before I-B-YY can begin."
+- This rule prevents cross-feature specification drift, ensures each feature's
+  spec is the single source of truth for its domain, and guarantees that core
+  API changes are reviewed and tested under the owning feature's quality gate.
+- **Violation signal:** Any plan step that says "modify core type X" or
+  "extend Feature A's class Y" inside a different feature's plan is a
+  constitutional violation. Refactor the change into the owning feature.
 
 ## ADR Lifecycle
 

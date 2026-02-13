@@ -1550,6 +1550,14 @@ domain_objects:
         type: "List<String>"
         constraints: "always present, may be empty"
         note: "Structured log entries for matched profile, chain steps, warnings"
+      - name: specId
+        type: String
+        constraints: "nullable — null when status is PASSTHROUGH"
+        note: "The matched spec's identifier (threaded from TransformSpec.id())"
+      - name: specVersion
+        type: String
+        constraints: "nullable — null when status is PASSTHROUGH"
+        note: "The matched spec's version (threaded from TransformSpec.version())"
   - id: DO-001-12
     name: TransformProfile
     fields:

@@ -1247,6 +1247,36 @@ Track long-running or shared commands with timestamps to avoid duplicate work.
   - All existing 258+ tests still pass (no regressions).
   - Port types have zero `com.fasterxml.jackson` imports.
 
+---
+
+### Phase 12 — TransformResult Provenance Metadata
+
+> Extends the core `TransformResult` type with spec provenance fields
+> (`specId`, `specVersion`) so that adapters can surface which spec matched
+> without requiring engine-internal state. Requested by Feature 002
+> (FR-002-07) but owned here per Principle 8 (Feature Ownership Boundaries).
+
+#### I16 — TransformResult `specId` / `specVersion` extension
+
+- [ ] **T-001-67** — Add `specId` and `specVersion` to `TransformResult` (DO-001-05)
+  _Intent:_ Thread the matched spec's identity through the transform result so
+  adapters can surface provenance metadata (e.g., `TransformResultSummary` in
+  Feature 002, structured logs in standalone adapter).
+  _Test first:_ Write `TransformResultSpecMetadataTest`:
+  - `TransformResult.success(msg, "callback-prettify", "1.0.0")` → `.specId()` returns `"callback-prettify"`, `.specVersion()` returns `"1.0.0"`.
+  - `TransformResult.error(body, 502, "callback-prettify", "1.0.0")` → `.specId()` and `.specVersion()` populated.
+  - `TransformResult.passthrough()` → `.specId()` and `.specVersion()` are both `null`.
+  - Existing tests still pass (backward-compatible factory methods).
+  _Implement:_ Add `specId` (String, nullable) and `specVersion` (String, nullable)
+  fields to `TransformResult`. Extend `success()` and `error()` factory methods
+  with overloads that accept spec metadata. Update `TransformEngine.transformWithSpec()`
+  to thread `spec.id()` and `spec.version()` through to the result.
+  _Verify:_ `TransformResultSpecMetadataTest` passes. All existing 258+ tests pass.
+  _Verification commands:_
+  - `./gradlew :core:test --tests "*TransformResultSpecMetadataTest*"`
+  - `./gradlew :core:test`
+  - `./gradlew spotlessApply check`
+
 ## Notes / TODOs
 
 - **Package naming:** `io.messagexform.core` is a placeholder. Decide final

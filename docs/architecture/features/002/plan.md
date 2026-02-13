@@ -303,24 +303,21 @@ _To be completed after implementation._
    - _Goal:_ Implement `TransformResultSummary` record, `ExchangeProperty`
      declarations, `TRANSFORM_DENIED` property, and SPI service registration.
      Wire `TransformResultSummary` into `handleRequest()`/`handleResponse()`.
-   - _Preconditions:_ I4a complete.
+   - _Preconditions:_ I4a complete. **T-001-67 (Feature 001) complete** —
+     `TransformResult.specId()`/`.specVersion()` must be available in core
+     (Principle 8 — Feature Ownership Boundaries).
    - _Steps:_
-     1. **Core API change:** Add `specId` (String, nullable) and `specVersion`
-        (String, nullable) fields to `TransformResult` record. The
-        `TransformEngine.transformWithSpec()` already has `spec.id()` and
-        `spec.version()` — thread these through to `TransformResult.success()`
-        and `TransformResult.error()`. `TransformResult.passthrough()` keeps
-        both null. Update existing core tests for the new fields.
-     2. Implement `TransformResultSummary` record (FR-002-07).
-     3. **Test first:** Write `MessageTransformRuleTest`:
+     1. Implement `TransformResultSummary` record (FR-002-07), sourcing
+        `specId`/`specVersion` from `TransformResult.specId()`/`.specVersion()`.
+     2. **Test first:** Write `MessageTransformRuleTest`:
         - `TransformResultSummary` set on `ExchangeProperty` after transform.
         - `TRANSFORM_DENIED` ExchangeProperty declared correctly.
-     4. **Test first:** Write `SpiRegistrationTest`:
+     3. **Test first:** Write `SpiRegistrationTest`:
         - `ServiceFactory.isValidImplName(AsyncRuleInterceptor.class, fqcn)`.
         - `PingAccessAdapter` is NOT registered as SPI.
-     5. Create SPI file: `META-INF/services/com.pingidentity.pa.sdk.policy.AsyncRuleInterceptor`.
-     6. Wire `TransformResultSummary` into handleRequest/handleResponse.
-     7. Run tests, verify all pass.
+     4. Create SPI file: `META-INF/services/com.pingidentity.pa.sdk.policy.AsyncRuleInterceptor`.
+     5. Wire `TransformResultSummary` into handleRequest/handleResponse.
+     6. Run tests, verify all pass.
    - _Requirements covered:_ FR-002-07, FR-002-08, S-002-19, S-002-21.
    - _Commands:_ `./gradlew :adapter-pingaccess:test`,
      `./gradlew spotlessApply check`
