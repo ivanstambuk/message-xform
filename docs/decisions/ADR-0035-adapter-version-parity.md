@@ -90,6 +90,12 @@ adapter version = <GATEWAY_MAJOR>.<GATEWAY_MINOR>.<GATEWAY_PATCH>.<ADAPTER_PATCH
    follow the same pattern: adapter version mirrors the target gateway
    version, with a 4th segment for adapter patches.
 
+6. **Release-time requirement.** During pre-release development, adapter
+   modules use the shared project version (e.g., `0.1.0-SNAPSHOT`). The
+   parity scheme takes effect at the first tagged release. This avoids
+   per-module version overrides in the Gradle build during early
+   implementation.
+
 ### Gateway upgrade workflow
 
 ```

@@ -844,6 +844,11 @@ Examples:
 - Subsequent adapter-only fixes on the same PA line: `9.0.1.1`, `9.0.1.2`, ...
 - PA upgrade to `9.2.0` starts a new adapter line at `9.2.0.0`.
 
+> **Development note:** During pre-release development, the module uses the
+> shared project version (e.g., `0.1.0-SNAPSHOT`). The parity scheme takes
+> effect at the first tagged release. This avoids per-module version overrides
+> in the Gradle build during early implementation.
+
 **Misdeployment guard:** At runtime, `PaVersionGuard` MUST warn when the adapter
 is running against a different PA version than it was compiled for, with a
 remediation message to deploy the matching adapter version line.
