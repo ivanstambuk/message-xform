@@ -121,16 +121,15 @@ with Java 21, matching the core module.
 3. `applyChanges(Message, Exchange)`
 
 All wrap methods create **deep copies** of the native data (ADR-0013). For body
-data, parsing via `objectMapper.readTree(body.getContent())` inherently produces a
-new, independent `JsonNode` tree — satisfying the deep-copy requirement without an
-explicit `deepCopy()` call. Header maps are deep-copied by creating new `HashMap`
-instances with lowercase-normalized keys.
+data, `MessageBody.json(bytes)` creates a new `MessageBody` from the byte array —
+satisfying the deep-copy requirement. `HttpHeaders.ofMulti(map)` creates an
+immutable header collection from a new map with lowercase-normalized keys.
 
 | Aspect | Detail |
 |--------|--------|
 | Success path | `wrapRequest` reads `Exchange.getRequest()` body/headers/URL and returns a populated `Message` record |
-| Validation path | Unit tests with mock `Exchange` objects verify all 9 `Message` fields are populated |
-| Failure path | Null body → `NullNode`, null headers → empty map, malformed JSON → `NullNode` + log warning |
+| Validation path | Unit tests with mock `Exchange` objects verify all 7 `Message` fields are populated |
+| Failure path | Null body → `MessageBody.empty()`, null headers → `HttpHeaders.empty()`, malformed JSON → `MessageBody.empty()` + log warning |
 | Status | ⬜ Not yet implemented |
 | Source | G-002-01, SPI-001-04/05/06 |
 
@@ -143,11 +142,12 @@ PingAccess adapter handles parse failures **internally** in `wrapRequest()` and
 
 1. **Pre-read the body into memory:** If `!body.isRead()`, call `body.read()`.
    On `AccessException` (body exceeds PA's configured maximum) or `IOException`:
-   return `NullNode` as the body and log a warning with exception details.
-2. Attempt to parse `body.getContent()` as JSON via `ObjectMapper.readTree()`.
-3. On parse failure (malformed JSON, non-JSON content type): **return `NullNode`
-   as the body** and log a warning. Do NOT throw.
-4. The returned `Message` has all other fields (headers, path, method, etc.)
+   use `MessageBody.empty()` as the body and log a warning with exception details.
+2. Attempt to validate `body.getContent()` as JSON via `ObjectMapper.readTree()`.
+3. On parse success: create `MessageBody.json(body.getContent())`.
+4. On parse failure (malformed JSON, non-JSON content type): **use
+   `MessageBody.empty()` as the body** and log a warning. Do NOT throw.
+5. The returned `Message` has all other fields (headers, path, method, etc.)
    populated normally.
 
 > **Why `body.read()` is mandatory:** PingAccess's `Body` is stateful. For
@@ -162,24 +162,22 @@ orchestration flow (unlike `ProxyHandler` in standalone mode). The
 it directly to the engine. Throwing would require the rule to catch and
 reconstruct — swallowing inside `wrapRequest()` is cleaner.
 
-**Impact on profile matching:** A `NullNode` body still allows profile matching
-on path/method/headers. If a profile matches and attempts a body transformation,
-the JSLT expression receives `null` as input — this is handled gracefully by
-JSLT (returns `null` for property access on null).
+**Impact on profile matching:** A `MessageBody.empty()` body still allows profile
+matching on path/method/headers. If a profile matches and attempts a body
+transformation, the engine receives an empty body — this is handled gracefully
+(empty body produces no-op body transform).
 
 #### wrapRequest Mapping
 
 | Message Field | Source |
 |---------------|--------|
-| `body` | `exchange.getRequest().getBody()` → pre-read via `body.read()` if `!body.isRead()` → `body.getContent()` → parse as `JsonNode` (or `NullNode` on read failure / empty / non-JSON) |
-| `headers` | `exchange.getRequest().getHeaders().asMap()` → flatten `Map<String, String[]>` to single-value `Map<String, String>` (first value per name, lowercase keys) |
-| `headersAll` | `exchange.getRequest().getHeaders().asMap()` → convert `Map<String, String[]>` to `Map<String, List<String>>` (all values per name, lowercase keys) |
+| `body` | `exchange.getRequest().getBody()` → pre-read via `body.read()` if `!body.isRead()` → `body.getContent()` → validate as JSON via `objectMapper.readTree()` → `MessageBody.json(bytes)` on success, `MessageBody.empty()` on read failure / empty / non-JSON |
+| `headers` | `exchange.getRequest().getHeaders().asMap()` → convert `Map<String, String[]>` to `Map<String, List<String>>` (lowercase keys) → `HttpHeaders.ofMulti(multiMap)` |
 | `statusCode` | `null` (requests have no status code, per ADR-0020) |
-| `contentType` | `exchange.getRequest().getHeaders().getContentType()` → null-safe: `MediaType ct = ...; contentType = (ct != null) ? ct.toString() : null` |
 | `requestPath` | `exchange.getRequest().getUri()` (path portion only, strip query string) — see URI choice note below |
 | `requestMethod` | `exchange.getRequest().getMethod().getName()` → uppercase string |
 | `queryString` | `exchange.getRequest().getUri()` (query portion after `?`, or null) |
-| `sessionContext` | See FR-002-06 (identity/session binding) |
+| `session` | See FR-002-06 (identity/session binding) |
 
 > **URI choice:** The adapter uses `Request.getUri()` (the current URI, which
 > may already be rewritten by upstream PingAccess rules) rather than
@@ -193,15 +191,13 @@ JSLT (returns `null` for property access on null).
 
 | Message Field | Source |
 |---------------|--------|
-| `body` | `exchange.getResponse().getBody()` → pre-read via `body.read()` if `!body.isRead()` → `body.getContent()` → parse as `JsonNode` (or `NullNode` on read failure / empty / non-JSON) |
-| `headers` | `exchange.getResponse().getHeaders().asMap()` → flatten to single-value map (same normalization as request) |
-| `headersAll` | `exchange.getResponse().getHeaders().asMap()` → convert to multi-value map (same normalization as request) |
+| `body` | `exchange.getResponse().getBody()` → pre-read via `body.read()` if `!body.isRead()` → `body.getContent()` → validate as JSON → `MessageBody.json(bytes)` on success, `MessageBody.empty()` on read failure / empty / non-JSON |
+| `headers` | `exchange.getResponse().getHeaders().asMap()` → convert to multi-value map (same normalization as request) → `HttpHeaders.ofMulti(multiMap)` |
 | `statusCode` | `exchange.getResponse().getStatusCode()` |
-| `contentType` | `exchange.getResponse().getHeaders().getContentType()` → null-safe: `(ct != null) ? ct.toString() : null` |
 | `requestPath` | `exchange.getRequest().getUri()` (original request path for profile matching) |
 | `requestMethod` | `exchange.getRequest().getMethod().getName()` |
 | `queryString` | From original request URI |
-| `sessionContext` | See FR-002-06 |
+| `session` | See FR-002-06 |
 
 > **Logging:** `wrapResponse()` SHOULD log the request path at DEBUG level:
 > `LOG.debug("wrapResponse: {} {} → status={}", requestMethod, requestPath, statusCode)`.
@@ -209,14 +205,15 @@ JSLT (returns `null` for property access on null).
 > server logs, especially when multiple applications/rules process the same exchange.
 
 > **Header normalization pattern:** `Headers.asMap()` returns `Map<String, String[]>`.
-> The adapter produces two maps from this:
-> - **Single-value** (`headers`): iterate entries, `key.toLowerCase()` → `values[0]`.
-> - **Multi-value** (`headersAll`): iterate entries, `key.toLowerCase()` → `Arrays.asList(values)`.
+> The adapter converts this to `Map<String, List<String>>` (lowercase keys) and
+> creates `HttpHeaders.ofMulti(multiMap)`. The `HttpHeaders` class provides
+> both single-value (`.toSingleValueMap()`) and multi-value (`.toMultiValueMap()`)
+> views from a single immutable instance.
 >
-> **Null Content-Type:** `Headers.getContentType()` returns `null` (not an empty
-> `MediaType`) when the Content-Type header is absent. The adapter MUST null-check
-> before calling `toString()`. This matches the `StandaloneAdapter` behavior where
-> Javalin's `ctx.contentType()` also returns `null` for absent Content-Type.
+> **Content-Type for body construction:** `Headers.getContentType()` returns `null`
+> when the Content-Type header is absent. The adapter uses this to determine
+> the `MediaType` when constructing `MessageBody`. When absent, the adapter still
+> attempts JSON parsing of the raw bytes (best-effort).
 
 #### applyChanges Direction Strategy
 
@@ -265,17 +262,14 @@ response-only would mask directional bugs during request-phase transforms.
 > Attempting to write request fields during RESPONSE is silently ignored by
 > PingAccess (Constraint #3).
 
-**Body serialization:** The adapter serializes the transformed `JsonNode` to
-bytes via `objectMapper.writeValueAsBytes(transformedMessage.body())`. Jackson
-defaults to UTF-8 encoding. After calling `setBodyContent(bytes)` (which auto-
-updates `Content-Length`), the adapter MUST set the Content-Type header to
+**Body write-back:** The transformed `MessageBody.content()` provides the body
+bytes directly. After calling `setBodyContent(bytes)` (which auto-updates
+`Content-Length`), the adapter MUST set the Content-Type header to
 `application/json; charset=utf-8` if the body was successfully transformed.
-If the original Content-Type had a charset parameter, it is replaced by the
-Jackson output charset (always UTF-8).
 
-For `NullNode` bodies (passthrough or non-JSON original), the adapter does NOT
-call `setBodyContent()` and does NOT modify Content-Type — the original response
-body and Content-Type are preserved unchanged.
+For `MessageBody.empty()` bodies (passthrough or non-JSON original), the adapter
+does NOT call `setBodyContent()` and does NOT modify Content-Type — the original
+response body and Content-Type are preserved unchanged.
 
 #### Header Application Strategy
 
@@ -288,10 +282,10 @@ The adapter uses a **diff-based** approach:
 1. **Capture original headers** at wrap time (snapshot the header names from
    the native `Request`/`Response` before passing to the engine). The original
    header name snapshot is **normalized to lowercase** before diff comparison,
-   matching the `Message.headers()` key normalization. This ensures
-   case-insensitive diff correctness regardless of PA's original header casing.
+   matching the `HttpHeaders` key normalization. This ensures case-insensitive
+   diff correctness regardless of PA's original header casing.
 2. **After transformation**, compare the original header names with the
-   transformed `Message.headers()` keyset.
+   transformed `Message.headers().toSingleValueMap()` keyset.
 3. **Apply changes:**
    - Headers in transformed but not in original → `headers.add(name, value)` (new).
    - Headers in both → `headers.setValues(name, List.of(value))` (update).
@@ -635,19 +629,20 @@ thread flag provides a fallback safety net. See SDK guide §1.
 
 ### FR-002-06: Session Context Binding (Identity)
 
-**Requirement:** The adapter MUST populate the `sessionContext` field of the
+**Requirement:** The adapter MUST populate the `session` field of the
 `Message` record from the PingAccess `Identity` object (ADR-0030, FR-001-13).
 
-**Design principle:** The `$session` context (spec notation: `JsonTree`; runtime
-type: Jackson `JsonNode`) is a **flat merged object** that
-combines all identity sources into a single hierarchy. This allows JSLT
-expressions to access any session attribute uniformly (e.g., `$session.email`,
-`$session.clientId`, `$session.authzCache`) without navigating nested sub-objects.
+**Design principle:** The `$session` context is a **flat merged map** that
+combines all identity sources into a single `Map<String, Object>`, wrapped as
+`SessionContext.of(map)` on the `Message`. The engine converts this to a
+`JsonNode` internally for JSLT evaluation. This allows JSLT expressions to access
+any session attribute uniformly (e.g., `$session.email`, `$session.clientId`,
+`$session.authzCache`) without navigating nested sub-objects.
 
 #### Merge Layers (lowest to highest precedence)
 
-The adapter merges four sources into a single flat `ObjectNode`. Later layers
-override earlier layers on key collision:
+The adapter merges four sources into a single flat `Map<String, Object>`. Later
+layers override earlier layers on key collision:
 
 | Layer | Source | Contents | Precedence |
 |-------|--------|----------|------------|
@@ -667,11 +662,13 @@ override earlier layers on key collision:
 > [`docs/architecture/features/002/pingaccess-sdk-guide.md` §6 "Building $session"](pingaccess-sdk-guide.md#building-session--flat-merge-pattern)
 > for the complete `buildSessionContext()` implementation.
 >
-> **No boundary conversion needed (ADR-0031):** PA uses a flat classpath —
-> `lib/*` and `deploy/*` share the same `AppClassLoader`. Jackson is
-> PA-provided (`compileOnly`), so `Identity.getAttributes()` returns the
-> same `JsonNode` class the adapter uses. Direct `session.set(key, paNode)`
-> works without serialization round-trips.
+> **Jackson to port type conversion (ADR-0031, ADR-0032):** PA uses a flat
+> classpath — `lib/*` and `deploy/*` share the same `AppClassLoader`.
+> `Identity.getAttributes()` returns `Map<String, JsonNode>` (PA's Jackson).
+> The adapter converts `JsonNode` values to plain Java objects (`String`,
+> `List<String>`, etc.) and builds a `Map<String, Object>`, then wraps it as
+> `SessionContext.of(map)`. The engine's internal Jackson converts this map
+> back to `JsonNode` for JSLT expression evaluation.
 
 #### `$session` Schema (flat)
 
@@ -717,7 +714,7 @@ collisions:
   e.g., a rule sets `authzLevel` in session state, and JSLT reads the latest.
 
 **Null identity (unauthenticated):** If `exchange.getIdentity() == null`,
-`sessionContext` is `null` → `$session` evaluates to `null` in JSLT.
+`session` is `SessionContext.empty()` → `$session` evaluates to `null` in JSLT.
 Transforms MUST gracefully handle null `$session` (e.g., `if ($session != null) ...`).
 
 **Trust model:** The `$session` variable exposes the full identity context
@@ -739,7 +736,7 @@ multi-tenant spec authoring becomes a requirement.
 | Aspect | Detail |
 |--------|--------|
 | Success path | `$session.email` resolves to OIDC claim, `$session.clientId` to OAuth client, `$session.authzCache` to dynamic state |
-| Failure path | No identity (unauthenticated) → `sessionContext = null` → `$session` is `null` in JSLT |
+| Failure path | No identity (unauthenticated) → `session = SessionContext.empty()` → `$session` is `null` in JSLT |
 | Collision path | L4 session state key overrides L3 OIDC claim key (by design — dynamic > static) |
 | Status | ⬜ Not yet implemented |
 | Source | ADR-0030, FR-001-13, G-002-01 |
@@ -1029,11 +1026,11 @@ of the `GatewayAdapter` SPI — adapter-specific helper) that maps:
 | TransformContext Field | Source | Notes |
 |------------------------|--------|-------|
 | `headers` | `exchange.getRequest().getHeaders().asMap()` → flatten to single-value map (first value per name, lowercase keys) | Same normalization pattern as `wrapRequest` |
-| `headersAll` | `exchange.getRequest().getHeaders().asMap()` → convert to multi-value map | Same normalization pattern |
+| `headersAll` | `exchange.getRequest().getHeaders().asMap()` → convert to multi-value map → provided by `HttpHeaders.toMultiValueMap()` | Same normalization pattern |
 | `status` | `null` for REQUEST direction, `exchange.getResponse().getStatusCode()` for RESPONSE | Set by the caller (`MessageTransformRule`) based on direction |
 | `queryParams` | `exchange.getRequest().getQueryStringParams()` → flatten `Map<String, String[]>` to `Map<String, String>` using first-value semantics | Values are URL-decoded by the PA SDK. On `URISyntaxException`: log warning, use empty map. |
 | `cookies` | `exchange.getRequest().getHeaders().getCookies()` → flatten `Map<String, String[]>` to `Map<String, String>` using first-value semantics | Cookie values are URL-decoded |
-| `sessionContext` | See FR-002-06 (`Exchange.getIdentity()` → build `JsonNode`) | `null` if no identity (unauthenticated) |
+| `sessionContext` | See FR-002-06 (`Exchange.getIdentity()` → build `SessionContext`) | `SessionContext.empty()` if no identity (unauthenticated) |
 
 **Query param multi-value handling:** PingAccess's `getQueryStringParams()` returns
 `Map<String, String[]>`. The adapter uses **first-value semantics** (take `values[0]`
@@ -1065,7 +1062,7 @@ sizes).
 |--------|--------|
 | Success path | `TransformContext` populated with headers, cookies, query params, session → JSLT `$cookies.sessionToken` resolves correctly |
 | Failure path (URI) | Malformed query string → empty `queryParams` → JSLT `$queryParams.page` evaluates to `null` |
-| Failure path (no identity) | Unauthenticated → `sessionContext = null` → `$session` is `null` in JSLT |
+| Failure path (no identity) | Unauthenticated → `session = SessionContext.empty()` → `$session` is `null` in JSLT |
 | Status | ⬜ Not yet implemented |
 | Source | G-002-01, FR-004-37 (StandaloneAdapter reference pattern) |
 
@@ -1195,8 +1192,8 @@ zero configuration.
 | S-002-04 | **Header transform:** Request headers added/removed/renamed before forwarding; response headers modified before returning to client. |
 | S-002-05 | **Status code transform:** Backend returns 404 → spec maps to 200 with synthetic body. |
 | S-002-06 | **URL rewrite:** Request path rewritten by spec before forwarding to backend (ADR-0027). |
-| S-002-07 | **Empty body:** Request with no body → NullNode → transform skipped (no match) → original forwarded. |
-| S-002-08 | **Non-JSON body:** Request with `text/plain` body → body parses to NullNode → headers-only transform possible. |
+| S-002-07 | **Empty body:** Request with no body → `MessageBody.empty()` → transform skipped (no match) → original forwarded. |
+| S-002-08 | **Non-JSON body:** Request with `text/plain` body → body parses to `MessageBody.empty()` → headers-only transform possible. |
 | S-002-09 | **Profile matching:** Only transform requests matching active profile path pattern `/api/v1/*`. |
 | S-002-10 | **No matching spec:** Request doesn't match any spec → pass-through, no transformation applied. |
 | S-002-11 | **Error mode PASS_THROUGH:** Spec expression throws → log warning → continue with original body. |
@@ -1220,7 +1217,7 @@ zero configuration.
 | S-002-29 | **Spec hot-reload (success):** `reloadIntervalSec=30` → spec YAML modified on disk → next poll reloads specs → new spec matches next request → transform uses updated spec. |
 | S-002-30 | **Spec hot-reload (failure):** `reloadIntervalSec=30` → malformed spec written to disk → reload fails with warning log → previous specs remain active → existing transforms unaffected. |
 | S-002-31 | **Concurrent reload during active transform:** Reload swaps `AtomicReference<TransformRegistry>` while a transform is in flight → in-flight transform completes using its snapshot of the old registry (Java reference semantics guarantee this) → next request uses the new registry. Outcome: no data corruption, no locking, no request failure. Test: trigger reload in a background thread while a slow transform is executing. |
-| S-002-32 | **Non-JSON response body:** Backend returns `text/html` response body → `wrapResponse()` attempts JSON parse, fails, falls back to `NullNode` body → response-direction transforms can still operate on headers and status code → body passthrough unmodified. Outcome: PASSTHROUGH for body transforms, SUCCESS for header-only transforms. |
+| S-002-32 | **Non-JSON response body:** Backend returns `text/html` response body → `wrapResponse()` attempts JSON parse, fails, falls back to `MessageBody.empty()` body → response-direction transforms can still operate on headers and status code → body passthrough unmodified. Outcome: PASSTHROUGH for body transforms, SUCCESS for header-only transforms. |
 | S-002-33 | **JMX metrics opt-in:** Admin configures `enableJmxMetrics=true` → adapter registers MBean on `configure()` → JConsole shows `io.messagexform:type=TransformMetrics,instance=<name>` → counters increment per request → admin calls `resetMetrics()` via JConsole → counters zero. Toggle to `false` → MBean unregistered → JConsole no longer shows it. |
 | S-002-34 | **JMX metrics disabled (default):** Admin does not toggle `enableJmxMetrics` → no MBean registered → no JMX overhead → SLF4J logging still operational → `pingaccess_engine_audit.log` records transaction timing. |
 | S-002-35 | **PA-specific non-standard status codes passthrough:** Backend returns PingAccess-specific status `277` (`ALLOWED`) or `477` (`REQUEST_BODY_REQUIRED`) → adapter preserves status unchanged and does not map to/from these codes. |
@@ -1236,7 +1233,7 @@ zero configuration.
   `applyChanges` methods with mock `Exchange`/`Request`/`Response`/`Body`/`Headers`
   objects. Follows the pattern of `StandaloneAdapterTest`.
   - Mock framework: Mockito (already in use).
-  - Key verification: all 9 `Message` fields populated correctly, deep copy
+  - Key verification: all 7 `Message` fields populated correctly, deep copy
     semantics, header normalization (lowercase), null/empty body handling.
 
 - **`MessageTransformRuleTest`** — Tests the `handleRequest` / `handleResponse`
@@ -1352,8 +1349,8 @@ zero configuration.
 5. **Body.read() may be deferred:** The `Body.getContent()` call may trigger
    a lazy read. The adapter MUST call `body.read()` if `!body.isRead()`
    before accessing content. **On failure** (`AccessException` or `IOException`
-   from `body.read()`): treat as empty body (`NullNode`), log warning with
-   exception details. This is consistent with the "malformed JSON → NullNode"
+   from `body.read()`): treat as empty body (`MessageBody.empty()`), log warning with
+   exception details. This is consistent with the "malformed JSON → `MessageBody.empty()`"
    fallback in FR-002-01.
 6. **No pipeline halt for responses:** `handleResponse()` returns
    `CompletionStage<Void>`, not `Outcome`. The adapter cannot prevent
@@ -1367,7 +1364,7 @@ zero configuration.
    at the engine level (`body.read()` throws `AccessException` if exceeded).
    The adapter does NOT impose an additional limit beyond PingAccess's built-in
    enforcement. On `AccessException` from `body.read()`, the adapter falls back
-   to `NullNode` (per FR-002-01 body read failure strategy).
+   to `MessageBody.empty()` (per FR-002-01 body read failure strategy).
 
    **Output body limit:** The core engine's `maxOutputSizeBytes` (NFR-001-07)
    limits the transformed output size.
@@ -1387,7 +1384,7 @@ zero configuration.
 10. **No compressed body support (v1):** The adapter does NOT decompress
     `Content-Encoding: gzip/deflate/br` response bodies. If the backend sends
     a compressed body, JSON parsing will fail and the body falls back to
-    `NullNode` (headers-only transform). PingAccess administrators SHOULD
+    `MessageBody.empty()` (headers-only transform). PingAccess administrators SHOULD
     configure sites to disable response compression for endpoints using this
     rule, or place PA's built-in `OutboundContentRewriteInterceptor` upstream
     to decompress before this rule runs. Compressed body support may be added

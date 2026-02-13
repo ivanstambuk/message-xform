@@ -79,7 +79,7 @@ client,
 
 **Given** a GET request with no body arrives at the rule,
 **when** `wrapRequest()` is called,
-**then** `Message.body()` is `NullNode`,
+**then** `Message.body()` is `MessageBody.empty()`,
 **and** if no spec matches a bodyless request, the exchange passes through
 unmodified.
 
@@ -90,7 +90,7 @@ unmodified.
 **Given** a POST request with `Content-Type: text/plain` and body `"hello world"`,
 **when** `wrapRequest()` attempts JSON parse,
 **then** the parse fails gracefully,
-**and** `Message.body()` is `NullNode`,
+**and** `Message.body()` is `MessageBody.empty()`,
 **and** a warning is logged,
 **and** the spec can still match and transform headers (non-body fields).
 
@@ -148,7 +148,7 @@ unmodified.
 `trackingId = "tx-001"`,
 **and** a transform spec uses JSLT expression `.subject = $session.subject`,
 **when** `handleRequest()` processes the exchange,
-**then** `Message.sessionContext()` contains `{"subject": "bjensen", "trackingId": "tx-001", ...}`,
+**then** `Message.session()` contains `{"subject": "bjensen", "trackingId": "tx-001", ...}`,
 **and** the JSLT expression resolves `$session.subject` to `"bjensen"`.
 
 ---
@@ -157,7 +157,7 @@ unmodified.
 
 **Given** the PingAccess Exchange has no Identity (unauthenticated request),
 **when** `wrapRequest()` is called,
-**then** `Message.sessionContext()` is `null`,
+**then** `Message.session()` is `SessionContext.empty()`,
 **and** JSLT expressions referencing `$session` evaluate to `null` without error.
 
 ---
@@ -381,7 +381,7 @@ interceptors fire in reverse order even on `RETURN`),
 
 **Given** a backend returns a `text/html` response body,
 **when** `wrapResponse()` attempts to parse the body as JSON,
-**then** the parse fails gracefully and falls back to `NullNode` body,
+**then** the parse fails gracefully and falls back to `MessageBody.empty()` body,
 **and** response-direction transforms can still operate on headers and status code,
 **and** the body is passed through unmodified.
 

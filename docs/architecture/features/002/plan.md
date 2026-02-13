@@ -170,32 +170,31 @@ _To be completed after implementation._
 
 2. **I2 — PingAccessAdapter.wrapRequest()** (≤90 min)
    - _Goal:_ Implement `PingAccessAdapter.wrapRequest(Exchange)` mapping all
-     9 `Message` fields from the PA `Exchange`/`Request`/`Body`/`Headers` model.
+     7 `Message` fields from the PA `Exchange`/`Request`/`Body`/`Headers` model.
    - _Preconditions:_ I1 complete (config exists for constructor injection).
    - _Steps:_
      1. **Test first:** Write `PingAccessAdapterTest.wrapRequest*` tests:
-        - Normal JSON body → `Message.body()` is parsed `JsonNode`.
-        - Empty body → `NullNode`.
-        - Non-JSON body (`text/plain`) → `NullNode` + warning logged.
+        - Normal JSON body → `Message.body()` is `MessageBody.json(bytes)`.
+        - Empty body → `MessageBody.empty()`.
+        - Non-JSON body (`text/plain`) → `MessageBody.empty()` + warning logged.
         - Body read failure (`body.isRead() == false`, `body.read()` throws
-          `IOException`) → `NullNode` + warning logged.
+          `IOException`) → `MessageBody.empty()` + warning logged.
         - Body read failure (`AccessException` from `body.read()`) →
-          `NullNode` + warning logged.
-        - Headers → lowercase-normalized single-value + multi-value maps.
-        - Content-Type → extracted from `Headers.getContentType()`, null-safe.
+          `MessageBody.empty()` + warning logged.
+        - Headers → `HttpHeaders.ofMulti()` from PA's `Map<String, String[]>`.
         - Request path → from `Request.getUri()` (path portion only).
         - Request method → from `Request.getMethod().getName()`.
         - Query string → from `Request.getUri()` (after `?`).
         - Status code → `null` (requests have no status, ADR-0020).
-        - Session context → `null` for now (FR-002-06 in Phase 4).
+        - Session → `SessionContext.empty()` for now (FR-002-06 in Phase 4).
      2. Implement `PingAccessAdapter.wrapRequest()` with body pre-read,
-        JSON parse with `NullNode` fallback, header normalization.
+        JSON validation with `MessageBody.empty()` fallback, header normalization.
      3. Run tests, verify all pass.
    - _Requirements covered:_ FR-002-01 (wrapRequest mapping table), S-002-01,
      S-002-07, S-002-08, S-002-27.
    - _Commands:_ `./gradlew :adapter-pingaccess:test`,
      `./gradlew spotlessApply check`
-   - _Exit:_ `wrapRequest()` maps all 9 fields. Deep-copy verified. Null/empty
+   - _Exit:_ `wrapRequest()` maps all 7 fields. Deep-copy verified. Null/empty
      edge cases handled.
 
 3. **I3 — PingAccessAdapter.wrapResponse() + applyChanges()** (≤90 min)
@@ -205,35 +204,35 @@ _To be completed after implementation._
    - _Preconditions:_ I2 complete.
    - _Steps:_
      1. **Test first:** Write `PingAccessAdapterTest.wrapResponse*` tests:
-        - Normal JSON response body → parsed `JsonNode`.
-        - Non-JSON response body → `NullNode` + warning.
+        - Normal JSON response body → `MessageBody.json(bytes)`.
+        - Non-JSON response body → `MessageBody.empty()` + warning.
         - Compressed response body (`Content-Encoding: gzip`/`deflate`/`br`)
-          → no decompression in v1, parse fallback to `NullNode` + warning
-          (Constraint 10).
+          → no decompression in v1, parse fallback to `MessageBody.empty()` +
+          warning (Constraint 10).
         - `body.read()` failure (`IOException` or `AccessException`) →
-          `NullNode` + warning (Constraint 5 parity with request side).
+          `MessageBody.empty()` + warning (Constraint 5 parity with request side).
         - Status code → `exchange.getResponse().getStatusCode()`.
-        - Headers → same normalization as request.
+        - Headers → `HttpHeaders.ofMulti()` (same normalization as request).
         - `requestPath` and `requestMethod` from original request.
         - DEBUG log emitted: `"wrapResponse: {} {} → status={}"` (spec
           lines 206–209).
      2. **Test first:** Write `PingAccessAdapterTest.applyRequestChanges*` tests:
-        - Body serialized via `objectMapper.writeValueAsBytes()` →
+        - Body → `transformedMessage.body().content()` bytes →
           `setBodyContent()` called.
         - Headers diff: added/updated/removed correctly.
         - Protected headers (`content-length`, `transfer-encoding`) excluded
           from diff.
         - URI rewrite → `setUri()` called.
         - Method override → `setMethod()` called.
-        - `NullNode` body → `setBodyContent()` NOT called (passthrough).
+        - `MessageBody.empty()` → `setBodyContent()` NOT called (passthrough).
         - After `setBodyContent()`: Content-Type set to
-          `application/json; charset=utf-8` (FR-002-01, spec lines 271–274).
-          For `NullNode` body: Content-Type NOT modified.
+          `application/json; charset=utf-8` (FR-002-01).
+          For `MessageBody.empty()`: Content-Type NOT modified.
      3. **Test first:** Write `applyResponseChanges*` tests:
         - Body → `setBodyContent()` on response.
         - Status code → `setStatus(HttpStatus.forCode())`.
         - Headers diff on response side.
-        - `NullNode` body → passthrough.
+        - `MessageBody.empty()` body → passthrough.
         - **Negative test (Constraint 3):** `applyResponseChanges()` does
           NOT call `setUri()` or `setMethod()` — request-side writes are
           invalid during response phase.
@@ -360,8 +359,8 @@ _To be completed after implementation._
 6. **I6 — Session context: Identity → $session** (≤90 min)
    - _Goal:_ Implement the 4-layer flat merge of `Identity`, `OAuthTokenMetadata`,
      `Identity.getAttributes()`, and `SessionStateSupport.getAttributes()` into
-     a single `ObjectNode` for `$session`. Wire into `wrapRequest()` /
-     `wrapResponse()` via `Message.sessionContext()`.
+     a `Map<String, Object>` wrapped as `SessionContext.of(map)` for `$session`.
+     Wire into `wrapRequest()` / `wrapResponse()` via `Message.session()`.
    - _Preconditions:_ I5 complete (TransformContext construction works).
    - _Steps:_
      1. **Test first:** Write `PingAccessAdapterTest.buildSessionContext*`
@@ -370,11 +369,11 @@ _To be completed after implementation._
           `trackingId`, `tokenId`, `tokenExpiration` (ISO string).
         - Layer 2: `OAuthTokenMetadata` → `clientId`, `scopes`, `tokenType`,
           `realm`, `tokenExpiresAt`, `tokenRetrievedAt`.
-        - Layer 3: `Identity.getAttributes()` → spread into flat object,
+        - Layer 3: `Identity.getAttributes()` → spread into flat map,
           overrides L1 keys.
         - Layer 4: `SessionStateSupport.getAttributes()` → spread, overrides
           all prior layers.
-        - Null identity → `sessionContext = null`.
+        - Null identity → `session = SessionContext.empty()`.
         - Null `OAuthTokenMetadata` → skip L2.
         - Null `tokenExpiration` → field omitted.
      2. Implement `buildSessionContext(Exchange)` method.
@@ -602,6 +601,10 @@ _To be completed after implementation._
      - _Steps:_
        1. **Test first:** Write `AdapterArchTest` in `adapter-pingaccess`:
           - Rule 1 (Reflections): `classes().should().notDependOnAnyClassesThat().resideInAPackage("java.lang.reflect..")`.
+             **Exemption:** `PaVersionGuard` uses `Class.forName()` to detect
+             Jackson runtime version (ADR-0035). Add exclusion for
+             `PaVersionGuard` or replace with direct `PackageVersion.VERSION`
+             access (see backlog item).
           - Rule 2 (Leakage): Production classes should not depend on test classes.
           - Rule 3 (PA SDK): Only allowed packages from PA SDK can be accessed (bridge pattern).
        2. Run ArchUnit tests, verify compliance.
@@ -746,3 +749,8 @@ _To be filled during implementation._
 - [ ] **PA-native error handler integration** — Add `ErrorHandlerUtil`
       configuration fields for PA HTML template-based error pages alongside
       RFC 9457. Follow-up if requested.
+- [ ] **PaVersionGuard reflection removal** — `PaVersionGuard.detectJacksonVersion()`
+      uses `Class.forName()` (reflection), which violates NFR-002-04. Consider
+      replacing with direct `com.fasterxml.jackson.databind.cfg.PackageVersion.VERSION`
+      access since Jackson is on the compile classpath (`compileOnly`). This would
+      eliminate the reflection need while preserving the version-check behavior.

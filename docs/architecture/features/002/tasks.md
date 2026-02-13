@@ -24,13 +24,13 @@ _Last updated:_ 2026-02-12
 
 #### I1 — MessageTransformConfig + enums + Bean Validation (FR-002-04)
 
-- [x] **T-002-01** — Implement `ErrorMode` and `SchemaValidation` enums (FR-002-04) ✅ 2026-02-12
+- [ ] **T-002-01** — Implement `ErrorMode` and `SchemaValidation` enums (FR-002-04)
   _Intent:_ Provide typed configuration options for the admin UI.
   _Verify:_ `EnumTest` confirms enum values and serialization labels.
   _Verification commands:_
   - `./gradlew :adapter-pingaccess:test --tests "*EnumTest*"`
 
-- [x] **T-002-02** — Implement `MessageTransformConfig` with validation and defaults (FR-002-04, S-002-17, S-002-18) ✅ 2026-02-12
+- [ ] **T-002-02** — Implement `MessageTransformConfig` with validation and defaults (FR-002-04, S-002-17, S-002-18)
   _Intent:_ Define config model with `@UIElement`, `@Help`, `@NotNull`, `@Min`, `@Max`.
   _Test first:_ `MessageTransformConfigTest` for required fields, defaults, bounds.
   _Implement:_ `MessageTransformConfig extends SimplePluginConfiguration`.
@@ -55,14 +55,14 @@ _Last updated:_ 2026-02-12
 - [ ] **T-002-05** — Request body read + JSON parse fallback (FR-002-01, Constraint 5, S-002-01, S-002-07, S-002-08)
   _Test first:_ `PingAccessAdapterRequestTest.bodyReadAndParseFallback()` covering:
   - `!body.isRead()` -> `body.read()` invoked.
-  - `IOException`/`AccessException` from `body.read()` -> `NullNode` + warning.
-  - malformed/non-JSON -> `NullNode` + warning.
+  - `IOException`/`AccessException` from `body.read()` -> `MessageBody.empty()` + warning.
+  - malformed/non-JSON -> `MessageBody.empty()` + warning.
   _Implement:_ Body pre-read and parse strategy in `wrapRequest()`.
   _Verify:_ Body fallback tests pass.
 
 - [ ] **T-002-06** — Request metadata mapping: method, content-type, request status, session placeholder (FR-002-01)
   _Test first:_ `PingAccessAdapterRequestTest.requestMetadataMapping()`.
-  _Implement:_ Map `requestMethod`, `contentType`, `statusCode=null` and `sessionContext` placeholder.
+  _Implement:_ Map `requestMethod`, `statusCode=null` and `session` placeholder (`SessionContext.empty()`).
   _Verify:_ Metadata mapping tests pass.
 
 #### I3 — `wrapResponse()` + apply helpers (FR-002-01)
@@ -88,15 +88,15 @@ _Last updated:_ 2026-02-12
 
 - [ ] **T-002-10** — Body replacement + content-type semantics (FR-002-01, S-002-01, S-002-02)
   _Test first:_ `ApplyChangesTest.bodyReplacement()` covering:
-  - `setBodyContent()` on non-NullNode
+  - `setBodyContent()` on non-empty `MessageBody`
   - `application/json; charset=utf-8` set after body replacement
-  - NullNode passthrough (no body/content-type mutation)
+  - `MessageBody.empty()` passthrough (no body/content-type mutation)
   _Implement:_ Body write logic in apply helpers.
   _Verify:_ Body replacement tests pass.
 
 - [ ] **T-002-10a** — Compressed body fallback contract (Constraint 10, S-002-32)
   _Test first:_ `PingAccessAdapterResponseTest.compressedBodyFallback()` for `gzip`/`deflate`/`br` content-encoding.
-  _Implement:_ Explicit v1 behavior: no decompression, parse fallback to `NullNode` + warning.
+  _Implement:_ Explicit v1 behavior: no decompression, parse fallback to `MessageBody.empty()` + warning.
   _Verify:_ Compressed body fallback tests pass.
 
 - [ ] **T-002-11** — Response status code application incl. PA non-standard passthrough (FR-002-01, S-002-05, S-002-35)
