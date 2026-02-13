@@ -49,14 +49,15 @@ The PingAccess Adapter bridges the message-xform core engine into PingAccess
 
 ## Prerequisites
 
-- [x] Feature spec is `Status: Ready`
+- [x] Feature spec is `Status: Spec Ready`
 - [x] All high-/medium-impact open questions resolved (0 open)
 - [x] Related ADRs accepted: ADR-0013, ADR-0020, ADR-0022, ADR-0024, ADR-0025,
       ADR-0027, ADR-0030, ADR-0031, ADR-0032, ADR-0033, ADR-0034, ADR-0035
 - [x] `adapter-pingaccess` Gradle module scaffolded (compileOnly deps, shadow
       JAR excludes, PaVersionGuard, `pa-compiled-versions.properties`)
 - [x] PA SDK JAR available at `libs/pingaccess-sdk/pingaccess-sdk-9.0.1.0.jar`
-- [x] Core engine stable (Feature 001 complete, all tests green)
+- [x] Core engine stable (Feature 001 Phases 1–10 complete, all tests green;
+      T-001-67 required before I4b — see Phase 3 preconditions)
 
 ## Dependencies & Interfaces
 
@@ -529,13 +530,16 @@ _To be completed after implementation._
          - `jar tf` output DOES contain `io/messagexform/internal/jackson/`
            (core's relocated copy).
          - `jar tf` output does NOT contain `org/slf4j/` (PA-provided).
-         - `jar tf` output does NOT contain `jakarta/validation/`.
+        - `jar tf` output does NOT contain `jakarta/validation/`.
          - JAR file size < 5 MB.
          - `META-INF/services/com.pingidentity.pa.sdk.policy.AsyncRuleInterceptor`
            exists.
       2. Build shadow JAR: `./gradlew :adapter-pingaccess:shadowJar`.
       3. Verify via `jar tf` and file size check.
-         _Verification command:_ `jar tf adapter-pingaccess/build/libs/adapter-pingaccess-*-SNAPSHOT.jar | grep -vE "io/messagexform|META-INF|snakeyaml|jslt|networknt"` (should return nothing or only empty directory entries).
+         _Verification commands:_
+         - `jar tf adapter-pingaccess/build/libs/adapter-pingaccess-*-SNAPSHOT.jar | grep -vE "io/messagexform|META-INF|snakeyaml|jslt|networknt"` (should return nothing or only empty directory entries).
+         - `jar tf adapter-pingaccess/build/libs/adapter-pingaccess-*-SNAPSHOT.jar | grep "com/fasterxml/jackson"` (should return nothing — catches MR-JAR leakage under `META-INF/versions/`).
+         - `jar tf adapter-pingaccess/build/libs/adapter-pingaccess-*-SNAPSHOT.jar | grep "META-INF/services/com.fasterxml.jackson"` (should return nothing — catches dangling service files).
       4. Verify `PaVersionGuard` runs during `configure()` and logs version
          info at INFO level.
          - Mismatch path (compiled vs runtime PA version) logs WARN with

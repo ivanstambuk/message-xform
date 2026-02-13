@@ -63,6 +63,8 @@ tasks.withType<ShadowJar>().configureEach {
     // Exclude PA-provided classes — belt-and-suspenders safety net
     // These are compileOnly, but transitive pulls could sneak them in
     exclude("com/fasterxml/jackson/**")
+    exclude("META-INF/versions/**/com/fasterxml/jackson/**")  // MR-JAR leakage
+    exclude("META-INF/services/com.fasterxml.jackson.*")      // dangling service files
     exclude("org/slf4j/**")
     exclude("jakarta/validation/**")
     exclude("jakarta/inject/**")
