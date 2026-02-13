@@ -56,7 +56,7 @@ public interface GatewayAdapter<R> {
      * <li>{@code body} — parsed JSON body as {@code MessageBody.json(bytes)},
      * or {@code MessageBody.empty()} if absent/unparseable</li>
      * <li>{@code headers} — {@code HttpHeaders} (lowercase keys per RFC 9110,
-     * single-value via {@code get()}, multi-value via {@code getAll()})</li>
+     * single-value via {@code first()}, multi-value via {@code all()})</li>
      * <li>{@code statusCode} — {@code null} for requests (ADR-0020)</li>
      * <li>{@code requestPath} — the request path (e.g., {@code /api/v1/users})</li>
      * <li>{@code requestMethod} — the HTTP method (e.g., {@code POST})</li>
@@ -84,7 +84,7 @@ public interface GatewayAdapter<R> {
      * <li>{@code body} — parsed JSON body as {@code MessageBody.json(bytes)},
      * or {@code MessageBody.empty()} if absent/unparseable</li>
      * <li>{@code headers} — {@code HttpHeaders} (lowercase keys,
-     * single-value via {@code get()}, multi-value via {@code getAll()})</li>
+     * single-value via {@code first()}, multi-value via {@code all()})</li>
      * <li>{@code statusCode} — the HTTP response status code</li>
      * <li>{@code requestPath} — the <em>original</em> request path (for profile
      * matching on response transforms)</li>

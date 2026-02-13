@@ -524,17 +524,20 @@ decommissioned. Two strategies are applied together (belt-and-suspenders):
 > **Note:** The `reloadExecutor` field is set once in `configure()` and
 > never reassigned — it is safe for concurrent reads (same thread-safety
 > model as other init-time fields per NFR-002-03).
-The executor calls `TransformEngine.reload()` at the specified interval. This
-allows ops to update transform specs on disk without restarting PingAccess.
-When `reloadIntervalSec = 0` (default), specs are loaded only once during
+The executor calls `TransformEngine.reload(specPaths, profilePath)` at the
+specified interval, where `specPaths` is the list of `*.yaml`/`*.yml` files
+enumerated from `specsDir` and `profilePath` is resolved from `profilesDir`
++ `activeProfile` (or `null` when no profile is configured). This allows ops
+to update transform specs on disk without restarting PingAccess. When
+`reloadIntervalSec = 0` (default), specs are loaded only once during
 `configure()` and changes require a PA restart.
 
-**Reload failure semantics:** If `TransformEngine.reload()` throws during a
-scheduled reload (e.g., malformed YAML, file I/O error), the adapter logs a
-warning and retains the previous valid `TransformRegistry`. The failed reload
-does NOT disrupt in-flight requests — `TransformEngine`'s `AtomicReference`-
-based swap ensures that the old registry remains active until a successful
-reload replaces it (NFR-001-05).
+**Reload failure semantics:** If `TransformEngine.reload(specPaths, profilePath)`
+throws during a scheduled reload (e.g., malformed YAML, file I/O error), the
+adapter logs a warning and retains the previous valid `TransformRegistry`. The
+failed reload does NOT disrupt in-flight requests — `TransformEngine`'s
+`AtomicReference`-based swap ensures that the old registry remains active
+until a successful reload replaces it (NFR-001-05).
 
 **Security note:** The `specsDir` and `profilesDir` fields accept arbitrary
 file system paths. While PingAccess admin access is a privileged context,
@@ -863,7 +866,7 @@ be declared `compileOnly` and **not** bundled in the shadow JAR:
 > **No Jackson relocation.** Jackson is PA-provided and shared. Relocating
 > Jackson would cause `ClassCastException` because `Identity.getAttributes()`
 > returns `com.fasterxml.jackson.databind.JsonNode` but relocated code would
-> expect `io.messagexform.shaded.jackson.databind.JsonNode` — different
+> expect `io.messagexform.internal.jackson.databind.JsonNode` — different
 > classes within the same classloader.
 >
 > **No boundary conversion.** Since PA and the adapter share the same Jackson
