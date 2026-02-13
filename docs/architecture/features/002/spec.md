@@ -1206,8 +1206,8 @@ zero configuration.
 | S-002-19 | **Plugin SPI registration:** JAR deployed to `/opt/server/deploy/` → PA restart → "Message Transform" rule type visible in admin. |
 | S-002-20 | **Thread safety:** Concurrent requests through the same rule instance → no data corruption. |
 | S-002-21 | **ExchangeProperty metadata:** Downstream rule reads transform result metadata (spec id, duration). |
-| S-002-22 | **Cookie access in JSLT:** JSLT expression uses `$cookies` → resolves from PA request cookies via `TransformContext.cookiesAsJson()`. |
-| S-002-23 | **Query param access in JSLT:** JSLT expression uses `$queryParams` → resolves from PA query string via `TransformContext.queryParamsAsJson()`. |
+| S-002-22 | **Cookie access in JSLT:** JSLT expression uses `$cookies` → resolves from PA request cookies via `TransformContext.cookies()` (first-value `Map<String, String>`). |
+| S-002-23 | **Query param access in JSLT:** JSLT expression uses `$queryParams` → resolves from PA query string via `TransformContext.queryParams()` (first-value `Map<String, String>`). |
 | S-002-24 | **Shadow JAR correctness:** Deploy shadow JAR → no `ClassNotFoundException` at runtime (all deps bundled, PA SDK excluded). |
 | S-002-25 | **OAuth context in JSLT:** JSLT expression uses `$session.clientId` and `$session.scopes` → resolves from `OAuthTokenMetadata` (flat `$session` namespace, see FR-002-06 merge layers). |
 | S-002-26 | **Session state in JSLT:** JSLT expression uses `$session.authzCache` → resolves from `SessionStateSupport` (flat `$session` namespace, layer 4 merge). |

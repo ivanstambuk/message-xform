@@ -252,8 +252,9 @@ record containing:
 **then** the JSLT expression resolves to `"abc123"`.
 
 > **Note:** The JSLT engine binds cookies as a top-level `$cookies` variable,
-> not nested under `$context`. See `TransformContext.cookiesAsJson()` for the
-> binding implementation.
+> not nested under `$context`. The `TransformContext.cookies()` accessor provides
+> a first-value `Map<String, String>` — JSON conversion is handled internally
+> by the engine.
 
 ---
 
@@ -265,7 +266,9 @@ record containing:
 **then** the JSLT expression resolves to `"2"`.
 
 > **Note:** The JSLT engine binds query params as a top-level `$queryParams`
-> variable, not nested under `$context`. See `TransformContext.queryParamsAsJson()`.
+> variable, not nested under `$context`. The `TransformContext.queryParams()`
+> accessor provides a first-value `Map<String, String>` — JSON conversion is
+> handled internally by the engine.
 
 ---
 
