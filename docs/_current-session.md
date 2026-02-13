@@ -1,27 +1,31 @@
-# Current Session — 2026-02-13 (F002 documentation alignment + /audit workflow)
+# Current Session — 2026-02-14 (F001 audit remediation)
 
 ## Focus
-Feature 002 documentation review and alignment with current core API types:
-- Fixed systemic type drift (JsonNode→MessageBody, NullNode→MessageBody.empty(), ObjectNode→SessionContext)
-- Fixed accessor rename drift (sessionContext→session, headersAll/contentType→merged into port types)
-- Fixed falsely-completed task checkboxes (T-002-01, T-002-02)
-- Created `/audit` workflow for systematic feature documentation auditing
+Assessed and resolved all 5 findings from the external model audit of Feature 001
+spec and scenarios (`audit-001-spec.md`), plus updated ADR-0030 and terminology.md
+to eliminate remaining API drift.
 
 ## Key Changes
-- `spec.md`: 20+ stale type references replaced, field count corrected 9→7, session accessor fixed
-- `plan.md`: Increments I2, I3, I6 aligned with port types; PaVersionGuard reflection exemption added
-- `tasks.md`: T-002-01/T-002-02 reset to [ ]; stale NullNode/sessionContext refs fixed
-- `scenarios.md`: NullNode→MessageBody.empty(), sessionContext→session in 5 scenarios
-- `terminology.md`: Message.getSessionContext()→Message.session()
-- `.agent/workflows/audit.md`: New 8-phase audit workflow with drift checklist
+- `spec.md`: TransformContext interface block updated to port-type API (F-001);
+  FR-001-13 adapter guidance updated to current SessionContext API (F-002)
+- `scenarios.md`: S-001-38i added to Scenario Index (F-003); FR-001-14 and
+  orphaned scenarios added to Coverage Matrix (F-004); 61 missing --- separators
+  inserted (F-005)
+- `ADR-0030`: Concrete changes section updated from JsonNode/getSessionContext()
+  to SessionContext port type and record accessors
+- `terminology.md`: TransformContext description updated to port-type fields
 
 ## Retro Findings (resolved)
-1. [3b] Stale accessor `Message.getSessionContext()` in terminology.md → FIXED
+1. [3b] terminology.md TransformContext stale types → FIXED (9165f8b)
 
 ## Status
-- All F002 docs now align with current core API types
-- T-002-01 and T-002-02 are correctly marked as pending implementation
-- `/audit` workflow ready for use across all features
+- All 5 audit findings resolved and verified
+- ADR-0030 reflects current API surface
+- Audit report deleted (ephemeral artifact)
+- F001 documentation fully aligned with current codebase
 
 ## Next Session
-Implement T-002-01 (ErrorMode + SchemaValidation enums), then T-002-02 (MessageTransformConfig).
+- Implement T-001-67 (specId/specVersion on TransformResult) — Feature 002 dependency
+- Implement T-001-68 (GatewayAdapter.java Javadoc staleness)
+- Continue Feature 002 implementation: T-002-01 (ErrorMode + SchemaValidation enums),
+  then T-002-02 (MessageTransformConfig)

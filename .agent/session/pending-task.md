@@ -1,14 +1,14 @@
 # Pending Task
 
-**Focus**: Feature 002 — PingAccess Adapter implementation
-**Status**: Documentation aligned and ready. No implementation code exists yet (T-002-01 through T-002-02 still pending).
-**Next Step**: Implement T-002-01 (ErrorMode and SchemaValidation enums) and T-002-02 (MessageTransformConfig)
+**Focus**: Feature 001 audit complete; Feature 002 implementation next
+**Status**: All F001 audit findings resolved. Ready to resume F002 implementation.
+**Next Step**: Implement T-001-67 (specId/specVersion on TransformResult)
 
 ## Context Notes
-- All spec/plan/tasks/scenarios are now aligned with the current core API types (MessageBody, HttpHeaders, SessionContext)
-- T-002-01 and T-002-02 were falsely marked complete in a prior session (no code or commits) — now correctly reset to [ ]
-- The `/audit` workflow was created for systematic feature documentation auditing
-- PaVersionGuard reflection exemption is documented in plan.md (I12a + backlog)
+- T-001-67 is a Feature 002 dependency — TransformResult needs provenance metadata
+  so adapters can surface which spec matched (FR-002-07)
+- T-001-68 (GatewayAdapter Javadoc) is independent and can be done in any order
+- After T-001-67/68, resume Feature 002: T-002-01 (ErrorMode/SchemaValidation enums)
 
 ## SDD Gaps (if any)
-- None — retro ledger resolved.
+- None — retro findings ledger was resolved in-session
