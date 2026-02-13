@@ -1,5 +1,6 @@
 package io.messagexform.pingaccess;
 
+import com.fasterxml.jackson.databind.cfg.PackageVersion;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
@@ -37,10 +38,12 @@ final class PaVersionGuard {
         String compiledJackson = compiled.getProperty("pa.jackson.version", "unknown");
         String compiledSdk = compiled.getProperty("pa.sdk.version", "unknown");
 
-        // Detect runtime Jackson version via PackageVersion (jackson-databind)
-        String runtimeJackson = detectJacksonVersion();
+        // Detect runtime Jackson version via PackageVersion (jackson-databind).
+        // Direct static access — no reflection needed (NFR-002-04).
+        // Jackson is PA-provided (compileOnly) and always on the runtime classpath.
+        String runtimeJackson = PackageVersion.VERSION.toString();
 
-        if (runtimeJackson != null && !runtimeJackson.equals(compiledJackson)) {
+        if (!runtimeJackson.equals(compiledJackson)) {
             LOG.warn(
                     "Adapter compiled for Jackson {} but running with Jackson {}. "
                             + "Deploy adapter version matching this PA instance (ADR-0035).",
@@ -52,7 +55,7 @@ final class PaVersionGuard {
                 "PA version guard: compiled against SDK={}, Jackson={}, runtime Jackson={}",
                 compiledSdk,
                 compiledJackson,
-                runtimeJackson != null ? runtimeJackson : "undetectable");
+                runtimeJackson);
     }
 
     private static Properties loadCompiledVersions() {
@@ -65,17 +68,5 @@ final class PaVersionGuard {
             LOG.debug("Failed to load compiled PA versions", e);
         }
         return props;
-    }
-
-    private static String detectJacksonVersion() {
-        try {
-            // jackson-databind's PackageVersion reports the runtime version
-            Class<?> pvClass = Class.forName("com.fasterxml.jackson.databind.cfg.PackageVersion");
-            Object version = pvClass.getField("VERSION").get(null);
-            return version.toString();
-        } catch (ClassNotFoundException | NoSuchFieldException | IllegalAccessException e) {
-            LOG.debug("Cannot detect Jackson runtime version", e);
-            return null;
-        }
     }
 }

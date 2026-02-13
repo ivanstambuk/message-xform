@@ -38,7 +38,7 @@ The adapter is a **thin bridge layer** — all transformation logic lives in
 - PingAccess Docker & SDK: `docs/research/pingaccess-docker-and-sdk.md` (COMPLETE)
 - PingAM Authentication API: `docs/research/pingam-authentication-api.md` (COMPLETE)
 - SDK JAR: `docs/reference/vendor/pingaccess-sdk/pingaccess-sdk-9.0.1.0.jar`
-- PingAccess 9.0 reference: `docs/reference/pingaccess-9.0.pdf`
+- PingAccess SDK guide: `docs/reference/pingaccess-sdk-guide.md`
 
 ## Goals
 
@@ -1178,7 +1178,7 @@ zero configuration.
 | NFR-002-01 | Adapter transform latency MUST add < 10 ms overhead beyond the core engine transform time for a typical JSON body (< 64 KB). | Gateway SLA | Measure via `ExchangeProperty` timestamps (creation time vs. transform completion). | Core engine performance. | Spec. |
 | NFR-002-02 | Shadow JAR size MUST be < 5 MB (Jackson, SLF4J, Jakarta excluded — PA-provided per ADR-0031). | Deployment ergonomics | `ls -lh adapter-pingaccess-*.jar` | Shadow plugin, dependency management. | ADR-0031. |
 | NFR-002-03 | Adapter MUST be thread-safe — no mutable **per-request** state. Framework-injected fields (`@Inject`-set `ObjectMapper`, `TemplateRenderer`, `HttpClient`) and `configuration` are set once during initialization and are safe for concurrent read access. All per-request state (adapted messages, transform results, error bodies) MUST be method-local. | PA runtime constraint | Code review, ArchUnit rule (FR-009-12). | Core engine thread safety. | SDK docs. |
-| NFR-002-04 | Adapter MUST NOT use reflection — same no-reflection policy as core (FR-009-12 Rule 3). | AOT compatibility | ArchUnit test. | ArchUnit (FR-009-12). | Project constitution. |
+| NFR-002-04 | Adapter MUST NOT use reflection — same no-reflection policy as core (FR-009-12 Rule 3). | AOT compatibility | ArchUnit test (FR-009-12, cross-cutting). | FR-009-12 ArchUnit tests. | Project constitution. |
 | NFR-002-05 | Adapter MUST compile with Java 21 toolchain and `-Xlint:all -Werror`. | Build consistency | `./gradlew :adapter-pingaccess:compileJava` | FR-009-02, FR-009-03. | FR-009-03. |
 
 ---
@@ -1444,7 +1444,7 @@ Client                    PingAccess                        Backend
 | `docs/research/pingaccess-plugin-api.md` | SDK research (complete) |
 | `docs/research/pingaccess-docker-and-sdk.md` | Docker + SDK samples (complete) |
 | `docs/research/pingam-authentication-api.md` | PingAM callback format (transform target) |
-| `docs/reference/pingaccess-9.0.pdf` | Official PA 9.0 documentation |
+| `docs/reference/pingaccess-sdk-guide.md` | SDK guide (authored from PA 9.0 docs + decompilation) |
 | `docs/reference/vendor/pingaccess-sdk/pingaccess-sdk-9.0.1.0.jar` | SDK JAR |
 | `binaries/pingaccess-9.0.1/sdk/apidocs/` | Official SDK Javadoc |
 | `binaries/pingaccess-9.0.1/sdk/samples/` | SDK sample rules |

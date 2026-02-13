@@ -1,7 +1,7 @@
 # Feature 002 — PingAccess Adapter — Tasks
 
 _Status:_ In Progress (Phase 1)
-_Last updated:_ 2026-02-12
+_Last updated:_ 2026-02-13
 
 **Governing spec:** `docs/architecture/features/002/spec.md`
 **Implementation plan:** `docs/architecture/features/002/plan.md`
@@ -35,9 +35,8 @@ _Last updated:_ 2026-02-12
 | I10 | T-002-29, T-002-30 | 7 — Packaging |
 | I11 | T-002-31, T-002-31a | 7 — Thread Safety |
 | I12 | T-002-32 | 7 — Security |
-| I12a | T-002-33 | 7 — ArchUnit |
-| I13 | T-002-34 | 8 — Quality Gate |
-| I14 | T-002-35 | 8 — Documentation |
+| I13 | T-002-33 | 8 — Quality Gate |
+| I14 | T-002-34 | 8 — Documentation |
 
 ## Task Checklist
 
@@ -295,21 +294,20 @@ _Last updated:_ 2026-02-12
   _Implement:_ Normalize and validate `specsDir`/`profilesDir` in `configure()`.
   _Verify:_ Security path tests pass.
 
-#### I12a — ArchUnit validation (NFR-002-04)
-
-- [ ] **T-002-33** — ArchUnit automation
-  _Test first:_ `AdapterArchTest`.
-  _Implement:_ No-reflection and layer/leakage guard rules.
-  _Verify:_ ArchUnit tests pass.
+> **ArchUnit validation** is a cross-cutting concern owned by Feature 009
+> (FR-009-12). The no-reflection (Rule 3), module-boundary (Rule 1), core
+> isolation (Rule 2), and SPI-layering (Rule 4) rules apply to all modules
+> including `adapter-pingaccess` and are enforced by the shared ArchUnit
+> test suite. No per-adapter ArchUnit task is needed here.
 
 ### Phase 8 — Quality Gate & Documentation
 
 #### I13/I14 — Final audit and documentation sync
 
-- [ ] **T-002-34** — 36-scenario coverage audit (S-002-01..S-002-35 + S-002-35a)
+- [ ] **T-002-33** — 36-scenario coverage audit (S-002-01..S-002-35 + S-002-35a)
   _Intent:_ Prove all scenarios have executable test evidence.
   _Verify:_ Coverage matrix updated with test method mapping.
 
-- [ ] **T-002-35** — Documentation status sync
+- [ ] **T-002-34** — Documentation status sync
   _Intent:_ Sync roadmap, AGENTS mirror, knowledge map, `llms.txt`, and session state.
   _Verify:_ Docs reflect implementation state consistently.

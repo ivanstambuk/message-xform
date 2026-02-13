@@ -3,7 +3,7 @@
 _Linked specification:_ `docs/architecture/features/002/spec.md`
 _Linked tasks:_ `docs/architecture/features/002/tasks.md`
 _Status:_ Ready
-_Last updated:_ 2026-02-12 (post-review fixes applied)
+_Last updated:_ 2026-02-13 (audit fixes: ArchUnit → F009, PaVersionGuard reflection removed)
 
 > Guardrail: Keep this plan traceable back to the governing spec. Reference
 > FR/NFR/Scenario IDs from `spec.md` where relevant, log any new high- or
@@ -34,7 +34,7 @@ The PingAccess Adapter bridges the message-xform core engine into PingAccess
 - Adapter transform overhead < 10 ms for < 64 KB body (NFR-002-01).
 - Zero PA SDK classes in shadow JAR — verified via `jar tf`.
 - Thread-safe: concurrent test with 10 threads produces correct results (NFR-002-03).
-- No reflection used (NFR-002-04).
+- No reflection used (NFR-002-04, enforced by FR-009-12 ArchUnit tests).
 - Compiles with `-Xlint:all -Werror` on Java 21 (NFR-002-05).
 
 ## Scope Alignment
@@ -592,30 +592,17 @@ _To be completed after implementation._
     - _Exit:_ Path traversal rejected. Audit logging verified.
 
 
-12a. **I12a — ArchUnit validation** (≤45 min)
-     - _Goal:_ Automate non-functional requirement enforcement (no reflection, no leakage) using ArchUnit.
-     - _Preconditions:_ I12 complete.
-     - _Steps:_
-       1. **Test first:** Write `AdapterArchTest` in `adapter-pingaccess`:
-          - Rule 1 (Reflections): `classes().should().notDependOnAnyClassesThat().resideInAPackage("java.lang.reflect..")`.
-             **Exemption:** `PaVersionGuard` uses `Class.forName()` to detect
-             Jackson runtime version (ADR-0035). Add exclusion for
-             `PaVersionGuard` or replace with direct `PackageVersion.VERSION`
-             access (see backlog item).
-          - Rule 2 (Leakage): Production classes should not depend on test classes.
-          - Rule 3 (PA SDK): Only allowed packages from PA SDK can be accessed (bridge pattern).
-       2. Run ArchUnit tests, verify compliance.
-       3. Fix any accidental architectural violations.
-     - _Requirements covered:_ NFR-002-04 (no reflection).
-     - _Commands:_ `./gradlew :adapter-pingaccess:test --tests "*AdapterArchTest*"`
-     - _Exit:_ Architecture verified automatically via tests.
+    > **ArchUnit validation** is a cross-cutting concern owned by Feature 009
+    > (FR-009-12). The no-reflection, module-boundary, and SPI-layering rules
+    > apply to all modules (including `adapter-pingaccess`) and are enforced
+    > by the shared ArchUnit test suite. See FR-009-12 for the rule catalogue.
 
 ### Phase 8 — Quality Gate & Documentation (≤2 × 90 min)
 
 13. **I13 — Full quality gate + scenario coverage audit** (≤45 min)
     - _Goal:_ Run the full quality gate across all modules. Update scenario
       coverage matrix. Verify no drift between spec and implementation.
-    - _Preconditions:_ I12a complete.
+    - _Preconditions:_ I12 complete.
     - _Steps:_
       1. Run `./gradlew --no-daemon spotlessApply check`.
       2. Verify all tests pass across `core`, `adapter-standalone`,
@@ -704,7 +691,7 @@ Run `docs/operations/analysis-gate-checklist.md` at two milestones:
 
 ## Exit Criteria
 
-- [ ] All increments (I1–I14 plus I12a) completed and checked off
+- [ ] All increments (I1–I14) completed and checked off
 - [ ] Quality gate passes (`./gradlew --no-daemon spotlessApply check`)
 - [ ] All 36 scenarios have corresponding test methods
 - [ ] Scenario coverage matrix in `scenarios.md` has no uncovered FRs/NFRs
@@ -731,7 +718,7 @@ _To be filled during implementation._
 - **I10:** …
 - **I11:** …
 - **I12:** …
-- **I12a:** …
+
 - **I13:** …
 - **I14:** …
 
@@ -746,8 +733,3 @@ _To be filled during implementation._
 - [ ] **PA-native error handler integration** — Add `ErrorHandlerUtil`
       configuration fields for PA HTML template-based error pages alongside
       RFC 9457. Follow-up if requested.
-- [ ] **PaVersionGuard reflection removal** — `PaVersionGuard.detectJacksonVersion()`
-      uses `Class.forName()` (reflection), which violates NFR-002-04. Consider
-      replacing with direct `com.fasterxml.jackson.databind.cfg.PackageVersion.VERSION`
-      access since Jackson is on the compile classpath (`compileOnly`). This would
-      eliminate the reflection need while preserving the version-check behavior.
