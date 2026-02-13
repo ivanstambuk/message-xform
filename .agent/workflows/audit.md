@@ -1,5 +1,5 @@
 ---
-description: Audit feature documentation for gaps, inconsistencies, type drift, and cross-reference errors
+description: Audit feature documentation for gaps, inconsistencies, type drift, cross-reference errors, and cross-feature ownership violations
 ---
 
 # /audit — Feature Documentation Audit
@@ -159,6 +159,37 @@ types already loaded — not a full codebase Javadoc audit.
 **How to detect:** For each task/scenario, trace backwards to an FR. If no FR
 justifies the task, it's either scope creep (finding) or a missing FR (different
 finding). Similarly, check if plan increments introduce scope beyond the spec.
+
+#### 2f. Cross-Feature Ownership Boundaries (Principle 8)
+
+Every domain type, module, and code artefact is owned by exactly one feature.
+This check detects violations of Principle 8 (Feature Ownership Boundaries)
+where a feature's spec, plan, or tasks prescribe changes to types/code owned
+by another feature.
+
+| Check | What to look for | Severity |
+|-------|-----------------|----------|
+| **Inline core API change** | Plan step says "add field X to `TransformResult`" or "extend `Message` with Y" — but those types are owned by Feature 001 (DO-001-xx) | 🔴 Critical |
+| **Cross-module task** | Task says "implement Z in `core/src/`" when the task belongs to Feature 002's task list | 🔴 Critical |
+| **Spec claims foreign type** | Spec says "the `Foo` record is extended with..." where `Foo` is defined by another feature's spec | 🔴 Critical |
+| **Missing prerequisite gate** | Plan increment depends on a core type change but doesn't declare it as a prerequisite from the owning feature | 🟡 Medium |
+| **Foreign method reference** | Spec/scenario references a method (e.g., `TransformContext.cookiesAsJson()`) that doesn't exist on the type and no owning-feature task plans to add it | 🟡 Medium |
+
+**How to detect:**
+1. For each plan step, grep for keywords: "add field", "extend", "modify",
+   "change", "thread through", "wire into" combined with core type names.
+2. For each task, check that the code path it modifies is within the feature's
+   own module (e.g., Feature 002 tasks should only modify `adapter-pingaccess/`).
+3. For spec Method/API references (e.g., `TransformResult.specId()`), verify
+   the method exists in the actual source code. If it doesn't, check whether
+   the owning feature has a task to add it. If neither, flag as missing.
+4. Check that plan increments with core dependencies explicitly declare
+   prerequisite gates (e.g., "_Preconditions:_ **T-001-67 complete**").
+
+**Ownership lookup:** The owning feature is the one whose spec introduced the
+type's design object ID (e.g., `TransformResult` = DO-001-05 → Feature 001).
+When in doubt, check which feature's `spec.md` contains the type's `DO-xxx-yy`
+definition.
 
 ---
 
@@ -417,6 +448,14 @@ Check these explicitly during Phase 1:
       but core engine throws on invalid JSON → verify which layer handles errors
 - [ ] Accessor rename without type change: `sessionContext()` → `session()` (same
       `SessionContext` type but different accessor name — grep won't catch via type token)
+- [ ] **Principle 8 violation — inline core API change:** Plan step says "add field
+      X to `TransformResult`" or "extend `Message`" inside a non-owning feature's plan.
+      Must be refactored to a task in the owning feature (Principle 8).
+- [ ] **Principle 8 violation — phantom method reference:** Spec/scenario references
+      a method (e.g., `TransformContext.cookiesAsJson()`) that doesn't exist on the
+      type and no owning-feature task creates it.
+- [ ] **Principle 8 violation — missing prerequisite gate:** Plan increment depends
+      on a core type change but doesn't declare a prerequisite from the owning feature.
 
 > **Note:** This checklist should be updated as new drift patterns are discovered.
 > When you find a new pattern during an audit, append it to this list.
