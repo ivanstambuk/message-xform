@@ -1,29 +1,27 @@
-# Current Session — 2026-02-12 (retro closeout)
+# Current Session — 2026-02-13 (F002 documentation alignment + /audit workflow)
 
 ## Focus
-Feature 002 documentation deep-dive and alignment:
-- Restored and hardened `plan.md`
-- Tightened `spec.md` around ADR-0035 packaging/version-guard semantics
-- Realigned `tasks.md` to plan/spec branches
-- Executed retro audit and closed identified SDD hygiene gaps
+Feature 002 documentation review and alignment with current core API types:
+- Fixed systemic type drift (JsonNode→MessageBody, NullNode→MessageBody.empty(), ObjectNode→SessionContext)
+- Fixed accessor rename drift (sessionContext→session, headersAll/contentType→merged into port types)
+- Fixed falsely-completed task checkboxes (T-002-01, T-002-02)
+- Created `/audit` workflow for systematic feature documentation auditing
 
-## Findings Ledger (resolved)
-1. [3a] Missing scenario for FR-002-09 runtime version mismatch warning.
-   - FIXED: added `S-002-35a` to `docs/architecture/features/002/scenarios.md` and linked it from spec/plan/tasks.
-2. [3c] ADR-0035 lacked explicit validating scenario linkage and contained stale follow-up TODOs.
-   - FIXED: replaced follow-ups with stable references, including `S-002-35a`.
-3. [3e] Scenario totals/mappings drifted after FR-002-09 refinements.
-   - FIXED: synchronized counts/mappings across `plan.md` and `tasks.md` (36 scenarios including `S-002-35a`).
+## Key Changes
+- `spec.md`: 20+ stale type references replaced, field count corrected 9→7, session accessor fixed
+- `plan.md`: Increments I2, I3, I6 aligned with port types; PaVersionGuard reflection exemption added
+- `tasks.md`: T-002-01/T-002-02 reset to [ ]; stale NullNode/sessionContext refs fixed
+- `scenarios.md`: NullNode→MessageBody.empty(), sessionContext→session in 5 scenarios
+- `terminology.md`: Message.getSessionContext()→Message.session()
+- `.agent/workflows/audit.md`: New 8-phase audit workflow with drift checklist
 
-## Key Decisions
-- Runtime PA-version mismatch remains WARN-only with remediation text (no fail-fast), per ADR-0035.
-- Scenario ID suffixing (`S-002-35a`) used instead of cascading renumbering.
+## Retro Findings (resolved)
+1. [3b] Stale accessor `Message.getSessionContext()` in terminology.md → FIXED
 
 ## Status
-- Feature 002 specs/plans/tasks are implementation-ready and internally consistent.
-- `open-questions.md` remains empty.
-- Knowledge-map traceability now includes ADR-0035 for FR-002-09.
-- Terminology now defines `Misdeployment guard`.
+- All F002 docs now align with current core API types
+- T-002-01 and T-002-02 are correctly marked as pending implementation
+- `/audit` workflow ready for use across all features
 
 ## Next Session
-Start implementation from Phase 2 task `T-002-03` (`wrapRequest()` URI/path/query mapping), continuing task-by-task in order.
+Implement T-002-01 (ErrorMode + SchemaValidation enums), then T-002-02 (MessageTransformConfig).

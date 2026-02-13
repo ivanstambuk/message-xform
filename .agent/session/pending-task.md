@@ -1,14 +1,14 @@
 # Pending Task
 
-**Focus**: Feature 002 implementation kickoff (adapter bridge)
-**Status**: Planning/docs are aligned; implementation has not started beyond completed Phase 1 config tasks.
-**Next Step**: Execute `T-002-03` (`wrapRequest()` URI split: path + query), test-first.
+**Focus**: Feature 002 — PingAccess Adapter implementation
+**Status**: Documentation aligned and ready. No implementation code exists yet (T-002-01 through T-002-02 still pending).
+**Next Step**: Implement T-002-01 (ErrorMode and SchemaValidation enums) and T-002-02 (MessageTransformConfig)
 
 ## Context Notes
-- Feature 002 now tracks 36 scenarios (`S-002-01..S-002-35` + `S-002-35a`).
-- `S-002-35a` captures ADR-0035 runtime version mismatch WARN-remediation behavior.
-- Plan/spec/tasks/knowledge-map were synced during retro.
-- `open-questions.md` is empty.
+- All spec/plan/tasks/scenarios are now aligned with the current core API types (MessageBody, HttpHeaders, SessionContext)
+- T-002-01 and T-002-02 were falsely marked complete in a prior session (no code or commits) — now correctly reset to [ ]
+- The `/audit` workflow was created for systematic feature documentation auditing
+- PaVersionGuard reflection exemption is documented in plan.md (I12a + backlog)
 
 ## SDD Gaps (if any)
-- None identified in this retro pass.
+- None — retro ledger resolved.
