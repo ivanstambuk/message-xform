@@ -10,7 +10,10 @@ _Last updated:_ 2026-02-13
 > task must execute in test-first order (red -> green -> refactor) and record
 > verification commands.
 
-## Pre-Implementation Checklist (Rule 11)
+## Pre-Implementation Checklist
+
+> See also: AGENTS.md § "Pre-Implementation Checklist (Mandatory)" for the
+> full canonical list. The items below are feature-local prerequisites.
 
 - [x] **C-002-01** — Spec exists and is marked `Status: Spec Ready`.
 - [x] **C-002-02** — Implementation plan exists and is marked `Status: Ready`.
@@ -267,13 +270,13 @@ _Last updated:_ 2026-02-13
   _Verify:_ Shadow JAR checks pass.
   _Verification commands:_
   - `./gradlew :adapter-pingaccess:shadowJar`
-  - `jar tf adapter-pingaccess/build/libs/adapter-pingaccess-*-SNAPSHOT.jar > jar_contents.txt`
-  - `grep -q "io/messagexform/core" jar_contents.txt`
-  - `grep -q "io/messagexform/internal/jackson" jar_contents.txt`
-  - `grep -q "com/schibsted/spt/data/jslt" jar_contents.txt`
-  - `grep -q "META-INF/services/com.pingidentity.pa.sdk.policy.AsyncRuleInterceptor" jar_contents.txt`
-  - `! grep -q "com/pingidentity/pa/sdk" jar_contents.txt`
-  - `! grep -q "com/fasterxml/jackson" jar_contents.txt`
+  - `jar tf adapter-pingaccess/build/libs/adapter-pingaccess-*-SNAPSHOT.jar | grep -q "io/messagexform/core"`
+  - `jar tf ... | grep -q "io/messagexform/internal/jackson"`
+  - `jar tf ... | grep -q "com/schibsted/spt/data/jslt"`
+  - `jar tf ... | grep -q "META-INF/services/com.pingidentity.pa.sdk.policy.AsyncRuleInterceptor"`
+  - `jar tf ... | grep -c "com/pingidentity/pa/sdk"` → must be 0
+  - `jar tf ... | grep "com/fasterxml/jackson"` → must be empty (catches MR-JAR leakage)
+  - `jar tf ... | grep "META-INF/services/com.fasterxml.jackson"` → must be empty
 
 #### I11 — Thread safety + performance (NFR-002-01, NFR-002-03, S-002-16, S-002-20)
 
