@@ -158,7 +158,9 @@ unmodified.
 **Given** the PingAccess Exchange has no Identity (unauthenticated request),
 **when** `wrapRequest()` is called,
 **then** `Message.session()` is `SessionContext.empty()`,
-**and** JSLT expressions referencing `$session` evaluate to `null` without error.
+**and** JSLT expressions referencing `$session` see an empty object `{}`,
+**and** field access like `$session.subject` evaluates to `null` (key-absent
+semantics) without error.
 
 ---
 

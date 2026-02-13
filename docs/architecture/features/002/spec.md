@@ -739,7 +739,7 @@ multi-tenant spec authoring becomes a requirement.
 | Aspect | Detail |
 |--------|--------|
 | Success path | `$session.email` resolves to OIDC claim, `$session.clientId` to OAuth client, `$session.authzCache` to dynamic state |
-| Failure path | No identity (unauthenticated) → `session = SessionContext.empty()` → `$session` is `null` in JSLT |
+| Failure path | No identity (unauthenticated) → `session = SessionContext.empty()` → `$session` is `{}` (empty object) in JSLT — field access returns `null` per JSLT key-absent semantics |
 | Collision path | L4 session state key overrides L3 OIDC claim key (by design — dynamic > static) |
 | Status | ⬜ Not yet implemented |
 | Source | ADR-0030, FR-001-13, G-002-01 |
@@ -874,9 +874,11 @@ be declared `compileOnly` and **not** bundled in the shadow JAR:
 > expect `io.messagexform.internal.jackson.databind.JsonNode` — different
 > classes within the same classloader.
 >
-> **No boundary conversion.** Since PA and the adapter share the same Jackson
-> classes, `Identity.getAttributes()` returns the same `JsonNode` class.
-> Direct `session.set(key, paNode)` works. No serialization round-trip.
+> **Boundary conversion required (ADR-0032).** Although PA and the adapter
+> share the same Jackson classes, the core engine's port-type boundary requires
+> conversion: adapter converts `JsonNode` values to plain Java objects, then
+> wraps via `SessionContext.of(map)`. See FR-002-06 for the full conversion
+> contract.
 >
 > **No dual ObjectMapper.** A single `ObjectMapper` instance handles all
 > adapter JSON operations.
@@ -1029,8 +1031,9 @@ code is complete. It is listed here for traceability.
 Without this, JSLT variables `$cookies`, `$queryParams`, `$headers`, `$status`,
 and `$session` would be null/empty.
 
-The adapter MUST provide a `buildTransformContext(Exchange)` method (not part
-of the `GatewayAdapter` SPI — adapter-specific helper) that maps:
+The adapter MUST provide a `buildTransformContext(Exchange, Integer status)`
+method (not part of the `GatewayAdapter` SPI — adapter-specific helper) that
+maps:
 
 | TransformContext Field | Source | Notes |
 |------------------------|--------|-------|
@@ -1071,7 +1074,7 @@ sizes).
 |--------|--------|
 | Success path | `TransformContext` populated with headers, cookies, query params, session → JSLT `$cookies.sessionToken` resolves correctly |
 | Failure path (URI) | Malformed query string → empty `queryParams` → JSLT `$queryParams.page` evaluates to `null` |
-| Failure path (no identity) | Unauthenticated → `session = SessionContext.empty()` → `$session` is `null` in JSLT |
+| Failure path (no identity) | Unauthenticated → `session = SessionContext.empty()` → `$session` is `{}` (empty object) in JSLT — field access returns `null` per JSLT key-absent semantics |
 | Status | ⬜ Not yet implemented |
 | Source | G-002-01, FR-004-37 (StandaloneAdapter reference pattern) |
 
