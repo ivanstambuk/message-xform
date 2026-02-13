@@ -279,8 +279,11 @@ record containing:
 **then** no `ClassNotFoundException` or `NoClassDefFoundError` occurs at runtime,
 **and** the shadow JAR does NOT contain PA SDK classes
 (`com.pingidentity.pa.sdk.*`),
-**and** the shadow JAR DOES contain all core + transitive dependencies (Jackson,
-JSLT, SnakeYAML, JSON Schema Validator).
+**and** the shadow JAR DOES contain all core + transitive dependencies (JSLT,
+SnakeYAML, JSON Schema Validator, and core's relocated Jackson at
+`io.messagexform.internal.jackson`),
+**and** the shadow JAR does NOT contain `com/fasterxml/jackson/` (PA-provided,
+must not be bundled per FR-002-09).
 
 ---
 

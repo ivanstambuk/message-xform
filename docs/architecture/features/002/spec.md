@@ -975,10 +975,12 @@ exceptions are caught by `getErrorHandlingCallback()` (FR-002-02).
 > In `handleResponse()` DENY mode, the error body comes from one of two paths:
 >
 > 1. **Normal path:** `TransformResult.errorResponse()` — the core engine
->    produces an RFC 9457 `JsonNode` error body. The adapter serializes it via
->    `objectMapper.writeValueAsBytes(result.errorResponse())`, sets it as the
->    response body via `exchange.getResponse().setBodyContent()`, overwrites
->    the status to 502, and sets Content-Type to `application/problem+json`.
+>    produces an RFC 9457 error body as a `MessageBody` (already serialized to
+>    bytes by `ErrorResponseBuilder`). The adapter extracts the raw bytes via
+>    `result.errorResponse().content()`, sets them as the response body via
+>    `exchange.getResponse().setBodyContent()`, overwrites the status to
+>    `result.errorStatusCode()` (typically 502), and sets Content-Type to
+>    `application/problem+json`.
 > 2. **Wrap-failure path:** If `wrapResponse()` itself fails (e.g., `IOException`
 >    during `body.read()`), the adapter constructs its own RFC 9457 error body
 >    with `type: urn:messagexform:error:adapter:wrap-failure` and status 502.
