@@ -29,7 +29,7 @@ The PingAccess Adapter bridges the message-xform core engine into PingAccess
 
 **Measurable signals:**
 
-- All 36 scenarios (S-002-01 through S-002-35 plus S-002-35a) pass as unit tests.
+- All 36 scenarios (S-002-01 through S-002-36) pass as unit tests.
 - Shadow JAR < 5 MB (NFR-002-02).
 - Adapter transform overhead < 10 ms for < 64 KB body (NFR-002-01).
 - Zero PA SDK classes in shadow JAR — verified via `jar tf`.
@@ -40,8 +40,8 @@ The PingAccess Adapter bridges the message-xform core engine into PingAccess
 ## Scope Alignment
 
 - **In scope:** FR-002-01 through FR-002-11, FR-002-13, FR-002-14; all NFRs
-  (NFR-002-01 through NFR-002-05); all scenarios (S-002-01 through S-002-35
-  plus S-002-35a); SPI registration and shadow JAR packaging.
+  (NFR-002-01 through NFR-002-05); all scenarios (S-002-01 through S-002-36);
+  SPI registration and shadow JAR packaging.
 - **Out of scope (for this implementation pass):** Docker E2E test script
   (FR-002-12 — deferred to post-implementation, per spec). Agent deployment
   (N-002-01). Groovy scripts (N-002-02). Async HTTP calls (N-002-03).
@@ -541,7 +541,7 @@ _To be completed after implementation._
          - Mismatch path (compiled vs runtime PA version) logs WARN with
            remediation message per ADR-0035.
     - _Requirements covered:_ FR-002-09, FR-002-10, NFR-002-02, S-002-24,
-      S-002-35a.
+      S-002-36.
     - _Commands:_ `./gradlew :adapter-pingaccess:shadowJar`,
       `./gradlew :adapter-pingaccess:test`,
       `./gradlew spotlessApply check`
@@ -677,7 +677,7 @@ _To be completed after implementation._
 | S-002-33 | I9 | JMX metrics opt-in |
 | S-002-34 | I9 | JMX metrics disabled (default) |
 | S-002-35 | I7 | PA-specific status codes passthrough (Constraint 9) |
-| S-002-35a | I10 | Runtime PA version mismatch logs WARN remediation (ADR-0035) |
+| S-002-36 | I10 | Runtime PA version mismatch logs WARN remediation (ADR-0035) |
 
 ## Analysis Gate
 

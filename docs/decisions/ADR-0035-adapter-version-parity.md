@@ -159,5 +159,5 @@ Negative / trade-offs:
 ## References
 
 - `docs/architecture/features/002/spec.md` (FR-002-09)
-- `docs/architecture/features/002/scenarios.md` (S-002-35a)
+- `docs/architecture/features/002/scenarios.md` (S-002-36)
 - `docs/decisions/ADR-0031-pa-provided-dependencies.md`

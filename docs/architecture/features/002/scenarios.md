@@ -441,7 +441,7 @@ non-standard status,
 
 ---
 
-## S-002-35a: Runtime Version Mismatch Warning
+## S-002-36: Runtime Version Mismatch Warning
 
 **Given** the adapter was compiled for PingAccess `9.0.1` (from
 `pa-compiled-versions.properties`),

@@ -255,9 +255,13 @@ truly completed, so the audit trail it claims to preserve doesn't exist.
 - Count `FR-NNN-XX` IDs in spec.md → compare to FR index/summary
 - Count `T-NNN-XX` IDs in tasks.md → compare task count per phase header
 - Count `NFR-NNN-XX` IDs → compare to NFR section count
-- Verify ID sequences are **unique with no duplicates** (letter-suffix gaps like
-  `T-002-10` → `T-002-10a` → `T-002-11` are acceptable per the project's
-  suffix convention; numeric gaps like `S-002-15` → `S-002-17` should be flagged)
+- Verify ID sequences are **unique with no duplicates**:
+  - **Numeric gaps** (e.g., `S-002-15` → `S-002-17`) MUST be flagged.
+  - **Letter suffixes** (e.g., `S-002-11a`) are acceptable ONLY when the
+    suffixed item is a **genuine sub-case or variant** of its parent ID
+    (e.g., `S-002-11a` tests an edge case of `S-002-11`). If the suffixed
+    item is **semantically independent** from the parent, flag it and
+    recommend renumbering to the next sequential ID.
 
 ---
 
