@@ -1,5 +1,5 @@
 ---
-description: Audit feature documentation for gaps, inconsistencies, type drift, cross-reference errors, and cross-feature ownership violations
+description: Deep audit of feature documentation for gaps, inconsistencies, type drift, cross-reference errors, behavioral correctness, build verification, and cross-feature ownership violations
 ---
 
 # /audit — Feature Documentation Audit
@@ -7,7 +7,7 @@ description: Audit feature documentation for gaps, inconsistencies, type drift, 
 ## Invocation
 
 ```
-/audit <feature-id> [scope...] [--deep]
+/audit <feature-id> [scope...]
 ```
 
 **Examples:**
@@ -15,7 +15,6 @@ description: Audit feature documentation for gaps, inconsistencies, type drift, 
 - `/audit 002 spec plan` — audit spec and plan only
 - `/audit 004 tasks` — audit tasks only
 - `/audit 002 spec` — audit spec (includes scenarios automatically)
-- `/audit 002 all --deep` — deep audit with build verification and behavioral checks
 
 **Parameters:**
 - `<feature-id>` — Feature number, e.g. `002`, `004` (maps to `docs/architecture/features/<id>/`)
@@ -23,10 +22,6 @@ description: Audit feature documentation for gaps, inconsistencies, type drift, 
   - `all` = spec + plan + tasks + scenarios
   - `spec` automatically includes `scenarios` (they are tightly coupled)
   - If omitted, defaults to `all`
-- `--deep` — Enables Phases 6–8 (build verification, behavioral analysis, risk review).
-  Without `--deep`, the audit covers Phases 0–5 only (type drift, cross-references,
-  task status, terminology, structural completeness). Use `--deep` when preparing
-  for implementation or after significant spec/codebase changes.
 
 ---
 
@@ -416,7 +411,7 @@ elsewhere, flag as 🟡 Medium with a recommendation to move it.
 
 ---
 
-### Phase 6 — Behavioral Correctness (--deep only)
+### Phase 6 — Behavioral Correctness
 
 > **This phase goes beyond syntactic matching to verify the described behavior
 > is actually correct and implementable.**
@@ -442,7 +437,7 @@ the spec claims. Cross-reference against SDK documentation or decompiled sources
 
 ---
 
-### Phase 7 — Build & CI Verifiability (--deep only)
+### Phase 7 — Build & CI Verifiability
 
 // turbo
 | Check | What to look for | Severity |
@@ -470,7 +465,7 @@ the spec claims. Cross-reference against SDK documentation or decompiled sources
 
 ---
 
-### Phase 8 — Risk & Constraint Freshness (--deep only)
+### Phase 8 — Risk & Constraint Freshness
 
 | Check | What to look for | Severity |
 |-------|-----------------|----------|
@@ -511,7 +506,6 @@ The detailed report uses this format:
 > deleted.
 
 **Scope:** spec, plan, tasks, scenarios
-**Mode:** standard | deep
 **Date:** <current date>
 **Documents audited:** <list of files>
 **Core types checked:** <list of types verified against source>
