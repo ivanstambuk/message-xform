@@ -64,7 +64,7 @@ A **standalone transformation engine** with gateway-specific adapter plugins. Tr
 ### Feature 002 — PingAccess Adapter
 
 Primary production target. Spec complete (`docs/architecture/features/002/spec.md`),
-SDK guide complete (`docs/architecture/features/002/pingaccess-sdk-guide.md`).
+SDK guide complete (`docs/reference/pingaccess-sdk-guide.md`).
 
 ### Artifact Publishing (FR-009-16, FR-009-17)
 

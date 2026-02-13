@@ -7,8 +7,8 @@
 | Status | Draft |
 | Last updated | 2026-02-12 |
 | Audience | Architects, operators, developers |
-| Related spec | [`spec.md`](spec.md) |
-| Related ADRs | [ADR-0023](../../../decisions/ADR-0023-cross-profile-routing-is-product-defined.md), [ADR-0006](../../../decisions/ADR-0006-profile-match-resolution.md) |
+| Related spec | [`spec.md`](../architecture/features/002/spec.md) |
+| Related ADRs | [ADR-0023](../decisions/ADR-0023-cross-profile-routing-is-product-defined.md), [ADR-0006](../decisions/ADR-0006-profile-match-resolution.md) |
 
 ---
 
@@ -461,8 +461,8 @@ is logged. All existing transforms continue to work.
 
 ## See Also
 
-- [Feature 002 Spec](spec.md) — Full functional requirements
-- [PingAccess SDK Guide](pingaccess-sdk-guide.md) — SDK class reference
-- [ADR-0023](../../../decisions/ADR-0023-cross-profile-routing-is-product-defined.md) — Cross-profile routing is product-defined
-- [ADR-0006](../../../decisions/ADR-0006-profile-match-resolution.md) — Most-specific-wins match resolution
-- [ADR-0031](../../../decisions/ADR-0031-pa-provided-dependencies.md) — PA-provided dependencies
+- [Feature 002 Spec](../architecture/features/002/spec.md) — Full functional requirements
+- [PingAccess SDK Guide](../reference/pingaccess-sdk-guide.md) — SDK class reference
+- [ADR-0023](../decisions/ADR-0023-cross-profile-routing-is-product-defined.md) — Cross-profile routing is product-defined
+- [ADR-0006](../decisions/ADR-0006-profile-match-resolution.md) — Most-specific-wins match resolution
+- [ADR-0031](../decisions/ADR-0031-pa-provided-dependencies.md) — PA-provided dependencies

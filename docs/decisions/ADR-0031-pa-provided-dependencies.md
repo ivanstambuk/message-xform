@@ -242,6 +242,6 @@ Validating evidence:
 
 References:
 - Feature 002 spec: `docs/architecture/features/002/spec.md` (FR-002-06, FR-002-09)
-- SDK guide: `docs/architecture/features/002/pingaccess-sdk-guide.md` (§6, §9)
+- SDK guide: `docs/reference/pingaccess-sdk-guide.md` (§6, §9)
 - ADR-0025: Adapter Lifecycle SPI
 - ADR-0030: Session Context Binding

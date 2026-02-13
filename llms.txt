@@ -15,10 +15,10 @@ docs/architecture/features/001/scenarios.md
 docs/architecture/features/002/spec.md
 
 # PingAccess SDK Implementation Guide (LLM-optimized reference)
-docs/architecture/features/002/pingaccess-sdk-guide.md
+docs/reference/pingaccess-sdk-guide.md
 
 # PingAccess Adapter Deployment Architecture (two-level matching, config model)
-docs/architecture/features/002/deployment-architecture.md
+docs/operations/pingaccess-deployment.md
 
 # Feature 004 — Standalone HTTP Proxy Mode
 docs/architecture/features/004/spec.md

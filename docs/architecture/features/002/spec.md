@@ -9,7 +9,7 @@
 | Linked tasks | `docs/architecture/features/002/tasks.md` |
 | Roadmap entry | #2 – PingAccess Adapter |
 | Depends on | Feature 001 (core engine) |
-| Linked architecture | [`deployment-architecture.md`](deployment-architecture.md) |
+| Linked architecture | [`pingaccess-deployment.md`](../../../operations/pingaccess-deployment.md) |
 
 > Guardrail: This specification is the single normative source of truth for the feature.
 > Track questions in `docs/architecture/open-questions.md`, encode resolved answers
@@ -80,7 +80,7 @@ The adapter is a **thin bridge layer** — all transformation logic lives in
 ## SDK API Surface
 
 > Full SDK API documentation, method signatures, and implementation patterns are
-> in [`docs/architecture/features/002/pingaccess-sdk-guide.md`](pingaccess-sdk-guide.md).
+> in [`docs/reference/pingaccess-sdk-guide.md`](../../../reference/pingaccess-sdk-guide.md).
 > This section provides a high-level summary only.
 
 The adapter uses the following SDK types. See the guide for complete method
@@ -659,7 +659,7 @@ layers override earlier layers on key collision:
 > like `subject` are convenience wrappers that may already be in the claims as `sub`.
 
 > **Implementation pattern:** See
-> [`docs/architecture/features/002/pingaccess-sdk-guide.md` §6 "Building $session"](pingaccess-sdk-guide.md#building-session--flat-merge-pattern)
+> [`docs/reference/pingaccess-sdk-guide.md` §6 "Building $session"](../../../reference/pingaccess-sdk-guide.md#building-session--flat-merge-pattern)
 > for the complete `buildSessionContext()` implementation.
 >
 > **Jackson to port type conversion (ADR-0031, ADR-0032):** PA uses a flat
@@ -944,7 +944,7 @@ spec parse errors at runtime, eval budget exceeded, and output size exceeded.
 
 **Key constraint:** During `handleRequest()`, `exchange.getResponse()` is
 **null** — the adapter MUST use `ResponseBuilder` to construct a new `Response`.
-See [SDK guide §8](pingaccess-sdk-guide.md#8-responsebuilder--error-handling)
+See [SDK guide §8](../../../reference/pingaccess-sdk-guide.md#8-responsebuilder--error-handling)
 for complete code patterns and the rationale for rejecting `AccessException`.
 
 The adapter MUST NOT throw `AccessException` for transform failures — transform
@@ -1270,7 +1270,7 @@ zero configuration.
   ```
 
 > **Mock patterns, config validation code, and dependency alignment table:**
-> See [SDK guide §11](pingaccess-sdk-guide.md#11-testing-patterns)
+> See [SDK guide §11](../../../reference/pingaccess-sdk-guide.md#11-testing-patterns)
 > for the complete Mockito mock chain, `ArgumentCaptor` verification pattern,
 > standalone `Validator` setup, and SDK dependency versions.
 
@@ -1439,7 +1439,7 @@ Client                    PingAccess                        Backend
 
 | Document | Relevance |
 |----------|-----------|
-| [`deployment-architecture.md`](deployment-architecture.md) | Two-level matching, per-instance config, Docker/K8s layout |
+| [`pingaccess-deployment.md`](../../../operations/pingaccess-deployment.md) | Two-level matching, per-instance config, Docker/K8s layout |
 | `docs/research/pingaccess-plugin-api.md` | SDK research (complete) |
 | `docs/research/pingaccess-docker-and-sdk.md` | Docker + SDK samples (complete) |
 | `docs/research/pingam-authentication-api.md` | PingAM callback format (transform target) |
@@ -1460,7 +1460,7 @@ Client                    PingAccess                        Backend
 
 > Full configuration patterns (annotation-driven, programmatic, `@UIElement`
 > attributes, JSR-380 validation) are documented in
-> [SDK guide §7](pingaccess-sdk-guide.md#7-plugin-configuration--ui).
+> [SDK guide §7](../../../reference/pingaccess-sdk-guide.md#7-plugin-configuration--ui).
 >
 > **Runtime constraint:** `ConfigurationModelAccessor` instances must only
 > be used inside `configure()`, never during `handleRequest()` /
