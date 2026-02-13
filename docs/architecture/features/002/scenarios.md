@@ -92,7 +92,10 @@ unmodified.
 **then** the parse fails gracefully,
 **and** `Message.body()` is `MessageBody.empty()`,
 **and** a warning is logged,
-**and** the spec can still match and transform headers (non-body fields).
+**and** the adapter sets `bodyParseFailed = true`,
+**and** the spec can still match and transform headers/status/URL (non-body fields),
+**and** body transforms are skipped — the original `text/plain` body is forwarded
+unchanged to the backend (Q-003, Option A).
 
 ---
 
@@ -390,10 +393,13 @@ interceptors fire in reverse order even on `RETURN`),
 **Given** a backend returns a `text/html` response body,
 **when** `wrapResponse()` attempts to parse the body as JSON,
 **then** the parse fails gracefully and falls back to `MessageBody.empty()` body,
+**and** the adapter sets `bodyParseFailed = true`,
 **and** response-direction transforms can still operate on headers and status code,
-**and** the body is passed through unmodified.
+**and** body transforms are skipped — the original `text/html` body is forwarded
+unchanged to the client (Q-003, Option A).
 
-> **Outcome:** PASSTHROUGH for body transforms, SUCCESS for header-only transforms.
+> **Outcome:** Body is passed through unmodified (adapter skip guard). Header/status
+> transforms produce SUCCESS if they modify anything, PASSTHROUGH otherwise.
 
 ---
 

@@ -21,7 +21,6 @@ Hard rules:
 
 | ID | Owner | Question | Options (A preferred) | Status | Asked | Notes |
 |----|-------|----------|------------------------|--------|-------|-------|
-| Q-003 | F-002 | Non-JSON body fallback: should the adapter skip body transforms or let the engine evaluate against null input? | A: Adapter-side skip guard, B: Document null-input expression behavior | Open | 2026-02-13 | severity: high; audit F-003 |
 
 
 

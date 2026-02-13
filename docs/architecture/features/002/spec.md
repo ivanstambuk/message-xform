@@ -163,9 +163,11 @@ it directly to the engine. Throwing would require the rule to catch and
 reconstruct — swallowing inside `wrapRequest()` is cleaner.
 
 **Impact on profile matching:** A `MessageBody.empty()` body still allows profile
-matching on path/method/headers. If a profile matches and attempts a body
-transformation, the engine receives an empty body — this is handled gracefully
-(empty body produces no-op body transform).
+matching on path/method/headers. If a profile matches, header, status, and URL
+transforms apply normally. **Body transforms are skipped** — the adapter MUST
+track that body parse failed (e.g., via a `bodyParseFailed` flag) and, when
+set, forward the original raw body bytes unchanged to the backend. The JSLT
+body expression is NOT evaluated against `null` input (Q-003, Option A).
 
 #### wrapRequest Mapping
 
