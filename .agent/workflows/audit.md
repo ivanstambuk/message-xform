@@ -327,11 +327,28 @@ the spec claims. Cross-reference against SDK documentation or decompiled sources
 
 ---
 
-## Output Format
+## Output — Two-Tier Report
 
-After completing all phases, produce a **Findings Report** in this format:
+The audit produces **two outputs**: a detailed file (for reference) and a chat
+summary (for immediate action).
 
-```markdown
+### Tier 1 — Detailed Report File (gitignored)
+
+Write the full findings report to:
+
+```
+audit-reports/audit-<feature-id>-<scope>.md
+```
+
+Example: `audit-reports/audit-002-spec.md`, `audit-reports/audit-004-all.md`
+
+This directory is **gitignored** (`audit-reports/` in `.gitignore`) — reports
+are ephemeral session artifacts that inform decisions, not permanent
+documentation. They must **never** be committed.
+
+The detailed report uses this format:
+
+````markdown
 # Feature <ID> Documentation Audit — Findings
 
 **Scope:** spec, plan, tasks, scenarios
@@ -381,7 +398,37 @@ dismissed. These should be discussed before applying any fixes.
 
 1. <prioritized list of actions>
 2. ...
-```
+````
+
+### Tier 2 — Chat Summary (always present)
+
+After writing the detailed report, present a **concise tabular summary** in
+chat. This is what the user sees immediately. Format:
+
+````markdown
+## Feature <ID> Audit — Summary
+
+**Overall health:** 🟢/🟡/🔴 <one-line assessment>
+**Detailed report:** `audit-reports/audit-<id>-<scope>.md`
+
+| ID | Severity | Type | Status |
+|----|----------|------|--------|
+| F-001 | 🔴 HIGH | <short description> | Fix required |
+| F-002 | 🟡 MEDIUM | <short description> | Recommendation |
+| F-003 | 🟢 LOW | <short description> | Tracked |
+| F-004 | ✅ OK | <phase or check name> | Verified |
+
+### Remaining Action Items
+1. **[Fix]** F-001: <one-line fix>
+2. **[Track]** F-003: <one-line recommendation>
+````
+
+The chat summary must:
+- Fit in one screenful (no scrolling needed for the table)
+- Use the tabular format above (ID, Severity, Type, Status)
+- Include verified/clean checks as ✅ OK rows for completeness
+- End with a prioritized action item list
+- Always reference the detailed report file path
 
 ---
 
@@ -404,13 +451,15 @@ Use these criteria to assign severity consistently:
 
 ## Post-Audit Actions
 
-After presenting the findings report:
+After presenting the chat summary:
 1. **Wait for user approval** before making any changes
 2. If the user says "fix all" or "fix issues 1-4", apply the fixes
 3. Each fix should be a targeted edit (not a full rewrite)
 4. After fixes, re-run the relevant checks to verify no regressions
-5. Do NOT start implementation — this is a documentation-only workflow
-6. **Open questions** from the findings report should be discussed with the
+5. Update the **detailed report file** to mark fixed items (strikethrough + ✅)
+6. Do **not** commit the report file — it stays gitignored
+7. Do NOT start implementation — this is a documentation-only workflow
+8. **Open questions** from the findings report should be discussed with the
    user and resolved via the Decision Card protocol (AGENTS.md Rule 9) if
    they represent design decisions. If they're spec clarifications, update
    the spec directly after user confirmation.

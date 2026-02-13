@@ -43,3 +43,6 @@ docker-compose.override.yml
 
 # Local vendor libraries — track structure/docs, ignore JARs
 libs/**/*.jar
+
+# Audit reports — ephemeral session artifacts, not tracked
+audit-reports/
