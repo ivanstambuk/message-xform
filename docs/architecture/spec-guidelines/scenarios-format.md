@@ -6,6 +6,9 @@ This document defines the standard formats for scenario files across all feature
 All scenarios are **machine-parseable YAML** inside markdown code blocks — no
 free-form BDD prose.
 
+**Template:** Copy `docs/architecture/spec-guidelines/scenarios-template.md` when
+creating a new feature's `scenarios.md`.
+
 ## 1. Shared Header Metadata
 
 Every `scenarios.md` file MUST begin with this preamble:

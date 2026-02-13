@@ -26,6 +26,7 @@ constitution in `docs/decisions/project-constitution.md` before acting.
 | `docs/architecture/open-questions.md` | Live open questions (scratchpad, not archive) |
 | `docs/architecture/spec-guidelines/docs-style.md` | Docs formatting & cross-reference conventions |
 | `docs/architecture/spec-guidelines/open-questions-format.md` | Decision Card format for open questions |
+| `docs/architecture/spec-guidelines/scenarios-format.md` | Scenario YAML schemas, preamble template, structural rules |
 | `docs/operations/analysis-gate-checklist.md` | Pre-implementation & drift gate verification |
 | `llms.txt` | High-signal specs manifest for LLM context windows |
 | `docs/_current-session.md` | Live session snapshot for agent handoffs |
@@ -53,7 +54,7 @@ constitution in `docs/decisions/project-constitution.md` before acting.
 Every feature progresses through these steps. Do not skip steps.
 
 1. **Research** — Analyze the gateway's extension model, API, SDK. Write findings to `docs/research/<name>.md`.
-2. **Scenarios** — Define concrete test scenarios with input/output JSON pairs in `features/<NNN>/scenarios.md`.
+2. **Scenarios** — Define concrete test scenarios as structured YAML in `features/<NNN>/scenarios.md` per `docs/architecture/spec-guidelines/scenarios-format.md`.
 3. **Spec** — Write the feature specification (SDD) in `features/<NNN>/spec.md`.
 4. **Plan** — Break the spec into implementation phases in `features/<NNN>/plan.md`.
 5. **Tasks** — Granular task breakdown in `features/<NNN>/tasks.md`. Order tests before code in every task.
@@ -71,14 +72,14 @@ Update both `docs/architecture/roadmap.md` and the Roadmap table above when stat
   - `PLAN.md` — Vision, architecture, features, and open questions.
   - `AGENTS.md` — Agent rules and project conventions (this file).
   - `docs/architecture/features/<NNN>/spec.md` — Feature specifications (SDD).
-  - `docs/architecture/features/<NNN>/scenarios.md` — Test scenarios (input/output contracts).
+  - `docs/architecture/features/<NNN>/scenarios.md` — Test scenarios (structured YAML contracts per `scenarios-format.md`).
   - `docs/architecture/features/<NNN>/plan.md` — Implementation plans.
   - `docs/architecture/features/<NNN>/tasks.md` — Task breakdowns.
   - `docs/architecture/open-questions.md` — Live open questions (scratchpad, not archive).
   - `docs/architecture/roadmap.md` — Feature roadmap (canonical source).
   - `docs/architecture/terminology.md` — Project terminology (golden source).
   - `docs/architecture/knowledge-map.md` — Module/concept dependency graph.
-  - `docs/architecture/spec-guidelines/` — Docs style, open questions format.
+  - `docs/architecture/spec-guidelines/` — Docs style, open questions format, scenarios format.
   - `docs/decisions/` — Architecture Decision Records (ADRs).
   - `docs/decisions/project-constitution.md` — Project constitution.
   - `docs/operations/` — Gate checklists, operational runbooks, and cross-cutting
@@ -199,7 +200,7 @@ See `docs/operations/quality-gate.md` for full pipeline documentation.
      earlier one, **remove** the stale content from the earlier ADR — do not
      leave struck-out text or historical annotations. Every statement in an ADR
      must be currently true. Git history preserves the evolution.
-9. **Decisions Must Be Testable**: Every ADR or resolved open question that changes the spec MUST produce at least one validating scenario in `scenarios.md`. Scenarios reference ADRs (via tags like `adr-0002`) and spec requirements (via `requires: [FR-001-10]`). The coverage matrix at the bottom of `scenarios.md` MUST be updated. When a discussion reveals a new edge case, add a scenario immediately — don't defer.
+9. **Decisions Must Be Testable**: Every ADR or resolved open question that changes the spec MUST produce at least one validating scenario in `scenarios.md`. Scenarios reference ADRs (via tags like `adr-0002`) and spec requirements (via `refs: [FR-001-10]`). The coverage matrix at the bottom of `scenarios.md` MUST be updated. When a discussion reveals a new edge case, add a scenario immediately — don't defer. All scenarios MUST conform to `docs/architecture/spec-guidelines/scenarios-format.md`.
 10. **Spec Review Protocol**: When the agent reviews or critiques a spec, findings MUST be triaged and persisted — never left as chat-only output.
     - **🔴🟡 Decisions needed** (high/medium severity): Register as formal open questions in `docs/architecture/open-questions.md`. These require human input via Decision Cards before the spec is updated. Each question gets a severity tag in the Notes column (`severity: high` or `severity: medium`).
     - **🔵 Obvious fixes** (low/polish): Apply directly to the spec in a commit. These are corrections or consistency issues, not architectural decisions — they don't need Decision Cards.
