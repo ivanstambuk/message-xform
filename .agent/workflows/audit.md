@@ -467,10 +467,12 @@ After presenting the chat summary:
    user and resolved via the Decision Card protocol (AGENTS.md Rule 9) if
    they represent design decisions. If they're spec clarifications, update
    the spec directly after user confirmation.
-9. **Cleanup:** Once **all** action items are resolved (every item in the
-   Action Items section is struck through with ✅), **delete the report file**.
-   The report is a working artifact, not permanent documentation. Resolved
-   findings are captured by the commits that fixed them.
+// turbo
+9. **Auto-cleanup:** Once **all** action items are resolved (every finding is
+   fixed, every open question is closed), **immediately delete the report
+   file** — do NOT ask the user for confirmation. The report is a gitignored
+   ephemeral working artifact; resolved findings are captured by the commits
+   that fixed them. Keeping the file after resolution adds noise.
 
 ---
 
