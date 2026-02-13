@@ -127,7 +127,7 @@ types already loaded — not a full codebase Javadoc audit.
 | Check | What to look for | Severity |
 |-------|-----------------|----------|
 | **Scenario coverage** | Every FR that changes observable behavior has at least one scenario (per AGENTS.md Rule 9) | 🔴 Critical for behavior-changing FRs; 🟡 Medium for internal-only FRs |
-| **Scenario accuracy** | Given/When/Then text matches spec behavior | 🟡 Medium |
+| **Scenario accuracy** | YAML scenario assertions match spec behavior | 🟡 Medium |
 | **Type references** | Scenarios use correct type names | 🟢 Low |
 | **Edge case coverage** | Spec edge cases (null, empty, failure) have scenarios | 🟡 Medium |
 
@@ -190,6 +190,129 @@ by another feature.
 type's design object ID (e.g., `TransformResult` = DO-001-05 → Feature 001).
 When in doubt, check which feature's `spec.md` contains the type's `DO-xxx-yy`
 definition.
+
+#### 2g. Scenario Format Compliance
+
+Verifies `scenarios.md` conforms to `docs/architecture/spec-guidelines/scenarios-format.md`.
+This catches structural debt that accumulates as scenarios are added incrementally.
+
+**Reference standard:** `docs/architecture/spec-guidelines/scenarios-format.md`
+
+// turbo
+**Automated checks (run these commands):**
+
+```bash
+# SC-01: Preamble — correct title format
+head -1 docs/architecture/features/<id>/scenarios.md
+# Should match: # Feature NNN – [Feature Name]: Scenarios
+
+# SC-02: Preamble — Format field present
+grep -c '| Format |' docs/architecture/features/<id>/scenarios.md
+# Must be >= 1
+
+# SC-03: No BDD prose — no Given/When/Then outside YAML blocks
+python3 -c "
+import re
+with open('docs/architecture/features/<id>/scenarios.md') as f:
+    content = f.read()
+# Remove YAML blocks
+stripped = re.sub(r'\`\`\`yaml.*?\`\`\`', '', content, flags=re.DOTALL)
+for i, line in enumerate(stripped.splitlines(), 1):
+    if re.match(r'^\*\*(Given|When|Then|And)\*\*', line):
+        print(f'BDD prose at line {i}: {line[:80]}')
+"
+
+# SC-04: refs field present on every scenario
+python3 -c "
+import re
+with open('docs/architecture/features/<id>/scenarios.md') as f:
+    content = f.read()
+blocks = re.findall(r'\`\`\`yaml\n(.*?)\`\`\`', content, re.DOTALL)
+missing = []
+for b in blocks:
+    m = re.search(r'^scenario: (S-\d+-\S+)', b, re.MULTILINE)
+    if m and m.group(1) != 'S-001-XX' and m.group(1) != 'S-NNN-XX':
+        if not re.search(r'^refs:', b, re.MULTILINE):
+            missing.append(m.group(1))
+print(f'Scenarios without refs: {len(missing)}')
+for s in missing: print(f'  {s}')
+"
+
+# SC-05: No 'requires:' field (should be 'refs:')
+grep -c '^requires:' docs/architecture/features/<id>/scenarios.md
+# Must be 0
+
+# SC-06: Every scenario has a heading
+python3 -c "
+import re
+with open('docs/architecture/features/<id>/scenarios.md') as f:
+    content = f.read()
+blocks = re.findall(r'\`\`\`yaml\n(.*?)\`\`\`', content, re.DOTALL)
+for b in blocks:
+    m = re.search(r'^scenario: (S-\d+-\S+)', b, re.MULTILINE)
+    if m and 'XX' not in m.group(1) and 'NNN' not in m.group(1):
+        sid = m.group(1)
+        pat = rf'^###? {re.escape(sid)}'
+        if not re.search(pat, content, re.MULTILINE):
+            print(f'Headless scenario (no ##/### heading): {sid}')
+"
+
+# SC-07: Category numbers are monotonic (no duplicates)
+grep '^## Category' docs/architecture/features/<id>/scenarios.md \
+  | sed 's/## Category \([0-9]*\).*/\1/' | sort -n | uniq -d
+# Must produce no output
+
+# SC-08: No content after trailing tables
+# (scenarios should NOT appear after Scenario Index or Coverage Matrix)
+python3 -c "
+with open('docs/architecture/features/<id>/scenarios.md') as f:
+    lines = f.readlines()
+idx_line = None
+for i, l in enumerate(lines):
+    if l.startswith('## Scenario Index') or l.startswith('## Coverage Matrix'):
+        idx_line = i
+        break
+if idx_line:
+    for i in range(idx_line, len(lines)):
+        if lines[i].startswith('## Category') or lines[i].startswith('### S-'):
+            print(f'Content after trailing tables at line {i+1}: {lines[i].strip()}')
+"
+
+# SC-09: Coverage matrix present
+grep -c '^## Coverage Matrix' docs/architecture/features/<id>/scenarios.md
+# Must be >= 1
+
+# SC-10: All scenarios have --- separators
+python3 -c "
+import re
+with open('docs/architecture/features/<id>/scenarios.md') as f:
+    lines = f.readlines()
+missing = 0
+for i, line in enumerate(lines):
+    if (line.startswith('### S-') or line.startswith('## S-')):
+        j = i - 1
+        while j >= 0 and lines[j].strip() == '': j -= 1
+        if j >= 0 and lines[j].strip() != '---' and not lines[j].startswith('## Category'):
+            missing += 1
+            print(f'Missing --- before line {i+1}: {line.strip()}')
+print(f'Total missing separators: {missing}')
+"
+```
+
+**Finding table for format violations:**
+
+| Check ID | What to look for | Severity |
+|----------|-----------------|----------|
+| **SC-01** | Preamble title does not match standard template | 🟡 Medium |
+| **SC-02** | Preamble missing `Format` field | 🟡 Medium |
+| **SC-03** | BDD prose (Given/When/Then) outside YAML blocks | 🔴 Critical |
+| **SC-04** | Scenario YAML block missing `refs:` field | 🔴 Critical |
+| **SC-05** | Non-standard `requires:` used instead of `refs:` | 🟡 Medium |
+| **SC-06** | Scenario YAML exists but has no markdown heading | 🟡 Medium |
+| **SC-07** | Duplicate category numbers | 🟡 Medium |
+| **SC-08** | Scenarios/categories placed after trailing index tables | 🔴 Critical |
+| **SC-09** | Missing coverage matrix | 🟡 Medium |
+| **SC-10** | Missing `---` separators between scenarios | 🟢 Low |
 
 ---
 
@@ -260,7 +383,7 @@ boundaries adds noise and confuses agents:
 | `tasks.md` | Actionable checklist items — what to do, how to verify | Architectural rationale, design commentary, blockquote "notes" explaining *why* a task doesn't exist, cross-cutting concern narratives |
 | `plan.md` | Implementation strategy, phasing, rationale, risk analysis | Raw task checklists (`- [ ]`), verification command lists without context |
 | `spec.md` | Requirements (FR/NFR), constraints, API surface, design objects | Implementation sequencing, task IDs, build commands |
-| `scenarios.md` | Executable Given/When/Then contracts | Rationale paragraphs, ADR references, implementation notes |
+| `scenarios.md` | Executable YAML scenario contracts (per `scenarios-format.md`) | Rationale paragraphs, ADR references, implementation notes, BDD prose |
 
 **How to detect:** Scan for blockquotes (`> ...`) and standalone paragraphs
 in `tasks.md` that are not task-level `_Intent:_`/`_Verify:_` annotations.
@@ -286,6 +409,10 @@ elsewhere, flag as 🟡 Medium with a recommendation to move it.
     (e.g., `S-002-11a` tests an edge case of `S-002-11`). If the suffixed
     item is **semantically independent** from the parent, flag it and
     recommend renumbering to the next sequential ID.
+- Verify `## Category N:` numbers are **monotonically increasing with no
+  duplicates** (run the SC-07 check from Phase 2g if not already done)
+- Verify scenario index row count matches actual scenario heading count
+- Verify coverage matrix lists every FR/NFR from the spec
 
 ---
 
