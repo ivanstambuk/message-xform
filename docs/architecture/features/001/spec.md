@@ -3,7 +3,7 @@
 | Field | Value |
 |-------|-------|
 | Status | Ready |
-| Last updated | 2026-02-09 |
+| Last updated | 2026-02-13 |
 | Owners | Ivan |
 | Linked plan | `docs/architecture/features/001/plan.md` |
 | Linked tasks | `docs/architecture/features/001/tasks.md` |
@@ -211,26 +211,22 @@ interface CompiledExpression {
 
 /**
  * Read-only context passed to expression engines during evaluation.
- * Engines consume whichever context they support (e.g., JSLT binds $headers
- * and $status as variables; JOLT ignores them).
+ * Contains port value objects (ADR-0033) — no third-party types.
+ * Engines consume whichever context they support (e.g., JSLT converts
+ * HttpHeaders to JsonNode internally for $headers / $headers_all binding;
+ * JOLT ignores context entirely).
  */
 interface TransformContext {
-  /** HTTP headers as a JSON object (keys = header names, values = first value). */
-  readonly headers: JsonTree;
-  /** All HTTP header values (keys = header names, values = string arrays). ADR-0026. */
-  readonly headersAll: JsonTree;
+  /** HTTP headers — port type providing single-value and multi-value views (ADR-0026). */
+  readonly headers: HttpHeaders;
   /** HTTP status code, or null for request transforms (ADR-0017, ADR-0020). */
-  readonly statusCode: number | null;
-  /** Request path (e.g., "/json/alpha/authenticate"). */
-  readonly requestPath: string;
-  /** HTTP method (e.g., "POST"). */
-  readonly requestMethod: string;
-  /** Query params as JSON object (keys = param names, values = first value). ADR-0021. */
-  readonly queryParams: JsonTree;
-  /** Request cookies as JSON object (keys = cookie names, values = cookie values). ADR-0021. */
-  readonly cookies: JsonTree;
-  /** Gateway session context as arbitrary JSON, or null if unavailable. ADR-0030. */
-  readonly sessionContext: JsonTree | null;
+  readonly status: number | null;
+  /** Query params (keys = param names, values = first value). ADR-0021. */
+  readonly queryParams: Map<string, string>;
+  /** Request cookies (keys = cookie names, values = cookie values). ADR-0021. */
+  readonly cookies: Map<string, string>;
+  /** Gateway session context, or SessionContext.empty() if unavailable. ADR-0030. */
+  readonly session: SessionContext;
 }
 ```
 
@@ -1031,12 +1027,14 @@ transform:
 ```
 
 **Adapter responsibilities:**
-- Each gateway adapter populates `Message.getSessionContext()` from its native
-  session API during `wrapRequest()` / `wrapResponse()`.
-- If the gateway has no session concept or no session exists, the adapter leaves
-  `sessionContext` as `null`.
-- Session context population is **optional** — adapters that do not support sessions
-  simply return `null`.
+- Each gateway adapter populates `Message.session()` from its native session
+  API during `wrapRequest()` / `wrapResponse()`, using `SessionContext.of(map)`
+  for populated sessions.
+- If the gateway has no session concept or no session exists, the adapter passes
+  `null` or `SessionContext.empty()` — the `Message` canonical constructor
+  normalizes `null` to `SessionContext.empty()`.
+- Session context population is **optional** — adapters that do not support
+  sessions simply pass `null` (normalized to `SessionContext.empty()`).
 
 **Mutability:** Read-only. Transforms consume session data but do NOT modify it.
 Writing to session state is a gateway-level concern, not a transform concern.
@@ -1048,8 +1046,8 @@ MUST be rejected at load time with a diagnostic message.
 
 | Aspect | Detail |
 |--------|--------|
-| Success path | Adapter populates `sessionContext` → engine binds `$session` → JSLT accesses session fields |
-| Success path | No session provided → `$session` is null → null-safe access in JSLT |
+| Success path | Adapter populates `Message.session()` via `SessionContext.of(map)` → engine binds `$session` → JSLT accesses session fields |
+| Success path | No session provided → `SessionContext.empty()` → `$session` is null in JSLT → null-safe access |
 | Validation path | JOLT spec with `$session` reference → rejected at load time |
 | Failure path | N/A — `$session` is always nullable; null access is safe in JSLT |
 | Source | ADR-0030, ADR-0021 precedent |
