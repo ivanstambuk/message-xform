@@ -248,6 +248,30 @@ truly completed, so the audit trail it claims to preserve doesn't exist.
 | **Constraint coverage** | All spec constraints are testable/tested | 🟡 Medium |
 | **Non-goals drift** | Plan/tasks accidentally include items listed as non-goals | 🔴 Critical |
 | **Quantitative self-consistency** | Scenario count in matrix matches actual scenarios; FR count matches; task count per phase matches plan | 🟡 Medium |
+| **Misplaced content** | Content that belongs in one document type but appears in another | 🟡 Medium |
+
+**Misplaced content detection:**
+
+Each document type has a defined purpose. Content that violates these
+boundaries adds noise and confuses agents:
+
+| Document | Purpose | Should NOT contain |
+|----------|---------|-------------------|
+| `tasks.md` | Actionable checklist items — what to do, how to verify | Architectural rationale, design commentary, blockquote "notes" explaining *why* a task doesn't exist, cross-cutting concern narratives |
+| `plan.md` | Implementation strategy, phasing, rationale, risk analysis | Raw task checklists (`- [ ]`), verification command lists without context |
+| `spec.md` | Requirements (FR/NFR), constraints, API surface, design objects | Implementation sequencing, task IDs, build commands |
+| `scenarios.md` | Executable Given/When/Then contracts | Rationale paragraphs, ADR references, implementation notes |
+
+**How to detect:** Scan for blockquotes (`> ...`) and standalone paragraphs
+in `tasks.md` that are not task-level `_Intent:_`/`_Verify:_` annotations.
+These are typically architectural remarks that belong in `plan.md`. Similarly,
+check `spec.md` for implementation-ordering language ("do X before Y") and
+`scenarios.md` for non-Given/When/Then prose.
+
+If the same content already exists in the correct document (e.g., a remark
+in `tasks.md` that is duplicated in `plan.md`), flag as 🟡 Medium with a
+recommendation to remove the duplicate. If the content doesn't exist
+elsewhere, flag as 🟡 Medium with a recommendation to move it.
 
 **Quantitative checks to perform:**
 // turbo
