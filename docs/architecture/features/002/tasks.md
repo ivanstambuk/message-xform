@@ -69,7 +69,7 @@ _Last updated:_ 2026-02-13
 
 - [ ] **T-002-04** — Header mapping: single-value + multi-value normalized maps (FR-002-01, S-002-04)
   _Test first:_ `PingAccessAdapterRequestTest.headerMapping()` with mixed-case and repeated headers.
-  _Implement:_ Convert `Map<String, String[]>` to lowercase `headers` + `headersAll`.
+  _Implement:_ Convert `Map<String, String[]>` to `HttpHeaders.ofMulti(multiMap)` (provides both single-value and multi-value views).
   _Verify:_ Header normalization and first-value semantics tests pass.
 
 - [ ] **T-002-05** — Request body read + JSON parse fallback (FR-002-01, Constraint 5, S-002-01, S-002-07, S-002-08)
@@ -133,12 +133,12 @@ _Last updated:_ 2026-02-13
 
 #### I4a — MessageTransformRule core lifecycle (FR-002-02, FR-002-03, FR-002-05, FR-002-10)
 
-- [ ] **T-002-12** — Rule skeleton + annotation contract + callback (FR-002-02, FR-002-03, Constraint 1, S-002-17)
+- [ ] **T-002-12** — Rule skeleton + annotation contract + callback (FR-002-02, FR-002-03, Constraint 1, S-002-03, S-002-17)
   _Test first:_ `RuleLifecycleTest.annotationAndCallback()` verifying `@Rule(destination = Site)` and non-null `getErrorHandlingCallback()`.
   _Implement:_ `MessageTransformRule extends AsyncRuleInterceptorBase<MessageTransformConfig>`.
   _Verify:_ Annotation and callback tests pass.
 
-- [ ] **T-002-13** — `configure()` engine init and config validation (FR-002-02, FR-002-05, S-002-17, S-002-18)
+- [ ] **T-002-13** — `configure()` engine init and config validation (FR-002-02, FR-002-05, S-002-09, S-002-10, S-002-15, S-002-17, S-002-18)
   _Test first:_ `RuleLifecycleTest.configureBoot()` for valid and invalid `specsDir`.
   _Implement:_ Parser/engine init and spec/profile load boot path.
   _Verify:_ Configure tests pass.
@@ -172,7 +172,7 @@ _Last updated:_ 2026-02-13
 
 - [ ] **T-002-17** — Build TransformContext (headers/query/cookies/status/session) with URI failure fallback
   _Test first:_ `ContextMappingTest` for:
-  - headers + headersAll mapping
+  - headers mapping (single + multi-value views via `HttpHeaders`)
   - query/cookie first-value semantics
   - request status null / response status integer
   - `URISyntaxException` -> empty query map + warning
@@ -207,7 +207,7 @@ _Last updated:_ 2026-02-13
   _Implement:_ Response dispatch paths.
   _Verify:_ Response success/passthrough tests pass.
 
-- [ ] **T-002-22** — PASS_THROUGH error mode
+- [ ] **T-002-22** — PASS_THROUGH error mode (S-002-11)
   _Test first:_ `TransformFlowTest.passThroughOnErrorRequestAndResponse()`.
   _Implement:_ Warning log + preserve original message paths.
   _Verify:_ PASS_THROUGH tests pass.
@@ -261,7 +261,7 @@ _Last updated:_ 2026-02-13
   _Implement:_ Version mismatch detection and warning message.
   _Verify:_ Version guard tests pass.
 
-- [ ] **T-002-30** — Shadow JAR correctness verification (S-002-24)
+- [ ] **T-002-30** — Shadow JAR correctness verification (NFR-002-02, S-002-24)
   _Test first:_ `ShadowJarTest` for include/exclude assertions.
   _Implement:_ Verify JAR contains adapter + core + relocated core deps and excludes PA SDK/Jackson/SLF4J/Jakarta.
   _Verify:_ Shadow JAR checks pass.
@@ -304,7 +304,7 @@ _Last updated:_ 2026-02-13
 
 #### I13/I14 — Final audit and documentation sync
 
-- [ ] **T-002-33** — 36-scenario coverage audit (S-002-01..S-002-35 + S-002-35a)
+- [ ] **T-002-33** — 36-scenario coverage audit (NFR-002-05, S-002-01..S-002-35 + S-002-35a)
   _Intent:_ Prove all scenarios have executable test evidence.
   _Verify:_ Coverage matrix updated with test method mapping.
 
