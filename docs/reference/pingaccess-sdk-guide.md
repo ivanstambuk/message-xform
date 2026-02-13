@@ -3070,5 +3070,5 @@ this guide. The 5 previously undocumented classes were added in this revision:
 | SDK JAR (binary) | `binaries/pingaccess-9.0.1/sdk/` |
 | SDK Javadoc (HTML) | `binaries/pingaccess-9.0.1/sdk/apidocs/` |
 | SDK sample rules | `binaries/pingaccess-9.0.1/sdk/samples/` |
-| Local SDK JAR copy | `docs/reference/pingaccess-sdk/pingaccess-sdk-9.0.1.0.jar` |
+| Local SDK JAR copy | `docs/reference/vendor/pingaccess-sdk/pingaccess-sdk-9.0.1.0.jar` |
 | Engine JAR (vendor plugins) | `binaries/pingaccess-9.0.1.zip → lib/pingaccess-engine-9.0.1.0.jar` |

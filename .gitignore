@@ -31,11 +31,8 @@ dependency-reduced-pom.xml
 # Logs
 *.log
 
-# Reference docs — ignore large binaries/extracts, track authored .md files
-docs/reference/**/*.pdf
-docs/reference/**/*.txt
-docs/reference/**/*.jar
-docs/reference/**/apidocs/
+# Reference docs — authored .md files are tracked; vendor binaries are not
+docs/reference/vendor/
 
 # Vendor binaries (product zips, license files, extracted SDKs)
 binaries/

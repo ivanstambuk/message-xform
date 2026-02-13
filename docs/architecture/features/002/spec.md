@@ -37,7 +37,7 @@ The adapter is a **thin bridge layer** — all transformation logic lives in
 - PingAccess Plugin API: `docs/research/pingaccess-plugin-api.md` (COMPLETE)
 - PingAccess Docker & SDK: `docs/research/pingaccess-docker-and-sdk.md` (COMPLETE)
 - PingAM Authentication API: `docs/research/pingam-authentication-api.md` (COMPLETE)
-- SDK JAR: `docs/reference/pingaccess-sdk/pingaccess-sdk-9.0.1.0.jar`
+- SDK JAR: `docs/reference/vendor/pingaccess-sdk/pingaccess-sdk-9.0.1.0.jar`
 - PingAccess 9.0 reference: `docs/reference/pingaccess-9.0.pdf`
 
 ## Goals
@@ -918,7 +918,7 @@ Gradle subproject with:
 6. Java 21 toolchain (same as core).
 7. The PingAccess Maven repository
    (`http://maven.pingidentity.com/release/`) added as a repository. Fallback:
-   local JAR at `docs/reference/pingaccess-sdk/pingaccess-sdk-9.0.1.0.jar` via
+   local JAR at `docs/reference/vendor/pingaccess-sdk/pingaccess-sdk-9.0.1.0.jar` via
    `files()` dependency if the Maven repo is unreachable.
 
    > **HTTP not HTTPS:** The Ping Identity Maven repository uses HTTP per the
@@ -1444,7 +1444,7 @@ Client                    PingAccess                        Backend
 | `docs/research/pingaccess-docker-and-sdk.md` | Docker + SDK samples (complete) |
 | `docs/research/pingam-authentication-api.md` | PingAM callback format (transform target) |
 | `docs/reference/pingaccess-9.0.pdf` | Official PA 9.0 documentation |
-| `docs/reference/pingaccess-sdk/pingaccess-sdk-9.0.1.0.jar` | SDK JAR |
+| `docs/reference/vendor/pingaccess-sdk/pingaccess-sdk-9.0.1.0.jar` | SDK JAR |
 | `binaries/pingaccess-9.0.1/sdk/apidocs/` | Official SDK Javadoc |
 | `binaries/pingaccess-9.0.1/sdk/samples/` | SDK sample rules |
 | `adapter-standalone/src/main/java/.../StandaloneAdapter.java` | Reference adapter implementation |
