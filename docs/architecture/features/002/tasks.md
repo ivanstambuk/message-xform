@@ -1,6 +1,6 @@
 # Feature 002 — PingAccess Adapter — Tasks
 
-_Status:_ In Progress (Phase 1)
+_Status:_ Ready
 _Last updated:_ 2026-02-13
 
 **Governing spec:** `docs/architecture/features/002/spec.md`

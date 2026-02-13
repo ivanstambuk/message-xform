@@ -3,7 +3,7 @@
 | Field | Value |
 |-------|-------|
 | Status | Spec Ready |
-| Last updated | 2026-02-12 |
+| Last updated | 2026-02-13 |
 | Owners | Ivan |
 | Linked plan | `docs/architecture/features/002/plan.md` |
 | Linked tasks | `docs/architecture/features/002/tasks.md` |
