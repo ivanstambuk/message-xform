@@ -15,7 +15,7 @@ Identity Gateway / IG). PingGateway uses a Java/Groovy filter/handler chain.
 
 ## Key Research
 
-- PingGateway reference: `docs/reference/pinggateway-2025.11.txt` (37K lines, not yet analyzed)
+- PingGateway reference: `docs/reference/vendor/pinggateway-2025.11.txt` (37K lines, not yet analyzed)
 - Gateway Candidates: `docs/research/gateway-candidates.md` (evaluation complete)
 
 ## Scope (to be elaborated)

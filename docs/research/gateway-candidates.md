@@ -35,7 +35,7 @@ These gateways can call Java code natively, meaning the `message-xform-core` lib
 - **Java interop:** Native — same Java ecosystem as PingAccess
 - **Assessment:** **Strong candidate.** Same vendor ecosystem as PingAccess and PingAM. Clients using PingAM likely also use PingGateway. The Groovy scripting model provides a lighter-weight option than compiled Java plugins. A shared Java core should serve both PingAccess and PingGateway adapters.
 - **Research:** Not yet done (backlog item in `PLAN.md`)
-- **Docs available:** `docs/reference/pinggateway-2025.11.txt` (37K lines)
+- **Docs available:** `docs/reference/vendor/pinggateway-2025.11.txt` (37K lines)
 
 ### WSO2 API Manager
 

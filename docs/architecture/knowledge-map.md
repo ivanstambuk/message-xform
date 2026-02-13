@@ -168,8 +168,8 @@ ADR-0035 (Version Parity)    governs ── FR-002-09, supersedes ADR-0031 §7-�
 
 | Document | Topic | Feeds Into |
 |----------|-------|------------|
-| `docs/research/pingam-callback-api.md` | PingAM callback API analysis | Feature 001 scenarios |
-| `docs/research/gateway-extension-models.md` | Gateway adapter comparison | Features 002–008 |
+| `docs/research/pingam-authentication-api.md` | PingAM authentication API analysis | Feature 001 scenarios |
+| `docs/research/gateway-candidates.md` | Gateway adapter comparison | Features 002–008 |
 | `docs/research/t-001-12-jslt-context-variables.md` | JSLT context variable binding approach | T-001-10 (JsltExpressionEngine), ADR-0021 |
 | `docs/research/standalone-proxy-http-server.md` | HTTP server evaluation for standalone proxy | Feature 004, ADR-0029 |
 | `docs/research/pingaccess-plugin-api.md` | PingAccess Add-on SDK, RuleInterceptor SPI, Exchange model | Feature 002 spec |

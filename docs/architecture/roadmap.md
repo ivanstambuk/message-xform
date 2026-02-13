@@ -34,7 +34,7 @@ Research complete: `docs/research/pingaccess-plugin-api.md`,
 ### Feature 003 — PingGateway Adapter
 
 Same Ping vendor ecosystem. Java/Groovy filter/handler chain.
-Research pending: reference docs at `docs/reference/pinggateway-2025.11.txt`.
+Research pending: reference docs at `docs/reference/vendor/pinggateway-2025.11.txt`.
 
 ### Feature 004 — Standalone HTTP Proxy Mode
 
