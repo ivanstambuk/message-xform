@@ -1277,6 +1277,17 @@ Track long-running or shared commands with timestamps to avoid duplicate work.
   - `./gradlew :core:test`
   - `./gradlew spotlessApply check`
 
+- [ ] **T-001-68** — Update stale `GatewayAdapter.java` Javadoc (audit F-003)
+  _Intent:_ The `GatewayAdapter` SPI Javadoc still references pre-refactor types
+  and fields: `{@code NullNode}` (now `MessageBody.empty()`), `{@code headersAll}`
+  (now `HttpHeaders.toMultiValueMap()`), `{@code contentType}` (now
+  `Message.contentType()` accessor), and `{@code JsonNode.deepCopy()}` (now
+  `byte[]` copy via `MessageBody`). Update all Javadoc comments on `wrapRequest()`
+  and `wrapResponse()` to match the current API surface.
+  _Stale locations:_ Lines 20, 55, 58, 61, 81, 83, 88.
+  _Verify:_ `./gradlew :core:javadoc` succeeds with no warnings.
+  _Source:_ Feature 002 audit report (2026-02-13), finding F-003.
+
 ## Notes / TODOs
 
 - **Package naming:** `io.messagexform.core` is a placeholder. Decide final

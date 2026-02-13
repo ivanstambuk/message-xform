@@ -18,6 +18,27 @@ _Last updated:_ 2026-02-12
 - [x] **C-002-04** — Open-question queue is empty for Feature 002.
 - [x] **C-002-05** — Scenarios include S-002-01 through S-002-35 and S-002-35a.
 
+## Increment → Task Mapping
+
+| Increment | Tasks | Phase |
+|-----------|-------|-------|
+| I1 | T-002-01, T-002-02 | 1 — Configuration & Scaffold |
+| I2 | T-002-03, T-002-04, T-002-05, T-002-06 | 2 — Adapter Bridge |
+| I3 | T-002-07, T-002-08, T-002-09, T-002-10, T-002-10a, T-002-11, T-002-11a | 2 — Adapter Bridge |
+| I4a | T-002-12, T-002-13, T-002-14 | 3 — Rule Lifecycle |
+| I4b | T-002-15 _(gate)_, T-002-15a, T-002-16 | 3 — Rule Lifecycle |
+| I5 | T-002-17 | 3 — Context |
+| I6 | T-002-18, T-002-19 | 4 — Session Context |
+| I7 | T-002-20, T-002-21, T-002-22, T-002-23, T-002-24 | 5 — Error Mode |
+| I8 | T-002-25, T-002-26 | 6 — Hot Reload |
+| I9 | T-002-27, T-002-28 | 6 — Observability |
+| I10 | T-002-29, T-002-30 | 7 — Packaging |
+| I11 | T-002-31, T-002-31a | 7 — Thread Safety |
+| I12 | T-002-32 | 7 — Security |
+| I12a | T-002-33 | 7 — ArchUnit |
+| I13 | T-002-34 | 8 — Quality Gate |
+| I14 | T-002-35 | 8 — Documentation |
+
 ## Task Checklist
 
 ### Phase 1 — Configuration & Scaffold
