@@ -1098,14 +1098,48 @@ assertions:
 
 ## S-002-28: DENY + handleResponse Interaction
 
-**Given** `errorMode = DENY` in the plugin configuration,
-**and** a spec's JSLT expression throws a runtime error during `handleRequest()`,
-**when** `handleRequest()` returns `Outcome.RETURN` with an RFC 9457 error body,
-**then** PingAccess still calls `handleResponse()` (SDK contract — response
-interceptors fire in reverse order even on `RETURN`),
-**and** `handleResponse()` checks `exchange.getProperty(TRANSFORM_DENIED)`,
-**and** finding it `true`, skips all response processing,
-**and** the client receives the original DENY error response unchanged.
+```yaml
+scenario: S-002-28
+name: deny-handle-response-interaction
+description: >
+  After handleRequest returns RETURN (DENY), PingAccess still calls
+  handleResponse (SDK contract). The adapter must detect TRANSFORM_DENIED
+  and skip response processing to preserve the error body.
+tags: [deny, lifecycle, guard, GAP-4]
+refs: [FR-002-10, FR-002-11]
+
+setup:
+  config:
+    errorMode: DENY
+  exchange:
+    request:
+      method: POST
+      uri: /api/data
+      contentType: application/json
+      body: '{"data": "value"}'
+    response:
+      statusCode: 200
+      contentType: application/json
+      body: '{"result": "ok"}'
+  specs:
+    - id: broken-transform
+      matches: "POST /api/data"
+      direction: both
+      forward_expr: '.nonexistent.boom()'  # causes error on request
+      reverse_expr: '{"cleaned": true}'
+
+trigger: handleRequest + handleResponse
+
+assertions:
+  - description: handleRequest returns RETURN (DENY)
+    expect: handleRequest.outcome == RETURN
+  - description: handleRequest sets TRANSFORM_DENIED property
+    expect: exchange.getProperty(TRANSFORM_DENIED) == true
+  - description: handleResponse detects DENY guard and skips processing
+    expect: handleResponse.skipped == true
+  - description: client receives original DENY error response unchanged
+    expect: response.body.type == "about:blank"
+```
 
 > **Note:** Without the DENY guard (GAP-4 fix), `handleResponse()` would
 > overwrite the error response with a normal response transform.
@@ -1114,113 +1148,342 @@ interceptors fire in reverse order even on `RETURN`),
 
 ## S-002-29: Spec Hot-Reload (Success)
 
-**Given** `reloadIntervalSec = 30` in the plugin configuration,
-**and** the adapter has loaded specs from `specsDir` during `configure()`,
-**when** an operator modifies a spec YAML file on disk,
-**and** the next scheduled reload poll fires,
-**then** `TransformEngine.reload()` is called,
-**and** the updated spec is loaded into the `TransformRegistry`,
-**and** subsequent requests use the updated spec.
+```yaml
+scenario: S-002-29
+name: spec-hot-reload-success
+description: >
+  When a spec file is modified on disk, the next scheduled reload
+  picks up the change and subsequent requests use the updated spec.
+tags: [hot-reload, lifecycle, config]
+refs: [FR-002-14]
+
+setup:
+  config:
+    specsDir: /opt/specs
+    reloadIntervalSec: 30
+  state:
+    initial_spec:
+      id: data-transform
+      matches: "POST /api/data"
+      direction: request
+      expr: '. + {"v": 1}'
+    modified_spec:
+      id: data-transform
+      matches: "POST /api/data"
+      direction: request
+      expr: '. + {"v": 2}'
+
+trigger: reload
+
+assertions:
+  - description: TransformEngine.reload() is called on schedule
+    expect: reload.invoked == true
+  - description: updated spec is loaded into TransformRegistry
+    expect: registry.spec("data-transform").expr contains '"v": 2'
+  - description: subsequent requests use the updated spec
+    expect: forwarded.body contains '"v": 2'
+```
 
 ---
 
 ## S-002-30: Spec Hot-Reload (Failure)
 
-**Given** `reloadIntervalSec = 30` in the plugin configuration,
-**and** the adapter has loaded valid specs during `configure()`,
-**when** an operator writes a malformed YAML file to `specsDir`,
-**and** the next scheduled reload poll fires,
-**then** `TransformEngine.reload()` fails with a warning log,
-**and** the previous valid `TransformRegistry` remains active,
-**and** in-flight and subsequent requests continue to use the previously valid specs.
+```yaml
+scenario: S-002-30
+name: spec-hot-reload-failure
+description: >
+  When a malformed YAML file is written to specsDir, reload fails
+  gracefully. The previous valid registry remains active.
+tags: [hot-reload, error-handling, resilience]
+refs: [FR-002-14]
+
+setup:
+  config:
+    specsDir: /opt/specs
+    reloadIntervalSec: 30
+  state:
+    initial_spec:
+      id: data-transform
+      matches: "POST /api/data"
+      direction: request
+      expr: '. + {"v": 1}'
+    malformed_file: "{ broken: yaml: [["
+
+trigger: reload
+
+assertions:
+  - description: reload fails with warning log
+    expect: log.contains("WARN", "reload failed")
+  - description: previous valid TransformRegistry remains active
+    expect: registry.spec("data-transform").expr contains '"v": 1'
+  - description: in-flight and subsequent requests use previous valid specs
+    expect: forwarded.body contains '"v": 1'
+```
 
 ---
 
 ## S-002-31: Concurrent Reload During Active Transform
 
-**Given** `reloadIntervalSec = 30` in the plugin configuration,
-**and** a transform is currently in-flight (being processed by a request thread),
-**when** the reload timer fires and swaps the `AtomicReference<TransformRegistry>`,
-**then** the in-flight transform completes using its snapshot of the old registry
-(Java reference semantics guarantee this),
-**and** the next request uses the new registry,
-**and** no data corruption, locking, or request failure occurs.
+```yaml
+scenario: S-002-31
+name: concurrent-reload-during-transform
+description: >
+  A reload fires while a transform is in-flight. The in-flight transform
+  completes with its snapshot (Java reference semantics). The next request
+  uses the new registry. No corruption or locking.
+tags: [hot-reload, concurrency, threading]
+refs: [FR-002-14, NFR-002-02]
 
-> **Test:** Trigger reload in a background thread while a slow transform is executing.
+setup:
+  config:
+    specsDir: /opt/specs
+    reloadIntervalSec: 30
+  state:
+    initial_spec:
+      id: slow-transform
+      matches: "POST /api/data"
+      direction: request
+      expr: '. + {"v": 1}'  # simulated slow execution
+    updated_spec:
+      id: slow-transform
+      matches: "POST /api/data"
+      direction: request
+      expr: '. + {"v": 2}'
+  concurrency:
+    scenario: >
+      Thread A begins transform with v1 spec.
+      Reload thread swaps AtomicReference<TransformRegistry> to v2.
+      Thread A completes with v1 snapshot.
+      Thread B starts new request, gets v2.
+
+trigger: handleRequest (concurrent) + reload
+
+assertions:
+  - description: in-flight transform completes with old registry snapshot
+    expect: threadA.result contains '"v": 1'
+  - description: next request uses new registry
+    expect: threadB.result contains '"v": 2'
+  - description: no data corruption or locking
+    expect: error.absent("ConcurrentModificationException")
+  - description: no request failure
+    expect: all outcomes in [CONTINUE, SUCCESS]
+```
 
 ---
 
 ## S-002-32: Non-JSON Response Body
 
-**Given** a backend returns a `text/html` response body,
-**when** `wrapResponse()` attempts to parse the body as JSON,
-**then** the parse fails gracefully and falls back to `MessageBody.empty()` body,
-**and** the adapter sets `bodyParseFailed = true`,
-**and** response-direction transforms can still operate on headers and status code,
-**and** body transforms are skipped — the original `text/html` body is forwarded
-unchanged to the client (Q-003, Option A).
+```yaml
+scenario: S-002-32
+name: non-json-response-body-passthrough
+description: >
+  Non-JSON response body triggers parse-failure guard on the response
+  direction. Body transforms are skipped, original bytes forwarded
+  unchanged. Header/status transforms still apply.
+tags: [body, parse-failure, response, Q-003]
+refs: [FR-002-02, ADR-0013]
 
-> **Outcome:** Body is passed through unmodified (adapter skip guard). Header/status
-> transforms produce SUCCESS if they modify anything, PASSTHROUGH otherwise.
+setup:
+  exchange:
+    request:
+      method: GET
+      uri: /api/page
+    response:
+      statusCode: 200
+      contentType: text/html
+      body: "<html><body>Hello</body></html>"
+  specs:
+    - id: response-transform
+      matches: "GET /api/page"
+      direction: response
+      expr: '{"text": .}'
+      headers:
+        add:
+          X-Processed: "true"
+
+trigger: handleResponse
+
+assertions:
+  - description: JSON parse fails gracefully
+    expect: responseMessage.body() == MessageBody.empty()
+  - description: bodyParseFailed flag is set
+    expect: bodyParseFailed == true
+  - description: body transforms are skipped (adapter skip guard)
+    expect: returned.body.content == "<html><body>Hello</body></html>"
+  - description: header transforms still apply
+    expect: returned.header["X-Processed"] == "true"
+  - description: original content type is preserved
+    expect: returned.body.mediaType == "text/html"
+```
+
+> **Outcome:** Body is passed through unmodified (adapter skip guard).
+> Header/status transforms produce SUCCESS if they modify anything.
 
 ---
 
 ## S-002-33: JMX Metrics Opt-In
 
-**Given** an admin configures `enableJmxMetrics = true` in the plugin configuration,
-**when** `configure()` is called,
-**then** the adapter registers a JMX MBean at
-`io.messagexform:type=TransformMetrics,instance=<pluginName>`,
-**and** JConsole shows the MBean under the `io.messagexform` domain,
-**and** counters (successCount, errorCount, passthroughCount, etc.) increment
-per request,
-**and** the admin can invoke `resetMetrics()` via JConsole to zero all counters.
+```yaml
+scenario: S-002-33
+name: jmx-metrics-opt-in
+description: >
+  When enableJmxMetrics is true, the adapter registers a JMX MBean.
+  Counters increment per request. MBean is unregistered when disabled.
+tags: [jmx, observability, lifecycle]
+refs: [FR-002-16, NFR-002-04]
 
-**When** the admin later toggles `enableJmxMetrics = false` and reconfigures,
-**then** the MBean is unregistered,
-**and** JConsole no longer shows it.
+setup:
+  config:
+    enableJmxMetrics: true
+    specsDir: /opt/specs
+    errorMode: PASS_THROUGH
+
+trigger: configure
+
+assertions:
+  - description: JMX MBean is registered
+    expect: mbean.registered("io.messagexform:type=TransformMetrics,instance=<pluginName>")
+  - description: MBean is visible in JConsole under io.messagexform domain
+    expect: jmx.domain("io.messagexform").contains("TransformMetrics")
+  - description: counters (successCount, errorCount, passthroughCount) increment per request
+    expect: after(handleRequest) -> mbean.successCount >= 1
+  - description: resetMetrics() can be invoked to zero all counters
+    expect: after(mbean.resetMetrics()) -> mbean.successCount == 0
+```
+
+```yaml
+# Toggle off: MBean is unregistered
+scenario: S-002-33b
+name: jmx-metrics-toggle-off
+description: >
+  When enableJmxMetrics is toggled to false and reconfigured,
+  the MBean is unregistered.
+tags: [jmx, lifecycle, config]
+refs: [FR-002-16]
+
+setup:
+  config:
+    enableJmxMetrics: false
+  state:
+    previousConfig:
+      enableJmxMetrics: true  # MBean was previously registered
+
+trigger: configure
+
+assertions:
+  - description: MBean is unregistered
+    expect: mbean.absent("io.messagexform:type=TransformMetrics")
+```
 
 ---
 
 ## S-002-34: JMX Metrics Disabled (Default)
 
-**Given** `enableJmxMetrics` is not set (defaults to `false`),
-**when** the adapter is configured and processing requests,
-**then** no JMX MBean is registered,
-**and** there is zero JMX overhead,
-**and** SLF4J logging remains operational (INFO-level transform results),
-**and** `pingaccess_engine_audit.log` records per-transaction timing automatically.
+```yaml
+scenario: S-002-34
+name: jmx-metrics-disabled-default
+description: >
+  When enableJmxMetrics is not set (defaults to false), no JMX MBean
+  is registered. Zero JMX overhead. SLF4J logging remains operational.
+tags: [jmx, defaults, observability]
+refs: [FR-002-16, NFR-002-04]
+
+setup:
+  config:
+    specsDir: /opt/specs
+    errorMode: PASS_THROUGH
+    # enableJmxMetrics not set — defaults to false
+
+trigger: configure
+
+assertions:
+  - description: no JMX MBean is registered
+    expect: mbean.absent("io.messagexform:type=TransformMetrics")
+  - description: zero JMX overhead
+    expect: jmx.overhead == 0
+  - description: SLF4J logging remains operational (INFO-level results)
+    expect: log.contains("INFO", "transform result")
+  - description: PA engine audit log records per-transaction timing
+    expect: auditLog.contains("pingaccess_engine_audit")
+```
 
 ---
 
 ## S-002-35: PA-Specific Non-Standard Status Codes Passthrough
 
-**Given** a backend returns HTTP status 277 (`ALLOWED` — PingAccess internal) or
-477 (`REQUEST_BODY_REQUIRED` — PingAccess internal),
-**and** a response-direction transform spec is loaded,
-**when** `MessageTransformRule.handleResponse()` processes the exchange,
-**then** the adapter does NOT map, rewrite, or reject the non-standard status code,
-**and** the status code is passed through unchanged to downstream rules,
-**and** response body/header transforms (if any) apply normally alongside the
-non-standard status,
-**and** `$status` in JSLT expressions resolves to the non-standard integer value
-(277 or 477).
+```yaml
+scenario: S-002-35
+name: non-standard-status-codes-passthrough
+description: >
+  PingAccess uses non-standard HTTP status codes internally (e.g., 277
+  ALLOWED, 477 REQUEST_BODY_REQUIRED). The adapter must not map, rewrite,
+  or reject them. $status resolves to the non-standard integer.
+tags: [status, non-standard, passthrough, constraint-9]
+refs: [FR-002-05, Constraint-9]
 
-> **Constraint 9 coverage:** PingAccess uses non-standard HTTP status codes
-> internally. The adapter must not assume standard HTTP semantics for status codes.
+setup:
+  exchange:
+    request:
+      method: POST
+      uri: /api/data
+    response:
+      statusCode: 277  # PingAccess internal: ALLOWED
+      contentType: application/json
+      body: '{"allowed": true}'
+  specs:
+    - id: response-enricher
+      matches: "POST /api/data"
+      direction: response
+      expr: '. + {"processed": true}'
+
+trigger: handleResponse
+
+assertions:
+  - description: non-standard status code is passed through unchanged
+    expect: response.statusCode == 277
+  - description: body transforms apply normally alongside non-standard status
+    expect: response.body contains '"processed": true'
+  - description: $status in JSLT resolves to the non-standard integer
+    expect: jslt.eval("$status") == 277
+```
+
+> **Constraint 9 coverage:** PingAccess uses non-standard HTTP status codes.
+> The adapter must not assume standard HTTP semantics.
 
 ---
 
 ## S-002-36: Runtime Version Mismatch Warning
 
-**Given** the adapter was compiled for PingAccess `9.0.1` (from
-`pa-compiled-versions.properties`),
-**and** runtime PingAccess reports version `9.2.0`,
-**when** `MessageTransformRule.configure()` initializes `PaVersionGuard`,
-**then** the adapter logs a WARN message indicating compiled/runtime mismatch,
-**and** the warning includes remediation text to deploy adapter version
-`9.2.0.x` for that PingAccess instance,
-**and** the rule remains active (no fail-fast or startup abort).
+```yaml
+scenario: S-002-36
+name: runtime-version-mismatch-warning
+description: >
+  When the adapter's compiled PA version differs from the runtime PA
+  version, a WARN is logged with remediation text. The rule remains
+  active (no fail-fast).
+tags: [version-guard, deployment, resilience]
+refs: [FR-002-15, ADR-0035]
 
-> **ADR-0035 coverage:** Validates the simplified misdeployment guard contract:
-> mismatch produces a WARN with clear remediation, not severity grading.
+setup:
+  state:
+    compiled_version: "9.0.1"  # from pa-compiled-versions.properties
+    runtime_version: "9.2.0"   # PingAccess Server.getVersion()
+
+trigger: configure
+
+assertions:
+  - description: WARN logged indicating compiled/runtime mismatch
+    expect: log.contains("WARN", "version mismatch")
+  - description: warning includes compiled version
+    expect: log.contains("WARN", "9.0.1")
+  - description: warning includes runtime version
+    expect: log.contains("WARN", "9.2.0")
+  - description: warning includes remediation text
+    expect: log.contains("WARN", "deploy adapter version 9.2.0")
+  - description: rule remains active (no fail-fast or abort)
+    expect: rule.active == true
+```
+
+> **ADR-0035 coverage:** Mismatch produces a WARN with clear remediation,
+> not severity grading.
+

@@ -3,7 +3,7 @@
 **Objective:** Rewrite all 36 Feature 002 scenarios from BDD prose to structured
 YAML behavioral contracts per `docs/architecture/spec-guidelines/scenarios-format.md`.
 
-**Status:** In Progress
+**Status:** ✅ Complete
 
 ---
 
@@ -17,7 +17,7 @@ YAML behavioral contracts per `docs/architecture/spec-guidelines/scenarios-forma
 | 3 | Error modes + session: S-002-11 → S-002-14 | 4 | ✅ Done |
 | 4 | Config + SPI + threading: S-002-15 → S-002-21 | 7 | ✅ Done |
 | 5 | Context variables: S-002-22 → S-002-27 | 6 | ✅ Done |
-| 6 | Advanced behavioral: S-002-28 → S-002-36 | 9 | ⬜ |
+| 6 | Advanced behavioral: S-002-28 → S-002-36 | 9 | ✅ Done |
 
 **Total:** 36 scenarios across 6 phases.
 
@@ -83,15 +83,15 @@ prior rule effects.
 
 Complex lifecycle interactions, hot reload, JMX, and version guards.
 
-- [ ] S-002-28: DENY + handleResponse Interaction
-- [ ] S-002-29: Spec Hot-Reload (Success)
-- [ ] S-002-30: Spec Hot-Reload (Failure)
-- [ ] S-002-31: Concurrent Reload During Active Transform
-- [ ] S-002-32: Non-JSON Response Body
-- [ ] S-002-33: JMX Metrics Opt-In
-- [ ] S-002-34: JMX Metrics Disabled (Default)
-- [ ] S-002-35: PA-Specific Non-Standard Status Codes Passthrough
-- [ ] S-002-36: Runtime Version Mismatch Warning
+- [x] S-002-28: DENY + handleResponse Interaction
+- [x] S-002-29: Spec Hot-Reload (Success)
+- [x] S-002-30: Spec Hot-Reload (Failure)
+- [x] S-002-31: Concurrent Reload During Active Transform
+- [x] S-002-32: Non-JSON Response Body
+- [x] S-002-33: JMX Metrics Opt-In
+- [x] S-002-34: JMX Metrics Disabled (Default)
+- [x] S-002-35: PA-Specific Non-Standard Status Codes Passthrough
+- [x] S-002-36: Runtime Version Mismatch Warning
 
 ---
 
