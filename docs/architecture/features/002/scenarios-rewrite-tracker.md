@@ -12,7 +12,7 @@ YAML behavioral contracts per `docs/architecture/spec-guidelines/scenarios-forma
 | Phase | Scenarios | Count | Status |
 |-------|-----------|-------|--------|
 | 0 | Preamble + format guideline | — | ✅ Done |
-| 1 | Core transforms: S-002-01 → S-002-06 | 6 | ⬜ |
+| 1 | Core transforms: S-002-01 → S-002-06 | 6 | ✅ Done |
 | 2 | Edge cases + matching: S-002-07 → S-002-10 | 4 | ⬜ |
 | 3 | Error modes + session: S-002-11 → S-002-14 | 4 | ⬜ |
 | 4 | Config + SPI + threading: S-002-15 → S-002-21 | 7 | ⬜ |
@@ -30,12 +30,12 @@ YAML behavioral contracts per `docs/architecture/spec-guidelines/scenarios-forma
 The bread-and-butter adapter scenarios: request/response body, bidirectional,
 header, status code, and URL rewrite.
 
-- [ ] S-002-01: Request Body Transform
-- [ ] S-002-02: Response Body Transform
-- [ ] S-002-03: Bidirectional Transform
-- [ ] S-002-04: Header Transform
-- [ ] S-002-05: Status Code Transform
-- [ ] S-002-06: URL Rewrite
+- [x] S-002-01: Request Body Transform
+- [x] S-002-02: Response Body Transform
+- [x] S-002-03: Bidirectional Transform
+- [x] S-002-04: Header Transform
+- [x] S-002-05: Status Code Transform
+- [x] S-002-06: URL Rewrite
 
 ### Phase 2 — Edge Cases + Matching (S-002-07 → S-002-10)
 

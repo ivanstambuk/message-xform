@@ -1,79 +1,246 @@
 # Feature 002 – PingAccess Adapter: Scenarios
 
-> Each scenario is a testable contract. Scenarios prefixed `S-002-` map to the
-> spec's Branch & Scenario Matrix and are referenced by task IDs during
-> implementation.
+| Field | Value |
+|-------|-------|
+| Status | Draft |
+| Last updated | 2026-02-13 |
+| Linked spec | `docs/architecture/features/002/spec.md` |
+| Format | Behavioral Contract (see `docs/architecture/spec-guidelines/scenarios-format.md`) |
+
+> Guardrail: Each scenario is a **testable contract** expressed as structured
+> YAML. Scenarios serve as integration test fixtures — they can be loaded or
+> parsed directly by test infrastructure.
 
 ---
 
 ## S-002-01: Request Body Transform
 
-**Given** a POST request to `/api/users` with JSON body `{"name": "ivan"}` passes
-through PingAccess to a backend site,
-**and** a transform spec is loaded that matches `POST /api/users` direction
-`request`,
-**and** the spec rewrites the body to `{"username": "ivan", "source": "pa"}`,
-**when** the `MessageTransformRule.handleRequest()` processes the exchange,
-**then** the backend receives the transformed body `{"username": "ivan", "source": "pa"}`,
-**and** the `Content-Length` header is auto-updated to match the new body size,
-**and** `Outcome.CONTINUE` is returned.
+```yaml
+scenario: S-002-01
+name: request-body-transform
+description: >
+  POST request body is transformed by the matched spec before forwarding
+  to the backend. Content-Length is auto-updated.
+tags: [body, request, core]
+refs: [FR-002-01, FR-002-03]
+
+setup:
+  exchange:
+    request:
+      method: POST
+      uri: /api/users
+      contentType: application/json
+      body: '{"name": "ivan"}'
+  specs:
+    - id: user-rewrite
+      matches: "POST /api/users"
+      direction: request
+      expr: '{"username": .name, "source": "pa"}'
+
+trigger: handleRequest
+
+assertions:
+  - description: backend receives transformed body
+    expect: response.body == '{"username": "ivan", "source": "pa"}'
+  - description: Content-Length is auto-updated to match new body size
+    expect: response.header["Content-Length"] == new body byte length
+  - description: rule returns CONTINUE
+    expect: outcome == CONTINUE
+```
 
 ---
 
 ## S-002-02: Response Body Transform
 
-**Given** a backend returns status 200 with JSON body `{"result": "ok", "debug_token": "abc123"}`,
-**and** a transform spec matches `GET /api/status` direction `response`,
-**and** the spec removes the `debug_token` field,
-**when** `MessageTransformRule.handleResponse()` processes the exchange,
-**then** the client receives `{"result": "ok"}`,
-**and** the `Content-Length` is updated.
+```yaml
+scenario: S-002-02
+name: response-body-transform
+description: >
+  Response body is transformed by the matched spec before returning to
+  the client. Internal fields are stripped.
+tags: [body, response, core]
+refs: [FR-002-02, FR-002-03]
+
+setup:
+  exchange:
+    request:
+      method: GET
+      uri: /api/status
+    response:
+      statusCode: 200
+      contentType: application/json
+      body: '{"result": "ok", "debug_token": "abc123"}'
+  specs:
+    - id: strip-debug
+      matches: "GET /api/status"
+      direction: response
+      expr: '{"result": .result}'
+
+trigger: handleResponse
+
+assertions:
+  - description: client receives body with debug_token stripped
+    expect: response.body == '{"result": "ok"}'
+  - description: Content-Length is updated
+    expect: response.header["Content-Length"] == new body byte length
+```
 
 ---
 
 ## S-002-03: Bidirectional Transform
 
-**Given** a transform spec has both `request` and `response` direction transforms
-for `POST /api/auth`,
-**when** a POST request flows through the rule,
-**then** `handleRequest()` transforms the request body before forwarding,
-**and** `handleResponse()` transforms the response body before returning to the
-client,
-**and** both transformations are independent (no shared state between phases).
+```yaml
+scenario: S-002-03
+name: bidirectional-transform
+description: >
+  A spec with both request and response directions transforms the request
+  body on the way in and the response body on the way out. No shared
+  state between phases.
+tags: [body, bidirectional, core]
+refs: [FR-002-03]
+
+setup:
+  exchange:
+    request:
+      method: POST
+      uri: /api/auth
+      contentType: application/json
+      body: '{"user": "ivan"}'
+    response:
+      statusCode: 200
+      contentType: application/json
+      body: '{"token": "abc", "internal": true}'
+  specs:
+    - id: auth-transform
+      matches: "POST /api/auth"
+      direction: both
+      forward_expr: '{"username": .user}'
+      reverse_expr: '{"token": .token}'
+
+trigger: handleRequest + handleResponse
+
+assertions:
+  - description: handleRequest transforms request body before forwarding
+    expect: forwarded.body == '{"username": "ivan"}'
+  - description: handleResponse transforms response body before returning
+    expect: returned.body == '{"token": "abc"}'
+  - description: no shared mutable state between request and response phases
+    expect: phases are independent
+```
 
 ---
 
 ## S-002-04: Header Transform
 
-**Given** a transform spec adds header `X-Transformed: true` and removes header
-`X-Internal-Debug` on the request,
-**when** `handleRequest()` processes the exchange,
-**then** the forwarded request has `X-Transformed: true` added,
-**and** the `X-Internal-Debug` header is removed,
-**and** original headers not targeted by the spec are preserved unchanged.
+```yaml
+scenario: S-002-04
+name: header-transform
+description: >
+  A spec adds and removes headers on the request. Untargeted headers
+  are preserved unchanged.
+tags: [headers, request, core]
+refs: [FR-002-04, FR-001-10]
+
+setup:
+  exchange:
+    request:
+      method: GET
+      uri: /api/data
+      headers:
+        X-Internal-Debug: "verbose"
+        Accept: "application/json"
+  specs:
+    - id: header-ops
+      matches: "GET /api/data"
+      direction: request
+      headers:
+        add:
+          X-Transformed: "true"
+        remove:
+          - X-Internal-Debug
+
+trigger: handleRequest
+
+assertions:
+  - description: X-Transformed header is added
+    expect: forwarded.header["X-Transformed"] == "true"
+  - description: X-Internal-Debug header is removed
+    expect: forwarded.header["X-Internal-Debug"] == absent
+  - description: untargeted headers are preserved
+    expect: forwarded.header["Accept"] == "application/json"
+```
 
 ---
 
 ## S-002-05: Status Code Transform
 
-**Given** a backend returns status 404 with empty body,
-**and** a spec matches the response and maps status 404 to 200 with synthetic body
-`{"found": false, "fallback": true}`,
-**when** `handleResponse()` processes the exchange,
-**then** the response status is changed to 200 via `setStatus(HttpStatus.forCode(200))`,
-**and** the body is replaced with the synthetic JSON.
+```yaml
+scenario: S-002-05
+name: status-code-transform
+description: >
+  A spec matches a 404 response and maps it to 200 with a synthetic
+  fallback body.
+tags: [status, response, core]
+refs: [FR-002-05, FR-001-11, ADR-0003]
+
+setup:
+  exchange:
+    request:
+      method: GET
+      uri: /api/resource
+    response:
+      statusCode: 404
+      body: ""
+  specs:
+    - id: status-mapper
+      matches: "GET /api/resource"
+      direction: response
+      status:
+        when: "$status == 404"
+        set: 200
+      expr: '{"found": false, "fallback": true}'
+
+trigger: handleResponse
+
+assertions:
+  - description: response status is changed from 404 to 200
+    expect: response.statusCode == 200
+  - description: body is replaced with synthetic JSON
+    expect: response.body == '{"found": false, "fallback": true}'
+```
 
 ---
 
 ## S-002-06: URL Rewrite
 
-**Given** a transform spec rewrites request path from `/legacy/users` to
-`/api/v2/users`,
-**when** `handleRequest()` processes the exchange,
-**then** `exchange.getRequest().setUri()` is called with the new path,
-**and** the original query string is preserved.
+```yaml
+scenario: S-002-06
+name: url-rewrite
+description: >
+  A spec rewrites the request path. Original query string is preserved.
+tags: [url, request, core]
+refs: [FR-002-12, FR-001-12, ADR-0027]
 
----
+setup:
+  exchange:
+    request:
+      method: GET
+      uri: /legacy/users?page=2
+  specs:
+    - id: url-rewriter
+      matches: "GET /legacy/**"
+      direction: request
+      url:
+        path_expr: '"/api/v2/users"'
+
+trigger: handleRequest
+
+assertions:
+  - description: request URI path is rewritten
+    expect: forwarded.uri.path == "/api/v2/users"
+  - description: original query string is preserved
+    expect: forwarded.uri.query == "page=2"
+```
 
 ## S-002-07: Empty Body
 
