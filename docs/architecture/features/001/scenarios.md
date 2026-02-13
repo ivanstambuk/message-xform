@@ -17,6 +17,9 @@
 
 Each scenario follows this structure:
 
+
+---
+
 ```yaml
 scenario: S-001-XX
 name: human-readable-name
@@ -42,10 +45,16 @@ For multi-engine scenarios, the same input/output is tested with different engin
 
 Real-world use cases derived from PingAM 8 authentication API documentation.
 
+
+---
+
 ### S-001-01: PingAM Callback — Username + Password Step
 
 The core use case: transform PingAM's nested callback JSON into a clean, flat
 structure suitable for a modern frontend.
+
+
+---
 
 ```yaml
 scenario: S-001-01
@@ -119,6 +128,9 @@ expected_output:
 The reverse direction: transform the clean frontend JSON back into PingAM's
 callback format, with filled-in values.
 
+
+---
+
 ```yaml
 scenario: S-001-02
 name: pingam-callback-reverse
@@ -188,6 +200,9 @@ expected_output:
 Transform PingAM success response to remove internal fields and normalize
 the response for the frontend.
 
+
+---
+
 ```yaml
 scenario: S-001-03
 name: pingam-success-strip-internals
@@ -220,6 +235,9 @@ expected_output:
 ### S-001-04: PingAM Callback — Choice/Confirmation Types
 
 More callback types: ChoiceCallback with multiple options, ConfirmationCallback.
+
+
+---
 
 ```yaml
 scenario: S-001-04
@@ -299,6 +317,9 @@ expected_output:
 
 Edge case: no callbacks at all (zero-page login result).
 
+
+---
+
 ```yaml
 scenario: S-001-05
 name: pingam-no-callbacks-simple-success
@@ -337,9 +358,15 @@ expected_output:
 Use cases derived from Kong/Apigee transformation patterns. These represent
 common gateway transformations that message-xform should handle.
 
+
+---
+
 ### S-001-06: Strip Internal/Debug Fields
 
 Remove fields that should not be exposed to external consumers.
+
+
+---
 
 ```yaml
 scenario: S-001-06
@@ -381,6 +408,9 @@ expected_output:
 
 Same as above, but using JSLT's `* : .` to pass everything through EXCEPT
 the blacklisted fields. This tests the open-world assumption.
+
+
+---
 
 ```yaml
 scenario: S-001-07
@@ -425,6 +455,9 @@ expected_output:
 
 Rename fields for API version migration without changing structure.
 
+
+---
+
 ```yaml
 scenario: S-001-08
 name: rename-fields-api-versioning
@@ -467,6 +500,9 @@ expected_output:
 
 Enrich response with default values for missing fields.
 
+
+---
+
 ```yaml
 scenario: S-001-09
 name: add-default-values
@@ -503,6 +539,9 @@ expected_output:
 ### S-001-10: Add Gateway Metadata
 
 Inject gateway metadata into response body. Common pattern for traceability.
+
+
+---
 
 ```yaml
 scenario: S-001-10
@@ -545,9 +584,15 @@ expected_output:
 Deep structural transformations — the core differentiator of message-xform
 vs field-level gateway transformers.
 
+
+---
+
 ### S-001-11: Flatten Nested Object
 
 Flatten a deeply nested object into a flat key-value structure.
+
+
+---
 
 ```yaml
 scenario: S-001-11
@@ -603,6 +648,9 @@ expected_output:
 
 The reverse of S-001-11: restructure a flat object into a nested hierarchy.
 
+
+---
+
 ```yaml
 scenario: S-001-12
 name: nest-flat-object
@@ -652,6 +700,9 @@ expected_output:
 ### S-001-13: Array-of-Objects Reshaping
 
 Transform an array of objects from one shape into another shape.
+
+
+---
 
 ```yaml
 scenario: S-001-13
@@ -724,6 +775,9 @@ expected_output:
 
 Normalize different OAuth token responses into a consistent format.
 
+
+---
+
 ```yaml
 scenario: S-001-14
 name: oauth-token-normalization
@@ -768,9 +822,15 @@ expected_output:
 
 Transformations that produce different output structures based on input values.
 
+
+---
+
 ### S-001-15: Conditional Output Shape — Error vs Success
 
 Produce different output structures based on whether the response is an error.
+
+
+---
 
 ```yaml
 scenario: S-001-15
@@ -819,6 +879,9 @@ expected_output:
 ### S-001-16: Conditional Output Shape — Success Path
 
 Same transform as S-001-15 but with a success response.
+
+
+---
 
 ```yaml
 scenario: S-001-16
@@ -869,6 +932,9 @@ expected_output:
 
 Map backend enum values to frontend-friendly labels.
 
+
+---
+
 ```yaml
 scenario: S-001-17
 name: value-mapping-enum-translation
@@ -916,6 +982,9 @@ expected_output:
 
 When no transform profile matches, the message passes through unchanged.
 
+
+---
+
 ```yaml
 scenario: S-001-18
 name: passthrough-no-match
@@ -944,6 +1013,9 @@ expected_output:
 
 Non-JSON body should pass through without transformation.
 
+
+---
+
 ```yaml
 scenario: S-001-19
 name: passthrough-invalid-json
@@ -967,6 +1039,9 @@ expected_transform_applied: false
 ### S-001-20: Open-World — Extra Fields Preserved
 
 Fields not mentioned in the transform pass through unchanged.
+
+
+---
 
 ```yaml
 scenario: S-001-20
@@ -1007,6 +1082,9 @@ expected_output:
 
 Transform handles empty input gracefully.
 
+
+---
+
 ```yaml
 scenario: S-001-21
 name: empty-input-object
@@ -1036,6 +1114,9 @@ expected_output:
 ### S-001-22: Null Values in Input
 
 Transform correctly handles null values in input fields.
+
+
+---
 
 ```yaml
 scenario: S-001-22
@@ -1071,6 +1152,9 @@ expected_output:
 ### S-001-23: Large Array Transformation
 
 Performance scenario: transform a large array of 100 objects.
+
+
+---
 
 ```yaml
 scenario: S-001-23
@@ -1114,6 +1198,9 @@ expected_output:
 When a JSLT expression fails, the engine returns a configurable error response
 to the caller (ADR-0022). The original message is NOT passed through.
 
+
+---
+
 ```yaml
 scenario: S-001-24
 name: evaluation-error-returns-error-response
@@ -1151,7 +1238,13 @@ expected_passthrough: false
 Verify that the same logical transformation works across different engines
 when they can express the same mapping.
 
+
+---
+
 ### S-001-25: Multi-Engine — Simple Rename (JSLT)
+
+
+---
 
 ```yaml
 scenario: S-001-25
@@ -1180,6 +1273,9 @@ expected_output:
 ```
 
 ### S-001-26: Multi-Engine — Simple Rename (JOLT)
+
+
+---
 
 ```yaml
 scenario: S-001-26
@@ -1212,6 +1308,9 @@ expected_output:
 
 ### S-001-27: Multi-Engine — Simple Rename (jq)
 
+
+---
+
 ```yaml
 scenario: S-001-27
 name: multi-engine-rename-jq
@@ -1236,6 +1335,9 @@ expected_output:
 ```
 
 ### S-001-28: Unknown Engine — Rejected at Load Time
+
+
+---
 
 ```yaml
 scenario: S-001-28
@@ -1265,6 +1367,9 @@ expected_error:
 
 Verify that forward → reverse produces a result that, when forwarded again,
 produces the same output as the first forward pass.
+
+
+---
 
 ```yaml
 scenario: S-001-29
@@ -1364,6 +1469,9 @@ step_2_expected:
 
 ### S-001-30: Bidirectional — Flat ↔ Nested
 
+
+---
+
 ```yaml
 scenario: S-001-30
 name: bidirectional-flat-nested
@@ -1425,6 +1533,9 @@ step_2_expected:
 
 ### S-001-31: RFC 9457 Problem Details Normalization
 
+
+---
+
 ```yaml
 scenario: S-001-31
 name: error-normalize-rfc9457
@@ -1463,6 +1574,9 @@ expected_output:
 ```
 
 ### S-001-32: PingAM Error Normalization
+
+
+---
 
 ```yaml
 scenario: S-001-32
@@ -1506,9 +1620,15 @@ expected_output:
 
 Scenarios validating header-to-body and body-to-header injection (ADR-0002, FR-001-10).
 
+
+---
+
 ### S-001-33: Header-to-Body Injection via `$headers`
 
 Inject a request header value into the transformed response body.
+
+
+---
 
 ```yaml
 scenario: S-001-33
@@ -1548,6 +1668,9 @@ expected_output:
 ### S-001-34: Body-to-Header Injection via Dynamic `expr`
 
 Extract values from the transformed body and emit them as response headers.
+
+
+---
 
 ```yaml
 scenario: S-001-34
@@ -1602,6 +1725,9 @@ expected_headers:
 
 Edge case: referencing a header that doesn't exist returns null.
 
+
+---
+
 ```yaml
 scenario: S-001-35
 name: missing-header-returns-null
@@ -1637,9 +1763,15 @@ expected_output:
 
 Scenarios validating status code transformation (ADR-0003, FR-001-11).
 
+
+---
+
 ### S-001-36: Conditional Status Change — Error Body → 400
 
 The key use case: upstream returns 200 but body contains an error → change to 400.
+
+
+---
 
 ```yaml
 scenario: S-001-36
@@ -1682,6 +1814,9 @@ expected_status: 400
 
 Use the original status code inside the JSLT body expression.
 
+
+---
+
 ```yaml
 scenario: S-001-37
 name: status-in-body-expression
@@ -1716,6 +1851,9 @@ expected_status: 200
 ### S-001-38: Unconditional Status Set
 
 Set status code unconditionally (no `when` predicate).
+
+
+---
 
 ```yaml
 scenario: S-001-38
@@ -1756,6 +1894,9 @@ expected_status: 202
 **Narrative**: When the `when` predicate on a status block fails at evaluation time
 (e.g., type error, missing function argument), the engine keeps the original status
 code and does NOT abort the entire transform — the body transform still succeeds.
+
+
+---
 
 ```yaml
 scenario: S-001-38i
@@ -1798,10 +1939,16 @@ notes: >
 Scenarios validating URL rewriting — path rewrite, query parameter operations,
 and HTTP method override (ADR-0027, FR-001-12).
 
+
+---
+
 ### S-001-38a: URL Path Rewrite — De-polymorphize Dispatch Endpoint
 
 The primary use case: extract routing fields from the request body and construct
 a specific REST-style URL.
+
+
+---
 
 ```yaml
 scenario: S-001-38a
@@ -1843,6 +1990,9 @@ expected_path: "/api/users/123"
 ```
 
 ### S-001-38b: URL Query Parameter Add/Remove
+
+
+---
 
 ```yaml
 scenario: S-001-38b
@@ -1892,6 +2042,9 @@ expected_query_params:
 
 ### S-001-38c: HTTP Method Override with Conditional Predicate
 
+
+---
+
 ```yaml
 scenario: S-001-38c
 name: url-method-override-conditional
@@ -1931,6 +2084,9 @@ expected_method: "DELETE"
 
 ### S-001-38d: URL Path Expr Returns Null — Error
 
+
+---
+
 ```yaml
 scenario: S-001-38d
 name: url-path-expr-returns-null
@@ -1963,6 +2119,9 @@ expected_error:
 
 ### S-001-38e: Invalid HTTP Method — Rejected at Load Time
 
+
+---
+
 ```yaml
 scenario: S-001-38e
 name: url-method-invalid-rejected
@@ -1986,6 +2145,9 @@ expected_error:
 ```
 
 ### S-001-38f: URL Block on Response Transform — Ignored with Warning
+
+
+---
 
 ```yaml
 scenario: S-001-38f
@@ -2026,6 +2188,9 @@ expected_warning: "url block is ignored for response-direction transforms"
 Extract fields from the URL (path segment + query parameter) and inject them into
 nested body fields. The URL is then cleaned (path simplified, query param removed).
 This is the reverse of de-polymorphization: instead of body → URL, it's URL → body.
+
+
+---
 
 ```yaml
 scenario: S-001-38g
@@ -2087,9 +2252,15 @@ expected_query_params:
 
 Scenarios validating engine support matrix enforcement (ADR-0004, FR-001-02).
 
+
+---
+
 ### S-001-39: JOLT Engine with Unsupported Predicate — Rejected at Load Time
 
 A spec using `lang: jolt` with a `when` predicate must be rejected.
+
+
+---
 
 ```yaml
 scenario: S-001-39
@@ -2120,6 +2291,9 @@ expected_error:
 ```
 
 ### S-001-40: JOLT Engine with `$headers` Reference — Rejected at Load Time
+
+
+---
 
 ```yaml
 scenario: S-001-40
@@ -2155,7 +2329,13 @@ expected_error:
 
 Scenarios validating profile-to-spec version pinning (ADR-0005, FR-001-05).
 
+
+---
+
 ### S-001-41: Concurrent Spec Versions — Different Routes Use Different Versions
+
+
+---
 
 ```yaml
 scenario: S-001-41
@@ -2199,6 +2379,9 @@ test_request_2:
 
 ### S-001-42: Missing Spec Version — Rejected at Load Time
 
+
+---
+
 ```yaml
 scenario: S-001-42
 name: missing-spec-version-rejected
@@ -2223,6 +2406,9 @@ expected_error:
 ```
 
 ### S-001-43: Bare Spec Reference — Resolves to Latest Version
+
+
+---
 
 ```yaml
 scenario: S-001-43
@@ -2262,7 +2448,13 @@ test_request:
 
 Scenarios validating most-specific-wins profile matching (ADR-0006, FR-001-05, NFR-001-08).
 
+
+---
+
 ### S-001-44: Specific Path Beats Wildcard
+
+
+---
 
 ```yaml
 scenario: S-001-44
@@ -2292,6 +2484,9 @@ expected_match:
 
 ### S-001-45: Ambiguous Tie — Rejected at Load Time
 
+
+---
+
 ```yaml
 scenario: S-001-45
 name: ambiguous-tie-rejected
@@ -2317,6 +2512,9 @@ expected_error:
 ```
 
 ### S-001-46: Constraint Count Tie-Breaking
+
+
+---
 
 ```yaml
 scenario: S-001-46
@@ -2357,7 +2555,13 @@ expected_match:
 
 Scenarios validating the telemetry SPI and trace correlation (ADR-0007, NFR-001-09, NFR-001-10).
 
+
+---
+
 ### S-001-47: TelemetryListener Receives Transform Lifecycle Events
+
+
+---
 
 ```yaml
 scenario: S-001-47
@@ -2394,6 +2598,9 @@ expected_telemetry_events:
 
 ### S-001-48: Trace Context Propagation — X-Request-ID in Log Output
 
+
+---
+
 ```yaml
 scenario: S-001-48
 name: trace-context-propagation
@@ -2424,7 +2631,13 @@ expected_log_entry:
 
 Mixed-engine composition at the profile level — the sanctioned approach per ADR-0008.
 
+
+---
+
 ### S-001-49: Profile-Level Chaining — JOLT Structural Shift → JSLT Conditional Enrichment
+
+
+---
 
 ```yaml
 scenario: S-001-49
@@ -2509,7 +2722,13 @@ expected_output:
 
 Mapper definitions and `mapperRef` resolution within transform specs.
 
+
+---
+
 ### S-001-50: Apply Directive — Mapper + Expr + Mapper Pipeline
+
+
+---
 
 ```yaml
 scenario: S-001-50
@@ -2572,6 +2791,9 @@ expected_output:
 
 ### S-001-51: Missing mapperRef in Apply Directive Rejected at Load Time
 
+
+---
+
 ```yaml
 scenario: S-001-51
 name: mapper-ref-missing-rejected
@@ -2604,6 +2826,9 @@ expected_error:
 ```
 
 ### S-001-52: Duplicate mapperRef in Apply Directive Rejected at Load Time
+
+
+---
 
 ```yaml
 scenario: S-001-52
@@ -2641,6 +2866,9 @@ expected_error:
 ```
 
 ### S-001-59: Apply Directive Without `expr` Rejected at Load Time
+
+
+---
 
 ```yaml
 scenario: S-001-59
@@ -2681,7 +2909,13 @@ expected_error:
 
 Input/output JSON Schema validation at load time and runtime.
 
+
+---
+
 ### S-001-53: Valid Schemas Accepted at Load Time
+
+
+---
 
 ```yaml
 scenario: S-001-53
@@ -2724,6 +2958,9 @@ expected_load_result: success
 
 ### S-001-54: Invalid Schema Rejected at Load Time
 
+
+---
+
 ```yaml
 scenario: S-001-54
 name: schema-invalid-rejected
@@ -2756,6 +2993,9 @@ expected_error:
 ```
 
 ### S-001-55: Strict-Mode Runtime Schema Validation Failure
+
+
+---
 
 ```yaml
 scenario: S-001-55
@@ -2813,10 +3053,16 @@ expected_log:
 Scenarios validating profile-level chaining (ADR-0012), TransformContext (DO-001-07),
 and copy-on-wrap adapter semantics (ADR-0013).
 
+
+---
+
 ### S-001-56: Pipeline Chain Abort on Failure
 
 When a chain of two specs is configured and the first spec fails, the entire chain
 aborts and returns an error response (ADR-0022).
+
+
+---
 
 ```yaml
 scenario: S-001-56
@@ -2865,6 +3111,9 @@ expected_error_response:
 The JSLT body expression can access `$headers` to inject header values into the
 transformed body.
 
+
+---
+
 ```yaml
 scenario: S-001-57
 name: transform-context-headers-in-body
@@ -2902,6 +3151,9 @@ expected_output:
 
 Validates that on transform failure, the adapter's copy is discarded and an
 error response is returned to the caller (ADR-0022).
+
+
+---
 
 ```yaml
 scenario: S-001-58
@@ -2945,6 +3197,9 @@ expected_native_state:
 
 Validates that the same unidirectional spec can be bound to both `request` and
 `response` directions in a profile (ADR-0016).
+
+
+---
 
 ```yaml
 scenario: S-001-60
@@ -2999,6 +3254,9 @@ expected_output_request:
 
 Validates that `$status` is `null` during request-phase transforms (ADR-0017).
 
+
+---
+
 ```yaml
 scenario: S-001-61
 name: status-null-in-request-transform
@@ -3040,6 +3298,9 @@ expected_output:
 Validates that invalid JSON path syntax in the `sensitive` block is rejected at
 load time (ADR-0019).
 
+
+---
+
 ```yaml
 scenario: S-001-62
 name: sensitive-path-invalid-syntax-rejected
@@ -3073,6 +3334,9 @@ expected_error:
 
 Validates that valid JSON path expressions in the `sensitive` block are parsed
 and stored on the `TransformSpec` at load time (ADR-0019, NFR-001-06).
+
+
+---
 
 ```yaml
 scenario: S-001-75
@@ -3117,6 +3381,9 @@ expected:
 
 Validates that `$status` is properly null (not -1 or any sentinel) for request
 transforms, using the nullable `Integer` contract (ADR-0020).
+
+
+---
 
 ```yaml
 scenario: S-001-63
@@ -3163,6 +3430,9 @@ negative_assertion:
 
 Validates that `$queryParams` is accessible in JSLT body expressions, allowing
 specs to branch on URL query parameters (ADR-0021).
+
+
+---
 
 ```yaml
 scenario: S-001-64
@@ -3212,6 +3482,9 @@ expected_context:
 Validates that `$cookies` is accessible in JSLT body expressions, exposing
 request-side cookies as key-value pairs (ADR-0021).
 
+
+---
+
 ```yaml
 scenario: S-001-65
 name: cookies-in-body-expression
@@ -3259,10 +3532,16 @@ expected_context:
 Scenarios validating that the engine exposes the correct exception types to adapters
 and that error responses carry the correct URN `type` values.
 
+
+---
+
 ### S-001-66: Load-Time Error Type Discrimination
 
 Adapters must be able to distinguish different load-time failure causes by exception
 type (`TransformLoadException` subtypes).
+
+
+---
 
 ```yaml
 scenario: S-001-66
@@ -3327,6 +3606,9 @@ expected_error_3:
 
 ### S-001-67: Evaluation Budget Exceeded → EvalBudgetExceededException
 
+
+---
+
 ```yaml
 scenario: S-001-67
 name: eval-budget-exceeded-exception-type
@@ -3374,6 +3656,9 @@ expected_exception:
 Validates that `SpecParseException` carries the `source` field pointing to the
 failing file path.
 
+
+---
+
 ```yaml
 scenario: S-001-68
 name: spec-parse-exception-source-path
@@ -3405,7 +3690,13 @@ expected_error:
 
 Scenarios validating that `$headers_all` exposes all header values as arrays.
 
+
+---
+
 ### S-001-69: Multi-Value Set-Cookie via `$headers_all`
+
+
+---
 
 ```yaml
 scenario: S-001-69
@@ -3445,6 +3736,9 @@ expected_output:
 
 ### S-001-70: `$headers_all` Missing Header Returns Null
 
+
+---
+
 ```yaml
 scenario: S-001-70
 name: headers-all-missing-returns-null
@@ -3479,6 +3773,9 @@ expected_output:
 ```
 
 ### S-001-71: X-Forwarded-For Chain via `$headers_all`
+
+
+---
 
 ```yaml
 scenario: S-001-71
@@ -3518,6 +3815,9 @@ expected_output:
 
 ### S-001-72: Header Case Normalization
 
+
+---
+
 ```yaml
 scenario: S-001-72
 name: header-case-normalization
@@ -3555,6 +3855,9 @@ expected_output:
 
 ### S-001-73: Chain Direction Conflict — Rejected at Load Time
 
+
+---
+
 ```yaml
 scenario: S-001-73
 name: chain-direction-conflict-rejected
@@ -3591,6 +3894,9 @@ error_detail_contains: "conflicting directions"
 
 Validates that each chain step emits structured log entries with `chain_step`,
 `spec_id`, and `profile_id` (NFR-001-08, T-001-33).
+
+
+---
 
 ```yaml
 scenario: S-001-74
@@ -3636,7 +3942,13 @@ expected_log_entries:
 Scenarios validating the immutable `TransformRegistry` snapshot, atomic swap via
 `TransformEngine.reload()`, and fail-safe behaviour when reload encounters errors.
 
+
+---
+
 ### S-001-76: Reload Swaps Registry Atomically
+
+
+---
 
 ```yaml
 scenario: S-001-76
@@ -3674,6 +3986,9 @@ phase_2_reload_with:
 ```
 
 ### S-001-77: Fail-Safe Reload Preserves Old Registry on Error
+
+
+---
 
 ```yaml
 scenario: S-001-77
@@ -3715,6 +4030,9 @@ phase_2_reload_with:
 ```
 
 ### S-001-78: Concurrent Reads During Swap See Consistent Snapshot
+
+
+---
 
 ```yaml
 scenario: S-001-78
@@ -3760,7 +4078,13 @@ for ≤ 50KB payloads). Enabled via `-Dio.messagexform.benchmark=true` or
 `IO_MESSAGEXFORM_BENCHMARK=true`. See ADR-0028 for the hybrid performance testing
 strategy.
 
+
+---
+
 ### S-001-79: Identity JSLT Transform — p95 < 5ms (1KB body)
+
+
+---
 
 ```yaml
 scenario: S-001-79
@@ -3785,6 +4109,9 @@ assert:
 ```
 
 ### S-001-80: 5-Field Mapping JSLT Transform — p95 < 5ms (10KB body)
+
+
+---
 
 ```yaml
 scenario: S-001-80
@@ -3816,6 +4143,9 @@ assert:
 ```
 
 ### S-001-81: Complex Nested/Array Transform — p95 < 5ms (50KB body)
+
+
+---
 
 ```yaml
 scenario: S-001-81
@@ -4082,10 +4412,16 @@ assert:
 
 Scenarios for gateway-provided session context (`$session`). See ADR-0030.
 
+
+---
+
 ### S-001-82: Inject Session Subject into Request Body
 
 The gateway provides session context with `sub` claim. The transform injects it
 into the request body as `userId`.
+
+
+---
 
 ```yaml
 scenario: S-001-82
@@ -4128,6 +4464,9 @@ expected_output:
 
 The transform uses `$session.roles` to conditionally include admin-only fields
 in the response body.
+
+
+---
 
 ```yaml
 scenario: S-001-83
@@ -4175,6 +4514,9 @@ expected_output:
 When no session context is provided by the gateway, `$session` is `null`.
 JSLT handles null gracefully — accessing fields on null returns null.
 
+
+---
+
 ```yaml
 scenario: S-001-84
 name: session-null-safe-access
@@ -4210,6 +4552,9 @@ expected_output:
 
 JOLT does not support context variables. A spec declaring `lang: jolt` that
 references `$session` must be rejected at load time.
+
+
+---
 
 ```yaml
 scenario: S-001-85
