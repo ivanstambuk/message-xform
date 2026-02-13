@@ -197,7 +197,7 @@ terminology agreements must be captured here immediately.
     itself — it's gateway-level metadata. Exposed as a read-only `$session` variable
     in JSLT expressions. Nullable: when the gateway does not support sessions or no
     session exists, `$session` is `null`. JSLT handles null gracefully.
-    Adapters are responsible for populating `Message.getSessionContext()` from their
+    Adapters are responsible for populating `Message.session()` from their
     gateway-native session API. See ADR-0030.
 
 - **Pipeline chaining** (profile-level chaining)
