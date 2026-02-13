@@ -426,48 +426,158 @@ assertions:
 
 ## S-002-11: Error Mode PASS_THROUGH
 
-**Given** `errorMode = PASS_THROUGH` in the plugin configuration,
-**and** a spec's JSLT expression throws a runtime error (e.g., NPE in expression),
-**when** `handleRequest()` processes the exchange,
-**then** a warning is logged with the error details,
-**and** the original request body is forwarded unchanged (ADR-0013 copy-on-wrap safety),
-**and** `Outcome.CONTINUE` is returned.
+```yaml
+scenario: S-002-11
+name: error-mode-pass-through
+description: >
+  When errorMode is PASS_THROUGH and a JSLT expression fails at runtime,
+  the original request body is forwarded unchanged and CONTINUE is returned.
+tags: [error-handling, pass-through, resilience]
+refs: [FR-002-10, ADR-0013]
+
+setup:
+  config:
+    errorMode: PASS_THROUGH
+  exchange:
+    request:
+      method: POST
+      uri: /api/process
+      contentType: application/json
+      body: '{"data": "value"}'
+  specs:
+    - id: broken-transform
+      matches: "POST /api/process"
+      direction: request
+      expr: '.nonexistent.deep.path.boom()'  # causes runtime error
+
+trigger: handleRequest
+
+assertions:
+  - description: warning is logged with error details
+    expect: log.contains("WARN", "transform error")
+  - description: original request body forwarded unchanged (copy-on-wrap)
+    expect: forwarded.body == '{"data": "value"}'
+  - description: outcome is CONTINUE (pipeline continues)
+    expect: outcome == CONTINUE
+```
 
 ---
 
 ## S-002-12: Error Mode DENY
 
-**Given** `errorMode = DENY` in the plugin configuration,
-**and** a spec's JSLT expression throws a runtime error,
-**when** `handleRequest()` processes the exchange,
-**then** a warning/error is logged,
-**and** `Outcome.RETURN` is returned (halts the PingAccess pipeline),
-**and** the response body is an RFC 9457 Problem Detail JSON object with
-`status: 502`.
+```yaml
+scenario: S-002-12
+name: error-mode-deny
+description: >
+  When errorMode is DENY and a JSLT expression fails at runtime,
+  the pipeline is halted with an RFC 9457 Problem Detail response.
+tags: [error-handling, deny, security]
+refs: [FR-002-10, FR-002-11, ADR-0013]
+
+setup:
+  config:
+    errorMode: DENY
+  exchange:
+    request:
+      method: POST
+      uri: /api/process
+      contentType: application/json
+      body: '{"data": "value"}'
+  specs:
+    - id: broken-transform
+      matches: "POST /api/process"
+      direction: request
+      expr: '.nonexistent.deep.path.boom()'  # causes runtime error
+
+trigger: handleRequest
+
+assertions:
+  - description: warning/error is logged
+    expect: log.contains("WARN" or "ERROR", "transform error")
+  - description: outcome is RETURN (halts PingAccess pipeline)
+    expect: outcome == RETURN
+  - description: response body is RFC 9457 Problem Detail
+    expect: response.body.type == "about:blank"
+  - description: problem detail status is 502
+    expect: response.body.status == 502
+```
 
 ---
 
 ## S-002-13: Session Context in JSLT
 
-**Given** the PingAccess Exchange has an Identity with `subject = "bjensen"`,
-`trackingId = "tx-001"`,
-**and** a transform spec uses JSLT expression `.subject = $session.subject`,
-**when** `handleRequest()` processes the exchange,
-**then** `Message.session()` contains `{"subject": "bjensen", "trackingId": "tx-001", ...}`,
-**and** the JSLT expression resolves `$session.subject` to `"bjensen"`.
+```yaml
+scenario: S-002-13
+name: session-context-in-jslt
+description: >
+  Authenticated exchange's Identity attributes are bound as $session
+  in JSLT. JSLT expressions can access session fields like $session.subject.
+tags: [session, identity, jslt-context]
+refs: [FR-002-06, FR-002-13, ADR-0030]
+
+setup:
+  exchange:
+    request:
+      method: POST
+      uri: /api/data
+      contentType: application/json
+      body: '{"action": "fetch"}'
+    identity:
+      subject: "bjensen"
+      trackingId: "tx-001"
+      attributes:
+        email: "bjensen@example.com"
+        groups: ["admins", "users"]
+  specs:
+    - id: enrich-with-session
+      matches: "POST /api/data"
+      direction: request
+      expr: '. + {"requestedBy": $session.subject}'
+
+trigger: handleRequest
+
+assertions:
+  - description: Message.session() contains identity attributes
+    expect: message.session().get("subject") == "bjensen"
+  - description: $session.subject resolves in JSLT
+    expect: forwarded.body contains '"requestedBy": "bjensen"'
+  - description: $session.trackingId is available
+    expect: message.session().get("trackingId") == "tx-001"
+```
 
 ---
 
 ## S-002-14: No Identity (Unauthenticated)
 
-**Given** the PingAccess Exchange has no Identity (unauthenticated request),
-**when** `wrapRequest()` is called,
-**then** `Message.session()` is `SessionContext.empty()`,
-**and** JSLT expressions referencing `$session` see an empty object `{}`,
-**and** field access like `$session.subject` evaluates to `null` (key-absent
-semantics) without error.
+```yaml
+scenario: S-002-14
+name: unauthenticated-empty-session
+description: >
+  Unauthenticated exchange (no Identity) produces SessionContext.empty().
+  $session is {} (empty object) in JSLT; field access returns null
+  per key-absent semantics.
+tags: [session, unauthenticated, edge-case]
+refs: [FR-002-06, FR-002-13]
 
----
+setup:
+  exchange:
+    request:
+      method: GET
+      uri: /api/public
+    identity: null  # unauthenticated — no Identity on exchange
+
+trigger: handleRequest
+
+assertions:
+  - description: Message.session() is SessionContext.empty()
+    expect: message.session() == SessionContext.empty()
+  - description: $session evaluates to {} (empty object) in JSLT
+    expect: jslt.eval("$session") == {}
+  - description: field access $session.subject returns null without error
+    expect: jslt.eval("$session.subject") == null
+  - description: no error or warning logged
+    expect: log.absent("ERROR")
+```
 
 ## S-002-15: Multiple Specs Loaded
 

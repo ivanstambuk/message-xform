@@ -14,7 +14,7 @@ YAML behavioral contracts per `docs/architecture/spec-guidelines/scenarios-forma
 | 0 | Preamble + format guideline | — | ✅ Done |
 | 1 | Core transforms: S-002-01 → S-002-06 | 6 | ✅ Done |
 | 2 | Edge cases + matching: S-002-07 → S-002-10 | 4 | ✅ Done |
-| 3 | Error modes + session: S-002-11 → S-002-14 | 4 | ⬜ |
+| 3 | Error modes + session: S-002-11 → S-002-14 | 4 | ✅ Done |
 | 4 | Config + SPI + threading: S-002-15 → S-002-21 | 7 | ⬜ |
 | 5 | Context variables: S-002-22 → S-002-27 | 6 | ⬜ |
 | 6 | Advanced behavioral: S-002-28 → S-002-36 | 9 | ⬜ |
@@ -50,10 +50,10 @@ Empty/non-JSON body handling and profile matching behavior.
 
 Error handling modes and session context binding.
 
-- [ ] S-002-11: Error Mode PASS_THROUGH
-- [ ] S-002-12: Error Mode DENY
-- [ ] S-002-13: Session Context in JSLT
-- [ ] S-002-14: No Identity (Unauthenticated)
+- [x] S-002-11: Error Mode PASS_THROUGH
+- [x] S-002-12: Error Mode DENY
+- [x] S-002-13: Session Context in JSLT
+- [x] S-002-14: No Identity (Unauthenticated)
 
 ### Phase 4 — Config + SPI + Threading (S-002-15 → S-002-21)
 
