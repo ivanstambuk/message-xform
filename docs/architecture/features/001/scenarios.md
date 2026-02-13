@@ -4183,228 +4183,6 @@ assert:
   p95_latency_ms: "< 5.0"
 ```
 
----
-
-## Scenario Index
-
-| ID | Name | Category | Tags |
-|----|------|----------|------|
-| S-001-01 | pingam-callback-username-password | PingAM | pingam, callback, structural, core |
-| S-001-02 | pingam-callback-reverse | PingAM | pingam, callback, reverse, bidirectional |
-| S-001-03 | pingam-success-strip-internals | PingAM | pingam, success, remove-fields |
-| S-001-04 | pingam-callback-choice-confirmation | PingAM | pingam, callback, choice, structural |
-| S-001-05 | pingam-no-callbacks-simple-success | PingAM | pingam, edge-case, conditional |
-| S-001-06 | strip-internal-fields | Gateway | gateway, remove, security, kong-pattern |
-| S-001-07 | strip-internal-fields-passthrough | Gateway | gateway, remove, open-world, passthrough |
-| S-001-08 | rename-fields-api-versioning | Gateway | gateway, rename, api-versioning, kong-pattern |
-| S-001-09 | add-default-values | Gateway | gateway, defaults, kong-pattern |
-| S-001-10 | add-gateway-metadata | Gateway | gateway, enrichment, metadata |
-| S-001-11 | flatten-nested-object | Structural | structural, flatten, deep-path |
-| S-001-12 | nest-flat-object | Structural | structural, nesting, reverse |
-| S-001-13 | reshape-array-of-objects | Structural | structural, array, scim |
-| S-001-14 | oauth-token-normalization | Structural | structural, oauth, conditional |
-| S-001-15 | conditional-error-vs-success | Conditional | conditional, error-handling, structural |
-| S-001-16 | conditional-success-path | Conditional | conditional, structural |
-| S-001-17 | value-mapping-enum-translation | Conditional | conditional, value-mapping, enum |
-| S-001-18 | passthrough-no-match | Edge Cases | passthrough, edge-case, safety |
-| S-001-19 | passthrough-invalid-json | Edge Cases | passthrough, edge-case, safety |
-| S-001-20 | open-world-extra-fields | Edge Cases | open-world, passthrough, forward-compat |
-| S-001-21 | empty-input-object | Edge Cases | edge-case, empty, robustness |
-| S-001-22 | null-values-in-input | Edge Cases | edge-case, null, robustness |
-| S-001-23 | large-array-performance | Edge Cases | performance, array, large |
-| S-001-24 | evaluation-error-returns-error-response | Edge Cases | error, error-response, safety, adr-0022 |
-| S-001-25 | multi-engine-rename-jslt | Multi-Engine | multi-engine, jslt, rename |
-| S-001-26 | multi-engine-rename-jolt | Multi-Engine | multi-engine, jolt, rename |
-| S-001-27 | multi-engine-rename-jq | Multi-Engine | multi-engine, jq, rename |
-| S-001-28 | unknown-engine-rejected | Multi-Engine | multi-engine, error, validation |
-| S-001-29 | bidirectional-roundtrip-pingam | Bidirectional | bidirectional, round-trip, pingam |
-| S-001-30 | bidirectional-flat-nested | Bidirectional | bidirectional, structural, round-trip |
-| S-001-31 | error-normalize-rfc9457 | Error Normalization | error-normalization, rfc9457 |
-| S-001-32 | pingam-error-normalization | Error Normalization | pingam, error-normalization |
-| S-001-33 | header-to-body-injection | Header ↔ Body | header, body, injection, adr-0002 |
-| S-001-34 | body-to-header-injection | Header ↔ Body | header, body, injection, dynamic, adr-0002 |
-| S-001-35 | missing-header-returns-null | Header ↔ Body | header, edge-case, null, adr-0002 |
-| S-001-36 | conditional-status-error-body | Status Code | status, conditional, error, adr-0003 |
-| S-001-37 | status-in-body-expression | Status Code | status, body, variable, adr-0003 |
-| S-001-38 | unconditional-status-set | Status Code | status, unconditional, adr-0003 |
-| S-001-38a | url-path-rewrite-dispatch | URL Rewriting | url, path-rewrite, de-polymorphize, adr-0027 |
-| S-001-38b | url-query-param-operations | URL Rewriting | url, query, add, remove, glob, adr-0027 |
-| S-001-38c | url-method-override-conditional | URL Rewriting | url, method, override, conditional, adr-0027 |
-| S-001-38d | url-path-expr-returns-null | URL Rewriting | url, error, null, validation |
-| S-001-38e | url-method-invalid-rejected | URL Rewriting | url, method, validation, load-time |
-| S-001-38f | url-block-on-response-ignored | URL Rewriting | url, direction, response, warning |
-| S-001-38g | url-to-body-extraction | URL Rewriting | url, body, extraction, path-segment, query-param, adr-0027, adr-0021 |
-| S-001-39 | jolt-unsupported-predicate-rejected | Engine Capability | engine, capability, jolt, validation, adr-0004 |
-| S-001-40 | jolt-unsupported-headers-rejected | Engine Capability | engine, capability, jolt, validation, adr-0004 |
-| S-001-41 | concurrent-spec-versions | Version Pinning | version, profile, concurrent, adr-0005 |
-| S-001-42 | missing-spec-version-rejected | Version Pinning | version, profile, validation, adr-0005 |
-| S-001-43 | bare-spec-resolves-to-latest | Version Pinning | version, profile, latest, adr-0005 |
-| S-001-44 | specific-path-beats-wildcard | Match Resolution | profile, match, specificity, adr-0006 |
-| S-001-45 | ambiguous-tie-rejected | Match Resolution | profile, match, ambiguous, validation, adr-0006 |
-| S-001-46 | constraint-count-tiebreaker | Match Resolution | profile, match, tiebreaker, adr-0006 |
-| S-001-47 | telemetry-listener-lifecycle | Observability | observability, telemetry, spi, adr-0007 |
-| S-001-48 | trace-context-propagation | Observability | observability, tracing, correlation, adr-0007 |
-| S-001-49 | profile-chain-jolt-then-jslt | Profile Chaining | profile-chaining, mixed-engine, jolt, jslt, adr-0008 |
-| S-001-50 | apply-directive-mapper-pipeline | Reusable Mappers | mappers, mapperRef, apply, resolution, fr-001-08, adr-0014 |
-| S-001-51 | mapper-ref-missing-rejected | Reusable Mappers | mappers, mapperRef, apply, validation, error, fr-001-08, adr-0014 |
-| S-001-52 | mapper-ref-duplicate-rejected | Reusable Mappers | mappers, mapperRef, duplicate, validation, error, fr-001-08, adr-0014 |
-| S-001-53 | schema-valid-load-time | Schema Validation | schema, validation, load-time, fr-001-09, adr-0001 |
-| S-001-54 | schema-invalid-rejected | Schema Validation | schema, validation, error, load-time, fr-001-09, adr-0001 |
-| S-001-55 | schema-strict-mode-runtime-failure | Schema Validation | schema, validation, strict-mode, runtime, fr-001-09, adr-0001 |
-| S-001-56 | pipeline-chain-abort-on-failure | Pipeline Chaining & Message Semantics | profile-chaining, abort, error, adr-0012, adr-0013 |
-| S-001-57 | transform-context-headers-in-body | Pipeline Chaining & Message Semantics | transform-context, headers, body, do-001-07 |
-| S-001-58 | copy-on-wrap-abort-error-response | Pipeline | copy-on-wrap, abort, error-response, adr-0013, adr-0022 |
-| S-001-59 | apply-directive-missing-expr-rejected | Reusable Mappers | mappers, apply, validation, error, fr-001-08, adr-0014 |
-| S-001-60 | direction-agnostic-both-bindings | Direction Semantics | direction, agnostic, profile, adr-0016 |
-| S-001-61 | status-null-in-request-transform | Status Code | status, null, request, direction, adr-0017 |
-| S-001-62 | sensitive-path-invalid-syntax-rejected | Sensitive Fields | sensitive, validation, error, adr-0019, nfr-001-06 |
-| S-001-75 | sensitive-paths-valid-parsed | Sensitive Fields | sensitive, validation, load-time, adr-0019, nfr-001-06 |
-| S-001-63 | nullable-status-integer-contract | Status Code | status, null, nullable, integer, adr-0020 |
-| S-001-64 | query-params-in-body-expression | TransformContext | query-params, context, branching, adr-0021 |
-| S-001-65 | cookies-in-body-expression | TransformContext | cookies, context, adr-0021 |
-| S-001-66 | load-time-error-type-discrimination | Error Type Catalogue | error-catalogue, load-time, exception-hierarchy, adr-0024 |
-| S-001-67 | eval-budget-exceeded-exception-type | Error Type Catalogue | error-catalogue, eval-time, budget, exception-hierarchy, adr-0024 |
-| S-001-68 | spec-parse-exception-source-path | Error Type Catalogue | error-catalogue, load-time, source-path, adr-0024 |
-| S-001-69 | headers-all-set-cookie-multi-value | Multi-Value Headers | headers, multi-value, headers-all, set-cookie, adr-0026 |
-| S-001-70 | headers-all-missing-returns-null | Multi-Value Headers | headers, multi-value, headers-all, null, edge-case, adr-0026 |
-| S-001-71 | headers-all-x-forwarded-for-chain | Multi-Value Headers | headers, multi-value, headers-all, x-forwarded-for, adr-0026 |
-| S-001-72 | header-case-normalization | Header Transforms | headers, case-insensitive, normalization, rfc9110 |
-| S-001-73 | chain-direction-conflict-rejected | Transform Profiles | profile, chain, direction, validation, error, load-time |
-| S-001-74 | chain-step-structured-logging | Chain Step Logging | chain-step-logging, structured-logging, nfr-001-08, profile-chaining |
-| S-001-76 | reload-swaps-registry-atomically | Hot Reload | hot-reload, atomic-swap, registry, nfr-001-05 |
-| S-001-77 | fail-safe-reload-preserves-old | Hot Reload | hot-reload, fail-safe, error, registry, nfr-001-05 |
-| S-001-78 | concurrent-reads-consistent-snapshot | Hot Reload | hot-reload, concurrent, thread-safety, atomic-swap, nfr-001-05 |
-| S-001-79 | benchmark-identity-1kb | Performance Benchmarks | benchmark, performance, identity, nfr-001-03, adr-0028 |
-| S-001-80 | benchmark-field-mapping-10kb | Performance Benchmarks | benchmark, performance, field-mapping, nfr-001-03, adr-0028 |
-| S-001-81 | benchmark-complex-50kb | Performance Benchmarks | benchmark, performance, complex, array, nfr-001-03, adr-0028 |
-
-## Coverage Matrix
-
-| Spec Requirement | Scenarios |
-|------------------|-----------|
-| FR-001-01 (Spec Format) | S-001-01 through S-001-17, S-001-49 |
-| FR-001-02 (Expression Engine SPI) | S-001-25, S-001-26, S-001-27, S-001-28, S-001-39, S-001-40, S-001-57, S-001-63, S-001-64, S-001-65 |
-| FR-001-03 (Bidirectional) | S-001-02, S-001-29, S-001-30, S-001-60 |
-| FR-001-04 (Message Envelope) | S-001-19, S-001-58 |
-| FR-001-05 (Transform Profiles) | S-001-41, S-001-42, S-001-43, S-001-44, S-001-45, S-001-46, S-001-49, S-001-56, S-001-73 |
-| FR-001-06 (Passthrough) | S-001-18, S-001-19 |
-| FR-001-07 (Error Handling) | S-001-24, S-001-28, S-001-56, S-001-58, S-001-66, S-001-67, S-001-68 |
-| FR-001-08 (Reusable Mappers) | S-001-50, S-001-51, S-001-52, S-001-59 |
-| FR-001-09 (Schema Validation) | S-001-53, S-001-54, S-001-55 |
-| FR-001-10 (Header Transforms) | S-001-33, S-001-34, S-001-35, S-001-57, S-001-69, S-001-70, S-001-71, S-001-72 |
-| FR-001-11 (Status Code Transforms) | S-001-36, S-001-37, S-001-38, S-001-38i, S-001-61, S-001-63 |
-| FR-001-12 (URL Rewriting) | S-001-38a, S-001-38b, S-001-38c, S-001-38d, S-001-38e, S-001-38f, S-001-38g |
-| FR-001-13 (Session Context Binding) | S-001-82, S-001-83, S-001-84, S-001-85 |
-| NFR-001-01 (Stateless) | All — implicit in test harness design |
-| NFR-001-03 (Latency <5ms) | S-001-23, S-001-79, S-001-80, S-001-81 |
-| NFR-001-04 (Open-world) | S-001-07, S-001-20 |
-| NFR-001-07 (Eval budget) | S-001-24 |
-| NFR-001-02 (Zero gateway deps) | *Verified by dependency analysis, not scenario-testable* |
-| NFR-001-05 (Hot reload) | S-001-76, S-001-77, S-001-78 |
-| NFR-001-06 (Sensitive fields) | S-001-62, S-001-75; *static analysis + code review — add more when engine is implemented* |
-| NFR-001-08 (Match logging) | S-001-44, S-001-46 (matched profile logged), S-001-74 (chain step logging) |
-| NFR-001-09 (Telemetry SPI) | S-001-47 |
-| NFR-001-10 (Trace correlation) | S-001-48 |
-
-## Scenario → Test Class Verification
-
-> Updated 2026-02-08 (T-001-51). Each scenario lists the test class(es) that verify it.
-
-| Scenario | Test Class(es) | Notes |
-|----------|---------------|-------|
-| S-001-01 | `ScenarioSuiteTest`, `TransformEngineTest` | PingAM callback core use case |
-| S-001-02 | `ScenarioSuiteTest`, `BidirectionalSpecTest`, `BidirectionalProfileTest` | Reverse transform |
-| S-001-03 | `ScenarioSuiteTest` | Success response strip |
-| S-001-04 | `ScenarioSuiteTest` | Choice/confirmation callbacks |
-| S-001-05 | `ScenarioSuiteTest` | No-callbacks edge case |
-| S-001-06 | `ScenarioSuiteTest`, `TransformEngineTest` | Strip internal fields |
-| S-001-07 | `JsltExpressionEngineTest` | Open-world `* : .` passthrough (JSLT minus syntax) |
-| S-001-08 | `ScenarioSuiteTest`, `TransformEngineTest`, `JsltExpressionEngineTest` | Field renaming |
-| S-001-09 | `TransformEngineTest` | Defaults (JSLT absent-field behavior) |
-| S-001-10 | — | `now()` dynamic; skipped in suite |
-| S-001-11 | `ScenarioSuiteTest`, `TransformEngineTest` | Flatten nested |
-| S-001-12 | `ScenarioSuiteTest` | Nest flat |
-| S-001-13 | `ScenarioSuiteTest`, `TransformEngineTest`, `JsltExpressionEngineTest` | Array reshape |
-| S-001-14 | `ScenarioSuiteTest` | OAuth normalization |
-| S-001-15 | `ScenarioSuiteTest`, `JsltExpressionEngineTest` | Conditional error vs success |
-| S-001-16 | `ScenarioSuiteTest` | Conditional success path |
-| S-001-17 | `ScenarioSuiteTest` | Enum translation |
-| S-001-18 | `TransformEngineTest` | Passthrough (no match) |
-| S-001-19 | `TransformEngineTest` | Passthrough (invalid JSON) |
-| S-001-20 | `ScenarioSuiteTest` | Open-world extra fields |
-| S-001-21 | `ScenarioSuiteTest` | Empty input |
-| S-001-22 | `ScenarioSuiteTest`, `EvalErrorTest` | Null values |
-| S-001-23 | — | Large array; placeholder data |
-| S-001-24 | `EvalErrorTest` | JSLT eval error → error response |
-| S-001-25 | `ScenarioSuiteTest` | Multi-engine rename (JSLT) |
-| S-001-26 | — | JOLT engine not implemented |
-| S-001-27 | — | jq engine not implemented |
-| S-001-28 | `TransformEngineTest` | Unknown engine rejected |
-| S-001-29 | `BidirectionalSpecTest` | Bidirectional round-trip |
-| S-001-30 | `BidirectionalSpecTest` | Bidirectional flat ↔ nested |
-| S-001-31 | `ScenarioSuiteTest` | RFC 9457 normalization |
-| S-001-32 | `ScenarioSuiteTest` | PingAM error normalization |
-| S-001-33 | `DynamicHeaderTest` | `$headers` in body |
-| S-001-34 | `DynamicHeaderTest` | Body-to-header expr |
-| S-001-35 | `DynamicHeaderTest` | Missing header returns null |
-| S-001-36 | `StatusTransformTest` | Conditional status change |
-| S-001-37 | `StatusTransformTest`, `StatusBindingTest` | `$status` in body |
-| S-001-38 | `StatusTransformTest` | Unconditional status set |
-| S-001-38a | `UrlPathRewriteTest` | URL path rewrite |
-| S-001-38b | `UrlQueryParamTest` | Query param add/remove |
-| S-001-38c | `UrlPathRewriteTest` | HTTP method override |
-| S-001-38d | `UrlPathRewriteTest` | Path expr null → error |
-| S-001-38e | `UrlPathRewriteTest` | Invalid method rejected |
-| S-001-38f | `UrlPathRewriteTest` | URL on response ignored |
-| S-001-38g | `UrlPathRewriteTest` | URL-to-body extraction |
-| S-001-38i | `StatusTransformTest` | Status predicate error → keep |
-| S-001-39 | — | JOLT not implemented |
-| S-001-40 | — | JOLT not implemented |
-| S-001-41 | `TransformEngineTest` | Concurrent spec versions |
-| S-001-42 | `TransformEngineTest` | Missing spec version |
-| S-001-43 | `TransformEngineTest` | Bare spec → latest |
-| S-001-44 | `TransformEngineTest` | Specific path beats wildcard |
-| S-001-45 | `TransformEngineTest` | Ambiguous tie rejected |
-| S-001-46 | `TransformEngineTest` | Constraint count tie-break |
-| S-001-47 | `TelemetryListenerTest` | Telemetry lifecycle events |
-| S-001-48 | `TraceContextTest` | Trace context propagation |
-| S-001-49 | `ChainingTest` | Profile chain (JOLT not impl) |
-| S-001-50 | `MapperPipelineTest` | Mapper + expr pipeline |
-| S-001-51 | `MapperPipelineTest` | Missing mapperRef rejected |
-| S-001-52 | `MapperPipelineTest` | Duplicate mapperRef rejected |
-| S-001-53 | `SchemaValidationTest` | Valid schemas accepted |
-| S-001-54 | `SchemaValidationTest` | Invalid schema rejected |
-| S-001-55 | `SchemaValidationTest` | Strict-mode runtime failure |
-| S-001-56 | `ChainingTest` | Pipeline abort on failure |
-| S-001-57 | `DynamicHeaderTest` | `$headers` context binding |
-| S-001-58 | `TestAdapterTest` | Copy-on-wrap error path |
-| S-001-59 | `MapperPipelineTest` | Apply without expr rejected |
-| S-001-60 | `BidirectionalProfileTest` | Direction-agnostic spec |
-| S-001-61 | `StatusBindingTest` | `$status` null in request |
-| S-001-62 | `SensitiveFieldTest` | Sensitive path validation |
-| S-001-63 | `StatusBindingTest` | Nullable status integer |
-| S-001-64 | `TransformEngineTest` | Query params in body |
-| S-001-65 | `TransformEngineTest` | Cookies in body |
-| S-001-66 | `TransformEngineTest` | Load-time error types |
-| S-001-67 | `EvalErrorTest` | Eval budget exceeded |
-| S-001-68 | `TransformEngineTest` | YAML parse → SpecParseException |
-| S-001-69 | `DynamicHeaderTest` | Multi-value Set-Cookie |
-| S-001-70 | `DynamicHeaderTest` | `$headers_all` missing → null |
-| S-001-71 | `DynamicHeaderTest` | X-Forwarded-For chain |
-| S-001-72 | `HeaderNormalizationTest` | Header name case normalization |
-| S-001-74 | `ChainingTest` | Chain step logging |
-| S-001-75 | `SensitiveFieldTest` | Valid sensitive paths parsed |
-| S-001-76 | `HotReloadTest` | Reload swaps registry |
-| S-001-77 | `HotReloadTest` | Fail-safe reload preserves old |
-| S-001-78 | `HotReloadTest` | Concurrent reads see snapshot |
-| S-001-79 | `TransformEngineBenchmark` | Identity 1KB — p95 < 5ms (opt-in) |
-| S-001-80 | `TransformEngineBenchmark` | Field-mapping 10KB — p95 < 5ms (opt-in) |
-| S-001-81 | `TransformEngineBenchmark` | Complex 50KB — p95 < 5ms (opt-in) |
-| S-001-82 | `ScenarioSuiteTest`, `SessionContextBindingTest`, `SessionContextE2ETest` | `$session.sub` in request body (FR-001-13, ADR-0030) |
-| S-001-83 | `ScenarioSuiteTest`, `SessionContextBindingTest` | `$session.roles` conditional response (FR-001-13, ADR-0030) |
-| S-001-84 | `ScenarioSuiteTest`, `SessionContextBindingTest`, `SessionContextE2ETest` | `$session` null — null-safe access (FR-001-13, ADR-0030) |
-| S-001-85 | `SessionContextJoltRejectionTest` | JOLT + `$session` → rejected at load time (FR-001-13, ADR-0030) |
-
 
 ---
 
@@ -4584,3 +4362,229 @@ expected_error:
   exception: ExpressionCompileException
   message_contains: "does not support context variables"
 ```
+
+## Scenario Index
+
+| ID | Name | Category | Tags |
+|----|------|----------|------|
+| S-001-01 | pingam-callback-username-password | PingAM | pingam, callback, structural, core |
+| S-001-02 | pingam-callback-reverse | PingAM | pingam, callback, reverse, bidirectional |
+| S-001-03 | pingam-success-strip-internals | PingAM | pingam, success, remove-fields |
+| S-001-04 | pingam-callback-choice-confirmation | PingAM | pingam, callback, choice, structural |
+| S-001-05 | pingam-no-callbacks-simple-success | PingAM | pingam, edge-case, conditional |
+| S-001-06 | strip-internal-fields | Gateway | gateway, remove, security, kong-pattern |
+| S-001-07 | strip-internal-fields-passthrough | Gateway | gateway, remove, open-world, passthrough |
+| S-001-08 | rename-fields-api-versioning | Gateway | gateway, rename, api-versioning, kong-pattern |
+| S-001-09 | add-default-values | Gateway | gateway, defaults, kong-pattern |
+| S-001-10 | add-gateway-metadata | Gateway | gateway, enrichment, metadata |
+| S-001-11 | flatten-nested-object | Structural | structural, flatten, deep-path |
+| S-001-12 | nest-flat-object | Structural | structural, nesting, reverse |
+| S-001-13 | reshape-array-of-objects | Structural | structural, array, scim |
+| S-001-14 | oauth-token-normalization | Structural | structural, oauth, conditional |
+| S-001-15 | conditional-error-vs-success | Conditional | conditional, error-handling, structural |
+| S-001-16 | conditional-success-path | Conditional | conditional, structural |
+| S-001-17 | value-mapping-enum-translation | Conditional | conditional, value-mapping, enum |
+| S-001-18 | passthrough-no-match | Edge Cases | passthrough, edge-case, safety |
+| S-001-19 | passthrough-invalid-json | Edge Cases | passthrough, edge-case, safety |
+| S-001-20 | open-world-extra-fields | Edge Cases | open-world, passthrough, forward-compat |
+| S-001-21 | empty-input-object | Edge Cases | edge-case, empty, robustness |
+| S-001-22 | null-values-in-input | Edge Cases | edge-case, null, robustness |
+| S-001-23 | large-array-performance | Edge Cases | performance, array, large |
+| S-001-24 | evaluation-error-returns-error-response | Edge Cases | error, error-response, safety, adr-0022 |
+| S-001-25 | multi-engine-rename-jslt | Multi-Engine | multi-engine, jslt, rename |
+| S-001-26 | multi-engine-rename-jolt | Multi-Engine | multi-engine, jolt, rename |
+| S-001-27 | multi-engine-rename-jq | Multi-Engine | multi-engine, jq, rename |
+| S-001-28 | unknown-engine-rejected | Multi-Engine | multi-engine, error, validation |
+| S-001-29 | bidirectional-roundtrip-pingam | Bidirectional | bidirectional, round-trip, pingam |
+| S-001-30 | bidirectional-flat-nested | Bidirectional | bidirectional, structural, round-trip |
+| S-001-31 | error-normalize-rfc9457 | Error Normalization | error-normalization, rfc9457 |
+| S-001-32 | pingam-error-normalization | Error Normalization | pingam, error-normalization |
+| S-001-33 | header-to-body-injection | Header ↔ Body | header, body, injection, adr-0002 |
+| S-001-34 | body-to-header-injection | Header ↔ Body | header, body, injection, dynamic, adr-0002 |
+| S-001-35 | missing-header-returns-null | Header ↔ Body | header, edge-case, null, adr-0002 |
+| S-001-36 | conditional-status-error-body | Status Code | status, conditional, error, adr-0003 |
+| S-001-37 | status-in-body-expression | Status Code | status, body, variable, adr-0003 |
+| S-001-38 | unconditional-status-set | Status Code | status, unconditional, adr-0003 |
+| S-001-38a | url-path-rewrite-dispatch | URL Rewriting | url, path-rewrite, de-polymorphize, adr-0027 |
+| S-001-38b | url-query-param-operations | URL Rewriting | url, query, add, remove, glob, adr-0027 |
+| S-001-38c | url-method-override-conditional | URL Rewriting | url, method, override, conditional, adr-0027 |
+| S-001-38d | url-path-expr-returns-null | URL Rewriting | url, error, null, validation |
+| S-001-38e | url-method-invalid-rejected | URL Rewriting | url, method, validation, load-time |
+| S-001-38f | url-block-on-response-ignored | URL Rewriting | url, direction, response, warning |
+| S-001-38g | url-to-body-extraction | URL Rewriting | url, body, extraction, path-segment, query-param, adr-0027, adr-0021 |
+| S-001-39 | jolt-unsupported-predicate-rejected | Engine Capability | engine, capability, jolt, validation, adr-0004 |
+| S-001-40 | jolt-unsupported-headers-rejected | Engine Capability | engine, capability, jolt, validation, adr-0004 |
+| S-001-41 | concurrent-spec-versions | Version Pinning | version, profile, concurrent, adr-0005 |
+| S-001-42 | missing-spec-version-rejected | Version Pinning | version, profile, validation, adr-0005 |
+| S-001-43 | bare-spec-resolves-to-latest | Version Pinning | version, profile, latest, adr-0005 |
+| S-001-44 | specific-path-beats-wildcard | Match Resolution | profile, match, specificity, adr-0006 |
+| S-001-45 | ambiguous-tie-rejected | Match Resolution | profile, match, ambiguous, validation, adr-0006 |
+| S-001-46 | constraint-count-tiebreaker | Match Resolution | profile, match, tiebreaker, adr-0006 |
+| S-001-47 | telemetry-listener-lifecycle | Observability | observability, telemetry, spi, adr-0007 |
+| S-001-48 | trace-context-propagation | Observability | observability, tracing, correlation, adr-0007 |
+| S-001-49 | profile-chain-jolt-then-jslt | Profile Chaining | profile-chaining, mixed-engine, jolt, jslt, adr-0008 |
+| S-001-50 | apply-directive-mapper-pipeline | Reusable Mappers | mappers, mapperRef, apply, resolution, fr-001-08, adr-0014 |
+| S-001-51 | mapper-ref-missing-rejected | Reusable Mappers | mappers, mapperRef, apply, validation, error, fr-001-08, adr-0014 |
+| S-001-52 | mapper-ref-duplicate-rejected | Reusable Mappers | mappers, mapperRef, duplicate, validation, error, fr-001-08, adr-0014 |
+| S-001-53 | schema-valid-load-time | Schema Validation | schema, validation, load-time, fr-001-09, adr-0001 |
+| S-001-54 | schema-invalid-rejected | Schema Validation | schema, validation, error, load-time, fr-001-09, adr-0001 |
+| S-001-55 | schema-strict-mode-runtime-failure | Schema Validation | schema, validation, strict-mode, runtime, fr-001-09, adr-0001 |
+| S-001-56 | pipeline-chain-abort-on-failure | Pipeline Chaining & Message Semantics | profile-chaining, abort, error, adr-0012, adr-0013 |
+| S-001-57 | transform-context-headers-in-body | Pipeline Chaining & Message Semantics | transform-context, headers, body, do-001-07 |
+| S-001-58 | copy-on-wrap-abort-error-response | Pipeline | copy-on-wrap, abort, error-response, adr-0013, adr-0022 |
+| S-001-59 | apply-directive-missing-expr-rejected | Reusable Mappers | mappers, apply, validation, error, fr-001-08, adr-0014 |
+| S-001-60 | direction-agnostic-both-bindings | Direction Semantics | direction, agnostic, profile, adr-0016 |
+| S-001-61 | status-null-in-request-transform | Status Code | status, null, request, direction, adr-0017 |
+| S-001-62 | sensitive-path-invalid-syntax-rejected | Sensitive Fields | sensitive, validation, error, adr-0019, nfr-001-06 |
+| S-001-75 | sensitive-paths-valid-parsed | Sensitive Fields | sensitive, validation, load-time, adr-0019, nfr-001-06 |
+| S-001-63 | nullable-status-integer-contract | Status Code | status, null, nullable, integer, adr-0020 |
+| S-001-64 | query-params-in-body-expression | TransformContext | query-params, context, branching, adr-0021 |
+| S-001-65 | cookies-in-body-expression | TransformContext | cookies, context, adr-0021 |
+| S-001-66 | load-time-error-type-discrimination | Error Type Catalogue | error-catalogue, load-time, exception-hierarchy, adr-0024 |
+| S-001-67 | eval-budget-exceeded-exception-type | Error Type Catalogue | error-catalogue, eval-time, budget, exception-hierarchy, adr-0024 |
+| S-001-68 | spec-parse-exception-source-path | Error Type Catalogue | error-catalogue, load-time, source-path, adr-0024 |
+| S-001-69 | headers-all-set-cookie-multi-value | Multi-Value Headers | headers, multi-value, headers-all, set-cookie, adr-0026 |
+| S-001-70 | headers-all-missing-returns-null | Multi-Value Headers | headers, multi-value, headers-all, null, edge-case, adr-0026 |
+| S-001-71 | headers-all-x-forwarded-for-chain | Multi-Value Headers | headers, multi-value, headers-all, x-forwarded-for, adr-0026 |
+| S-001-72 | header-case-normalization | Header Transforms | headers, case-insensitive, normalization, rfc9110 |
+| S-001-73 | chain-direction-conflict-rejected | Transform Profiles | profile, chain, direction, validation, error, load-time |
+| S-001-74 | chain-step-structured-logging | Chain Step Logging | chain-step-logging, structured-logging, nfr-001-08, profile-chaining |
+| S-001-76 | reload-swaps-registry-atomically | Hot Reload | hot-reload, atomic-swap, registry, nfr-001-05 |
+| S-001-77 | fail-safe-reload-preserves-old | Hot Reload | hot-reload, fail-safe, error, registry, nfr-001-05 |
+| S-001-78 | concurrent-reads-consistent-snapshot | Hot Reload | hot-reload, concurrent, thread-safety, atomic-swap, nfr-001-05 |
+| S-001-79 | benchmark-identity-1kb | Performance Benchmarks | benchmark, performance, identity, nfr-001-03, adr-0028 |
+| S-001-80 | benchmark-field-mapping-10kb | Performance Benchmarks | benchmark, performance, field-mapping, nfr-001-03, adr-0028 |
+| S-001-81 | benchmark-complex-50kb | Performance Benchmarks | benchmark, performance, complex, array, nfr-001-03, adr-0028 |
+| S-001-82 | session-inject-subject | Session Context | session, subject, request, fr-001-13, adr-0030 |
+| S-001-83 | session-conditional-roles | Session Context | session, roles, conditional, response, fr-001-13, adr-0030 |
+| S-001-84 | session-null-safe-access | Session Context | session, null, null-safe, fr-001-13, adr-0030 |
+| S-001-85 | session-jolt-rejected-at-load-time | Session Context | session, jolt, validation, load-time, fr-001-13, adr-0030 |
+
+## Coverage Matrix
+
+| Spec Requirement | Scenarios |
+|------------------|-----------|
+| FR-001-01 (Spec Format) | S-001-01 through S-001-17, S-001-49 |
+| FR-001-02 (Expression Engine SPI) | S-001-25, S-001-26, S-001-27, S-001-28, S-001-39, S-001-40, S-001-57, S-001-63, S-001-64, S-001-65 |
+| FR-001-03 (Bidirectional) | S-001-02, S-001-29, S-001-30, S-001-60 |
+| FR-001-04 (Message Envelope) | S-001-19, S-001-58 |
+| FR-001-05 (Transform Profiles) | S-001-41, S-001-42, S-001-43, S-001-44, S-001-45, S-001-46, S-001-49, S-001-56, S-001-73 |
+| FR-001-06 (Passthrough) | S-001-18, S-001-19 |
+| FR-001-07 (Error Handling) | S-001-24, S-001-28, S-001-56, S-001-58, S-001-66, S-001-67, S-001-68 |
+| FR-001-08 (Reusable Mappers) | S-001-50, S-001-51, S-001-52, S-001-59 |
+| FR-001-09 (Schema Validation) | S-001-53, S-001-54, S-001-55 |
+| FR-001-10 (Header Transforms) | S-001-33, S-001-34, S-001-35, S-001-57, S-001-69, S-001-70, S-001-71, S-001-72 |
+| FR-001-11 (Status Code Transforms) | S-001-36, S-001-37, S-001-38, S-001-38i, S-001-61, S-001-63 |
+| FR-001-12 (URL Rewriting) | S-001-38a, S-001-38b, S-001-38c, S-001-38d, S-001-38e, S-001-38f, S-001-38g |
+| FR-001-13 (Session Context Binding) | S-001-82, S-001-83, S-001-84, S-001-85 |
+| NFR-001-01 (Stateless) | All — implicit in test harness design |
+| NFR-001-03 (Latency <5ms) | S-001-23, S-001-79, S-001-80, S-001-81 |
+| NFR-001-04 (Open-world) | S-001-07, S-001-20 |
+| NFR-001-07 (Eval budget) | S-001-24 |
+| NFR-001-02 (Zero gateway deps) | *Verified by dependency analysis, not scenario-testable* |
+| NFR-001-05 (Hot reload) | S-001-76, S-001-77, S-001-78 |
+| NFR-001-06 (Sensitive fields) | S-001-62, S-001-75; *static analysis + code review — add more when engine is implemented* |
+| NFR-001-08 (Match logging) | S-001-44, S-001-46 (matched profile logged), S-001-74 (chain step logging) |
+| NFR-001-09 (Telemetry SPI) | S-001-47 |
+| NFR-001-10 (Trace correlation) | S-001-48 |
+
+## Scenario → Test Class Verification
+
+> Updated 2026-02-08 (T-001-51). Each scenario lists the test class(es) that verify it.
+
+| Scenario | Test Class(es) | Notes |
+|----------|---------------|-------|
+| S-001-01 | `ScenarioSuiteTest`, `TransformEngineTest` | PingAM callback core use case |
+| S-001-02 | `ScenarioSuiteTest`, `BidirectionalSpecTest`, `BidirectionalProfileTest` | Reverse transform |
+| S-001-03 | `ScenarioSuiteTest` | Success response strip |
+| S-001-04 | `ScenarioSuiteTest` | Choice/confirmation callbacks |
+| S-001-05 | `ScenarioSuiteTest` | No-callbacks edge case |
+| S-001-06 | `ScenarioSuiteTest`, `TransformEngineTest` | Strip internal fields |
+| S-001-07 | `JsltExpressionEngineTest` | Open-world `* : .` passthrough (JSLT minus syntax) |
+| S-001-08 | `ScenarioSuiteTest`, `TransformEngineTest`, `JsltExpressionEngineTest` | Field renaming |
+| S-001-09 | `TransformEngineTest` | Defaults (JSLT absent-field behavior) |
+| S-001-10 | — | `now()` dynamic; skipped in suite |
+| S-001-11 | `ScenarioSuiteTest`, `TransformEngineTest` | Flatten nested |
+| S-001-12 | `ScenarioSuiteTest` | Nest flat |
+| S-001-13 | `ScenarioSuiteTest`, `TransformEngineTest`, `JsltExpressionEngineTest` | Array reshape |
+| S-001-14 | `ScenarioSuiteTest` | OAuth normalization |
+| S-001-15 | `ScenarioSuiteTest`, `JsltExpressionEngineTest` | Conditional error vs success |
+| S-001-16 | `ScenarioSuiteTest` | Conditional success path |
+| S-001-17 | `ScenarioSuiteTest` | Enum translation |
+| S-001-18 | `TransformEngineTest` | Passthrough (no match) |
+| S-001-19 | `TransformEngineTest` | Passthrough (invalid JSON) |
+| S-001-20 | `ScenarioSuiteTest` | Open-world extra fields |
+| S-001-21 | `ScenarioSuiteTest` | Empty input |
+| S-001-22 | `ScenarioSuiteTest`, `EvalErrorTest` | Null values |
+| S-001-23 | — | Large array; placeholder data |
+| S-001-24 | `EvalErrorTest` | JSLT eval error → error response |
+| S-001-25 | `ScenarioSuiteTest` | Multi-engine rename (JSLT) |
+| S-001-26 | — | JOLT engine not implemented |
+| S-001-27 | — | jq engine not implemented |
+| S-001-28 | `TransformEngineTest` | Unknown engine rejected |
+| S-001-29 | `BidirectionalSpecTest` | Bidirectional round-trip |
+| S-001-30 | `BidirectionalSpecTest` | Bidirectional flat ↔ nested |
+| S-001-31 | `ScenarioSuiteTest` | RFC 9457 normalization |
+| S-001-32 | `ScenarioSuiteTest` | PingAM error normalization |
+| S-001-33 | `DynamicHeaderTest` | `$headers` in body |
+| S-001-34 | `DynamicHeaderTest` | Body-to-header expr |
+| S-001-35 | `DynamicHeaderTest` | Missing header returns null |
+| S-001-36 | `StatusTransformTest` | Conditional status change |
+| S-001-37 | `StatusTransformTest`, `StatusBindingTest` | `$status` in body |
+| S-001-38 | `StatusTransformTest` | Unconditional status set |
+| S-001-38a | `UrlPathRewriteTest` | URL path rewrite |
+| S-001-38b | `UrlQueryParamTest` | Query param add/remove |
+| S-001-38c | `UrlPathRewriteTest` | HTTP method override |
+| S-001-38d | `UrlPathRewriteTest` | Path expr null → error |
+| S-001-38e | `UrlPathRewriteTest` | Invalid method rejected |
+| S-001-38f | `UrlPathRewriteTest` | URL on response ignored |
+| S-001-38g | `UrlPathRewriteTest` | URL-to-body extraction |
+| S-001-38i | `StatusTransformTest` | Status predicate error → keep |
+| S-001-39 | — | JOLT not implemented |
+| S-001-40 | — | JOLT not implemented |
+| S-001-41 | `TransformEngineTest` | Concurrent spec versions |
+| S-001-42 | `TransformEngineTest` | Missing spec version |
+| S-001-43 | `TransformEngineTest` | Bare spec → latest |
+| S-001-44 | `TransformEngineTest` | Specific path beats wildcard |
+| S-001-45 | `TransformEngineTest` | Ambiguous tie rejected |
+| S-001-46 | `TransformEngineTest` | Constraint count tie-break |
+| S-001-47 | `TelemetryListenerTest` | Telemetry lifecycle events |
+| S-001-48 | `TraceContextTest` | Trace context propagation |
+| S-001-49 | `ChainingTest` | Profile chain (JOLT not impl) |
+| S-001-50 | `MapperPipelineTest` | Mapper + expr pipeline |
+| S-001-51 | `MapperPipelineTest` | Missing mapperRef rejected |
+| S-001-52 | `MapperPipelineTest` | Duplicate mapperRef rejected |
+| S-001-53 | `SchemaValidationTest` | Valid schemas accepted |
+| S-001-54 | `SchemaValidationTest` | Invalid schema rejected |
+| S-001-55 | `SchemaValidationTest` | Strict-mode runtime failure |
+| S-001-56 | `ChainingTest` | Pipeline abort on failure |
+| S-001-57 | `DynamicHeaderTest` | `$headers` context binding |
+| S-001-58 | `TestAdapterTest` | Copy-on-wrap error path |
+| S-001-59 | `MapperPipelineTest` | Apply without expr rejected |
+| S-001-60 | `BidirectionalProfileTest` | Direction-agnostic spec |
+| S-001-61 | `StatusBindingTest` | `$status` null in request |
+| S-001-62 | `SensitiveFieldTest` | Sensitive path validation |
+| S-001-63 | `StatusBindingTest` | Nullable status integer |
+| S-001-64 | `TransformEngineTest` | Query params in body |
+| S-001-65 | `TransformEngineTest` | Cookies in body |
+| S-001-66 | `TransformEngineTest` | Load-time error types |
+| S-001-67 | `EvalErrorTest` | Eval budget exceeded |
+| S-001-68 | `TransformEngineTest` | YAML parse → SpecParseException |
+| S-001-69 | `DynamicHeaderTest` | Multi-value Set-Cookie |
+| S-001-70 | `DynamicHeaderTest` | `$headers_all` missing → null |
+| S-001-71 | `DynamicHeaderTest` | X-Forwarded-For chain |
+| S-001-72 | `HeaderNormalizationTest` | Header name case normalization |
+| S-001-74 | `ChainingTest` | Chain step logging |
+| S-001-75 | `SensitiveFieldTest` | Valid sensitive paths parsed |
+| S-001-76 | `HotReloadTest` | Reload swaps registry |
+| S-001-77 | `HotReloadTest` | Fail-safe reload preserves old |
+| S-001-78 | `HotReloadTest` | Concurrent reads see snapshot |
+| S-001-79 | `TransformEngineBenchmark` | Identity 1KB — p95 < 5ms (opt-in) |
+| S-001-80 | `TransformEngineBenchmark` | Field-mapping 10KB — p95 < 5ms (opt-in) |
+| S-001-81 | `TransformEngineBenchmark` | Complex 50KB — p95 < 5ms (opt-in) |
+| S-001-82 | `ScenarioSuiteTest`, `SessionContextBindingTest`, `SessionContextE2ETest` | `$session.sub` in request body (FR-001-13, ADR-0030) |
+| S-001-83 | `ScenarioSuiteTest`, `SessionContextBindingTest` | `$session.roles` conditional response (FR-001-13, ADR-0030) |
+| S-001-84 | `ScenarioSuiteTest`, `SessionContextBindingTest`, `SessionContextE2ETest` | `$session` null — null-safe access (FR-001-13, ADR-0030) |
+| S-001-85 | `SessionContextJoltRejectionTest` | JOLT + `$session` → rejected at load time (FR-001-13, ADR-0030) |
+
+
