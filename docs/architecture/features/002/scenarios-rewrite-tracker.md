@@ -16,7 +16,7 @@ YAML behavioral contracts per `docs/architecture/spec-guidelines/scenarios-forma
 | 2 | Edge cases + matching: S-002-07 → S-002-10 | 4 | ✅ Done |
 | 3 | Error modes + session: S-002-11 → S-002-14 | 4 | ✅ Done |
 | 4 | Config + SPI + threading: S-002-15 → S-002-21 | 7 | ✅ Done |
-| 5 | Context variables: S-002-22 → S-002-27 | 6 | ⬜ |
+| 5 | Context variables: S-002-22 → S-002-27 | 6 | ✅ Done |
 | 6 | Advanced behavioral: S-002-28 → S-002-36 | 9 | ⬜ |
 
 **Total:** 36 scenarios across 6 phases.
@@ -72,12 +72,12 @@ Plugin lifecycle, configuration, SPI registration, threading, and metadata.
 JSLT context variable binding: cookies, query params, OAuth, session state,
 prior rule effects.
 
-- [ ] S-002-22: Cookie Access in JSLT
-- [ ] S-002-23: Query Param Access in JSLT
-- [ ] S-002-24: Shadow JAR Correctness
-- [ ] S-002-25: OAuth Context in JSLT
-- [ ] S-002-26: Session State in JSLT
-- [ ] S-002-27: Prior Rule URI Rewrite
+- [x] S-002-22: Cookie Access in JSLT
+- [x] S-002-23: Query Param Access in JSLT
+- [x] S-002-24: Shadow JAR Correctness
+- [x] S-002-25: OAuth Context in JSLT
+- [x] S-002-26: Session State in JSLT
+- [x] S-002-27: Prior Rule URI Rewrite
 
 ### Phase 6 — Advanced Behavioral (S-002-28 → S-002-36)
 

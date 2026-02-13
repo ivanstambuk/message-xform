@@ -870,88 +870,231 @@ assertions:
 
 ## S-002-22: Cookie Access in JSLT
 
-**Given** a request contains cookie `session_token=abc123`,
-**and** a transform spec uses `$cookies.session_token`,
-**when** `handleRequest()` processes the exchange,
-**then** the JSLT expression resolves to `"abc123"`.
+```yaml
+scenario: S-002-22
+name: cookie-access-in-jslt
+description: >
+  Cookies from the request are bound as $cookies in JSLT.
+  The TransformContext.cookies() accessor provides a first-value
+  Map<String, String>.
+tags: [jslt-context, cookies, binding]
+refs: [FR-002-13, FR-001-13]
 
-> **Note:** The JSLT engine binds cookies as a top-level `$cookies` variable,
-> not nested under `$context`. The `TransformContext.cookies()` accessor provides
-> a first-value `Map<String, String>` — JSON conversion is handled internally
-> by the engine.
+setup:
+  exchange:
+    request:
+      method: GET
+      uri: /api/dashboard
+      cookies:
+        session_token: "abc123"
+        preference: "dark-mode"
+  specs:
+    - id: cookie-check
+      matches: "GET /api/dashboard"
+      direction: request
+      expr: '. + {"token": $cookies.session_token}'
+
+trigger: handleRequest
+
+assertions:
+  - description: $cookies.session_token resolves to cookie value
+    expect: jslt.eval("$cookies.session_token") == "abc123"
+  - description: cookie value is embedded in transformed body
+    expect: forwarded.body contains '"token": "abc123"'
+```
+
+> **Note:** Cookies are bound as a top-level `$cookies` variable, not nested
+> under `$context`. JSON conversion is handled internally by the engine.
 
 ---
 
 ## S-002-23: Query Param Access in JSLT
 
-**Given** a request to `/api/users?page=2&limit=10`,
-**and** a transform spec uses `$queryParams.page`,
-**when** `handleRequest()` processes the exchange,
-**then** the JSLT expression resolves to `"2"`.
+```yaml
+scenario: S-002-23
+name: query-param-access-in-jslt
+description: >
+  Query parameters are bound as $queryParams in JSLT. First-value
+  semantics for multi-valued params.
+tags: [jslt-context, query-params, binding]
+refs: [FR-002-13, FR-001-13]
 
-> **Note:** The JSLT engine binds query params as a top-level `$queryParams`
-> variable, not nested under `$context`. The `TransformContext.queryParams()`
-> accessor provides a first-value `Map<String, String>` — JSON conversion is
-> handled internally by the engine.
+setup:
+  exchange:
+    request:
+      method: GET
+      uri: /api/users?page=2&limit=10
+  specs:
+    - id: paginate
+      matches: "GET /api/users"
+      direction: request
+      expr: '. + {"requestedPage": $queryParams.page}'
+
+trigger: handleRequest
+
+assertions:
+  - description: $queryParams.page resolves to "2"
+    expect: jslt.eval("$queryParams.page") == "2"
+  - description: $queryParams.limit resolves to "10"
+    expect: jslt.eval("$queryParams.limit") == "10"
+```
+
+> **Note:** Query params are bound as a top-level `$queryParams` variable.
+> First-value `Map<String, String>` — JSON conversion handled internally.
 
 ---
 
 ## S-002-24: Shadow JAR Correctness
 
-**Given** the shadow JAR is built via `./gradlew :adapter-pingaccess:shadowJar`,
-**when** deployed to a PingAccess 9.0 instance,
-**then** no `ClassNotFoundException` or `NoClassDefFoundError` occurs at runtime,
-**and** the shadow JAR does NOT contain PA SDK classes
-(`com.pingidentity.pa.sdk.*`),
-**and** the shadow JAR DOES contain all core + transitive dependencies (JSLT,
-SnakeYAML, JSON Schema Validator, and core's relocated Jackson at
-`io.messagexform.internal.jackson`),
-**and** the shadow JAR does NOT contain `com/fasterxml/jackson/` (PA-provided,
-must not be bundled per FR-002-09).
+```yaml
+scenario: S-002-24
+name: shadow-jar-correctness
+description: >
+  The shadow JAR bundles all required dependencies, excludes PA-provided
+  classes, and works without runtime classpath errors on PA 9.0.
+tags: [build, shadow-jar, deployment]
+refs: [FR-002-09, NFR-002-03, ADR-0031]
+
+setup:
+  state:
+    jar_built_via: "./gradlew :adapter-pingaccess:shadowJar"
+    deploy_target: "PingAccess 9.0 instance"
+
+trigger: deploy
+
+assertions:
+  - description: no ClassNotFoundException at runtime
+    expect: error.absent("ClassNotFoundException")
+  - description: no NoClassDefFoundError at runtime
+    expect: error.absent("NoClassDefFoundError")
+  - description: JAR does NOT contain PA SDK classes
+    expect: jar.absent("com/pingidentity/pa/sdk/**")
+  - description: JAR contains core + transitive deps (JSLT, SnakeYAML, etc.)
+    expect: jar.contains("com/schibsted/spt/data/jslt/**")
+  - description: JAR contains core's relocated Jackson
+    expect: jar.contains("io/messagexform/internal/jackson/**")
+  - description: JAR does NOT contain PA-provided Jackson
+    expect: jar.absent("com/fasterxml/jackson/**")
+```
 
 ---
 
 ## S-002-25: OAuth Context in JSLT
 
-**Given** the PingAccess Exchange has an Identity with
-`OAuthTokenMetadata.getClientId() = "my-app"` and
-`OAuthTokenMetadata.getScopes() = ["openid", "email"]`,
-**and** a transform spec uses `$session.clientId` and `$session.scopes`,
-**when** `handleRequest()` processes the exchange,
-**then** `$session.clientId` resolves to `"my-app"`,
-**and** `$session.scopes` resolves to `["openid", "email"]`.
+```yaml
+scenario: S-002-25
+name: oauth-context-in-jslt
+description: >
+  Identity's OAuth token metadata (clientId, scopes) is merged flat
+  into $session at layer 2. No $session.oauth nesting.
+tags: [session, oauth, jslt-context]
+refs: [FR-002-06, FR-002-13]
 
-> **Note:** The `$session` namespace is flat — OAuth metadata is merged at
-> layer 2 (see FR-002-06). There is no `$session.oauth` nesting.
+setup:
+  exchange:
+    request:
+      method: POST
+      uri: /api/data
+      contentType: application/json
+      body: '{"action": "fetch"}'
+    identity:
+      subject: "bjensen"
+      oauth:
+        clientId: "my-app"
+        scopes: ["openid", "email"]
+
+trigger: handleRequest
+
+assertions:
+  - description: $session.clientId resolves to OAuth client ID
+    expect: jslt.eval("$session.clientId") == "my-app"
+  - description: $session.scopes resolves to scope list
+    expect: jslt.eval("$session.scopes") == ["openid", "email"]
+  - description: no $session.oauth nesting (flat merge)
+    expect: jslt.eval("$session.oauth") == null
+```
+
+> **Note:** OAuth metadata is merged at layer 2 (see FR-002-06). The
+> `$session` namespace is flat by design.
 
 ---
 
 ## S-002-26: Session State in JSLT
 
-**Given** a prior rule has stored `authzCache = "PERMIT"` via
-`SessionStateSupport` on the Exchange,
-**and** a transform spec uses `$session.authzCache`,
-**when** `handleRequest()` processes the exchange,
-**then** `$session.authzCache` resolves to `"PERMIT"`.
+```yaml
+scenario: S-002-26
+name: session-state-in-jslt
+description: >
+  Session state attributes (stored by prior rules via SessionStateSupport)
+  are merged flat into $session at layer 4 (highest precedence).
+tags: [session, session-state, jslt-context]
+refs: [FR-002-06, FR-002-13]
 
-> **Note:** Session state attributes are merged flat into `$session` at layer 4
-> (highest precedence). There is no `$session.sessionState` nesting.
+setup:
+  exchange:
+    request:
+      method: POST
+      uri: /api/authz
+      contentType: application/json
+      body: '{"resource": "/protected"}'
+    identity:
+      subject: "bjensen"
+    state:
+      sessionState:
+        authzCache: "PERMIT"
+
+trigger: handleRequest
+
+assertions:
+  - description: $session.authzCache resolves to session state value
+    expect: jslt.eval("$session.authzCache") == "PERMIT"
+  - description: no $session.sessionState nesting (flat merge)
+    expect: jslt.eval("$session.sessionState") == null
+```
+
+> **Note:** Session state attributes are layer 4 (highest precedence).
+> They override lower-layer attributes with the same key.
 
 ---
 
 ## S-002-27: Prior Rule URI Rewrite
 
-**Given** an upstream `ParameterRule` rewrites the request URI from `/old/path`
-to `/new/path` before the `MessageTransformRule` executes,
-**when** `wrapRequest()` reads the request URI via `exchange.getRequest().getUri()`,
-**then** the adapter wraps the **rewritten** URI (`/new/path`),
-**and** `Message.requestPath()` contains `/new/path`,
-**and** spec matching uses the rewritten URI, not the original client URI.
+```yaml
+scenario: S-002-27
+name: prior-rule-uri-rewrite
+description: >
+  When an upstream rule rewrites the URI before the adapter executes,
+  the adapter wraps the rewritten URI, not the original client URI.
+  Spec matching uses the rewritten path.
+tags: [uri, prior-rules, interceptor-chain]
+refs: [FR-002-01, FR-002-12]
 
-> **Note:** This validates the FR-002-01 note that `Request.getUri()` reflects
-> modifications by prior rules in the interceptor chain.
+setup:
+  exchange:
+    request:
+      method: GET
+      uri: /new/path?q=test  # rewritten by prior ParameterRule
+    state:
+      originalUri: /old/path?q=test  # exchange.getOriginalRequestUri()
+  specs:
+    - id: new-path-transform
+      matches: "GET /new/**"
+      direction: request
+      expr: '. + {"routed": true}'
 
----
+trigger: handleRequest
+
+assertions:
+  - description: adapter wraps the rewritten URI
+    expect: message.requestPath() == "/new/path"
+  - description: spec matches against rewritten URI
+    expect: spec("new-path-transform") is applied
+  - description: original URI is NOT used for matching
+    expect: message.requestPath() != "/old/path"
+```
+
+> **Note:** `Request.getUri()` reflects modifications by prior rules in the
+> interceptor chain. `Exchange.getOriginalRequestUri()` retains the original.
 
 ## S-002-28: DENY + handleResponse Interaction
 
