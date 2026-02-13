@@ -1,6 +1,6 @@
 # ADR-0030 – Session Context Binding (`$session`)
 
-Date: 2026-02-09 | Status: Accepted
+Date: 2026-02-09 | Status: Accepted | Updated: 2026-02-14
 
 ## Context
 
@@ -33,11 +33,12 @@ transform expressions?
 
 ### Options Considered
 
-- **Option A – `$session` on TransformContext + `sessionContext()` on Message** (chosen)
-  - Add a nullable `JsonNode getSessionContext()` to the `Message` interface and a
-    corresponding `$session` binding to `TransformContext`. The engine extracts session
-    context from `Message` during context building, exactly like headers and status.
-    Each gateway adapter populates `sessionContext()` from its native session API.
+- **Option A – `$session` on TransformContext + `session()` on Message** (chosen)
+  - Add a `SessionContext session` field to the `Message` record and a corresponding
+    `$session` binding to `TransformContext`. The engine extracts session context from
+    `Message` during context building, exactly like headers and status. Each gateway
+    adapter populates `Message.session()` via `SessionContext.of(map)` from its native
+    session API.
   - Pros: follows the exact pattern of `$headers`/`$cookies`/`$queryParams`; no API
     signature change on `TransformEngine.transform()`; clean, discoverable variable name.
   - Cons: stretches `Message` abstraction slightly (session ≠ HTTP message); single-purpose
@@ -63,27 +64,38 @@ Related ADRs:
 
 ## Decision
 
-We adopt **Option A – `$session` on TransformContext + `sessionContext()` on Message**.
+We adopt **Option A – `$session` on TransformContext + `session()` on Message**.
 
 ### Concrete changes
 
-1. **`Message` interface** (FR-001-04 / DO-001-01) gains:
-   ```java
-   /** Gateway session context as arbitrary JSON, or null if unavailable. */
-   JsonNode getSessionContext();
-   void setSessionContext(JsonNode session);
-   ```
+> **Updated 2026-02-14:** The original ADR described `JsonNode getSessionContext()`
+> on an interface-based `Message`. Phase 11 (ADR-0032, ADR-0033) replaced all
+> third-party types with port value objects. The concrete changes below reflect
+> the current record-based API with `SessionContext` port type.
 
-2. **`TransformContext` interface** (DO-001-07) gains:
+1. **`Message` record** (FR-001-04 / DO-001-01) gains a `session` field:
    ```java
-   /** Gateway session as JsonNode, or null if not provided. ADR-0030. */
-   JsonNode getSessionContext();
+   /** Gateway session context, or SessionContext.empty() if unavailable. */
+   SessionContext session()
    ```
+   The `Message` canonical constructor normalizes `null` to `SessionContext.empty()`,
+   so `session()` never returns `null` at runtime. Adapters pass `SessionContext.of(map)`
+   for populated sessions or `null`/`SessionContext.empty()` for absent sessions.
+
+2. **`TransformContext` record** (DO-001-07) gains a `session` field:
+   ```java
+   /** Gateway session context, or SessionContext.empty(). ADR-0030. */
+   SessionContext session()
+   ```
+   Same null-normalization as `Message` — the canonical constructor normalizes
+   `null` to `SessionContext.empty()`.
 
 3. **JSLT binding:** `$session` is bound as an external variable, following the same
-   mechanism used for `$headers`, `$status`, `$queryParams`, and `$cookies`. When
-   session context is `null`, `$session` evaluates to `null` in JSLT (JSLT handles
-   null gracefully — `$session.sub` returns `null` when `$session` is null).
+   mechanism used for `$headers`, `$status`, `$queryParams`, and `$cookies`. The
+   JSLT engine converts `SessionContext` to `JsonNode` internally for variable
+   binding. When session context is empty, `$session` evaluates to `null` in JSLT
+   (JSLT handles null gracefully — `$session.sub` returns `null` when `$session`
+   is null).
 
 4. **Direction:** `$session` is available in **both** request and response transforms.
    The session context does not change between request/response processing in the
@@ -124,8 +136,8 @@ Positive:
   query params, and now session — all available in JSLT expressions.
 - Enables high-value use cases: user identity injection, tenant-aware transforms,
   role-based response filtering.
-- Zero disruption to existing adapters — `getSessionContext()` returns `null` by
-  default (Java interface default method or base class implementation).
+- Zero disruption to existing adapters — `Message.session()` returns
+  `SessionContext.empty()` by default (canonical constructor null-normalization).
 - Follows the proven pattern from ADR-0021 exactly — minimal new concept surface.
 
 Negative / trade-offs:
