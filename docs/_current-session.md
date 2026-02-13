@@ -1,31 +1,23 @@
-# Current Session — 2026-02-14 (F001 audit remediation)
+# Current Session State
 
-## Focus
-Assessed and resolved all 5 findings from the external model audit of Feature 001
-spec and scenarios (`audit-001-spec.md`), plus updated ADR-0030 and terminology.md
-to eliminate remaining API drift.
+**Date:** 2026-02-14
+**Focus:** Feature 002 plan/tasks audit resolution + T-001-67 (TransformResult specId/specVersion)
 
-## Key Changes
-- `spec.md`: TransformContext interface block updated to port-type API (F-001);
-  FR-001-13 adapter guidance updated to current SessionContext API (F-002)
-- `scenarios.md`: S-001-38i added to Scenario Index (F-003); FR-001-14 and
-  orphaned scenarios added to Coverage Matrix (F-004); 61 missing --- separators
-  inserted (F-005)
-- `ADR-0030`: Concrete changes section updated from JsonNode/getSessionContext()
-  to SessionContext port type and record accessors
-- `terminology.md`: TransformContext description updated to port-type fields
+## Session Progress
 
-## Retro Findings (resolved)
-1. [3b] terminology.md TransformContext stale types → FIXED (9165f8b)
+### Completed
+- ✅ Reviewed and verified 2 AI-generated audit reports (plan + tasks) for Feature 002
+- ✅ Fixed 4 audit findings in plan.md: bodyParseFailed skip-guard (F-001), scenario count alignment (F-002/F-003/F-004)
+- ✅ Fixed 3 audit findings in tasks.md: bodyParseFailed guard on T-002-05/07/20, scenario count references
+- ✅ T-001-67: Added specId/specVersion to TransformResult (7 tests, engine wired)
+- ✅ T-001-68: Confirmed already fixed in prior session, closed
+- ✅ Deleted both ephemeral audit reports
 
-## Status
-- All 5 audit findings resolved and verified
-- ADR-0030 reflects current API surface
-- Audit report deleted (ephemeral artifact)
-- F001 documentation fully aligned with current codebase
+### Key Decisions
+- bodyParseFailed is adapter-internal state (field or wrapper record), not a Message field
+- Chain results use last step's spec identity for provenance metadata
+- Existing factory methods preserved for backward compat (null spec metadata)
 
-## Next Session
-- Implement T-001-67 (specId/specVersion on TransformResult) — Feature 002 dependency
-- Implement T-001-68 (GatewayAdapter.java Javadoc staleness)
-- Continue Feature 002 implementation: T-002-01 (ErrorMode + SchemaValidation enums),
-  then T-002-02 (MessageTransformConfig)
+### Remaining Work
+- Feature 001 Phase 12 is now fully complete (T-001-67 + T-001-68)
+- Feature 002 implementation can begin: T-002-01 → T-002-02 (Phase 1)
