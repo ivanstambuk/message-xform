@@ -244,50 +244,185 @@ assertions:
 
 ## S-002-07: Empty Body
 
-**Given** a GET request with no body arrives at the rule,
-**when** `wrapRequest()` is called,
-**then** `Message.body()` is `MessageBody.empty()`,
-**and** if no spec matches a bodyless request, the exchange passes through
-unmodified.
+```yaml
+scenario: S-002-07
+name: empty-body
+description: >
+  A GET request with no body produces MessageBody.empty(). If no spec
+  matches a bodyless request, the exchange passes through unmodified.
+tags: [body, edge-case, passthrough]
+refs: [FR-002-01, ADR-0013]
+
+setup:
+  exchange:
+    request:
+      method: GET
+      uri: /api/health
+      body: null
+  specs: []
+
+trigger: handleRequest
+
+assertions:
+  - description: message body is MessageBody.empty()
+    expect: message.body() == MessageBody.empty()
+  - description: exchange passes through unmodified (no matching spec)
+    expect: outcome == CONTINUE
+  - description: no transformation applied
+    expect: forwarded.body == null
+```
 
 ---
 
 ## S-002-08: Non-JSON Body
 
-**Given** a POST request with `Content-Type: text/plain` and body `"hello world"`,
-**when** `wrapRequest()` attempts JSON parse,
-**then** the parse fails gracefully,
-**and** `Message.body()` is `MessageBody.empty()`,
-**and** a warning is logged,
-**and** the adapter sets `bodyParseFailed = true`,
-**and** the spec can still match and transform headers/status/URL (non-body fields),
-**and** body transforms are skipped — the original `text/plain` body is forwarded
-unchanged to the backend (Q-003, Option A).
+```yaml
+scenario: S-002-08
+name: non-json-body-passthrough
+description: >
+  Non-JSON request body triggers parse-failure guard. Body transforms
+  are skipped but header/status/URL transforms still apply. Original
+  bytes forwarded unchanged (Q-003, Option A).
+tags: [body, parse-failure, passthrough, Q-003]
+refs: [FR-002-01, ADR-0013]
+
+setup:
+  exchange:
+    request:
+      method: POST
+      uri: /api/data
+      contentType: text/plain
+      body: "hello world"
+  specs:
+    - id: data-transform
+      matches: "POST /api/data"
+      direction: request
+      expr: '{"wrapped": .}'
+      headers:
+        add:
+          X-Transformed: "true"
+
+trigger: handleRequest
+
+assertions:
+  - description: JSON parse fails gracefully
+    expect: message.body() == MessageBody.empty()
+  - description: bodyParseFailed flag is set
+    expect: bodyParseFailed == true
+  - description: warning is logged about parse failure
+    expect: log.contains("WARN", "JSON parse failed")
+  - description: header transforms still apply
+    expect: forwarded.header["X-Transformed"] == "true"
+  - description: body transforms are skipped (adapter skip guard)
+    expect: forwarded.body.content == "hello world"
+  - description: original content type is preserved
+    expect: forwarded.body.mediaType == "text/plain"
+```
 
 ---
 
 ## S-002-09: Profile Matching
 
-**Given** an active profile filters transforms to paths matching `/api/v1/**`,
-**and** a request arrives for `POST /api/v1/users`,
-**when** `handleRequest()` processes the exchange,
-**then** the matching transform spec is applied.
+```yaml
+scenario: S-002-09
+name: profile-matching
+description: >
+  An active profile filters which specs apply. Requests matching the
+  profile are transformed; non-matching requests pass through.
+tags: [profile, matching, core]
+refs: [FR-002-08, FR-001-06]
 
-**but given** a request arrives for `POST /admin/settings`,
-**when** `handleRequest()` processes the exchange,
-**then** no transform is applied (profile doesn't match), exchange passes through.
+setup:
+  config:
+    activeProfile: api-v1
+  exchange:
+    request:
+      method: POST
+      uri: /api/v1/users
+      contentType: application/json
+      body: '{"name": "ivan"}'
+  specs:
+    - id: v1-transform
+      profile: api-v1
+      matches: "POST /api/v1/**"
+      direction: request
+      expr: '{"username": .name}'
+
+trigger: handleRequest
+
+assertions:
+  - description: matching profile + path → spec is applied
+    expect: forwarded.body == '{"username": "ivan"}'
+```
+
+```yaml
+# Negative case (same scenario, different exchange)
+scenario: S-002-09b
+name: profile-matching-no-match
+description: >
+  Request path outside the profile filter passes through unmodified.
+tags: [profile, matching, passthrough]
+refs: [FR-002-08, FR-001-06]
+
+setup:
+  config:
+    activeProfile: api-v1
+  exchange:
+    request:
+      method: POST
+      uri: /admin/settings
+      contentType: application/json
+      body: '{"theme": "dark"}'
+  specs:
+    - id: v1-transform
+      profile: api-v1
+      matches: "POST /api/v1/**"
+      direction: request
+      expr: '{"username": .name}'
+
+trigger: handleRequest
+
+assertions:
+  - description: profile does not match → no transform applied
+    expect: forwarded.body == '{"theme": "dark"}'
+  - description: exchange passes through unchanged
+    expect: outcome == CONTINUE
+```
 
 ---
 
 ## S-002-10: No Matching Spec
 
-**Given** no transform spec matches `GET /favicon.ico`,
-**when** `handleRequest()` processes the exchange,
-**then** no transformation is applied,
-**and** `Outcome.CONTINUE` is returned,
-**and** no error or warning is logged (this is a normal case).
+```yaml
+scenario: S-002-10
+name: no-matching-spec
+description: >
+  When no spec matches the request, the exchange passes through with
+  no transformation and no error logged (normal case).
+tags: [matching, passthrough, normal]
+refs: [FR-002-08]
 
----
+setup:
+  exchange:
+    request:
+      method: GET
+      uri: /favicon.ico
+  specs:
+    - id: api-transform
+      matches: "POST /api/**"
+      direction: request
+      expr: '{"wrapped": .}'
+
+trigger: handleRequest
+
+assertions:
+  - description: no transformation applied
+    expect: forwarded == original exchange (unmodified)
+  - description: outcome is CONTINUE
+    expect: outcome == CONTINUE
+  - description: no warning or error logged
+    expect: log.absent("WARN") and log.absent("ERROR")
+```
 
 ## S-002-11: Error Mode PASS_THROUGH
 

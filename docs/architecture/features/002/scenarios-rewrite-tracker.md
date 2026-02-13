@@ -13,7 +13,7 @@ YAML behavioral contracts per `docs/architecture/spec-guidelines/scenarios-forma
 |-------|-----------|-------|--------|
 | 0 | Preamble + format guideline | — | ✅ Done |
 | 1 | Core transforms: S-002-01 → S-002-06 | 6 | ✅ Done |
-| 2 | Edge cases + matching: S-002-07 → S-002-10 | 4 | ⬜ |
+| 2 | Edge cases + matching: S-002-07 → S-002-10 | 4 | ✅ Done |
 | 3 | Error modes + session: S-002-11 → S-002-14 | 4 | ⬜ |
 | 4 | Config + SPI + threading: S-002-15 → S-002-21 | 7 | ⬜ |
 | 5 | Context variables: S-002-22 → S-002-27 | 6 | ⬜ |
@@ -41,10 +41,10 @@ header, status code, and URL rewrite.
 
 Empty/non-JSON body handling and profile matching behavior.
 
-- [ ] S-002-07: Empty Body
-- [ ] S-002-08: Non-JSON Body
-- [ ] S-002-09: Profile Matching
-- [ ] S-002-10: No Matching Spec
+- [x] S-002-07: Empty Body
+- [x] S-002-08: Non-JSON Body
+- [x] S-002-09: Profile Matching
+- [x] S-002-10: No Matching Spec
 
 ### Phase 3 — Error Modes + Session (S-002-11 → S-002-14)
 
