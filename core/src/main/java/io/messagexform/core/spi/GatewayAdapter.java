@@ -17,9 +17,10 @@ import io.messagexform.core.model.Message;
  * Implementations MUST create a <strong>mutable deep copy</strong> of the
  * native message in {@link #wrapRequest} and {@link #wrapResponse}:
  * <ul>
- * <li>Deep-copy of the JSON body ({@code JsonNode.deepCopy()}).</li>
- * <li>Copy of the headers map.</li>
- * <li>Snapshot of the status code.</li>
+ * <li>Deep-copy of the body content ({@code MessageBody}).</li>
+ * <li>Copy of the headers ({@code HttpHeaders}).</li>
+ * <li>Snapshot of the status code (response) or {@code null} (request).</li>
+ * <li>Snapshot of session context ({@code SessionContext}).</li>
  * </ul>
  * The engine mutates this copy freely during transformation. On success,
  * {@link #applyChanges} writes the final state back to the native object.
@@ -52,15 +53,17 @@ public interface GatewayAdapter<R> {
      * <p>
      * Implementations MUST populate:
      * <ul>
-     * <li>{@code body} — parsed JSON body (or {@code NullNode} if absent)</li>
-     * <li>{@code headers} — single-value header map (lowercase keys per RFC
-     * 9110)</li>
-     * <li>{@code headersAll} — multi-value header map (lowercase keys)</li>
+     * <li>{@code body} — parsed JSON body as {@code MessageBody.json(bytes)},
+     * or {@code MessageBody.empty()} if absent/unparseable</li>
+     * <li>{@code headers} — {@code HttpHeaders} (lowercase keys per RFC 9110,
+     * single-value via {@code get()}, multi-value via {@code getAll()})</li>
+     * <li>{@code statusCode} — {@code null} for requests (ADR-0020)</li>
      * <li>{@code requestPath} — the request path (e.g., {@code /api/v1/users})</li>
      * <li>{@code requestMethod} — the HTTP method (e.g., {@code POST})</li>
-     * <li>{@code contentType} — the Content-Type header value</li>
      * <li>{@code queryString} — raw query string without leading {@code ?},
      * nullable</li>
+     * <li>{@code session} — {@code SessionContext} from gateway identity,
+     * or {@code SessionContext.empty()} if unauthenticated</li>
      * </ul>
      *
      * @param nativeRequest the gateway-native request object
@@ -78,14 +81,18 @@ public interface GatewayAdapter<R> {
      * <p>
      * Implementations MUST populate:
      * <ul>
-     * <li>{@code body} — parsed JSON body (or {@code NullNode} if absent)</li>
-     * <li>{@code headers} — single-value header map (lowercase keys)</li>
-     * <li>{@code headersAll} — multi-value header map (lowercase keys)</li>
+     * <li>{@code body} — parsed JSON body as {@code MessageBody.json(bytes)},
+     * or {@code MessageBody.empty()} if absent/unparseable</li>
+     * <li>{@code headers} — {@code HttpHeaders} (lowercase keys,
+     * single-value via {@code get()}, multi-value via {@code getAll()})</li>
      * <li>{@code statusCode} — the HTTP response status code</li>
      * <li>{@code requestPath} — the <em>original</em> request path (for profile
      * matching on response transforms)</li>
      * <li>{@code requestMethod} — the <em>original</em> HTTP method</li>
-     * <li>{@code contentType} — the Content-Type header value</li>
+     * <li>{@code queryString} — raw query string from the original request,
+     * nullable</li>
+     * <li>{@code session} — {@code SessionContext} from gateway identity,
+     * or {@code SessionContext.empty()} if unauthenticated</li>
      * </ul>
      *
      * @param nativeResponse the gateway-native response object
