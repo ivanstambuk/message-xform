@@ -297,12 +297,6 @@ _Last updated:_ 2026-02-13
   _Implement:_ Normalize and validate `specsDir`/`profilesDir` in `configure()`.
   _Verify:_ Security path tests pass.
 
-> **ArchUnit validation** is a cross-cutting concern owned by Feature 009
-> (FR-009-12). The no-reflection (Rule 3), module-boundary (Rule 1), core
-> isolation (Rule 2), and SPI-layering (Rule 4) rules apply to all modules
-> including `adapter-pingaccess` and are enforced by the shared ArchUnit
-> test suite. No per-adapter ArchUnit task is needed here.
-
 ### Phase 8 — Quality Gate & Documentation
 
 #### I13/I14 — Final audit and documentation sync
