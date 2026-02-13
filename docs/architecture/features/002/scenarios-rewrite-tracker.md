@@ -15,7 +15,7 @@ YAML behavioral contracts per `docs/architecture/spec-guidelines/scenarios-forma
 | 1 | Core transforms: S-002-01 → S-002-06 | 6 | ✅ Done |
 | 2 | Edge cases + matching: S-002-07 → S-002-10 | 4 | ✅ Done |
 | 3 | Error modes + session: S-002-11 → S-002-14 | 4 | ✅ Done |
-| 4 | Config + SPI + threading: S-002-15 → S-002-21 | 7 | ⬜ |
+| 4 | Config + SPI + threading: S-002-15 → S-002-21 | 7 | ✅ Done |
 | 5 | Context variables: S-002-22 → S-002-27 | 6 | ⬜ |
 | 6 | Advanced behavioral: S-002-28 → S-002-36 | 9 | ⬜ |
 
@@ -59,13 +59,13 @@ Error handling modes and session context binding.
 
 Plugin lifecycle, configuration, SPI registration, threading, and metadata.
 
-- [ ] S-002-15: Multiple Specs Loaded
-- [ ] S-002-16: Large Body (64 KB)
-- [ ] S-002-17: Plugin Configuration via Admin UI
-- [ ] S-002-18: Invalid Spec Directory
-- [ ] S-002-19: Plugin SPI Registration
-- [ ] S-002-20: Thread Safety
-- [ ] S-002-21: ExchangeProperty Metadata
+- [x] S-002-15: Multiple Specs Loaded
+- [x] S-002-16: Large Body (64 KB)
+- [x] S-002-17: Plugin Configuration via Admin UI
+- [x] S-002-18: Invalid Spec Directory
+- [x] S-002-19: Plugin SPI Registration
+- [x] S-002-20: Thread Safety
+- [x] S-002-21: ExchangeProperty Metadata
 
 ### Phase 5 — Context Variables (S-002-22 → S-002-27)
 

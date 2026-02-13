@@ -581,85 +581,292 @@ assertions:
 
 ## S-002-15: Multiple Specs Loaded
 
-**Given** two specs are loaded:
-- Spec A matches `POST /api/users` (transforms user creation body)
-- Spec B matches `GET /api/status` (transforms status response)
+```yaml
+scenario: S-002-15
+name: multiple-specs-routing
+description: >
+  When multiple specs are loaded, only the matching spec is applied
+  per request. Non-matching specs are ignored.
+tags: [matching, routing, multi-spec]
+refs: [FR-002-08]
 
-**when** a `POST /api/users` request arrives,
-**then** Spec A is applied, Spec B is not.
+setup:
+  exchange:
+    request:
+      method: POST
+      uri: /api/users
+      contentType: application/json
+      body: '{"name": "ivan"}'
+  specs:
+    - id: user-transform
+      matches: "POST /api/users"
+      direction: request
+      expr: '{"username": .name}'
+    - id: status-transform
+      matches: "GET /api/status"
+      direction: response
+      expr: '{"up": true}'
 
-**when** a `GET /api/status` request arrives,
-**then** Spec B is applied, Spec A is not.
+trigger: handleRequest
+
+assertions:
+  - description: Spec A (user-transform) is applied
+    expect: forwarded.body == '{"username": "ivan"}'
+  - description: Spec B (status-transform) is NOT applied
+    expect: spec("status-transform").invocations == 0
+```
+
+```yaml
+# Reverse case: GET /api/status triggers Spec B
+scenario: S-002-15b
+name: multiple-specs-routing-reverse
+description: >
+  Same multi-spec setup; GET /api/status triggers Spec B only.
+tags: [matching, routing, multi-spec]
+refs: [FR-002-08]
+
+setup:
+  exchange:
+    request:
+      method: GET
+      uri: /api/status
+    response:
+      statusCode: 200
+      contentType: application/json
+      body: '{"status": "running", "uptime": 9999}'
+  specs:
+    - id: user-transform
+      matches: "POST /api/users"
+      direction: request
+      expr: '{"username": .name}'
+    - id: status-transform
+      matches: "GET /api/status"
+      direction: response
+      expr: '{"up": true}'
+
+trigger: handleResponse
+
+assertions:
+  - description: Spec B (status-transform) is applied
+    expect: response.body == '{"up": true}'
+  - description: Spec A (user-transform) is NOT applied
+    expect: spec("user-transform").invocations == 0
+```
 
 ---
 
 ## S-002-16: Large Body (64 KB)
 
-**Given** a request with a 64 KB JSON body,
-**when** `handleRequest()` transforms it,
-**then** the transform completes within the eval budget (default 5000 ms),
-**and** no `OutOfMemoryError` occurs,
-**and** adapter overhead (excluding engine time) is < 10 ms.
+```yaml
+scenario: S-002-16
+name: large-body-performance
+description: >
+  A 64 KB JSON body is transformed within the eval budget. No OOM.
+  Adapter overhead (excluding engine time) is < 10 ms.
+tags: [performance, large-body, nfr]
+refs: [NFR-002-01]
+
+setup:
+  exchange:
+    request:
+      method: POST
+      uri: /api/bulk
+      contentType: application/json
+      body: "<64 KB JSON object>"  # generated at test time
+  specs:
+    - id: bulk-transform
+      matches: "POST /api/bulk"
+      direction: request
+      expr: '. + {"processed": true}'
+
+trigger: handleRequest
+
+assertions:
+  - description: transform completes within eval budget (5000 ms default)
+    expect: duration < 5000
+  - description: no OutOfMemoryError
+    expect: error.absent("OutOfMemoryError")
+  - description: adapter overhead (excluding engine) < 10 ms
+    expect: adapterOverhead < 10
+```
 
 ---
 
 ## S-002-17: Plugin Configuration via Admin UI
 
-**Given** an admin creates a "Message Transform" rule in the PingAccess admin
-console (port 9000),
-**and** fills in `specsDir = /opt/specs`, `errorMode = PASS_THROUGH`,
-**when** the rule is saved,
-**then** PingAccess calls `configure(MessageTransformConfig)` with the JSON config,
-**and** the engine initializes and loads specs from `/opt/specs`.
+```yaml
+scenario: S-002-17
+name: plugin-configuration-valid
+description: >
+  Admin creates a Message Transform rule in PingAccess admin console.
+  configure() initializes engine and loads specs from the specified directory.
+tags: [config, lifecycle, admin-ui]
+refs: [FR-002-09, FR-002-15]
+
+setup:
+  config:
+    specsDir: /opt/specs
+    errorMode: PASS_THROUGH
+    enableJmxMetrics: false
+
+trigger: configure
+
+assertions:
+  - description: configure() receives MessageTransformConfig with JSON config
+    expect: config.specsDir == "/opt/specs"
+  - description: engine initializes successfully
+    expect: engine.initialized == true
+  - description: specs are loaded from /opt/specs
+    expect: engine.specCount >= 0
+```
 
 ---
 
 ## S-002-18: Invalid Spec Directory
 
-**Given** an admin configures `specsDir = /nonexistent/path`,
-**when** `configure()` is called,
-**then** a `ValidationException` is thrown with a message indicating the directory
-doesn't exist,
-**and** the rule is NOT activated (PingAccess shows error in admin UI).
+```yaml
+scenario: S-002-18
+name: invalid-spec-directory
+description: >
+  Configuring a non-existent specsDir causes ValidationException.
+  The rule is not activated.
+tags: [config, validation, error]
+refs: [FR-002-09]
+
+setup:
+  config:
+    specsDir: /nonexistent/path
+    errorMode: PASS_THROUGH
+
+trigger: configure
+
+assertions:
+  - description: ValidationException is thrown
+    expect: throws ValidationException
+  - description: error message indicates directory doesn't exist
+    expect: exception.message contains "/nonexistent/path"
+  - description: rule is NOT activated (PA shows error in admin UI)
+    expect: rule.active == false
+```
 
 ---
 
 ## S-002-19: Plugin SPI Registration
 
-**Given** the shadow JAR contains
-`META-INF/services/com.pingidentity.pa.sdk.policy.AsyncRuleInterceptor`
-with content `io.messagexform.pingaccess.MessageTransformRule`,
-**when** the JAR is deployed to `/opt/server/deploy/` and PingAccess is restarted,
-**then** the "Message Transform" rule type appears in the PingAccess admin
-console's rule type list.
+```yaml
+scenario: S-002-19
+name: plugin-spi-registration
+description: >
+  Shadow JAR contains the SPI service file. After deploy and restart,
+  the rule type appears in PingAccess admin console.
+tags: [spi, deployment, lifecycle]
+refs: [FR-002-15, NFR-002-03]
+
+setup:
+  state:
+    jar_contains:
+      - META-INF/services/com.pingidentity.pa.sdk.policy.AsyncRuleInterceptor
+    service_file_content: io.messagexform.pingaccess.MessageTransformRule
+
+trigger: deploy
+
+assertions:
+  - description: SPI service file is present in shadow JAR
+    expect: jar.contains("META-INF/services/com.pingidentity.pa.sdk.policy.AsyncRuleInterceptor")
+  - description: service file declares the correct implementation class
+    expect: serviceFile.content == "io.messagexform.pingaccess.MessageTransformRule"
+  - description: rule type appears in PingAccess admin console
+    expect: adminUI.ruleTypes contains "Message Transform"
+```
 
 ---
 
 ## S-002-20: Thread Safety
 
-**Given** the same `MessageTransformRule` instance handles 10 concurrent requests,
-**when** all requests are processed simultaneously,
-**then** no data corruption occurs,
-**and** each request gets independent transformation results,
-**and** no shared mutable state is accessed across threads.
+```yaml
+scenario: S-002-20
+name: thread-safety
+description: >
+  The same MessageTransformRule instance handles 10 concurrent requests
+  with no data corruption or shared mutable state access.
+tags: [threading, concurrency, nfr]
+refs: [NFR-002-02, FR-002-03]
+
+setup:
+  config:
+    errorMode: PASS_THROUGH
+  exchange:
+    request:
+      method: POST
+      uri: /api/data
+      contentType: application/json
+      body: '{"id": "${threadId}"}'  # unique per thread
+  specs:
+    - id: data-transform
+      matches: "POST /api/data"
+      direction: request
+      expr: '. + {"transformed": true}'
+  concurrency:
+    threads: 10
+    iterations: 100
+
+trigger: handleRequest (concurrent)
+
+assertions:
+  - description: no data corruption across threads
+    expect: each response contains its own threadId
+  - description: each request gets independent transformation results
+    expect: all 1000 results are correct
+  - description: no shared mutable state accessed
+    expect: no ConcurrentModificationException or race condition
+```
 
 ---
 
 ## S-002-21: ExchangeProperty Metadata
 
-**Given** a transform is applied successfully (spec matched, body transformed),
-**when** `handleRequest()` completes,
-**then** `exchange.getProperty(TRANSFORM_RESULT)` returns a `TransformResultSummary`
-record containing:
-- `specId` — the matched spec identifier
-- `specVersion` — the matched spec version
-- `direction` — `"REQUEST"` or `"RESPONSE"`
-- `durationMs` — transform execution time in milliseconds
-- `outcome` — `"SUCCESS"`, `"PASSTHROUGH"`, or `"ERROR"`
-- `errorType` — error type code (null if no error)
-- `errorMessage` — human-readable error message (null if no error)
+```yaml
+scenario: S-002-21
+name: exchange-property-metadata
+description: >
+  After a successful transform, the adapter stores a TransformResultSummary
+  as an ExchangeProperty for downstream rules and logging.
+tags: [metadata, exchange-property, observability]
+refs: [FR-002-07]
 
----
+setup:
+  exchange:
+    request:
+      method: POST
+      uri: /api/data
+      contentType: application/json
+      body: '{"data": "value"}'
+  specs:
+    - id: data-transform
+      matches: "POST /api/data"
+      direction: request
+      expr: '. + {"enriched": true}'
+
+trigger: handleRequest
+
+assertions:
+  - description: ExchangeProperty contains TransformResultSummary
+    expect: exchange.getProperty(TRANSFORM_RESULT) != null
+  - description: specId is set
+    expect: result.specId == "data-transform"
+  - description: specVersion is set
+    expect: result.specVersion != null
+  - description: direction is REQUEST
+    expect: result.direction == "REQUEST"
+  - description: durationMs is populated
+    expect: result.durationMs >= 0
+  - description: outcome is SUCCESS
+    expect: result.outcome == "SUCCESS"
+  - description: errorType is null (no error)
+    expect: result.errorType == null
+  - description: errorMessage is null (no error)
+    expect: result.errorMessage == null
+```
 
 ## S-002-22: Cookie Access in JSLT
 
