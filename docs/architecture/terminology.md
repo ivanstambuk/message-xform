@@ -185,11 +185,12 @@ terminology agreements must be captured here immediately.
 ## Pipeline chaining & message semantics
 
 - **TransformContext** (`TransformContext`, DO-001-07)
-  - A read-only context object passed to expression engines during evaluation.
-    Contains: `$headers` (JsonNode), `$status` (Integer, null for requests per
-    ADR-0020), `$queryParams` (JsonNode, ADR-0021), `$cookies` (JsonNode,
-    request-side only, ADR-0021), `$session` (JsonNode, nullable, ADR-0030),
-    request path, request method. Engines consume whichever context they support.
+  - A read-only context record passed to expression engines during evaluation.
+    Fields: `headers` (HttpHeaders — engines derive `$headers`/`$headers_all`),
+    `status` (Integer, null for requests per ADR-0020), `queryParams`
+    (Map\<String,String\>, ADR-0021), `cookies` (Map\<String,String\>, ADR-0021),
+    `session` (SessionContext, ADR-0030). All nullable fields are null-normalized
+    by the canonical constructor. Engines consume whichever context they support.
 
 - **Session context** (`$session`, ADR-0030)
   - An arbitrary JSON structure provided by the gateway's session management layer,
