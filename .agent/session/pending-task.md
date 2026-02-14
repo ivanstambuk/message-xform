@@ -1,23 +1,17 @@
 # Pending Task
 
-**Focus**: Feature 002 — PingAccess Adapter — Phase 4 (Session Context Binding)
-**Status**: Phases 1–3 complete (18 tasks). Phase 4 is next.
-**Next Step**: Implement T-002-18 (merge identity layers L1–L3 into SessionContext)
+**Focus**: Feature 002 — PingAccess Adapter — Phase 4 (Session Context) or Phase 6 (Hot Reload)
+**Status**: Phase 5 (Error Mode Dispatch) complete — all 5 tasks implemented and tested.
+**Next Step**: Implement Phase 4 (I6) session context binding (T-002-18, T-002-19), or skip to Phase 6 (I8) hot reload if session context is deferred.
 
 ## Context Notes
-- T-002-14 (cleanup hooks) is blocked on I8 (reload scheduler) — intentionally deferred.
-- `buildTransformContext()` accepts a `SessionContext` parameter — Phase 4 will
-  implement the identity → session merge that produces it.
-- PingAccess `Exchange.getIdentity()` returns `IdentityMappingContext` which provides
-  OAuth metadata, identity attributes, and session state. Need to decompile/javap
-  this interface to understand the full API before implementing T-002-18.
-- The coverage matrix in scenarios.md is complete for all implemented FRs.
+- Phase 5 introduced `responseFactory` injection pattern for testability (ResponseBuilder
+  requires PA ServiceFactory runtime — documented in SDK guide §8)
+- `TransformFlowTest.java` has 14 tests covering all Phase 5 orchestration paths
+- The `DenyOnError` nested test class injects a mock responseFactory in `@BeforeEach`
+- `PingAccessAdapter` now has `applyRequestChangesSkipBody`/`applyResponseChangesSkipBody`
+  for the bodyParseFailed skip-guard (S-002-08)
+- T-002-14 (@PreDestroy cleanup) remains blocked on I8 (reload scheduler)
 
-## Gotchas
-- PA SDK `HeaderField` uses `getHeaderName()` not `getName()` (see AGENTS.md pitfall)
-- `ErrorHandlerConfiguration` must be inline-implemented (config doesn't implement it)
-- Test specs need `input.schema` + `output.schema` blocks even for minimal tests
-- `ConfigurationBuilder.from()` is the pattern for `getConfigurationFields()`
-
-## SDD Gaps
-- None — all checks passed. Findings ledger was empty.
+## SDD Gaps (if any)
+- None — all retro findings resolved in commit `5595b88`
