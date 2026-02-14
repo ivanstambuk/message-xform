@@ -13,6 +13,8 @@ docs/architecture/features/001/scenarios.md
 
 # Feature 002 — PingAccess Adapter
 docs/architecture/features/002/spec.md
+docs/architecture/features/002/scenarios.md
+docs/architecture/features/002/coverage-matrix.md
 
 # PingAccess SDK Implementation Guide (LLM-optimized reference)
 docs/reference/pingaccess-sdk-guide.md

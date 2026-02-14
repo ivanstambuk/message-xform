@@ -1,42 +1,33 @@
 # Current Session State
 
-**Date:** 2026-02-14
-**Focus:** Feature 002 — PingAccess Adapter — Phase 5 Error Mode Dispatch (I7)
+| Field | Value |
+|-------|-------|
+| Date | 2026-02-14 |
+| Focus | Feature 002 — Final implementation phases (6–8) |
+| Status | **Complete** |
 
-## Completed This Session
+## Summary
 
-### I7 — PASS_THROUGH + DENY behavior (Phase 5)
-- [x] T-002-20 — Request SUCCESS/PASSTHROUGH/bodyParseFailed orchestration
-- [x] T-002-21 — Response SUCCESS/PASSTHROUGH orchestration
-- [x] T-002-22 — PASS_THROUGH error mode (S-002-11)
-- [x] T-002-23 — DENY error mode for request/response (S-002-12)
-- [x] T-002-24 — DENY guard in `handleResponse()` (S-002-28)
-- Commit: `78b7fff`
+Completed all remaining Feature 002 tasks (T-002-27 through T-002-34).
+Feature 002 — PingAccess Adapter is now fully implemented with:
 
-### Retro Fixes
-- Added error mode terminology entries (ErrorMode, PASS_THROUGH, DENY, bodyParseFailed)
-- Documented ResponseBuilder ServiceFactory testing pitfall in SDK guide
-- Commit: `5595b88`
+- 219 tests across 19 test classes
+- 36/36 scenarios covered (100%)
+- 13/14 FRs implemented (FR-002-12 Docker E2E deferred)
+- All 5 NFRs verified
+- 34/34 tasks complete
 
-## Key Decisions
+## Commits This Session
 
-- `responseFactory` (`BiFunction<HttpStatus, String, Response>`) injection pattern:
-  production defaults to `ResponseBuilder`; tests inject mock lambda since
-  `ResponseBuilder.newInstance()` requires PA runtime `ServiceFactory`
-- `bodyParseFailed` skip-guard implemented at rule level: adapter sets flag,
-  rule dispatches to `applyRequestChangesSkipBody`/`applyResponseChangesSkipBody`
-- DENY guard uses `TRANSFORM_DENIED` exchange property to skip response processing
-- `TransformFlowTest` uses real `PingAccessAdapter` but mocked `TransformEngine`
+| Hash | Message |
+|------|---------|
+| `d6d2345` | JMX MBean observability (T-002-27, T-002-28) |
+| `159ef49` | Version guard + shadow JAR tests (T-002-29, T-002-30) |
+| `5c10079` | Thread safety + path hardening (T-002-31, T-002-32) |
+| `a090f9a` | Complete Feature 002 (T-002-31a, T-002-33, T-002-34) |
 
-## Previously Completed (Phases 1–3)
+## Next Priorities
 
-- Phase 1 (I1): T-002-01, T-002-02
-- Phase 2 (I2, I3): T-002-03..T-002-11a
-- Phase 3 (I4a, I4b, I5): T-002-12, T-002-13, T-002-15..T-002-17
-
-## Remaining Work
-
-- **T-002-14** — Cleanup hooks (`@PreDestroy`) — blocked on reload scheduler (I8)
-- **Phase 4** (I6) — Session context binding: T-002-18, T-002-19
-- **Phase 6** (I8) — Hot reload: T-002-25..T-002-26
-- **Phase 7** (I9+) — JMX observability, shadow JAR, thread safety, security
+1. **Feature 002 remaining**: FR-002-12 (Docker E2E test) — deferred, needs PA Docker image.
+2. **Feature 004**: Standalone HTTP Proxy Mode — next major feature.
+3. **Feature 009**: Toolchain hardening (ArchUnit, SpotBugs).

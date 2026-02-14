@@ -42,3 +42,15 @@ transform:
   lang: jslt
   expr: "."
 ```
+
+## JMX MBean Test Isolation
+JMX uses the platform-wide `MBeanServer` singleton. Tests registering MBeans
+**must** use unique `ObjectName`s (include a UUID or test-method name) and
+unregister in `@AfterEach`. Otherwise, parallel test execution or re-runs
+will fail with `InstanceAlreadyExistsException`.
+
+## Gradle Test Working Directory
+Gradle may run tests from the **project root** or the **module directory**
+depending on the version and configuration cache state. Any test that resolves
+file paths relative to the project (e.g., `build/libs/*.jar`) must try both
+`adapter-pingaccess/build/libs` (from root) and `build/libs` (from module).
