@@ -1,6 +1,7 @@
 package io.messagexform.pingaccess;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -19,7 +20,7 @@ import org.mockito.ArgumentCaptor;
 
 /**
  * Tests for apply helpers on {@link PingAccessAdapter} (T-002-08, T-002-09,
- * T-002-10).
+ * T-002-10, T-002-11, T-002-11a).
  *
  * <p>
  * Covers request-side apply (URI + method), response-side apply (status),
@@ -147,6 +148,45 @@ class ApplyChangesTest {
             adapter.applyResponseChanges(msg, exchange, List.of());
 
             verify(response, never()).setStatus(any());
+        }
+
+        // T-002-11: PA non-standard status code passthrough
+
+        @Test
+        void nonStandardStatusCode277() {
+            Message msg = message(MessageBody.empty(), HttpHeaders.empty(), 277, "/test", "GET", null);
+
+            adapter.applyResponseChanges(msg, exchange, List.of());
+
+            ArgumentCaptor<HttpStatus> captor = ArgumentCaptor.forClass(HttpStatus.class);
+            verify(response).setStatus(captor.capture());
+            assertThat(captor.getValue().getCode()).isEqualTo(277);
+        }
+
+        @Test
+        void nonStandardStatusCode477() {
+            Message msg = message(MessageBody.empty(), HttpHeaders.empty(), 477, "/test", "GET", null);
+
+            adapter.applyResponseChanges(msg, exchange, List.of());
+
+            ArgumentCaptor<HttpStatus> captor = ArgumentCaptor.forClass(HttpStatus.class);
+            verify(response).setStatus(captor.capture());
+            assertThat(captor.getValue().getCode()).isEqualTo(477);
+        }
+    }
+
+    // ---- T-002-11a: SPI applyChanges() safety ----
+
+    @Nested
+    class SpiApplyChangesSafety {
+
+        @Test
+        void applyChangesThrowsUnsupportedOperationException() {
+            Message msg = message(MessageBody.empty(), HttpHeaders.empty(), null, "/test", "GET", null);
+
+            assertThatThrownBy(() -> adapter.applyChanges(msg, exchange))
+                    .isInstanceOf(UnsupportedOperationException.class)
+                    .hasMessageContaining("applyRequestChanges");
         }
     }
 

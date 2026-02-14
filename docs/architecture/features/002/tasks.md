@@ -91,7 +91,7 @@ _Last updated:_ 2026-02-15
 
 #### I3 — `wrapResponse()` + apply helpers (FR-002-01)
 
-- [ ] **T-002-07** — Response wrap mapping + debug log + bodyParseFailed tracking (FR-002-01, S-002-02, S-002-32)
+- [x] **T-002-07** — Response wrap mapping + debug log + bodyParseFailed tracking (FR-002-01, S-002-02, S-002-32)
   _Test first:_ `PingAccessAdapterResponseTest.wrapResponseMapping()` covering:
   - status/headers mapping
   - non-JSON fallback + `bodyParseFailed` flag set (parity with request side)
@@ -100,17 +100,17 @@ _Last updated:_ 2026-02-15
   _Implement:_ `wrapResponse()` mapping behavior with `bodyParseFailed` tracking.
   _Verify:_ Wrap response tests pass.
 
-- [ ] **T-002-08** — Request-side apply logic (URL + method + body write path) (FR-002-01, S-002-06)
+- [x] **T-002-08** — Request-side apply logic (URL + method + body write path) (FR-002-01, S-002-06)
   _Test first:_ `ApplyChangesTest.applyRequestChanges()` for `setUri()` and `setMethod()`.
   _Implement:_ `applyRequestChanges()` helper.
   _Verify:_ Request-side apply tests pass.
 
-- [ ] **T-002-09** — Header diff strategy + protected-header exclusion (FR-002-01, Constraint 3, S-002-04)
+- [x] **T-002-09** — Header diff strategy + protected-header exclusion (FR-002-01, Constraint 3, S-002-04)
   _Test first:_ `ApplyChangesTest.headerDiff()` for add/update/remove and exclusion of `content-length` / `transfer-encoding`.
   _Implement:_ Diff-based header application for request and response helpers.
   _Verify:_ Header diff tests pass.
 
-- [ ] **T-002-10** — Body replacement + content-type semantics (FR-002-01, S-002-01, S-002-02)
+- [x] **T-002-10** — Body replacement + content-type semantics (FR-002-01, S-002-01, S-002-02)
   _Test first:_ `ApplyChangesTest.bodyReplacement()` covering:
   - `setBodyContent()` on non-empty `MessageBody`
   - `application/json; charset=utf-8` set after body replacement
@@ -118,17 +118,17 @@ _Last updated:_ 2026-02-15
   _Implement:_ Body write logic in apply helpers.
   _Verify:_ Body replacement tests pass.
 
-- [ ] **T-002-10a** — Compressed body fallback contract (Constraint 10, S-002-32)
+- [x] **T-002-10a** — Compressed body fallback contract (Constraint 10, S-002-32)
   _Test first:_ `PingAccessAdapterResponseTest.compressedBodyFallback()` for `gzip`/`deflate`/`br` content-encoding.
   _Implement:_ Explicit v1 behavior: no decompression, parse fallback to `MessageBody.empty()` + warning.
   _Verify:_ Compressed body fallback tests pass.
 
-- [ ] **T-002-11** — Response status code application incl. PA non-standard passthrough (FR-002-01, S-002-05, S-002-35)
+- [x] **T-002-11** — Response status code application incl. PA non-standard passthrough (FR-002-01, S-002-05, S-002-35)
   _Test first:_ `ApplyChangesTest.statusCode()` with 200/404 and 277/477.
   _Implement:_ `HttpStatus.forCode()` in `applyResponseChanges()` with passthrough behavior.
   _Verify:_ Status code tests pass.
 
-- [ ] **T-002-11a** — SPI `applyChanges()` safety behavior (FR-002-01)
+- [x] **T-002-11a** — SPI `applyChanges()` safety behavior (FR-002-01)
   _Test first:_ `ApplyChangesTest.spiApplyChangesThrowsUnsupported()`.
   _Implement:_ `applyChanges()` throws `UnsupportedOperationException`.
   _Verify:_ SPI safety test passes.
@@ -137,12 +137,12 @@ _Last updated:_ 2026-02-15
 
 #### I4a — MessageTransformRule core lifecycle (FR-002-02, FR-002-03, FR-002-05, FR-002-10)
 
-- [ ] **T-002-12** — Rule skeleton + annotation contract + callback (FR-002-02, FR-002-03, Constraint 1, S-002-03, S-002-17)
+- [x] **T-002-12** — Rule skeleton + annotation contract + callback (FR-002-02, FR-002-03, Constraint 1, S-002-03, S-002-17)
   _Test first:_ `RuleLifecycleTest.annotationAndCallback()` verifying `@Rule(destination = Site)` and non-null `getErrorHandlingCallback()`.
   _Implement:_ `MessageTransformRule extends AsyncRuleInterceptorBase<MessageTransformConfig>`.
   _Verify:_ Annotation and callback tests pass.
 
-- [ ] **T-002-13** — `configure()` engine init and config validation (FR-002-02, FR-002-05, S-002-09, S-002-10, S-002-15, S-002-17, S-002-18)
+- [x] **T-002-13** — `configure()` engine init and config validation (FR-002-02, FR-002-05, S-002-09, S-002-10, S-002-15, S-002-17, S-002-18)
   _Test first:_ `RuleLifecycleTest.configureBoot()` for valid and invalid `specsDir`.
   _Implement:_ Parser/engine init and spec/profile load boot path.
   _Verify:_ Configure tests pass.
