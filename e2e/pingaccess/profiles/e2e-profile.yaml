@@ -86,9 +86,17 @@ transforms:
     match:
       path: "/api/status/**"
 
-  # ── Session context — OAuth/Identity (Tests 20–22) ──
+  # ── Session context — OAuth/Identity via Bearer token (Tests 20–22) ──
   - spec: e2e-session@1.0.0
     direction: request
     match:
       path: "/api/session/**"
+      method: POST
+
+  # ── Session context — OIDC Web Session (Tests 23–24, Phase 8b) ──
+  # The Web app uses contextRoot=/web/session, so paths arrive as /web/session/...
+  - spec: e2e-session@1.0.0
+    direction: request
+    match:
+      path: "/web/session/**"
       method: POST

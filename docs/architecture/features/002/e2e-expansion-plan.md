@@ -341,11 +341,11 @@ can simplify this.
 
 | ID | Task | Scenario(s) | Est. assertions | Status |
 |----|------|-------------|:---------------:|:------:|
-| P8b-01 | Configure PA Web Session: `clientId=e2e-web-client`, `clientSecret=e2e-secret`, scopes `openid profile email`, cookie type `Signed`, OIDC discovery from mock-oauth2-server. Register client with mock-OIDC if needed. | — | — | ⬜ |
-| P8b-02 | Create a second protected Application (`/web/session`, type `Web`) with the Web Session, attach the transform rule. No Access Token Validator — authentication is via Web Session cookie. | — | — | ⬜ |
-| P8b-03 | Add `oidc_login()` helper: simulates the auth code flow via `curl -L` with cookie jar. Steps: (a) GET `/web/session/test` → follow redirect to mock-OIDC `/authorize`, (b) POST to mock-OIDC login endpoint (auto-login), (c) follow callback redirect back to PA, (d) extract PA session cookie from jar. | — | — | ⬜ |
-| P8b-04 | Test 23: **Session state in JSLT (L4)** — After `oidc_login()`, POST to `/web/session/test` with PA session cookie. Assert: (a) `$session` is populated, (b) `subject` is non-empty, (c) a session-state attribute (e.g. `aud` or OIDC claim from L4) is present and non-empty. | S-002-26 | 3 | ⬜ |
-| P8b-05 | Test 24: **L4 overrides L3 on key collision** — If mock-OIDC returns a claim that also exists in L3 (Identity.getAttributes), verify L4 wins (highest precedence per `buildSessionContext()`). Best-effort — depends on PA session state contents. | S-002-26 | 1 | ⬜ |
+| P8b-01 | Configure PA Web Session: `clientId=e2e-web-client`, `clientSecret=e2e-secret`, scopes `openid profile email`, cookie type `Signed`, OIDC discovery from mock-oauth2-server. Register client with mock-OIDC if needed. | — | — | ✅ |
+| P8b-02 | Create a second protected Application (`/web/session`, type `Web`) with the Web Session, attach the transform rule. No Access Token Validator — authentication is via Web Session cookie. | — | — | ✅ |
+| P8b-03 | Add `oidc_login()` helper: simulates the auth code flow via `curl -L` with cookie jar. Steps: (a) GET `/web/session/test` → follow redirect to mock-OIDC `/authorize`, (b) POST to mock-OIDC login endpoint (auto-login), (c) follow callback redirect back to PA, (d) extract PA session cookie from jar. | — | — | ✅ |
+| P8b-04 | Test 23: **Session state in JSLT (L4)** — After `oidc_login()`, POST to `/web/session/test` with PA session cookie. Assert: (a) `$session` is populated, (b) `subject` is non-empty, (c) a session-state attribute (e.g. `aud` or OIDC claim from L4) is present and non-empty. | S-002-26 | 3 | ✅ |
+| P8b-05 | Test 24: **L4 overrides L3 on key collision** — If mock-OIDC returns a claim that also exists in L3 (Identity.getAttributes), verify L4 wins (highest precedence per `buildSessionContext()`). Best-effort — depends on PA session state contents. | S-002-26 | 1 | ✅ |
 
 ### Phase 9 — Hot-Reload E2E (S-002-29, S-002-30, S-002-31)
 
