@@ -1,5 +1,5 @@
 ---
-description: Read-only generated-code audit for quality, security, dependency hygiene, test quality, and lightweight performance signals
+description: Read-only generated-code audit for architecture, concurrency, lifecycle, resilience, security, dependency/supply-chain hygiene, test effectiveness, observability, data integrity, and performance signals
 ---
 
 # /code-audit — Generated Code Audit
@@ -116,6 +116,7 @@ Before recording a finding, verify all of the following:
 4. **Confidence:** mark as `HIGH` or `MEDIUM`.
 5. **False-positive note:** include when heuristic signals are uncertain.
 6. **Not style-noise:** if `spotlessCheck` passes, avoid emitting pure formatting findings.
+7. **Assignable:** include likely owner and rough fix cost (`S/M/L`).
 
 ### Phase 2.6 — Root-Cause Grouping
 
@@ -186,7 +187,122 @@ Architecture recommendation rule:
   2. target architecture shape,
   3. minimal migration path (incremental, low-risk steps).
 
-### Phase 5 — Security Signals
+### Phase 5 — Concurrency Signals
+
+Evaluate thread-safety and concurrent execution risks.
+
+| Check ID | What to inspect | Severity guidance |
+|----------|-----------------|-------------------|
+| CONC-01 | Shared mutable state on request/response paths | High |
+| CONC-02 | Non-thread-safe collections used across threads | High |
+| CONC-03 | Unsafe lazy init/publication without synchronization | High |
+| CONC-04 | Locking risks (deadlock-prone ordering, oversized synchronized scopes) | Medium |
+| CONC-05 | Atomicity gaps (check-then-act race windows) | Medium |
+
+Evidence commands (examples):
+
+```bash
+rg -n "static\\s+(?!final)|volatile\\s|synchronized\\s*\\(" <scope>/src/main/java
+rg -n "HashMap|ArrayList|LinkedList" <scope>/src/main/java
+rg -n "CompletableFuture|ExecutorService|Thread\\(" <scope>/src/main/java
+```
+
+### Phase 6 — Resource Lifecycle Signals
+
+Evaluate lifecycle and cleanup correctness.
+
+| Check ID | What to inspect | Severity guidance |
+|----------|-----------------|-------------------|
+| LIFE-01 | Unclosed streams/files/sockets/clients | High |
+| LIFE-02 | Scheduler/executor lifecycle leaks | High |
+| LIFE-03 | Missing shutdown hooks / `@PreDestroy` gaps | Medium |
+| LIFE-04 | Resource ownership ambiguity (who opens/closes) | Medium |
+
+Evidence commands (examples):
+
+```bash
+rg -n "new FileInputStream|new FileOutputStream|Files\\.newInputStream|Files\\.newOutputStream" <scope>/src/main/java
+rg -n "Executors\\.|ScheduledExecutorService|HttpClient\\.|Closeable|AutoCloseable" <scope>/src/main/java
+rg -n "@PreDestroy|close\\(|shutdown\\(|shutdownNow\\(" <scope>/src/main/java
+```
+
+### Phase 7 — Resilience Signals
+
+Evaluate failure handling and degradation behavior.
+
+| Check ID | What to inspect | Severity guidance |
+|----------|-----------------|-------------------|
+| RES-01 | Missing timeout controls on I/O and remote calls | High |
+| RES-02 | Retry behavior without bounds/backoff | High |
+| RES-03 | Failure isolation gaps (one failure cascades system-wide) | High |
+| RES-04 | Fallback behavior mismatched with contract | Medium |
+
+Evidence commands (examples):
+
+```bash
+rg -n "timeout|Duration|connectTimeout|readTimeout" <scope>/src/main/java
+rg -n "retry|backoff|attempt" <scope>/src/main/java
+rg -n "catch \\(.*\\) \\{|throw new|return" <scope>/src/main/java
+```
+
+### Phase 8 — API / Contract Evolution Signals
+
+Evaluate compatibility and contract discipline.
+
+| Check ID | What to inspect | Severity guidance |
+|----------|-----------------|-------------------|
+| API-01 | Breaking signature changes without migration path | High |
+| API-02 | Inconsistent nullability/validation contracts | High |
+| API-03 | Public API drift from documented spec/terminology | Medium |
+| API-04 | Versioning discipline gaps (silent behavior change) | Medium |
+
+Evidence commands (examples):
+
+```bash
+rg -n "public class|public interface|public record|public .*\\(" <scope>/src/main/java
+rg -n "@Nullable|@NotNull|requireNonNull|Objects\\.requireNonNull" <scope>/src/main/java
+rg -n "deprecated|@Deprecated" <scope>/src/main/java
+```
+
+### Phase 9 — Observability Signals
+
+Evaluate logs/metrics/tracing quality and operational usefulness.
+
+| Check ID | What to inspect | Severity guidance |
+|----------|-----------------|-------------------|
+| OBS-01 | Missing error context in logs (status, path, reason, correlation) | Medium |
+| OBS-02 | Sensitive data leakage risk in logs | High |
+| OBS-03 | Metrics cardinality explosion risk | Medium |
+| OBS-04 | Missing telemetry on failure paths | Medium |
+
+Evidence commands (examples):
+
+```bash
+rg -n "LOG\\.(info|warn|error|debug|trace)" <scope>/src/main/java
+rg -n "metric|counter|timer|histogram|LongAdder" <scope>/src/main/java
+rg -n "exception|error|failed|failure" <scope>/src/main/java
+```
+
+### Phase 10 — Data Integrity Signals
+
+Evaluate correctness of data handling and transformation boundaries.
+
+| Check ID | What to inspect | Severity guidance |
+|----------|-----------------|-------------------|
+| DATA-01 | Missing input validation at trust boundaries | High |
+| DATA-02 | Silent truncation/normalization without explicit contract | Medium |
+| DATA-03 | Lossy type conversion risks | Medium |
+| DATA-04 | Schema/version mismatch handling gaps | High |
+
+Evidence commands (examples):
+
+```bash
+rg -n "validate|validator|schema|parse|deserialize|serialize" <scope>/src/main/java
+rg -n "toString\\(|asText\\(|intValue\\(|longValue\\(|doubleValue\\(" <scope>/src/main/java
+rg -n "catch \\(.*\\) \\{\\s*return|catch \\(.*\\) \\{\\s*continue" <scope>/src/main/java
+```
+
+### Phase 11 — Security Signals
 
 Evaluate common secure-coding risks.
 
@@ -214,7 +330,7 @@ Secret-scan false-positive control:
 - Treat obvious placeholders in tests/docs (e.g., `example`, `dummy`, `test`, `changeme`) as non-findings.
 - If uncertain, keep as `Low` with confidence `MEDIUM`, not `Critical`.
 
-### Phase 6 — Dependency Hygiene Signals
+### Phase 12 — Dependency Hygiene Signals
 
 Evaluate dependency consistency and maintenance risk.
 
@@ -233,7 +349,26 @@ Use:
 ./gradlew --no-daemon :<module>:dependencies --configuration testCompileClasspath
 ```
 
-### Phase 7 — Test Quality Signals
+### Phase 13 — Supply-Chain & Compliance Signals
+
+Evaluate supply-chain and policy/compliance risks.
+
+| Check ID | What to inspect | Severity guidance |
+|----------|-----------------|-------------------|
+| SUP-01 | Known vulnerable dependencies (CVE/advisory evidence) | High |
+| SUP-02 | License compliance risk (unknown/incompatible licenses) | Medium |
+| SUP-03 | Banned/unapproved dependency usage | High |
+| SUP-04 | Unpinned tooling/runtime versions in critical paths | Medium |
+
+Evidence commands (examples):
+
+```bash
+./gradlew --no-daemon :<module>:dependencies --configuration runtimeClasspath
+rg -n "implementation\\(|api\\(|compileOnly\\(" <module>/build.gradle.kts build.gradle.kts
+rg -n "version|toolchain|java\\s*\\{" build.gradle.kts gradle/libs.versions.toml
+```
+
+### Phase 14 — Test Quality Signals
 
 Evaluate whether tests are strong enough to protect behavior.
 
@@ -254,7 +389,25 @@ rg -n "assertThat\\(.*\\)\\.isNotNull\\(\\)" <scope>/src/test/java
 rg -n "verify\\(|times\\(" <scope>/src/test/java
 ```
 
-### Phase 8 — Lightweight Performance Signals
+### Phase 15 — Test Effectiveness Signals
+
+Evaluate whether tests are behavior-revealing and resistant to regressions.
+
+| Check ID | What to inspect | Severity guidance |
+|----------|-----------------|-------------------|
+| TE-01 | Contract/integration gaps around externally visible behavior | High |
+| TE-02 | Assertions that do not check business outcome | Medium |
+| TE-03 | Missing negative/edge cases for critical logic | High |
+| TE-04 | Excessive fixture complexity hiding intent | Low |
+
+Evidence commands (examples):
+
+```bash
+rg -n "@Nested|@ParameterizedTest|@MethodSource|@CsvSource" <scope>/src/test/java
+rg -n "assertThat\\(|assertThrows\\(|verify\\(" <scope>/src/test/java
+```
+
+### Phase 16 — Lightweight Performance Signals
 
 Focus on pragmatic heuristics (not full benchmarking).
 
@@ -270,7 +423,7 @@ Notes:
 - Keep this phase heuristic and evidence-based.
 - Do not claim latency regressions without measured evidence.
 
-### Phase 9 — Guardrail Recommendation Synthesis
+### Phase 17 — Guardrail Recommendation Synthesis
 
 Convert findings into preventive controls.
 
@@ -317,17 +470,24 @@ Examples:
 ## Findings by Severity
 
 Finding ID format:
-- Use `<CATEGORY>-<NNN>` (e.g., `SEC-001`, `TQ-004`), not a global counter.
+- Use `<CATEGORY>-<NNN>` (e.g., `SEC-001`, `ARCH-002`, `CONC-003`), not a global counter.
+
+## Critical Path (Top 3)
+1. <finding id> — <why this is top priority now>
+2. <finding id> — <why this is top priority now>
+3. <finding id> — <why this is top priority now>
 
 ### Critical
 #### SEC-001 — <title>
-- Category: ARCH | CQ | SEC | DEP | TQ | PERF
+- Category: ARCH | CQ | CONC | LIFE | RES | API | OBS | DATA | SEC | DEP | SUP | TQ | TE | PERF
 - Check ID: <e.g., SEC-03>
 - Location: `<path>:<line>`
 - Evidence: `<symbol/signature/command output excerpt>`
 - Repro command: `<exact command>`
 - Risk: <impact in practical terms>
 - Recommendation: <concrete remediation path>
+- Owner: <core | adapter-standalone | adapter-pingaccess | build/tooling | docs/process>
+- Fix Cost: S | M | L
 - Confidence: HIGH | MEDIUM
 - Provenance: new | existing | unknown
 - False-positive note: <optional>
@@ -345,6 +505,11 @@ Finding ID format:
 | Check ID | Status | Notes |
 |----------|--------|-------|
 | CQ-01 | Executed / Skipped / N/A / Timed out | <reason or short result> |
+
+## Cannot Validate (Gaps)
+- <check or claim that could not be validated>
+- Reason: <missing tool/data/access/time>
+- Impact: <what this uncertainty means for confidence>
 
 ## Suppressed / Collapsed Signals
 - <optional list of intentionally collapsed low-value signals with reason>
@@ -392,5 +557,5 @@ Notes:
 ## Relationship to /audit
 
 - `/audit` = documentation/spec conformance.
-- `/code-audit` = generated code quality/security/performance/dependency/test signals.
+- `/code-audit` = generated code architecture/quality/concurrency/lifecycle/resilience/security/dependency/supply-chain/observability/data/test/performance signals.
 - They are separate by design and can be run independently.
