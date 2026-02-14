@@ -32,6 +32,8 @@ description: Read-only generated-code audit for quality, security, dependency hy
 3. **One report only:** produce a detailed report file (no mandatory chat scorecard).
 4. **Centralized output:** all audit reports live under `audit-reports/`.
 5. **Deterministic evidence:** every finding must include reproducible evidence.
+6. **Root-cause first:** do not emit duplicate findings for the same underlying issue.
+7. **Signal provenance:** classify findings as `new`, `existing`, or `unknown`.
 
 ---
 
@@ -49,6 +51,19 @@ Read:
 
 Goal: align findings with current project guardrails and toolchain policy.
 
+### Phase 0.5 — Preflight & Tool Availability
+
+// turbo
+Before running audit checks, verify:
+1. `git`, `rg`, and `./gradlew` are available.
+2. `origin/main` exists locally for merge-base fallback.
+3. Workspace is readable; report path `audit-reports/` is writable.
+
+If a tool is missing:
+- continue with available checks,
+- mark the skipped checks explicitly in the report's execution matrix,
+- do not infer findings for skipped checks.
+
 ### Phase 1 — Resolve Audit Scope
 
 // turbo
@@ -60,14 +75,17 @@ Goal: align findings with current project guardrails and toolchain policy.
      - `git ls-files --others --exclude-standard`
      - if all three are empty: `git diff --name-only $(git merge-base HEAD origin/main)...HEAD`
    - `<module>` -> that module only
-2. Build file sets:
+2. Validate module target against `settings.gradle.kts` includes. Unknown module -> stop with clear error.
+3. For `changed`, map files to module scopes and ignore non-code paths with explicit report note.
+4. Build file sets:
    - Production: `<module>/src/main/java/**`
    - Tests: `<module>/src/test/java/**`
    - Build files: `<module>/build.gradle.kts`, root `build.gradle.kts`, version catalog
-3. Exclude non-signal paths: `.gradle/`, `build/`, `out/`, `.idea/`, `.agent/session/`.
-4. Normalize and deduplicate file lists (stable sorted order).
-5. If resolved scope is empty, write a report with "No auditable code in scope" and stop.
-6. Record exact scope in report metadata.
+5. Exclude non-signal paths: `.gradle/`, `build/`, `out/`, `.idea/`, `.agent/session/`,
+   `.sdk-decompile/`, `binaries/`, `docs/`, `audit-reports/`.
+6. Normalize and deduplicate file lists (stable sorted order).
+7. If resolved scope is empty, write a report with "No auditable code in scope" and stop.
+8. Record exact scope in report metadata.
 
 ### Phase 2 — Baseline Build Signals (Non-Mutating)
 
@@ -88,6 +106,11 @@ Recommended commands:
 
 Capture failures/warnings as findings when relevant.
 
+Classification guidance for baseline failures:
+- Failure fully inside audited scope -> finding (`new` or `existing` based on blame/age).
+- Failure clearly outside scope -> record as contextual note, not a scoped finding.
+- Unable to determine provenance -> finding with provenance `unknown`.
+
 ### Phase 2.5 — Finding Quality Bar
 
 Before recording a finding, verify all of the following:
@@ -96,6 +119,13 @@ Before recording a finding, verify all of the following:
 3. **Actionable:** recommendation is specific enough for a follow-up task.
 4. **Confidence:** mark as `HIGH` or `MEDIUM`.
 5. **False-positive note:** include when heuristic signals are uncertain.
+
+### Phase 2.6 — Root-Cause Grouping
+
+Before finalizing findings:
+1. Group symptom-level signals under one root-cause finding when they share the same source.
+2. Keep one canonical finding with multiple affected locations.
+3. Avoid emitting N nearly identical findings for the same issue class.
 
 ### Phase 3 — Code Quality & Design Signals
 
@@ -144,6 +174,10 @@ rg -n "ObjectInputStream|readObject\\(|URLClassLoader|ScriptEngineManager" <scop
 rg -n "disableHostnameVerification|TrustAll|X509TrustManager|setHostnameVerifier" <scope>
 rg -n "HttpClient|HttpURLConnection|URI\\.create|new URI\\(" <scope>/src/main/java
 ```
+
+Secret-scan false-positive control:
+- Treat obvious placeholders in tests/docs (e.g., `example`, `dummy`, `test`, `changeme`) as non-findings.
+- If uncertain, keep as `Low` with confidence `MEDIUM`, not `Critical`.
 
 ### Phase 5 — Dependency Hygiene Signals
 
@@ -247,8 +281,11 @@ Examples:
 
 ## Findings by Severity
 
+Finding ID format:
+- Use `<CATEGORY>-<NNN>` (e.g., `SEC-001`, `TQ-004`), not a global counter.
+
 ### Critical
-#### CA-001 — <title>
+#### SEC-001 — <title>
 - Category: CQ | SEC | DEP | TQ | PERF
 - Check ID: <e.g., SEC-03>
 - Location: `<path>:<line>`
@@ -257,6 +294,7 @@ Examples:
 - Risk: <impact in practical terms>
 - Recommendation: <concrete remediation path>
 - Confidence: HIGH | MEDIUM
+- Provenance: new | existing | unknown
 - False-positive note: <optional>
 
 ### High
@@ -267,6 +305,11 @@ Examples:
 
 ### Low
 ...
+
+## Check Execution Matrix
+| Check ID | Status | Notes |
+|----------|--------|-------|
+| CQ-01 | Executed / Skipped / N/A | <reason or short result> |
 
 ## Passed Checks
 - <check id> — <short note>
@@ -294,6 +337,7 @@ Examples:
 Notes:
 - Use `Critical` sparingly; require concrete exploitability/correctness evidence.
 - Heuristic-only signals without hard evidence should not exceed `High`.
+- Use `High` instead of `Critical` when exploitability is plausible but unproven.
 
 ---
 
@@ -303,6 +347,7 @@ Notes:
 2. Do not update specs/plans/tasks as part of this workflow.
 3. Present report path and top findings to the user.
 4. Wait for explicit follow-up direction before making changes elsewhere.
+5. Do not commit the generated report (`audit-reports/` is ephemeral and gitignored).
 
 ---
 
