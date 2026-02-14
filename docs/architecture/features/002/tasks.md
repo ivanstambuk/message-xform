@@ -265,25 +265,16 @@ _Last updated:_ 2026-02-14
 
 #### I10 — Shadow JAR + version guard (FR-002-09, FR-002-10, ADR-0035)
 
-- [ ] **T-002-29** — Runtime version guard warning semantics (ADR-0035, S-002-36)
+- [x] **T-002-29** — Runtime version guard warning semantics (ADR-0035, S-002-36)
   _Intent:_ Detect PA runtime/compiled version mismatch and log WARN remediation (no fail-fast).
-  _Test first:_ `VersionGuardTest` for match and mismatch behavior.
-  _Implement:_ Version mismatch detection and warning message.
+  _Test first:_ `VersionGuardTest` (8 tests: properties file exists, expected keys, compiled semver, runtime detectable, SDK pinned, check no-throw, idempotent, no fail-fast).
+  _Implement:_ `PaVersionGuard.check()` wired into `configure()` as first action.
   _Verify:_ Version guard tests pass.
 
-- [ ] **T-002-30** — Shadow JAR correctness verification (NFR-002-02, S-002-24)
-  _Test first:_ `ShadowJarTest` for include/exclude assertions.
-  _Implement:_ Verify JAR contains adapter + core + relocated core deps and excludes PA SDK/Jackson/SLF4J/Jakarta.
+- [x] **T-002-30** — Shadow JAR correctness verification (NFR-002-02, S-002-24)
+  _Test first:_ `ShadowJarTest` (12 tests: adapter/core classes included, SPI service file, compiled versions props, PA SDK/Jackson/SLF4J/Jakarta excluded, MR-JAR leakage, JAR < 5 MB).
+  _Implement:_ Automated verification of shadow JAR contents and size.
   _Verify:_ Shadow JAR checks pass.
-  _Verification commands:_
-  - `./gradlew :adapter-pingaccess:shadowJar`
-  - `jar tf adapter-pingaccess/build/libs/adapter-pingaccess-*-SNAPSHOT.jar | grep -q "io/messagexform/core"`
-  - `jar tf ... | grep -q "io/messagexform/internal/jackson"`
-  - `jar tf ... | grep -q "com/schibsted/spt/data/jslt"`
-  - `jar tf ... | grep -q "META-INF/services/com.pingidentity.pa.sdk.policy.AsyncRuleInterceptor"`
-  - `jar tf ... | grep -c "com/pingidentity/pa/sdk"` → must be 0
-  - `jar tf ... | grep "com/fasterxml/jackson"` → must be empty (catches MR-JAR leakage)
-  - `jar tf ... | grep "META-INF/services/com.fasterxml.jackson"` → must be empty
 
 #### I11 — Thread safety + performance (NFR-002-01, NFR-002-03, S-002-16, S-002-20)
 

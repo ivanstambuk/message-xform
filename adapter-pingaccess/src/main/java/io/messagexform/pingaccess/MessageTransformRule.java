@@ -128,6 +128,9 @@ public class MessageTransformRule extends AsyncRuleInterceptorBase<MessageTransf
     public void configure(MessageTransformConfig config) throws ValidationException {
         super.configure(config);
 
+        // Runtime version guard (ADR-0035, T-002-29) — warn-only, never fail-fast
+        PaVersionGuard.check();
+
         // T-002-13: Validate specsDir exists
         Path specsPath = Paths.get(config.getSpecsDir());
         if (!Files.isDirectory(specsPath)) {
