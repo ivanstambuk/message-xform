@@ -15,6 +15,26 @@
 > Track questions in `docs/architecture/open-questions.md`, encode resolved answers
 > here, and use ADRs under `docs/decisions/` for architectural clarifications.
 
+## Terminology
+
+> Feature-specific terms. Cross-cutting terms live in `docs/architecture/terminology.md`.
+
+- **Error mode** (`ErrorMode`, FR-002-11) — per-rule configuration controlling behavior
+  when the transform engine returns an ERROR result. Two modes: PASS_THROUGH and DENY.
+- **PASS_THROUGH** (error mode) — logs warning, preserves original message/response
+  unmodified, continues to backend. Scenario: S-002-11.
+- **DENY** (error mode) — rejects request (RFC 9457 + `Outcome.RETURN`) or rewrites
+  response in-place. Sets `TRANSFORM_DENIED` property to guard response phase.
+  Scenarios: S-002-12, S-002-28.
+- **bodyParseFailed** (skip-guard, S-002-08) — flag set when body cannot be parsed as
+  JSON. Body JSLT skipped, original bytes preserved, header/URL/status transforms apply.
+- **Version parity** (ADR-0035) — adapter module version mirrors the target PA version:
+  `<PA_MAJOR>.<PA_MINOR>.<PA_PATCH>.<ADAPTER_PATCH>`.
+- **Misdeployment guard** (ADR-0035) — runtime check comparing compiled vs detected PA
+  version. On mismatch: WARN + remediation, no fail-fast.
+- **ResponseBuilder** — PA SDK factory for constructing `Response` objects. Requires
+  `ServiceFactory` runtime; tests use injectable `responseFactory` lambda.
+
 ## Overview
 
 Gateway adapter that integrates message-xform with **PingAccess 9.0** via the

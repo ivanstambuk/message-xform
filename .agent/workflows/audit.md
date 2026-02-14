@@ -348,6 +348,7 @@ truly completed, so the audit trail it claims to preserve doesn't exist.
 | Check | What to look for | Severity |
 |-------|-----------------|----------|
 | **Terminology alignment** | Terms match `docs/architecture/terminology.md` | 🟢 Low |
+| **Terminology scoping** | Feature-specific terms are in the feature's `spec.md ## Terminology`, NOT in global `terminology.md` (scope rule) | 🟡 Medium |
 | **ADR references** | Referenced ADRs exist and are current (not superseded) | 🟡 Medium |
 | **Status headers** | Document status headers are accurate | 🟡 Medium |
 | **Status drift gate** | If spec says "Spec Ready" but tasks show implementation edits or amended requirements, flag the mismatch. The feature lifecycle status must be consistent across all docs. | 🔴 Critical |

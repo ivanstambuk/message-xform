@@ -1,10 +1,17 @@
 # message-xform – Terminology
 
-Status: Draft | Last updated: 2026-02-12
+Status: Draft | Last updated: 2026-02-14
 
 This document defines common terms used across the message-xform docs and specs so we
 can use consistent vocabulary. It is the golden source for terminology — any new
 terminology agreements must be captured here immediately.
+
+> **Scope rule:** This file is for **project-wide, cross-cutting** terminology only.
+> A term belongs here if it is used across multiple features or is part of the core
+> engine / SPI vocabulary. Terms specific to a single feature or adapter (e.g.,
+> PingAccess `ErrorMode`, standalone `ProxyHandler`) belong in that feature's own
+> `spec.md` under a `## Terminology` section. If a feature-specific concept later
+> proves cross-cutting, promote it here.
 
 ## Core concepts
 
@@ -150,18 +157,6 @@ terminology agreements must be captured here immediately.
     a single profile** match the same request (ADR-0006). Higher score = more
     specific = wins.
 
-- **Version parity** (ADR-0035)
-  - The convention that a gateway adapter module's version mirrors the target
-    gateway version exactly: `<GATEWAY_MAJOR>.<GATEWAY_MINOR>.<GATEWAY_PATCH>.<ADAPTER_PATCH>`.
-    The first 3 segments signal compatibility; the 4th is the adapter's own
-    patch counter. Applies to all gateway adapters (PingAccess, future Kong/Envoy).
-
-- **Misdeployment guard** (ADR-0035)
-  - A runtime safety check that compares the adapter's compiled-against gateway
-    version with the detected runtime gateway version.
-  - On mismatch, it logs a WARN with remediation to deploy the matching adapter
-    version line. It does not fail fast or abort plugin activation.
-
 ## Transform lifecycle
 
 - **Load time** (spec load / profile load)
@@ -181,30 +176,6 @@ terminology agreements must be captured here immediately.
   - Passthrough applies **only** to non-matching requests. When a profile matches
     but the transformation fails, the engine returns an error response instead
     (ADR-0022).
-
-- **Error mode** (`ErrorMode`, FR-002-11)
-  - A per-rule configuration that controls behavior when the transform engine
-    returns an ERROR result. Two modes: PASS_THROUGH and DENY.
-  - Configured in `MessageTransformConfig.errorMode`.
-
-- **PASS_THROUGH** (error mode)
-  - Error mode that logs a warning and preserves the original message/response
-    unmodified. The request continues to the backend (or the original response
-    returns to the client). Scenario: S-002-11.
-
-- **DENY** (error mode)
-  - Error mode that rejects the request or rewrites the response with an
-    RFC 9457 error body. In request phase: builds a new `Response` via
-    `ResponseBuilder` and returns `Outcome.RETURN`. In response phase:
-    rewrites the existing response in-place. Sets `TRANSFORM_DENIED` exchange
-    property to guard the response phase. Scenarios: S-002-12, S-002-28.
-
-- **bodyParseFailed** (skip-guard, S-002-08)
-  - A flag set by the adapter when the request or response body cannot be
-    parsed as JSON. When true, body JSLT expressions are NOT evaluated and
-    the original raw bytes are preserved. Header, URL, and status transforms
-    still apply. This prevents transform failures when the body is not JSON
-    (e.g. binary, plain text, or malformed).
 
 ## Pipeline chaining & message semantics
 
@@ -315,122 +286,29 @@ terminology agreements must be captured here immediately.
     all log entries and telemetry events (NFR-001-10). The engine participates in the
     caller's trace — it does not create new traces.
 
-## Standalone proxy (Feature 004)
-
-- **Standalone proxy** (`adapter-standalone`)
-  - The message-xform engine running as an independent HTTP reverse proxy without
-    any gateway product. Receives HTTP requests, applies transform profiles via the
-    `TransformEngine`, forwards to a configured backend, transforms the response,
-    and returns to the client. Deployed as a shadow JAR or Docker image.
-  - Implements `GatewayAdapter<Context>` using Javalin 6 (Jetty 12) with Java 21
-    virtual threads (ADR-0029).
-  - Serves as the **reference adapter** — the first concrete `GatewayAdapter`
-    implementation and the pattern for all subsequent gateway adapters.
-
-- **Standalone adapter** (`StandaloneAdapter`)
-  - The `GatewayAdapter<Context>` implementation for the standalone proxy. Wraps
-    Javalin's `Context` into `Message` objects (`wrapRequest`, `wrapResponse`) and
-    writes transformed results back via `applyChanges`. Parses cookies and query
-    parameters into `TransformContext` for `$cookies` / `$queryParams` binding.
-
-- **Proxy handler** (`ProxyHandler`)
-  - The central HTTP handler that orchestrates the full proxy cycle: receive request
-    → wrap → request-transform → forward to backend → wrap response → response-
-    transform → return to client. Implements the `TransformResult` dispatch table
-    (FR-004-35) and generates/echoes `X-Request-ID` headers (FR-004-38).
-
-- **Proxy config** (`ProxyConfig`, `BackendTlsConfig`, `TlsConfig`, `PoolConfig`)
-  - Immutable record hierarchy defining all proxy configuration. Loaded from YAML
-    (`message-xform-proxy.yaml`) via `ConfigLoader` with environment variable
-    overlay (FR-004-11). `ProxyConfig` is the root (with flat backend fields and
-    a builder); nested records hold inbound TLS, outbound TLS, and connection pool
-    settings. 41 config keys (CFG-004-01 through CFG-004-41) with corresponding
-    environment variable mappings.
-
-- **File watcher** (`FileWatcher`)
-  - A `WatchService`-based component that monitors the specs directory for changes
-    and triggers `TransformEngine.reload()` with configurable debounce. Provides
-    zero-downtime hot reload (NFR-004-05). Can be disabled via `reload.enabled: false`.
-
-- **Admin reload handler** (`AdminReloadHandler`)
-  - Javalin handler for `POST /admin/reload` (FR-004-20). Scans the specs directory
-    for `*.yaml`/`*.yml` files, calls `TransformEngine.reload()`, and returns a JSON
-    summary (`{"status": "reloaded", "specs": N, "profile": "id-or-none"}`). On failure,
-    returns `500` with RFC 9457 problem detail; the previous registry stays active.
-    Registered as a dedicated route before the wildcard proxy handler — not subject to
-    profile matching.
-
-- **Sidecar pattern**
-  - A Kubernetes deployment model where the standalone proxy runs as a container
-    alongside the backend application in the same pod. Traffic flows through the
-    proxy for transformation before reaching the backend. The proxy uses
-    `localhost` as the backend host.
-
-- **Upstream client** (`UpstreamClient`)
-  - The component that forwards (potentially transformed) HTTP requests to the
-    configured backend. Uses JDK `HttpClient` with HTTP/1.1. Recalculates
-    `Content-Length` after body transformation.
-
-- **Hop-by-hop headers**
-  - HTTP headers that are meaningful only for a single transport-level connection
-    and must not be forwarded by proxies (RFC 9110 §7.6.1). Includes
-    `Connection`, `Keep-Alive`, `Transfer-Encoding`, `TE`, `Trailer`,
-    `Proxy-Authorization`, `Proxy-Authenticate`, and `Upgrade`. In this project,
-    `UpstreamClient` strips hop-by-hop headers from forwarded requests, and
-    `ProxyHandler` filters `Content-Length` and `Transfer-Encoding` from upstream
-    responses to prevent body truncation when response transforms change the body
-    size.
+## Packaging & error conventions
 
 - **Problem detail** (`ProblemDetail`, RFC 9457)
   - A standardised JSON error response format (`application/problem+json`) used
-    for all proxy-level errors: backend failures (502/504), body size violations
-    (413), non-JSON body on matched route (400), and method rejection (405).
-    Transform errors use the core `ErrorResponseBuilder` (ADR-0022) which produces
-    the same RFC 9457 structure. Every problem detail includes `type` (URN),
-    `title`, `status`, `detail`, and `instance` (request path) fields.
-
-- **Upstream exception** (`UpstreamException` hierarchy)
-  - Domain-specific exception classes for backend communication failures.
-    `UpstreamConnectException` covers connection refused and host unreachable
-    (→ 502 Bad Gateway). `UpstreamTimeoutException` covers read timeouts
-    (→ 504 Gateway Timeout). `ProxyHandler` catches these and converts them
-    to RFC 9457 problem details via `ProblemDetail`.
-
-- **TLS configurator** (`TlsConfigurator`)
-  - Configures Javalin's embedded Jetty for inbound TLS (HTTPS) serving
-    (FR-004-14, FR-004-15). Uses Jetty 11's `SslContextFactory.Server` to
-    terminate TLS, supporting server keystore, client-auth modes (`none`,
-    `want`, `need`), and truststore for mTLS client certificate validation.
-    Added via `config.jetty.addConnector()`.
-
-- **TLS config validator** (`TlsConfigValidator`)
-  - Startup-time validation of TLS settings (S-004-43). Checks keystore and
-    truststore file existence, readability, correct passwords, and mTLS
-    requirements (e.g., `client-auth=need` requires a truststore). Called
-    before the server starts to provide descriptive errors instead of cryptic
-    runtime failures.
-
-- **Mutual TLS (mTLS)**
-  - Two-way TLS authentication. **Inbound mTLS** (FR-004-15): the proxy
-    requires connecting clients to present a certificate verified against a
-    configured truststore. **Outbound mTLS** (FR-004-17): the proxy presents
-    a client certificate from a configured keystore when connecting to the
-    backend. Both rely on `SSLContext` with `KeyManagerFactory` and/or
-    `TrustManagerFactory`.
+    for all error responses across adapters and the core engine. Structure:
+    `type` (URN), `title`, `status`, `detail`, `instance` (request path).
+    Core `ErrorResponseBuilder` (ADR-0022) produces this structure for transform
+    errors; adapters use it for gateway-level errors.
 
 - **Shadow JAR**
-  - A single fat JAR containing the `core`, `adapter-standalone`, and all
-    transitive dependencies. Produced by the Gradle Shadow plugin. The Docker
-    image runs `java -jar proxy.jar` with no classpath setup required.
+  - A single fat JAR containing an adapter module, the `core`, and all
+    transitive dependencies. Produced by the Gradle Shadow plugin. Used by
+    both the standalone proxy (Docker image) and the PingAccess adapter
+    (PA plugin deployment).
 
-## Toolchain & quality (Feature 009)
+## Toolchain & quality
 
 - **Quality gate**
   - The automated verification pipeline that must pass before code is committed or
     merged. In message-xform this means `./gradlew --no-daemon spotlessCheck check`
     — which runs formatting verification, compilation with `-Werror`, and all JUnit 5
     tests. Enforced locally by `githooks/pre-commit` and remotely by
-    `.github/workflows/ci.yml`. See `docs/operations/quality-gate.md` and Feature 009.
+    `.github/workflows/ci.yml`. See `docs/operations/quality-gate.md`.
 
 - **Version catalog** (`gradle/libs.versions.toml`)
   - Gradle's centralized dependency version management. All dependency and plugin

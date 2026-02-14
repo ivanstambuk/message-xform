@@ -16,6 +16,32 @@
 > Track questions in `docs/architecture/open-questions.md`, encode resolved answers
 > here, and use ADRs under `docs/decisions/` for architectural clarifications.
 
+## Terminology
+
+> Feature-specific terms. Cross-cutting terms live in `docs/architecture/terminology.md`.
+
+- **Standalone proxy** (`adapter-standalone`) — the message-xform engine running as an
+  independent HTTP reverse proxy. Reference adapter and first `GatewayAdapter` impl.
+  Uses Javalin 6 / Jetty 12 with Java 21 virtual threads (ADR-0029).
+- **Standalone adapter** (`StandaloneAdapter`) — `GatewayAdapter<Context>` impl wrapping
+  Javalin `Context` into `Message` objects.
+- **Proxy handler** (`ProxyHandler`) — HTTP handler orchestrating the full proxy cycle:
+  receive → wrap → request-transform → forward → wrap response → response-transform → return.
+- **Proxy config** (`ProxyConfig`, `BackendTlsConfig`, `TlsConfig`, `PoolConfig`) —
+  immutable record hierarchy loaded from YAML with environment variable overlay.
+- **File watcher** (`FileWatcher`) — `WatchService`-based hot reload trigger with
+  configurable debounce.
+- **Admin reload handler** (`AdminReloadHandler`) — `POST /admin/reload` endpoint.
+- **Sidecar pattern** — Kubernetes deployment model alongside backend in same pod.
+- **Upstream client** (`UpstreamClient`) — JDK `HttpClient` wrapper for backend forwarding.
+- **Hop-by-hop headers** — HTTP headers stripped by the proxy per RFC 9110 §7.6.1.
+- **Upstream exception** (`UpstreamException` hierarchy) — domain exceptions for
+  backend failures (connect → 502, timeout → 504).
+- **TLS configurator** (`TlsConfigurator`) — Jetty TLS setup for inbound HTTPS.
+- **TLS config validator** (`TlsConfigValidator`) — startup-time TLS config validation.
+- **Mutual TLS (mTLS)** — two-way TLS: inbound client verification and/or outbound
+  client cert presentation.
+
 ## Overview
 
 The message-xform engine running as an independent **HTTP reverse proxy** without any

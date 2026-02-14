@@ -47,6 +47,11 @@ ledger (step 3f). Do NOT just mention gaps in chat — write them down.
 - Check: are all new terms defined in the terminology doc? If not, flag them.
 - Check: were any "avoid" terms from the canonical term map used in new docs?
   Search with `rg` if needed.
+- **Scope check**: Verify that every term in `terminology.md` is genuinely
+  cross-cutting (used across multiple features or part of core engine/SPI).
+  Terms specific to a single feature or adapter (e.g., `ErrorMode`, `ProxyHandler`,
+  `ResponseBuilder`) belong in that feature's `spec.md` under `## Terminology`.
+  If feature-specific terms were added to global terminology, flag them for relocation.
 
 #### 3c. ADR Completeness Check
 // turbo
