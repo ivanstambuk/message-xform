@@ -225,10 +225,25 @@ See `docs/operations/quality-gate.md` for full pipeline documentation.
 14. **No Destructive Commands**: Avoid destructive commands (e.g., `rm -rf`, `git reset --hard`, force-pushes) unless the user explicitly requests them. Stay within the repository sandbox. Prefer reversible operations.
 15. **Dependency Approval Required**: Never add or upgrade libraries, Gradle plugins, BOMs, or other build dependencies without explicit user approval. When approved, document the rationale in the relevant feature plan or ADR. Automated dependency PRs (e.g., Dependabot) still require owner approval before merging.
 16. **No Reflection**: Do not introduce Java reflection in production or test sources. When existing code requires access to collaborators or internals, prefer explicit seams (constructor parameters, package-private collaborators, or dedicated test fixtures) instead of reflection.
-17. **Learnings Must Be Persisted**: Session learnings (pitfalls, syntax gotchas, tooling workarounds, API surprises) MUST be written to a file — never left as chat-only retro bullets. Target locations:
+17. **Learnings Must Be Persisted**: Session learnings MUST be written to the appropriate file — never left as chat-only retro bullets. Knowledge has three tiers; choose the right destination:
+
+    **Tier 1 — Pitfalls** (gotchas, quirks, workarounds — short entries):
     - **Library/API quirks** → the module's `PITFALLS.md` (e.g., `core/PITFALLS.md`, `adapter-pingaccess/PITFALLS.md`).
-    - **Tooling/process pitfalls** → the module's `PITFALLS.md`, or `AGENTS.md` if truly project-wide.
-    - **Conventions** → `AGENTS.md` operational rules.
+    - **Tooling/process pitfalls** → the module's `PITFALLS.md`, or `AGENTS.md` Known Pitfalls section if truly project-wide.
+
+    **Tier 2 — Reference guides** (comprehensive, living documents — updated as knowledge accrues):
+    - Each gateway/product may have two reference guides:
+      - **SDK / development guide** — how the vendor's SDK works, API behaviour, lifecycle hooks, undocumented features, class hierarchies, configuration field semantics.
+      - **Operations guide** — how to deploy, configure, authenticate, debug, and diagnose the vendor product. Admin API recipes, Docker patterns, log file locations, common error flowcharts.
+    - When you discover something during implementation or debugging — a new API quirk, a configuration gotcha, a diagnostic technique — **update the relevant guide immediately**, don't defer. The guides are the canonical "lessons learned" repository for that product.
+    - Current guides (Feature 002 — PingAccess):
+      - SDK guide: `docs/reference/pingaccess-sdk-guide.md`
+      - Operations guide: `docs/operations/pingaccess-operations-guide.md`
+    - Future features (003 PingGateway, 005 WSO2, etc.) should create equivalent guides under the same patterns when implementation begins.
+
+    **Tier 3 — Conventions** (project-wide rules):
+    - **New conventions or process rules** → `AGENTS.md` operational rules.
+    - **Terminology** → `docs/architecture/terminology.md`.
 18. **No Cascading Renumber**: When inserting new increments, tasks, scenarios, or requirements between existing ones, use **letter suffixes** (e.g., I11a, T-001-36a, S-001-74a, FR-001-12a) instead of renumbering all downstream IDs. This avoids churn across cross-referencing documents (spec, plan, tasks, scenarios, knowledge-map). A dedicated cleanup pass may renumber IDs at the end of a feature when the structure is stable — never during active refinement.
 19. **Spec Amendment Cascade** ⚡ **(NON-NEGOTIABLE)**: When a feature spec is modified — new FRs added, interfaces changed, scenarios extended, or contracts altered — the agent MUST immediately cascade status and implementation changes through all dependent documents. Do **not** leave a spec amended while surrounding documents still claim "Complete".
     - **Cascade checklist** (complete ALL steps in the same commit or increment):
