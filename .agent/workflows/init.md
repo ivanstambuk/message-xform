@@ -56,8 +56,11 @@ If `cloc` is not installed, note it as a gap and continue.
 // turbo
 Check the latest GitHub Actions CI run status:
 ```bash
-gh run list --limit 1 --json status,conclusion,name,headBranch,event,createdAt,url
+gh run list --limit 1 --json status,conclusion,name,headBranch,event,createdAt,url \
+  | jq '.[0] + {ageMinutes: ((now - (.createdAt | fromdateiso8601)) / 60 | floor)}'
 ```
+The `ageMinutes` field tells you how long ago the run started — use this instead
+of comparing `createdAt` (UTC) against the user's local clock.
 Interpret the result:
 - **`conclusion: success`** → CI is green. Note it in the summary as ✅.
 - **`conclusion: failure`** → CI is RED. Flag it prominently in the summary as
