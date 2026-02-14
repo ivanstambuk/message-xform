@@ -1,15 +1,18 @@
 # Pending Task
 
-**Focus**: Feature 002 — PingAccess Adapter
-**Status**: Complete — all 34 tasks done, 219 tests passing, 100% scenario coverage.
-**Next Step**: Choose next feature to implement (Feature 004 Standalone Proxy or Feature 009 Toolchain).
+**Focus**: E2E Test Verification
+**Status**: Tests rewritten with stronger assertions but not yet run against live PA
+**Next Step**: Run `scripts/pa-e2e-test.sh` to verify all tests pass with the new
+bidirectional spec and raw-body echo backend
 
 ## Context Notes
-- FR-002-12 (Docker E2E) is intentionally deferred — requires PingAccess Docker image.
-- All FR status fields in `spec.md` updated to ✅ except FR-002-12.
-- Coverage matrix created at `docs/architecture/features/002/coverage-matrix.md`.
-- Two new pitfalls documented in `adapter-pingaccess/PITFALLS.md` (JMX test isolation, Gradle CWD).
-- `llms.txt` updated with scenarios.md and coverage-matrix.md for Feature 002.
+- `e2e-rename.yaml` changed from unidirectional to bidirectional (forward/reverse)
+- Echo backend now returns raw request body (no `{"echo":{...}}` envelope)
+- Test 1 now asserts actual field values (`user_id`, `first_name`, etc.) instead
+  of just "is JSON"
+- Direct echo probe added (bypasses PA) to verify request-side transform
+- Rule 17 in AGENTS.md now has three tiers — future features should create
+  SDK + operations guides following the same pattern as Feature 002
 
-## SDD Gaps
-- None — all checks passed (scenarios, terminology, ADRs, open questions, spec consistency).
+## SDD Gaps (if any)
+- None identified — all retro checks passed clean
