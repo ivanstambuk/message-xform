@@ -727,6 +727,10 @@ Notes:
 3. Present report path and top findings to the user.
 4. Wait for explicit follow-up direction before making changes elsewhere.
 5. Do not commit the generated report (`audit-reports/` is ephemeral and gitignored).
+6. **Auto-cleanup:** Once **all** action items from the active code-audit report are
+   resolved and verified, **immediately delete the report file** from
+   `audit-reports/` (do not ask for confirmation). Keep the file only while work
+   remains open.
 
 ---
 
