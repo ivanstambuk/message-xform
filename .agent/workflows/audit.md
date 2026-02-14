@@ -520,6 +520,21 @@ The detailed report uses this format:
 | 🟢 Low | X |
 | ✅ Clean phases | <list> |
 
+## Findings Tracker
+
+| ID | Severity | Status | Updated | Evidence |
+|----|----------|--------|---------|----------|
+| F-001 | 🔴 Critical | Open | 2026-02-14 | Initial audit |
+| F-002 | 🟡 Medium | Fixed ✅ | 2026-02-15 | Commit `<hash>` |
+| F-003 | ✅ OK | Verified | 2026-02-15 | Check output |
+
+Status values:
+- `Open` — finding still unresolved
+- `Fixed ✅` — fix implemented and verified
+- `Deferred` — acknowledged, intentionally postponed
+- `Blocked` — cannot proceed without decision/input
+- `Verified` — non-finding check passed (optional for ✅ OK rows)
+
 ## Findings
 
 ### 🔴 Critical
@@ -553,6 +568,12 @@ dismissed. These should be discussed before applying any fixes.
 1. <prioritized list of actions>
 2. ...
 ````
+
+**Tracker requirement (mandatory):**
+- The `Findings Tracker` section is required in every detailed audit report.
+- Every finding ID in the report must appear exactly once in the tracker.
+- When fixes are applied, update tracker status + evidence before sending the
+  final follow-up summary.
 
 ### Tier 2 — Chat Summary (always present)
 
@@ -610,7 +631,9 @@ After presenting the chat summary:
 2. If the user says "fix all" or "fix issues 1-4", apply the fixes
 3. Each fix should be a targeted edit (not a full rewrite)
 4. After fixes, re-run the relevant checks to verify no regressions
-5. Update the **detailed report file** to mark fixed items (strikethrough + ✅)
+5. Update the **detailed report file**:
+   - mark fixed items (strikethrough + ✅)
+   - update `Findings Tracker` statuses, dates, and evidence (commit/check)
 6. Do **not** commit the report file — it stays gitignored
 7. Do NOT start implementation — this is a documentation-only workflow
 8. **Open questions** from the findings report should be discussed with the
