@@ -17,8 +17,11 @@ import io.messagexform.core.model.SessionContext;
 import io.messagexform.core.model.TransformContext;
 import io.messagexform.core.model.TransformResult;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.CompletionStage;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -46,13 +49,18 @@ class TransformFlowTest {
     private Body responseBody;
     private Headers requestHeaders;
     private Headers responseHeaders;
+    private Path specsDir;
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
         engine = mock(TransformEngine.class);
         adapter = new PingAccessAdapter(MAPPER);
 
         rule = new MessageTransformRule();
+        specsDir = Files.createTempDirectory("mxform-transform-flow");
+        MessageTransformConfig config = new MessageTransformConfig();
+        config.setSpecsDir(specsDir.toString());
+        rule.configure(config);
         rule.setEngine(engine);
         rule.setAdapter(adapter);
 
@@ -80,6 +88,16 @@ class TransformFlowTest {
         when(responseBody.isRead()).thenReturn(true);
         when(responseBody.getContent()).thenReturn("{\"ok\":true}".getBytes(StandardCharsets.UTF_8));
         when(responseHeaders.getHeaderFields()).thenReturn(List.of());
+    }
+
+    @AfterEach
+    void cleanup() throws Exception {
+        if (rule != null) {
+            rule.shutdown();
+        }
+        if (specsDir != null) {
+            Files.deleteIfExists(specsDir);
+        }
     }
 
     // ── T-002-20: Request SUCCESS / PASSTHROUGH / bodyParseFailed ──
@@ -110,6 +128,8 @@ class TransformFlowTest {
             assertThat(result.toCompletableFuture().get()).isEqualTo(Outcome.CONTINUE);
             // Verify URI was applied to request
             verify(request).setUri("/api/test");
+            assertThat(rule.metrics().getTransformSuccessCount()).isEqualTo(1);
+            assertThat(rule.metrics().getTransformTotalCount()).isEqualTo(1);
         }
 
         @Test
@@ -126,6 +146,8 @@ class TransformFlowTest {
             assertThat(result.toCompletableFuture().get()).isEqualTo(Outcome.CONTINUE);
             // No changes applied — request URI not touched after wrap
             verify(request, never()).setUri(anyString());
+            assertThat(rule.metrics().getTransformPassthroughCount()).isEqualTo(1);
+            assertThat(rule.metrics().getTransformTotalCount()).isEqualTo(1);
         }
     }
 
@@ -228,6 +250,8 @@ class TransformFlowTest {
             assertThat(result.toCompletableFuture().get()).isEqualTo(Outcome.CONTINUE);
             // Original body preserved — no setUri calls
             verify(request, never()).setUri(anyString());
+            assertThat(rule.metrics().getTransformErrorCount()).isEqualTo(1);
+            assertThat(rule.metrics().getTransformTotalCount()).isEqualTo(1);
         }
 
         @Test
@@ -275,6 +299,8 @@ class TransformFlowTest {
             CompletionStage<Outcome> result = rule.handleRequest(exchange);
 
             assertThat(result.toCompletableFuture().get()).isEqualTo(Outcome.RETURN);
+            assertThat(rule.metrics().getTransformDenyCount()).isEqualTo(1);
+            assertThat(rule.metrics().getTransformTotalCount()).isEqualTo(1);
         }
 
         @Test

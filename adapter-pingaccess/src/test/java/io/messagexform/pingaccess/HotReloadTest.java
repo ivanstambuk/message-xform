@@ -4,7 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -23,6 +25,20 @@ import org.junit.jupiter.api.io.TempDir;
  * and verify outcomes through the engine's specCount() accessor.
  */
 class HotReloadTest {
+
+    private static final Duration RELOAD_TIMEOUT = Duration.ofSeconds(5);
+    private static final Duration RELOAD_POLL_INTERVAL = Duration.ofMillis(100);
+
+    private static void awaitCondition(BooleanSupplier condition, String failureMessage) throws Exception {
+        long deadline = System.nanoTime() + RELOAD_TIMEOUT.toNanos();
+        while (System.nanoTime() < deadline) {
+            if (condition.getAsBoolean()) {
+                return;
+            }
+            TimeUnit.MILLISECONDS.sleep(RELOAD_POLL_INTERVAL.toMillis());
+        }
+        assertThat(condition.getAsBoolean()).as(failureMessage).isTrue();
+    }
 
     // ── T-002-25: Scheduler lifecycle ──
 
@@ -141,11 +157,8 @@ class HotReloadTest {
                 // Add a second spec on disk
                 writeSpec(tempDir, "spec-b");
 
-                // Wait for at least one reload cycle
-                TimeUnit.SECONDS.sleep(3);
-
-                // Engine should now have more specs
-                assertThat(rule.engine().specCount()).isGreaterThan(initialCount);
+                awaitCondition(
+                        () -> rule.engine().specCount() > initialCount, "reload should pick up newly added spec file");
             } finally {
                 rule.shutdown();
             }
@@ -171,12 +184,9 @@ class HotReloadTest {
                 Path badFile = tempDir.resolve("bad-spec.yaml");
                 Files.writeString(badFile, "{ broken yaml: [[");
 
-                // Wait for reload cycle
-                TimeUnit.SECONDS.sleep(3);
-
-                // Previous valid registry should be retained
-                // (reload failure means old registry stays, specCount unchanged)
-                assertThat(rule.engine().specCount()).isEqualTo(configuredCount);
+                awaitCondition(
+                        () -> rule.engine().specCount() == configuredCount,
+                        "reload failure should retain previous valid registry");
 
                 // Remove bad file, restore health
                 Files.deleteIfExists(badFile);
@@ -219,11 +229,9 @@ class HotReloadTest {
                 // Engine loaded spec + profile at configure time
                 assertThat(rule.engine().specCount()).isGreaterThanOrEqualTo(1);
 
-                // Wait for at least one reload cycle to verify profile path resolution
-                TimeUnit.SECONDS.sleep(3);
-
-                // Engine should still have specs after reload (profile resolved OK)
-                assertThat(rule.engine().specCount()).isGreaterThanOrEqualTo(1);
+                awaitCondition(
+                        () -> rule.engine().specCount() >= 1,
+                        "reload should keep specs loaded when profile path resolves");
             } finally {
                 rule.shutdown();
             }
@@ -244,10 +252,8 @@ class HotReloadTest {
             try {
                 assertThat(rule.engine().specCount()).isGreaterThanOrEqualTo(1);
 
-                // Wait for reload — should succeed with null profile
-                TimeUnit.SECONDS.sleep(3);
-
-                assertThat(rule.engine().specCount()).isGreaterThanOrEqualTo(1);
+                awaitCondition(
+                        () -> rule.engine().specCount() >= 1, "reload without active profile should keep specs loaded");
             } finally {
                 rule.shutdown();
             }

@@ -12,6 +12,8 @@ import io.messagexform.core.model.SessionContext;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -269,6 +271,72 @@ class PingAccessAdapterRequestTest {
             when(body.getContent()).thenReturn(json);
             adapter.wrapRequest(exchange);
             assertThat(adapter.isBodyParseFailed()).isFalse();
+        }
+
+        @Test
+        void bodyParseFailedIsolatedPerThread() throws Exception {
+            Exchange exchangeA = mock(Exchange.class);
+            Request requestA = mock(Request.class);
+            Body bodyA = mock(Body.class);
+            Headers headersA = mock(Headers.class);
+            when(exchangeA.getRequest()).thenReturn(requestA);
+            when(requestA.getBody()).thenReturn(bodyA);
+            when(requestA.getHeaders()).thenReturn(headersA);
+            when(requestA.getMethod()).thenReturn(Method.POST);
+            when(requestA.getUri()).thenReturn("/a");
+            when(bodyA.isRead()).thenReturn(true);
+            when(bodyA.getContent()).thenReturn("not-json".getBytes(StandardCharsets.UTF_8));
+            when(headersA.getHeaderFields()).thenReturn(List.of());
+
+            Exchange exchangeB = mock(Exchange.class);
+            Request requestB = mock(Request.class);
+            Body bodyB = mock(Body.class);
+            Headers headersB = mock(Headers.class);
+            when(exchangeB.getRequest()).thenReturn(requestB);
+            when(requestB.getBody()).thenReturn(bodyB);
+            when(requestB.getHeaders()).thenReturn(headersB);
+            when(requestB.getMethod()).thenReturn(Method.POST);
+            when(requestB.getUri()).thenReturn("/b");
+            when(bodyB.isRead()).thenReturn(true);
+            when(bodyB.getContent()).thenReturn("{\"ok\":true}".getBytes(StandardCharsets.UTF_8));
+            when(headersB.getHeaderFields()).thenReturn(List.of());
+
+            CountDownLatch aWrapped = new CountDownLatch(1);
+            CountDownLatch bWrapped = new CountDownLatch(1);
+            AtomicBoolean aFlag = new AtomicBoolean();
+            AtomicBoolean bFlag = new AtomicBoolean();
+
+            Thread threadA = new Thread(() -> {
+                adapter.wrapRequest(exchangeA);
+                aWrapped.countDown();
+                try {
+                    bWrapped.await();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException(e);
+                }
+                aFlag.set(adapter.isBodyParseFailed());
+            });
+
+            Thread threadB = new Thread(() -> {
+                try {
+                    aWrapped.await();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException(e);
+                }
+                adapter.wrapRequest(exchangeB);
+                bFlag.set(adapter.isBodyParseFailed());
+                bWrapped.countDown();
+            });
+
+            threadA.start();
+            threadB.start();
+            threadA.join();
+            threadB.join();
+
+            assertThat(aFlag.get()).isTrue();
+            assertThat(bFlag.get()).isFalse();
         }
     }
 

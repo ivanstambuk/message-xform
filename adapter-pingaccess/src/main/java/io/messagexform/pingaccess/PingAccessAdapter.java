@@ -27,9 +27,9 @@ import org.slf4j.LoggerFactory;
  * tracks body parse state via {@link #isBodyParseFailed()}.
  *
  * <p>
- * <strong>Thread safety:</strong> A single adapter instance is used per
- * request/response cycle within a single thread (PingAccess rule lifecycle).
- * The {@code bodyParseFailed} flag is reset at the start of each wrap call
+ * <strong>Thread safety:</strong> Parse-state is tracked via thread-local
+ * storage so concurrent rule invocations cannot overwrite each other's
+ * body-parse outcome before it is consumed by the rule orchestration
  * (NFR-002-03).
  */
 class PingAccessAdapter implements GatewayAdapter<Exchange> {
@@ -47,7 +47,7 @@ class PingAccessAdapter implements GatewayAdapter<Exchange> {
      * {@code MessageTransformRule} to determine whether to skip body transforms
      * and preserve the original raw body bytes (spec §FR-002-01, S-002-08).
      */
-    private boolean bodyParseFailed;
+    private final ThreadLocal<Boolean> bodyParseFailed = ThreadLocal.withInitial(() -> Boolean.FALSE);
 
     PingAccessAdapter(ObjectMapper objectMapper) {
         this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper");
@@ -57,7 +57,7 @@ class PingAccessAdapter implements GatewayAdapter<Exchange> {
 
     @Override
     public Message wrapRequest(Exchange exchange) {
-        bodyParseFailed = false;
+        bodyParseFailed.set(Boolean.FALSE);
 
         Request request = exchange.getRequest();
 
@@ -91,7 +91,7 @@ class PingAccessAdapter implements GatewayAdapter<Exchange> {
 
     @Override
     public Message wrapResponse(Exchange exchange) {
-        bodyParseFailed = false;
+        bodyParseFailed.set(Boolean.FALSE);
 
         Request request = exchange.getRequest();
         Response response = exchange.getResponse();
@@ -141,7 +141,7 @@ class PingAccessAdapter implements GatewayAdapter<Exchange> {
      * skip body transforms and preserve the original raw body (S-002-08).
      */
     boolean isBodyParseFailed() {
-        return bodyParseFailed;
+        return bodyParseFailed.get();
     }
 
     // ── Session context construction (T-002-18, T-002-19, FR-002-06) ──
@@ -531,11 +531,11 @@ class PingAccessAdapter implements GatewayAdapter<Exchange> {
                 paBody.read();
             } catch (IOException e) {
                 LOG.warn("Failed to read body: {}", e.getMessage(), e);
-                bodyParseFailed = true;
+                bodyParseFailed.set(Boolean.TRUE);
                 return MessageBody.empty();
             } catch (AccessException e) {
                 LOG.warn("Body read denied ({}): {}", e.getErrorStatus(), e.getMessage(), e);
-                bodyParseFailed = true;
+                bodyParseFailed.set(Boolean.TRUE);
                 return MessageBody.empty();
             }
         }
@@ -552,7 +552,7 @@ class PingAccessAdapter implements GatewayAdapter<Exchange> {
             return MessageBody.json(content);
         } catch (IOException e) {
             LOG.warn("Body is not valid JSON ({} bytes), using empty body: {}", content.length, e.getMessage());
-            bodyParseFailed = true;
+            bodyParseFailed.set(Boolean.TRUE);
             return MessageBody.empty();
         }
     }

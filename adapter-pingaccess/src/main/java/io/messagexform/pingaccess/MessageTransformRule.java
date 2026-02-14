@@ -287,11 +287,17 @@ public class MessageTransformRule extends AsyncRuleInterceptorBase<MessageTransf
                     adapter.applyRequestChanges(result.message(), exchange, originalHeaderNames);
                     LOG.debug("Request transform SUCCESS: {} {}", wrapped.requestMethod(), wrapped.requestPath());
                 }
+                if (metrics != null) {
+                    metrics.recordSuccess(durationMs);
+                }
                 setTransformResultProperty(exchange, result, "REQUEST", durationMs);
                 yield CompletableFuture.completedFuture(Outcome.CONTINUE);
             }
             case PASSTHROUGH -> {
                 LOG.debug("Request transform PASSTHROUGH: {} {}", wrapped.requestMethod(), wrapped.requestPath());
+                if (metrics != null) {
+                    metrics.recordPassthrough(durationMs);
+                }
                 setTransformResultProperty(exchange, result, "REQUEST", durationMs);
                 yield CompletableFuture.completedFuture(Outcome.CONTINUE);
             }
@@ -346,6 +352,9 @@ public class MessageTransformRule extends AsyncRuleInterceptorBase<MessageTransf
                             wrapped.requestPath(),
                             status);
                 }
+                if (metrics != null) {
+                    metrics.recordSuccess(durationMs);
+                }
                 setTransformResultProperty(exchange, result, "RESPONSE", durationMs);
             }
             case PASSTHROUGH -> {
@@ -354,6 +363,9 @@ public class MessageTransformRule extends AsyncRuleInterceptorBase<MessageTransf
                         wrapped.requestMethod(),
                         wrapped.requestPath(),
                         status);
+                if (metrics != null) {
+                    metrics.recordPassthrough(durationMs);
+                }
                 setTransformResultProperty(exchange, result, "RESPONSE", durationMs);
             }
             case ERROR -> handleResponseError(exchange, result, wrapped, durationMs);
@@ -378,6 +390,9 @@ public class MessageTransformRule extends AsyncRuleInterceptorBase<MessageTransf
                     "Request transform error (PASS_THROUGH): {} {} — forwarding original",
                     wrapped.requestMethod(),
                     wrapped.requestPath());
+            if (metrics != null) {
+                metrics.recordError(durationMs);
+            }
             return CompletableFuture.completedFuture(Outcome.CONTINUE);
         }
 
@@ -392,6 +407,9 @@ public class MessageTransformRule extends AsyncRuleInterceptorBase<MessageTransf
         Response errorResponse = responseFactory.apply(HttpStatus.forCode(result.errorStatusCode()), errorBody);
         exchange.setResponse(errorResponse);
         exchange.setProperty(TRANSFORM_DENIED, Boolean.TRUE);
+        if (metrics != null) {
+            metrics.recordDeny(durationMs);
+        }
 
         return CompletableFuture.completedFuture(Outcome.RETURN);
     }
@@ -409,6 +427,9 @@ public class MessageTransformRule extends AsyncRuleInterceptorBase<MessageTransf
                     wrapped.requestMethod(),
                     wrapped.requestPath(),
                     wrapped.statusCode());
+            if (metrics != null) {
+                metrics.recordError(durationMs);
+            }
             return;
         }
 
@@ -425,6 +446,9 @@ public class MessageTransformRule extends AsyncRuleInterceptorBase<MessageTransf
         resp.setStatus(HttpStatus.forCode(result.errorStatusCode()));
         resp.setBodyContent(errorBody != null ? errorBody.getBytes(StandardCharsets.UTF_8) : new byte[0]);
         resp.getHeaders().setContentType("application/problem+json");
+        if (metrics != null) {
+            metrics.recordDeny(durationMs);
+        }
     }
 
     /**
