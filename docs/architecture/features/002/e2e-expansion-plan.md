@@ -1,7 +1,7 @@
 # E2E Test Expansion Plan — Feature 002
 
 _Created:_ 2026-02-14
-_Status:_ Draft
+_Status:_ Complete
 _Linked:_ `e2e-results.md`, FR-002-12, `scripts/pa-e2e-test.sh`
 
 ## Objective
@@ -10,9 +10,9 @@ Expand the E2E test suite from smoke-level (8 scenarios) to comprehensive
 coverage of all scenarios that exercise **live PA behavior** — things mocks
 cannot fully substitute.
 
-**Current state:** 18/18 assertions across 8 scenarios.
-**Target state:** ~13 additional scenarios validated E2E → 21 total.
-**Projected assertions:** ~44 total (18 existing + ~26 new).
+**Current state:** 50/50 assertions across 19 test groups covering 22 scenarios.
+**Starting baseline:** 18/18 assertions across 8 scenarios.
+**Net additions:** 32 assertions, 11 test groups, 14 new scenarios.
 
 ---
 
@@ -192,7 +192,7 @@ and new test patterns. Re-run existing tests as regression gate.
 | P2-01 | Upgrade `engine_request()` helper: (a) capture response headers to `$ENGINE_HEADERS` via `-D` dump-header flag, (b) accept optional extra header arguments after body, (c) skip default `Content-Type: application/json` when caller provides their own | ✅ |
 | P2-02 | Add `PROFILES_DIR` variable, mount `-v "$PROFILES_DIR:/profiles"` in PA container | ✅ |
 | P2-03 | Update rule creation JSON: `"profilesDir": "/profiles"`, `"activeProfile": "e2e-profile"` | ✅ |
-| P2-04 | Run existing 18 assertions — all must still pass (profile routes `/api/transform/**` → `e2e-rename` with both directions, same as before) | 🔲 run |
+| P2-04 | Run existing 18 assertions — all must still pass (profile routes `/api/transform/**` → `e2e-rename` with both directions, same as before) | ✅ |
 | P2-05 | Add log assertion: PA logs show `"Loaded profile: e2e-profile"` | ✅ |
 
 **Exit criteria:** Existing 18/18 pass + profile loaded. No regressions.
@@ -247,11 +247,11 @@ The existing rule has `errorMode=PASS_THROUGH`.
 
 | ID | Task | Status |
 |----|------|:------:|
-| P7-01 | Run full E2E suite, capture output, update `e2e-results.md` with new run results (total assertions, scenario coverage) | ⬜ |
-| P7-02 | Update `coverage-matrix.md` — add "E2E" column showing which scenarios have E2E vs unit-only coverage | ⬜ |
-| P7-03 | Add OAuth/identity E2E scenarios to backlog in `plan.md`: S-002-13 (session context), S-002-25 (OAuth context), S-002-26 (session state). Note: consider mock OAuth server (e.g., lightweight Python OIDC stub) as alternative to PingFederate/PingAM | ⬜ |
-| P7-04 | Document E2E coverage gap rationale for unit-only scenarios in `e2e-results.md`: S-002-16 (perf — adapter overhead not measurable through HTTP), S-002-18 (config validation — internal), S-002-20 (thread safety — controlled concurrency), S-002-21 (ExchangeProperty — PA internal), S-002-36 (version guard — needs different PA version) | ⬜ |
-| P7-05 | Commit all changes: specs, profile, echo backend, test script, documentation | ⬜ |
+| P7-01 | Run full E2E suite, capture output, update `e2e-results.md` with new run results (total assertions, scenario coverage) | ✅ |
+| P7-02 | Update `coverage-matrix.md` — add "E2E" column showing which scenarios have E2E vs unit-only coverage | ✅ |
+| P7-03 | Add OAuth/identity E2E scenarios to backlog in `plan.md`: S-002-13 (session context), S-002-25 (OAuth context), S-002-26 (session state). Note: consider mock OAuth server (e.g., lightweight Python OIDC stub) as alternative to PingFederate/PingAM | ✅ |
+| P7-04 | Document E2E coverage gap rationale for unit-only scenarios in `e2e-results.md`: S-002-16 (perf — adapter overhead not measurable through HTTP), S-002-18 (config validation — internal), S-002-20 (thread safety — controlled concurrency), S-002-21 (ExchangeProperty — PA internal), S-002-36 (version guard — needs different PA version) | ✅ |
+| P7-05 | Commit all changes: specs, profile, echo backend, test script, documentation | ✅ |
 
 ---
 
@@ -275,7 +275,8 @@ The existing rule has `errorMode=PASS_THROUGH`.
 | Phase 4 | 5 | 29 |
 | Phase 5 | 8 | 37 |
 | Phase 6 | 8 | 45 |
-| **Total** | **27** | **45** |
+| Plugin discovery | 5 | 50 |
+| **Total** | **32** | **50** |
 
 ---
 

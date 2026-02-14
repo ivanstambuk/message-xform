@@ -12,10 +12,9 @@ output:
     type: object
 
 headers:
-  request:
-    add:
-      X-Transformed: "true"
-      X-Transform-Version: "1.0.0"
+  add:
+    X-Transformed: "true"
+    X-Transform-Version: "1.0.0"
 
 transform:
   lang: jslt

@@ -681,7 +681,8 @@ assert_contains "  Loaded e2e-context spec" "Loaded spec: e2e-context.yaml" "$pa
 assert_contains "  Loaded e2e-error spec" "Loaded spec: e2e-error.yaml" "$pa_logs"
 assert_contains "  Loaded e2e-status-override spec" "Loaded spec: e2e-status-override.yaml" "$pa_logs"
 assert_contains "  Loaded e2e-url-rewrite spec" "Loaded spec: e2e-url-rewrite.yaml" "$pa_logs"
-assert_contains "  Loaded profile: e2e-profile" "Loaded profile: e2e-profile" "$pa_logs"
+pa_internal_log=$(docker exec "$PA_CONTAINER" cat /opt/out/instance/log/pingaccess.log 2>/dev/null || echo "")
+assert_contains "  Loaded profile: e2e-profile" "Loaded profile: e2e-profile" "$pa_internal_log"
 
 # Test 4: Shadow JAR class version (Java 17)
 info "Test 4: Shadow JAR verification"
@@ -704,10 +705,11 @@ info "Test 5: SPI registration"
 spi_content=$(unzip -p "$SHADOW_JAR" META-INF/services/com.pingidentity.pa.sdk.policy.AsyncRuleInterceptor 2>/dev/null || echo "")
 assert_contains "  SPI file contains MessageTransformRule" "io.messagexform.pingaccess.MessageTransformRule" "$spi_content"
 
-# Test 6: PA started cleanly (version guard, no errors)
+# Test 6: PA started cleanly (plugin configured, no errors)
+# Plugin LOG.info messages go to PA's internal log file, not docker stdout.
 info "Test 6: PingAccess health"
-pa_logs=$(docker logs "$PA_CONTAINER" 2>&1)
-assert_contains "  PingAccess started without errors" "PingAccess running" "$pa_logs"
+pa_internal_log=$(docker exec "$PA_CONTAINER" cat /opt/out/instance/log/pingaccess.log 2>/dev/null || echo "")
+assert_contains "  PingAccess started without errors" "MessageTransformRule configured" "$pa_internal_log"
 
 # ============================================================================
 # Phase 3 — Profile routing & header injection tests
@@ -719,6 +721,8 @@ info "=== Phase 3: Profile Routing & Header Injection ==="
 # Profile routes /api/headers/** → e2e-header-inject (request direction).
 # Spec injects X-Transformed: true and X-Transform-Version: 1.0.0 headers.
 # Echo backend reflects injected headers back as X-Echo-Req-* response headers.
+# PA forwards these response headers through to the client (confirmed by PA docs
+# and by Test 16 URL rewrite which uses the same X-Echo-* mechanism).
 info "Test 7: Header injection via profile routing"
 engine_request POST "/api/headers/test" '{"key":"value"}'
 assert_eq "  POST /api/headers/test returns 200" "200" "$ENGINE_HTTP_CODE"
@@ -759,8 +763,9 @@ assert_eq "  page from queryParams" "2" "$(json_field "$ENGINE_BODY" page)"
 
 # ---- Test 11: Session is null for unprotected (S-002-14 partial) ----
 # Unprotected app → no identity → $session is null.
+# JSLT null renders as JSON null; Python json.load().get() returns '' for null.
 info "Test 11: Session null for unprotected request"
-assert_eq "  session is null (unprotected)" "None" "$(json_field "$ENGINE_BODY" session)"
+assert_eq "  session is null (unprotected)" "" "$(json_field "$ENGINE_BODY" session)"
 
 # ============================================================================
 # Phase 5 — Body & status edge cases
@@ -822,8 +827,9 @@ info "Test 17: Error mode PASS_THROUGH"
 engine_request POST "/api/error/test" '{"key":"passthrough-test"}'
 assert_eq "  POST /api/error/test returns 200" "200" "$ENGINE_HTTP_CODE"
 assert_eq "  Original body forwarded (PASS_THROUGH)" "passthrough-test" "$(json_field "$ENGINE_BODY" key)"
-pa_logs=$(docker logs "$PA_CONTAINER" 2>&1)
-assert_contains "  PA log: request transform error (PASS_THROUGH)" "PASS_THROUGH" "$pa_logs"
+# Check PA's application log file (SLF4J writes to pingaccess.log, not stdout)
+pa_app_log=$(docker exec "$PA_CONTAINER" cat /opt/out/instance/log/pingaccess.log 2>/dev/null || echo "")
+assert_contains "  PA log: request transform error (PASS_THROUGH)" "PASS_THROUGH" "$pa_app_log"
 
 # ---- Test 18: Error mode DENY (S-002-12) ----
 # POST to /deny-api/error/test → profile routes to e2e-error spec → JSLT error()
@@ -833,8 +839,8 @@ engine_request POST "/deny-api/error/test" '{"key":"deny-test"}'
 assert_eq "  DENY returns 502" "502" "$ENGINE_HTTP_CODE"
 assert_contains "  RFC 9457 response has 'type'" "type" "$ENGINE_BODY"
 assert_contains "  RFC 9457 response has 'title'" "title" "$ENGINE_BODY"
-pa_logs=$(docker logs "$PA_CONTAINER" 2>&1)
-assert_contains "  PA log: request transform error (DENY)" "DENY" "$pa_logs"
+pa_app_log=$(docker exec "$PA_CONTAINER" cat /opt/out/instance/log/pingaccess.log 2>/dev/null || echo "")
+assert_contains "  PA log: request transform error (DENY)" "Request transform error (DENY)" "$pa_app_log"
 
 # ---- Test 19: DENY guard verification — best-effort (S-002-28) ----
 # After DENY, PA may or may not call handleResponse(). If it does, the adapter's
@@ -842,7 +848,7 @@ assert_contains "  PA log: request transform error (DENY)" "DENY" "$pa_logs"
 # either outcome is valid — the unit test verifies the guard logic independently.
 info "Test 19: DENY guard verification (best-effort)"
 TESTS_RUN=$((TESTS_RUN + 1))
-if echo "$pa_logs" | grep -q "Response processing skipped" 2>/dev/null; then
+if echo "$pa_app_log" | grep -q "Response processing skipped" 2>/dev/null; then
     ok "  DENY guard log message found"
     TESTS_PASSED=$((TESTS_PASSED + 1))
 else
