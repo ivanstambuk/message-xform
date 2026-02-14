@@ -43,6 +43,9 @@ docker-compose.override.yml
 
 # Local vendor libraries — track structure/docs, ignore JARs
 libs/**/*.jar
+# Exception: PA SDK is a 128 KB compile-only JAR (compileOnly + shadow-excluded).
+# Committed so CI can build adapter-pingaccess without manual provisioning.
+!libs/pingaccess-sdk/pingaccess-sdk-9.0.1.0.jar
 
 # Audit reports — ephemeral session artifacts, not tracked
 audit-reports/
