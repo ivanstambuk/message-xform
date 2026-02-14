@@ -25,6 +25,7 @@ import io.messagexform.core.model.Message;
 import io.messagexform.core.model.TransformContext;
 import io.messagexform.core.model.TransformResult;
 import io.messagexform.core.spec.SpecParser;
+import jakarta.annotation.PreDestroy;
 import jakarta.validation.ValidationException;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -36,6 +37,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.function.BiFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -83,6 +87,8 @@ public class MessageTransformRule extends AsyncRuleInterceptorBase<MessageTransf
     private TransformEngine engine;
     private PingAccessAdapter adapter;
     private ErrorMode errorMode = ErrorMode.PASS_THROUGH;
+    private ScheduledExecutorService reloadExecutor;
+    private MessageTransformConfig currentConfig;
 
     /**
      * Factory for building error responses during DENY mode. Defaults to
@@ -178,6 +184,19 @@ public class MessageTransformRule extends AsyncRuleInterceptorBase<MessageTransf
 
         // Wire error mode for runtime dispatch
         this.errorMode = config.getErrorMode();
+        this.currentConfig = config;
+
+        // Start reload scheduler if interval > 0 (FR-002-04, T-002-25)
+        int reloadSec = config.getReloadIntervalSec();
+        if (reloadSec > 0) {
+            reloadExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread t = new Thread(r, "mxform-spec-reload");
+                t.setDaemon(true);
+                return t;
+            });
+            reloadExecutor.scheduleWithFixedDelay(this::reloadSpecs, reloadSec, reloadSec, TimeUnit.SECONDS);
+            LOG.info("Hot-reload scheduler started: interval={}s", reloadSec);
+        }
 
         LOG.info(
                 "MessageTransformRule configured: specsDir={}, specs={}, profile={}",
@@ -454,7 +473,61 @@ public class MessageTransformRule extends AsyncRuleInterceptorBase<MessageTransf
         this.responseFactory = responseFactory;
     }
 
+    // ── Lifecycle ──
+
+    /**
+     * Shuts down the reload scheduler and releases managed resources
+     * (T-002-14, T-002-25, FR-002-05).
+     *
+     * <p>
+     * Belt-and-suspenders with the daemon thread flag — ensures cleanup
+     * even in non-graceful shutdown scenarios.
+     */
+    @PreDestroy
+    void shutdown() {
+        if (reloadExecutor != null) {
+            reloadExecutor.shutdownNow();
+            LOG.info("Hot-reload scheduler shut down");
+        }
+    }
+
     // ── Internal helpers ──
+
+    /**
+     * Reload task executed by the scheduler (T-002-26, FR-002-04).
+     *
+     * <p>
+     * Resolves spec/profile paths from the current config and calls
+     * {@link TransformEngine#reload(List, Path)}. On any failure, logs a
+     * warning and retains the previous valid registry (NFR-001-05).
+     */
+    private void reloadSpecs() {
+        try {
+            Path specsPath = Paths.get(currentConfig.getSpecsDir());
+            List<Path> specFiles = collectYamlFiles(specsPath);
+
+            // Resolve profile path (null if no profile configured)
+            Path profilePath = null;
+            String activeProfile = currentConfig.getActiveProfile();
+            if (activeProfile != null && !activeProfile.isEmpty()) {
+                Path profilesPath = Paths.get(currentConfig.getProfilesDir());
+                profilePath = profilesPath.resolve(activeProfile + ".yaml");
+                if (!Files.isRegularFile(profilePath)) {
+                    profilePath = profilesPath.resolve(activeProfile + ".yml");
+                }
+                if (!Files.isRegularFile(profilePath)) {
+                    LOG.warn("Hot-reload: profile file not found: {} in {}", activeProfile, profilesPath);
+                    return;
+                }
+            }
+
+            engine.reload(specFiles, profilePath);
+            LOG.debug("Hot-reload completed: specs={}", engine.specCount());
+        } catch (Exception e) {
+            // Retain previous valid registry on any failure (S-002-30)
+            LOG.warn("Hot-reload failed — retaining previous registry: {}", e.getMessage());
+        }
+    }
 
     /** Accessor for the adapter — used by flow tests. */
     PingAccessAdapter adapter() {
@@ -464,6 +537,11 @@ public class MessageTransformRule extends AsyncRuleInterceptorBase<MessageTransf
     /** Accessor for the engine — used by flow tests. */
     TransformEngine engine() {
         return engine;
+    }
+
+    /** Accessor for the reload executor — used by lifecycle tests. */
+    ScheduledExecutorService reloadExecutor() {
+        return reloadExecutor;
     }
 
     /**

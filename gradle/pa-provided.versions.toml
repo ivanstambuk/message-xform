@@ -34,6 +34,7 @@ pa-log4j = "2.24.3" # Log4j2 (PA's SLF4J backend)
 # Validation & DI
 pa-jakarta-validation = "3.1.1"
 pa-jakarta-inject = "2.0.1"
+pa-jakarta-annotation = "2.0.0"
 pa-hibernate-validator = "7.0.5.Final"
 
 # Utilities
@@ -57,6 +58,7 @@ pa-jakarta-validation = { group = "jakarta.validation", name = "jakarta.validati
 pa-hibernate-validator = { group = "org.hibernate.validator", name = "hibernate-validator", version.ref = "pa-hibernate-validator" }
 pa-jakarta-el = { group = "org.glassfish", name = "jakarta.el", version = "4.0.2" }
 pa-jakarta-inject = { group = "jakarta.inject", name = "jakarta.inject-api", version.ref = "pa-jakarta-inject" }
+pa-jakarta-annotation = { group = "jakarta.annotation", name = "jakarta.annotation-api", version.ref = "pa-jakarta-annotation" }
 
 # PA SDK — version extracted: 9.0.1.0
 # pa-sdk = { group = "com.pingidentity.pingaccess", name = "pingaccess-sdk", version.ref = "pa-sdk" }

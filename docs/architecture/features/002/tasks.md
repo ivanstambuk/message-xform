@@ -147,9 +147,9 @@ _Last updated:_ 2026-02-14
   _Implement:_ Parser/engine init and spec/profile load boot path.
   _Verify:_ Configure tests pass.
 
-- [ ] **T-002-14** — Rule lifecycle cleanup hooks (FR-002-05)
-  _Test first:_ `RuleLifecycleTest.shutdownLifecycle()`.
-  _Implement:_ `@PreDestroy` cleanup path for managed resources.
+- [x] **T-002-14** — Rule lifecycle cleanup hooks (FR-002-05)
+  _Test first:_ `HotReloadTest.ThreadLifecycle` (shutdown tests).
+  _Implement:_ `@PreDestroy shutdown()` cleanup path for managed resources.
   _Verify:_ Cleanup tests pass.
 
 #### I4b — ExchangeProperty metadata + SPI registration (FR-002-07, FR-002-08)
@@ -239,13 +239,13 @@ _Last updated:_ 2026-02-14
 
 #### I8 — Spec hot-reload scheduler (FR-002-04, FR-002-05, S-002-29, S-002-30, S-002-31)
 
-- [ ] **T-002-25** — Scheduler lifecycle management
-  _Test first:_ `HotReloadTest.threadLifecycle()`.
+- [x] **T-002-25** — Scheduler lifecycle management
+  _Test first:_ `HotReloadTest.ThreadLifecycle` (5 tests: zero-interval no-start, positive-interval start, shutdown terminates, shutdown no-op, shutdown idempotent).
   _Implement:_ daemon single-thread scheduler + `@PreDestroy` shutdown.
   _Verify:_ Scheduler lifecycle tests pass.
 
-- [ ] **T-002-26** — Reload task robustness and explicit path resolution
-  _Test first:_ `HotReloadTest.successFailureAndConcurrentSwap()`.
+- [x] **T-002-26** — Reload task robustness and explicit path resolution
+  _Test first:_ `HotReloadTest.ReloadBehavior` (4 tests: reload picks up new spec, reload failure retains previous, profile resolution, no-profile passes null).
   _Implement:_ Resolve specs/profile paths, call explicit `engine.reload(List<Path>, Path)`, retain previous registry on parse/compile/profile/io failures.
   _Verify:_ Reload behavior tests pass.
 

@@ -37,6 +37,7 @@ dependencies {
     compileOnly(paProvided.findLibrary("pa-slf4j-api").get())
     compileOnly(paProvided.findLibrary("pa-jakarta-validation").get())
     compileOnly(paProvided.findLibrary("pa-jakarta-inject").get())
+    compileOnly(paProvided.findLibrary("pa-jakarta-annotation").get())
 
     // Bundled — NOT shipped by PA
     implementation(catalog.findLibrary("snakeyaml").get())
