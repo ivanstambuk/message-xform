@@ -1,7 +1,7 @@
 # E2E Test Expansion Plan — Feature 002
 
 _Created:_ 2026-02-14
-_Status:_ Complete
+_Status:_ In Progress
 _Linked:_ `e2e-results.md`, FR-002-12, `scripts/pa-e2e-test.sh`
 
 ## Objective
@@ -290,20 +290,3 @@ The existing rule has `errorMode=PASS_THROUGH`.
 | Non-standard status codes (277) rejected by PA engine | **Medium** | PA SDK's `HttpStatus.forCode()` handles arbitrary codes; if rejected, document as known limitation and remove test |
 | PA skips `handleResponse()` after `Outcome.RETURN` | **Low** — DENY guard test inconclusive | Best-effort log check; unit test provides definitive coverage |
 | JSLT `$cookies`/`$queryParams` binding fails in PA runtime | **Low** | Same engine code path as unit tests; PA's cookie parsing is the only new variable |
-
----
-
-## Adversarial Review Log
-
-Issues found during adversarial review pass (2026-02-14):
-
-| ID | Severity | Issue | Resolution |
-|----|----------|-------|------------|
-| BUG-1 | 🔴 | `engine_request()` can't capture response headers — needed for header injection (P3-01) and URL rewrite (P5-05) | Added P2-01: upgrade helper with `$ENGINE_HEADERS` |
-| BUG-2 | 🔴 | `engine_request()` hardcodes `Content-Type: application/json` — blocks non-JSON body test (P5-01) | Added P2-01: extra header support with Content-Type override |
-| BUG-3 | 🔴 | DENY app path `/deny-api/error/test` doesn't match profile entry `/api/error/**` — DENY test would falsely pass | Added `/deny-api/error/**` entry to profile |
-| BUG-4 | 🔴 | Missing profile entries for `/api/html/**` and `/api/status/**` — adapter code path never exercised | Added response-direction entries routing through `e2e-rename` |
-| GAP-5 | 🟡 | S-002-28 (DENY guard) depends on PA calling `handleResponse()` after `Outcome.RETURN` | Downgraded to best-effort log check; noted unit test provides definitive coverage |
-| GAP-6 | 🟡 | Echo backend always returns `Content-Type: application/json` regardless of request type | Added P1-06(c): mirror request Content-Type |
-| IMP-7 | 🟢 | S-002-14 (unauth) partially coverable by checking `$session` is null | Added `$session` to context spec output; added P4-03 test |
-| IMP-8 | 🟢 | No projected assertion counts in plan | Added assertion count projection table |
