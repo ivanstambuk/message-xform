@@ -1,5 +1,5 @@
 ---
-description: Read-only generated-code audit for architecture, concurrency, lifecycle, resilience, security, dependency/supply-chain hygiene, test effectiveness, observability, data integrity, and performance signals
+description: Read-only generated-code audit for architecture, concurrency, lifecycle, resilience, operability, security, dependency/supply-chain hygiene, test effectiveness, observability, data integrity, and performance signals
 ---
 
 # /code-audit — Generated Code Audit
@@ -32,6 +32,9 @@ description: Read-only generated-code audit for architecture, concurrency, lifec
 6. **Root-cause first:** do not emit duplicate findings for the same underlying issue.
 7. **Signal provenance:** classify findings as `new`, `existing`, or `unknown`.
 8. **No speculative criticals:** `Critical` requires concrete, reproducible evidence.
+9. **Bounded execution:** timebox long-running checks; record timed-out checks in "Cannot Validate".
+10. **Scoped diagnostics:** when unrelated module failures block scoped checks, rerun minimal scoped commands and classify blockers separately.
+11. **Reproducible context:** capture environment snapshot (commit/toolchain) in report metadata.
 
 ---
 
@@ -49,7 +52,7 @@ Read:
 
 Goal: align findings with current project guardrails and toolchain policy.
 
-### Phase 0.5 — Preflight & Tool Availability
+### Phase 0a — Preflight & Tool Availability
 
 // turbo
 Before running audit checks, verify:
@@ -60,6 +63,29 @@ If a tool is missing:
 - continue with available checks,
 - mark the skipped checks explicitly in the report's execution matrix,
 - do not infer findings for skipped checks.
+
+### Phase 0b — Execution Budget & Timeouts
+
+Default command budgets:
+- `rg`/text scans: 30s per command
+- Gradle single-task checks: 5m per command
+- Gradle test tasks: 10m per command
+
+Rules:
+1. If a check times out, mark as `Timed out` and move the gap to "Cannot Validate".
+2. Do not silently retry more than once.
+3. Prefer deterministic, narrow reruns over broad reruns.
+
+### Phase 0c — Environment Snapshot
+
+Capture once per audit run:
+1. Git commit SHA (`git rev-parse HEAD`)
+2. `git status --short` summary
+3. Java runtime (`java -version`)
+4. Gradle runtime (`./gradlew --version`)
+5. OS/runtime context (`uname -a`)
+
+If any snapshot command fails, record the gap in "Cannot Validate (Gaps)".
 
 ### Phase 1 — Resolve Audit Scope
 
@@ -96,19 +122,26 @@ Recommended commands:
 ./gradlew --no-daemon :<module>:dependencies --configuration compileClasspath
 ```
 
+Scoped fallback (when unrelated failures block signal collection):
+
+```bash
+./gradlew --no-daemon --continue :<module>:spotlessCheck :<module>:compileJava :<module>:compileTestJava :<module>:test
+```
+
 Capture failures/warnings as findings when relevant.
 
 Classification guidance for baseline failures:
 - Failure fully inside audited scope -> finding (`new` or `existing` based on blame/age).
 - Failure clearly outside scope -> record as contextual note, not a scoped finding.
 - Unable to determine provenance -> finding with provenance `unknown`.
+- Unrelated module failure that blocks scoped checks -> add to "Cannot Validate (Gaps)" with blocker path and rerun evidence.
 
 Provenance method (deterministic):
 - `new`: evidence location is in uncommitted/staged/untracked changes, or last touched by `HEAD`.
 - `existing`: evidence location was last touched before `HEAD`.
 - `unknown`: provenance cannot be mapped reliably to a line/symbol.
 
-### Phase 2.5 — Finding Quality Bar
+### Phase 2a — Finding Quality Bar
 
 Before recording a finding, verify all of the following:
 1. **Evidence present:** command output or concrete symbol/location.
@@ -119,7 +152,7 @@ Before recording a finding, verify all of the following:
 6. **Not style-noise:** if `spotlessCheck` passes, avoid emitting pure formatting findings.
 7. **Assignable:** include likely owner and rough fix cost (`S/M/L`).
 
-### Phase 2.6 — Root-Cause Grouping
+### Phase 2b — Root-Cause Grouping
 
 Before finalizing findings:
 1. Group symptom-level signals under one root-cause finding when they share the same source.
@@ -129,14 +162,14 @@ Before finalizing findings:
    - one **primary category** (owning/root cause),
    - optional related categories list (`related: [ARCH, RES, ...]`).
 
-### Phase 2.7 — Noise Control
+### Phase 2c — Noise Control
 
 To keep reports actionable:
 1. Merge repetitive low-severity signals into one grouped finding per check ID.
 2. Cap low-severity listing to the top 10 most actionable entries; summarize the rest.
 3. Prefer high-confidence findings over broad speculative scans.
 
-### Phase 2.8 — Prioritization Model
+### Phase 2d — Prioritization Model
 
 Compute a priority score for each finding to drive the **Critical Path (Top 3)**.
 
@@ -153,6 +186,51 @@ Rules:
 1. Sort findings by `PriorityScore` descending.
 2. If scores tie, prefer newer findings (`provenance: new`) over existing.
 3. Critical Path must contain at most 3 findings and at least 1 when any High/Critical exists.
+4. Avoid choosing two Critical Path items with identical root cause unless no alternative exists.
+5. If no High/Critical findings exist, set Critical Path to `None` explicitly.
+
+### Phase 2e — Execution Matrix Completeness
+
+Before finalizing report:
+1. Every defined check ID (`CQ-*`, `ARCH-*`, ..., `OPR-*`) must appear in the execution matrix.
+2. Allowed statuses: `Executed`, `Skipped`, `N/A`, `Timed out`, `Not Run`, `Blocked`.
+3. `Skipped`, `Not Run`, `Blocked`, and `Timed out` must include a reason.
+
+### Phase 2f — Cross-Category Classification Boundaries
+
+When a finding appears to match multiple categories, choose **one primary category**
+using this precedence and record others in `Related categories`.
+
+Precedence (highest first):
+1. `ARCH` — structural boundary/layering/dependency-direction violations
+2. `API` — externally visible contract/compatibility/versioning violations
+3. `RES` — runtime failure-path behavior and degradation semantics
+4. `OPR` — operator-facing readiness/rollback/remediation operability
+5. `SEC` — exploitability/security exposure root cause
+6. `DATA` — data correctness/integrity root cause
+7. `CONC` / `LIFE` — threading/lifecycle resource correctness root cause
+8. `CQ` — local implementation hygiene/maintainability
+9. `DEP` / `SUP` — dependency and supply-chain governance
+10. `TQ` / `TE` — test reliability/effectiveness
+11. `PERF` — performance-specific root cause
+
+Pair-specific rules:
+1. `ARCH` vs `API`:
+   - Choose `ARCH` when contract issues are caused by architectural boundary leakage or layering errors.
+   - Choose `API` when the issue is a direct public contract break independent of architecture shape.
+2. `RES` vs `OPR`:
+   - Choose `RES` for runtime behavior under failure (timeouts/retries/fallback semantics).
+   - Choose `OPR` for operator control/visibility/readiness/rollback deficiencies.
+3. `CQ` vs `ARCH`:
+   - Choose `ARCH` for cross-module/layer concerns.
+   - Choose `CQ` for single-component code quality concerns.
+4. `TQ` vs `TE`:
+   - Use the dedicated boundary in Phase 15 (do not duplicate unless risk classes are distinct).
+
+Duplication rule:
+- Do not create two findings for the same location unless each finding has a
+  distinct risk outcome. If duplicated intentionally, include a "distinct-risk"
+  justification in both findings.
 
 ### Phase 3 — Code Quality & Design Signals
 
@@ -208,6 +286,11 @@ Architecture recommendation rule:
   1. current state (evidence),
   2. target architecture shape,
   3. minimal migration path (incremental, low-risk steps).
+
+ARCH vs API boundary (mandatory):
+1. Use `ARCH-*` for structural layering/module-boundary and dependency-direction issues.
+2. Use `API-*` for externally observable contract compatibility issues.
+3. If a public API break is caused by an architecture leak, classify as `ARCH` and add `API` to `Related categories`.
 
 ### Phase 5 — Concurrency Signals
 
@@ -266,6 +349,11 @@ rg -n "timeout|Duration|connectTimeout|readTimeout" <scope>/src/main/java
 rg -n "retry|backoff|attempt" <scope>/src/main/java
 rg -n "catch \\(.*\\) \\{|throw new|return" <scope>/src/main/java
 ```
+
+RES vs OPR boundary (mandatory):
+1. Use `RES-*` for runtime failure behavior correctness.
+2. Use `OPR-*` for operator-facing readiness/remediation/rollback controls.
+3. If both apply, pick the primary root cause per Phase 2f precedence.
 
 ### Phase 8 — API / Contract Evolution Signals
 
@@ -392,23 +480,23 @@ rg -n "version|toolchain|java\\s*\\{" build.gradle.kts gradle/libs.versions.toml
 
 ### Phase 14 — Test Quality Signals
 
-Evaluate whether tests are strong enough to protect behavior.
+Evaluate test-suite reliability, stability, and maintainability.
 
 | Check ID | What to inspect | Severity guidance |
 |----------|-----------------|-------------------|
 | TQ-01 | Missing tests for audited production code paths | High |
-| TQ-02 | Weak assertions (asserting only non-null / no behavior) | Medium |
-| TQ-03 | Flakiness signals (`Thread.sleep`, timing races, order dependence) | Medium |
-| TQ-04 | Disabled/ignored tests without rationale | Medium |
+| TQ-02 | Reliability anti-patterns (time sleeps, shared mutable fixtures, order coupling) | Medium |
+| TQ-03 | Disabled/ignored tests without rationale | Medium |
+| TQ-04 | Test harness/config assumptions that make tests environment-fragile | Medium |
 | TQ-05 | Missing failure-branch tests for error handling | High |
-| TQ-06 | Over-mocked tests that assert interactions but not outcomes | Medium |
+| TQ-06 | Low-diagnostic assertions (assertions too weak to localize failures) | Medium |
 
 Evidence commands (examples):
 
 ```bash
 rg -n "@Disabled|@Ignore|Thread\\.sleep\\(" <scope>/src/test/java
-rg -n "assertThat\\(.*\\)\\.isNotNull\\(\\)" <scope>/src/test/java
-rg -n "verify\\(|times\\(" <scope>/src/test/java
+rg -n "static\\s+(?!final)|new Random\\(|Math\\.random\\(|Instant\\.now\\(|LocalDateTime\\.now\\(" <scope>/src/test/java
+rg -n "assertThat\\(.*\\)\\.isNotNull\\(\\)|assertTrue\\(|assertFalse\\(" <scope>/src/test/java
 ```
 
 ### Phase 15 — Test Effectiveness Signals
@@ -418,16 +506,24 @@ Evaluate whether tests are behavior-revealing and resistant to regressions.
 | Check ID | What to inspect | Severity guidance |
 |----------|-----------------|-------------------|
 | TE-01 | Contract/integration gaps around externally visible behavior | High |
-| TE-02 | Assertions that do not check business outcome | Medium |
+| TE-02 | Interaction-only tests that do not verify externally observable outcome | Medium |
 | TE-03 | Missing negative/edge cases for critical logic | High |
-| TE-04 | Excessive fixture complexity hiding intent | Low |
+| TE-04 | Test intent/assertion mismatch (test claims behavior it does not actually verify) | Medium |
 
 Evidence commands (examples):
 
 ```bash
 rg -n "@Nested|@ParameterizedTest|@MethodSource|@CsvSource" <scope>/src/test/java
-rg -n "assertThat\\(|assertThrows\\(|verify\\(" <scope>/src/test/java
+rg -n "WireMock|MockWebServer|Testcontainers|integration|contract" <scope>/src/test/java
+rg -n "verify\\(|times\\(" <scope>/src/test/java
+rg -n "assertThat\\(|assertThrows\\(" <scope>/src/test/java
 ```
+
+TQ vs TE classification boundary (mandatory):
+1. Use `TQ-*` for test reliability/execution quality/maintainability risks.
+2. Use `TE-*` for behavioral defect-detection power and contract coverage risks.
+3. If one issue fits both, pick the primary root cause category and reference the other in `Related categories`.
+4. Do not emit both `TQ-*` and `TE-*` findings for the same code location unless risks are genuinely distinct.
 
 ### Phase 16 — Lightweight Performance Signals
 
@@ -445,7 +541,26 @@ Notes:
 - Keep this phase heuristic and evidence-based.
 - Do not claim latency regressions without measured evidence.
 
-### Phase 17 — Guardrail Recommendation Synthesis
+### Phase 17 — Operability Signals
+
+Evaluate production operability/readiness traits.
+
+| Check ID | What to inspect | Severity guidance |
+|----------|-----------------|-------------------|
+| OPR-01 | Startup fail-fast validation for critical config | High |
+| OPR-02 | Health/readiness semantics cover degraded dependencies | Medium |
+| OPR-03 | Error messages/logs include operator-actionable remediation hints | Medium |
+| OPR-04 | Safe rollback/feature-toggle path exists for risky behavior | Medium |
+
+Evidence commands (examples):
+
+```bash
+rg -n "health|readiness|liveness|startup|bootstrap|validate" <scope>/src/main/java
+rg -n "feature flag|toggle|rollback|fallback|degrade" <scope>/src/main/java
+rg -n "remediation|action|retry|check configuration" <scope>/src/main/java
+```
+
+### Phase 18 — Guardrail Recommendation Synthesis
 
 Convert findings into preventive controls.
 
@@ -457,6 +572,11 @@ For each High/Critical finding, recommend one or more:
 5. Test-template strengthening for failure-path coverage
 
 Recommendations must be concrete and directly tied to findings.
+Each recommendation must include:
+1. target artifact path,
+2. linked finding/check IDs,
+3. measurable acceptance signal.
+At least one recommendation must exist for each Critical Path finding.
 
 ---
 
@@ -481,6 +601,7 @@ Owner assignment heuristics (default):
 | `core/**` | `core` |
 | `adapter-standalone/**` | `adapter-standalone` |
 | `adapter-pingaccess/**` | `adapter-pingaccess` |
+| `adapter-*/**` | `adapter-<name>` |
 | `build.gradle.kts`, `settings.gradle.kts`, `gradle/**` | `build/tooling` |
 | `AGENTS.md`, `.agent/workflows/**`, `docs/**` | `docs/process` |
 
@@ -496,6 +617,11 @@ If ambiguous, keep owner as `unknown` and note in "Cannot Validate (Gaps)".
 ## Metadata
 - Date: <ISO timestamp>
 - Target: <all|module>
+- Commit: <git sha>
+- Workspace state: <clean|dirty + short summary>
+- Java: <version string>
+- Gradle: <version string>
+- Host: <uname summary>
 - Resolved modules: <explicit list>
 - Scope paths: <explicit list>
 - Commands executed: <explicit list>
@@ -506,6 +632,7 @@ If ambiguous, keep owner as `unknown` and note in "Cannot Validate (Gaps)".
 - New findings: <count>
 - Regressed findings (severity increased): <count>
 - Resolved findings (present previously, absent now): <count>
+- Selection rule: choose latest report with matching target (`all` or same module) when available.
 
 ## Findings by Severity
 
@@ -516,18 +643,21 @@ Finding ID format:
 1. <finding id> — <why this is top priority now>
 2. <finding id> — <why this is top priority now>
 3. <finding id> — <why this is top priority now>
+If none: `None (no High/Critical findings)`.
 
 ### Critical
 #### SEC-001 — <title>
-- Category: ARCH | CQ | CONC | LIFE | RES | API | OBS | DATA | SEC | DEP | SUP | TQ | TE | PERF
+- Category: ARCH | CQ | CONC | LIFE | RES | API | OBS | DATA | SEC | DEP | SUP | TQ | TE | PERF | OPR
 - Related categories: [optional list]
+- Primary classification rationale: <one sentence why this category is primary>
+- Distinct-risk justification: <required only if same location appears in another finding>
 - Check ID: <e.g., SEC-03>
 - Location: `<path>:<line>`
 - Evidence: `<symbol/signature/command output excerpt>`
 - Repro command: `<exact command>`
 - Risk: <impact in practical terms>
 - Recommendation: <concrete remediation path>
-- Owner: <core | adapter-standalone | adapter-pingaccess | build/tooling | docs/process>
+- Owner: <core | adapter-standalone | adapter-pingaccess | adapter-<name> | build/tooling | docs/process | unknown>
 - Fix Cost: S | M | L
 - Blast Radius: 1 | 2 | 3
 - Exploitability/TriggerLikelihood: 1 | 2 | 3
@@ -548,15 +678,17 @@ Finding ID format:
 ## Check Execution Matrix
 | Check ID | Status | Notes |
 |----------|--------|-------|
-| CQ-01 | Executed / Skipped / N/A / Timed out / Not Run | <reason or short result> |
+| CQ-01 | Executed / Skipped / N/A / Timed out / Not Run / Blocked | <reason or short result> |
 
 ## Cannot Validate (Gaps)
 - <check or claim that could not be validated>
 - Reason: <missing tool/data/access/time>
 - Impact: <what this uncertainty means for confidence>
+- Next step to validate: <specific command or prerequisite>
 
 ## Suppressed / Collapsed Signals
 - <optional list of intentionally collapsed low-value signals with reason>
+- Format: `<check-id> — <suppressed count> — <reason>`
 
 ## Passed Checks
 - <check id> — <short note>
@@ -601,5 +733,5 @@ Notes:
 ## Relationship to /audit
 
 - `/audit` = documentation/spec conformance.
-- `/code-audit` = generated code architecture/quality/concurrency/lifecycle/resilience/security/dependency/supply-chain/observability/data/test/performance signals.
+- `/code-audit` = generated code architecture/quality/concurrency/lifecycle/resilience/operability/security/dependency/supply-chain/observability/data/test/performance signals.
 - They are separate by design and can be run independently.
