@@ -527,9 +527,9 @@ The workflow MUST:
 | JSLT | 0.1.14 | Core (expression engine) |
 | Javalin | 6.7.0 | Adapter (HTTP server) |
 | JSON Schema Validator | 1.5.7 | Core (schema validation) |
-| SLF4J | 2.0.16 | Logging API |
+| SLF4J | 2.0.17 | Logging API |
 | Logback | 1.5.16 | Logging impl |
-| SnakeYAML | 2.3 | Config parsing |
+| SnakeYAML | 2.4 | Config parsing |
 | JUnit 5 | 5.11.4 | Test framework |
 | AssertJ | 3.27.6 | Test assertions |
 | Mockito | 5.15.2 | Test mocking |

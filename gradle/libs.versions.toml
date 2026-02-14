@@ -4,8 +4,8 @@ javalin = "6.7.0"
 jslt = "0.1.14"
 jsonSchemaValidator = "1.5.7"
 palantirJavaFormat = "2.78.0"
-slf4j = "2.0.16"
-snakeyaml = "2.3"
+slf4j = "2.0.17"
+snakeyaml = "2.4"
 
 # Test
 assertj = "3.27.6"
