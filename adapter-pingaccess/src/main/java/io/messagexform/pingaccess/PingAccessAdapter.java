@@ -138,6 +138,85 @@ class PingAccessAdapter implements GatewayAdapter<Exchange> {
         return bodyParseFailed;
     }
 
+    // ── TransformContext construction (T-002-17, FR-002-13) ──
+
+    /**
+     * Builds a {@link io.messagexform.core.model.TransformContext} from the
+     * PA exchange for engine evaluation (FR-002-13).
+     *
+     * <p>
+     * Maps headers, query params (first-value), cookies (first-value), status,
+     * and session context. On {@code URISyntaxException} from malformed query
+     * strings, logs a warning and falls back to an empty query params map.
+     *
+     * @param exchange the native PA exchange
+     * @param status   response status code ({@code null} for request phase)
+     * @param session  session context (from identity merge or empty)
+     * @return immutable transform context for engine evaluation
+     */
+    io.messagexform.core.model.TransformContext buildTransformContext(
+            Exchange exchange, Integer status, SessionContext session) {
+        // Headers — reuse the same mapHeaders() used by wrapRequest/wrapResponse
+        HttpHeaders headers = mapHeaders(exchange.getRequest().getHeaders());
+
+        // Query params — flatten String[] to first-value
+        Map<String, String> queryParams = flattenQueryParams(exchange);
+
+        // Cookies — flatten String[] to first-value
+        Map<String, String> cookies = flattenCookies(exchange.getRequest().getHeaders());
+
+        return new io.messagexform.core.model.TransformContext(
+                headers, status, queryParams, cookies, session != null ? session : SessionContext.empty());
+    }
+
+    /**
+     * Flattens PA's {@code Map<String, String[]>} query params to
+     * {@code Map<String, String>} using first-value semantics (FR-002-13).
+     *
+     * <p>
+     * On {@code URISyntaxException} from malformed URIs, logs a warning and
+     * returns an empty map. JSLT expressions referencing {@code $queryParams}
+     * will evaluate to {@code null} gracefully.
+     */
+    private Map<String, String> flattenQueryParams(Exchange exchange) {
+        try {
+            Map<String, String[]> raw = exchange.getRequest().getQueryStringParams();
+            if (raw == null || raw.isEmpty()) {
+                return Map.of();
+            }
+            Map<String, String> flat = new LinkedHashMap<>(raw.size());
+            for (Map.Entry<String, String[]> entry : raw.entrySet()) {
+                String[] values = entry.getValue();
+                if (values != null && values.length > 0) {
+                    flat.put(entry.getKey(), values[0]);
+                }
+            }
+            return flat;
+        } catch (java.net.URISyntaxException e) {
+            LOG.warn("Failed to parse query string — using empty queryParams: {}", e.getMessage());
+            return Map.of();
+        }
+    }
+
+    /**
+     * Flattens PA's {@code Map<String, String[]>} cookies to
+     * {@code Map<String, String>} using first-value semantics (FR-002-13).
+     */
+    private Map<String, String> flattenCookies(Headers paHeaders) {
+        Map<String, String[]> raw = paHeaders.getCookies();
+        if (raw == null || raw.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, String> flat = new LinkedHashMap<>(raw.size());
+        for (Map.Entry<String, String[]> entry : raw.entrySet()) {
+            String[] values = entry.getValue();
+            if (values != null && values.length > 0) {
+                flat.put(entry.getKey(), values[0]);
+            }
+        }
+        return flat;
+    }
+
     // ── Direction-specific apply helpers (T-002-08, T-002-09, T-002-10) ──
 
     /**

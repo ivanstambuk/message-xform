@@ -174,7 +174,7 @@ _Last updated:_ 2026-02-15
 
 #### I5 — TransformContext construction (FR-002-13, S-002-22, S-002-23)
 
-- [ ] **T-002-17** — Build TransformContext (headers/query/cookies/status/session) with URI failure fallback
+- [x] **T-002-17** — Build TransformContext (headers/query/cookies/status/session) with URI failure fallback
   _Test first:_ `ContextMappingTest` for:
   - headers mapping (single + multi-value views via `HttpHeaders`)
   - query/cookie first-value semantics
