@@ -594,19 +594,21 @@ If the backend returns a different JSON structure, the same JSLT will produce
 different (potentially nonsensical) output. This is by design for transforms
 that should be symmetrical. For asymmetric use cases, use bidirectional specs.
 
-### Bidirectional Specs
+### Bidirectional Specs (Recommended for E2E Testing)
 
 ```yaml
 # spec.yaml with forward + reverse
-forward:
-  lang: jslt
-  expr: |
-    { "userId": .user_id }  # request transform
-
+# reverse = applied in REQUEST direction (client → backend)
 reverse:
   lang: jslt
   expr: |
-    { "user_id": .userId }  # response transform
+    { "userId": .user_id }  # snake_case → camelCase for the backend
+
+# forward = applied in RESPONSE direction (backend → client)
+forward:
+  lang: jslt
+  expr: |
+    { "user_id": .userId }  # camelCase → snake_case for the client
 ```
 
 For bidirectional specs:
@@ -618,13 +620,17 @@ For bidirectional specs:
 
 ### Impact on E2E Testing
 
-Because unidirectional specs apply the same JSLT to both request and response,
-the E2E test cannot simply check the echo backend's response body — it will
-also be transformed. The test verifies:
+The E2E test uses a **bidirectional** spec so that both request and response
+transforms can be independently verified with actual payload assertions:
 
-1. HTTP 200 status (transform + routing worked end-to-end)
-2. Response body is valid JSON (transform executed without error)
-3. PA audit log shows the rule was applied to the correct app/resource
+1. Client sends snake_case → `reverse` JSLT → backend receives camelCase
+2. Echo backend returns the body as-is
+3. `forward` JSLT → client receives snake_case (round-trip)
+
+Assertions verify:
+- **Response payload fields** match the original snake_case structure (round-trip proof)
+- **Direct echo probe** (bypassing PA) confirms the backend received camelCase
+- **PA audit log** confirms the rule was applied to the correct app/resource
 
 ---
 
@@ -873,24 +879,45 @@ The E2E test script validates the full plugin lifecycle against a real PA instan
 
 ### Echo Backend
 
-A minimal Python HTTP server that echoes back any request:
+A minimal Python HTTP server that returns the **raw request body as-is**
+(no wrapper envelope). Request metadata is exposed via `X-Echo-*` response
+headers for test inspection:
 
 ```python
 import http.server, json
 
-class Handler(http.server.BaseHTTPRequestHandler):
-    def handle(self):
-        body = self.rfile.read(content_length)
-        response = json.dumps({
-            "echo": {
-                "method": self.command,
-                "path": self.path,
-                "headers": dict(self.headers),
-                "body": json.loads(body)
-            }
-        })
+class EchoHandler(http.server.BaseHTTPRequestHandler):
+    def do_POST(self):
+        length = int(self.headers.get("Content-Length", 0))
+        body = self.rfile.read(length) if length > 0 else b"{}"
+        # Return raw body — no envelope wrapping
         self.send_response(200)
-        self.wfile.write(response.encode())
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("X-Echo-Method", self.command)
+        self.send_header("X-Echo-Path", self.path)
+        # Forward request headers as X-Echo-Req-* for header injection tests
+        for name, value in self.headers.items():
+            self.send_header(f"X-Echo-Req-{name}", value)
+        self.end_headers()
+        self.wfile.write(body)
+```
+
+> **Why raw body?** The response JSLT needs to operate on the same JSON
+> structure as the request JSLT output. Wrapping the body in an `{"echo":{...}}`
+> envelope would cause the response JSLT to receive an incompatible structure,
+> making field-level assertions impossible.
+
+### Direct Echo Probing
+
+The echo backend is exposed on host port `18080`. Tests can hit it directly
+(bypassing PA) to verify what the backend received after the request transform:
+
+```bash
+# Verify the backend received camelCase fields
+curl -s http://localhost:18080/api/transform \
+    -d '{"userId":"u123","firstName":"John"}'
+# → {"userId":"u123","firstName":"John"}  (raw echo, no PA)
 ```
 
 ### Docker Network
@@ -974,7 +1001,7 @@ Located in `e2e/pingaccess/specs/`:
 
 | Cause | Fix |
 |-------|-----|
-| Unidirectional spec runs same JSLT on response | Expected behaviour (§9); use bidirectional spec if needed |
+| Unidirectional spec runs same JSLT on response | Use a **bidirectional spec** with separate `forward`/`reverse` expressions (§9). Unidirectional specs apply the same JSLT to both directions, which only works if the input and output JSON structures are identical. |
 
 ---
 

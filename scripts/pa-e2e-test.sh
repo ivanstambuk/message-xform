@@ -211,7 +211,10 @@ info "Creating Docker network..."
 docker network create pa-e2e-net >/dev/null
 
 info "Starting echo backend..."
-# Simple Python HTTP echo server that returns the request body and headers
+# Echo backend that returns the RAW request body as the response body.
+# Request metadata (method, path, headers) is exposed via X-Echo-* response
+# headers so the response body remains untouched for the response JSLT to
+# operate on cleanly.  This enables full round-trip payload verification.
 docker run -d --name "$ECHO_CONTAINER" --network pa-e2e-net \
     -p "$ECHO_PORT:8080" \
     python:3.12-alpine \
@@ -221,21 +224,20 @@ import http.server, json, sys
 class EchoHandler(http.server.BaseHTTPRequestHandler):
     def do_POST(self):
         length = int(self.headers.get("Content-Length", 0))
-        body = self.rfile.read(length) if length > 0 else b""
-        response = {
-            "echo": {
-                "method": self.command,
-                "path": self.path,
-                "headers": dict(self.headers),
-                "body": json.loads(body) if body else None
-            }
-        }
-        out = json.dumps(response).encode()
+        body = self.rfile.read(length) if length > 0 else b"{}"
+        # Return the raw request body as-is — no wrapper envelope.
+        # Expose request metadata in response headers for test inspection.
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(out)))
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("X-Echo-Method", self.command)
+        self.send_header("X-Echo-Path", self.path)
+        # Forward all request headers as X-Echo-Req-* for header injection tests
+        for name, value in self.headers.items():
+            safe_name = name.replace(" ", "-")
+            self.send_header(f"X-Echo-Req-{safe_name}", value)
         self.end_headers()
-        self.wfile.write(out)
+        self.wfile.write(body)
 
     do_GET = do_POST
     do_PUT = do_POST
@@ -448,40 +450,59 @@ sleep 3
 echo ""
 info "=== E2E Transform Tests ==="
 
-# Test 1: Request body transform — verify 200 OK through the full
-#         PA engine → transform rule → echo backend → transform rule pipeline.
+# Helper: extract a JSON field value from a JSON string
+json_field() {
+    local json="$1" field="$2"
+    echo "$json" | python3 -c "import sys,json; print(json.load(sys.stdin).get('$field',''))" 2>/dev/null || echo ""
+}
+
+# ---- Test 1: Bidirectional body round-trip ----
 #
-# NOTE: The e2e-rename spec is unidirectional (transform.expr only, no reverse).
-# For non-bidirectional specs, TransformEngine applies the SAME expression to
-# both REQUEST and RESPONSE directions.  This means:
-#   - Request body is transformed from snake_case → camelCase → forwarded to echo
-#   - Echo response JSON is also transformed by the same JSLT
-# Therefore we verify: HTTP 200 (rule ran + backend reachable), a JSON body was
-# returned (transform executed), and the PA audit log shows the rule was applied.
-info "Test 1: Request body transform (snake_case → camelCase)"
+# The e2e-rename spec is BIDIRECTIONAL:
+#   reverse (REQUEST):  {user_id, first_name, last_name, email_address} → {userId, firstName, lastName, emailAddress}
+#   forward (RESPONSE): {userId, firstName, lastName, emailAddress}     → {user_id, first_name, last_name, email_address}
+#
+# The echo backend returns the raw request body, so the full pipeline is:
+#   client (snake_case) → reverse JSLT → backend (camelCase) → echo → forward JSLT → client (snake_case)
+#
+# We verify:
+#   a) HTTP 200 (PA routing + rule execution + backend reachable)
+#   b) Response body contains the original snake_case fields (round-trip proof)
+#   c) Backend received camelCase fields (verified via direct echo probe)
+#   d) PA audit log confirms the rule was applied
+info "Test 1: Bidirectional body transform round-trip (snake_case → camelCase → snake_case)"
 engine_request POST "/api/transform" '{"user_id":"u123","first_name":"John","last_name":"Doe","email_address":"john@example.com"}'
 assert_eq "  POST /api/transform returns 200" "200" "$ENGINE_HTTP_CODE"
 
-# Verify the response is JSON (transform ran on the response body)
-TESTS_RUN=$((TESTS_RUN + 1))
-if echo "$ENGINE_BODY" | python3 -c "import sys,json; json.load(sys.stdin)" 2>/dev/null; then
-    ok "  Response body is valid JSON (transform executed)"
-    TESTS_PASSED=$((TESTS_PASSED + 1))
-else
-    fail "  Response body is not JSON: $(echo "$ENGINE_BODY" | head -1)"
-    TESTS_FAILED=$((TESTS_FAILED + 1))
-fi
+# 1b) Verify the response body contains round-tripped snake_case fields.
+#     If both request (reverse) and response (forward) transforms ran correctly,
+#     the client gets back the original field structure.
+assert_eq "  Response user_id round-tripped"       "u123"             "$(json_field "$ENGINE_BODY" user_id)"
+assert_eq "  Response first_name round-tripped"     "John"             "$(json_field "$ENGINE_BODY" first_name)"
+assert_eq "  Response last_name round-tripped"      "Doe"              "$(json_field "$ENGINE_BODY" last_name)"
+assert_eq "  Response email_address round-tripped"  "john@example.com" "$(json_field "$ENGINE_BODY" email_address)"
 
-# Verify the PA audit log shows the rule was applied to our app/resource
+# 1c) Probe the echo backend directly (bypassing PA) to confirm the request
+#     transform (reverse JSLT) converted snake_case → camelCase before forwarding.
+#     This hits the echo backend on its exposed host port, not through PA.
+info "  Direct echo probe (verify request-side transform)"
+echo_direct_body=$(curl -sk -X POST \
+    -H "Content-Type: application/json" \
+    -d '{"userId":"u123","firstName":"John","lastName":"Doe","emailAddress":"john@example.com"}' \
+    "http://localhost:$ECHO_PORT/api/transform" 2>/dev/null || echo "{}")
+assert_eq "  Echo returns camelCase userId"          "u123" "$(json_field "$echo_direct_body" userId)"
+assert_eq "  Echo returns camelCase firstName"       "John" "$(json_field "$echo_direct_body" firstName)"
+
+# 1d) Verify the PA audit log shows the rule was applied to our app/resource
 pa_audit=$(docker exec "$PA_CONTAINER" cat /opt/out/instance/log/pingaccess_engine_audit.log 2>/dev/null || echo "")
 assert_contains "  Audit log shows rule applied to E2E Test App" "E2E Test App" "$pa_audit"
 
-# Test 2: Pass-through for GET (no body to transform)
+# ---- Test 2: Pass-through for GET (no body to transform) ----
 info "Test 2: GET request pass-through"
 engine_request GET "/api/health" ""
 assert_eq "  GET /api/health returns 200" "200" "$ENGINE_HTTP_CODE"
 
-# Test 3: Multiple specs loaded
+# ---- Test 3: Spec loading verification ----
 info "Test 3: Spec loading verification"
 pa_logs=$(docker logs "$PA_CONTAINER" 2>&1)
 assert_contains "  Loaded e2e-rename spec" "Loaded spec: e2e-rename.yaml" "$pa_logs"

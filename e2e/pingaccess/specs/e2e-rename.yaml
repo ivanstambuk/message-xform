@@ -1,7 +1,15 @@
-# E2E test spec: rename snake_case → camelCase
+# E2E test spec: bidirectional field rename (snake_case ↔ camelCase)
+#
+# Uses forward/reverse so that request and response transforms are independent:
+#   reverse (REQUEST direction → toward backend):  snake_case → camelCase
+#   forward (RESPONSE direction → toward client):  camelCase → snake_case
+#
+# This enables full round-trip payload verification in the E2E test:
+#   client sends snake_case → PA transforms to camelCase → backend echoes →
+#   PA transforms back to snake_case → client receives original structure.
 id: e2e-rename
 version: "1.0.0"
-description: "E2E test — rename snake_case fields to camelCase"
+description: "E2E test — bidirectional field rename snake_case ↔ camelCase"
 
 input:
   schema:
@@ -22,16 +30,31 @@ output:
     properties:
       userId:
         type: string
-      displayName:
+      firstName:
         type: string
-      email:
+      lastName:
+        type: string
+      emailAddress:
         type: string
 
-transform:
+# reverse = applied to REQUEST direction (client → backend)
+reverse:
   lang: jslt
   expr: |
     {
       "userId": .user_id,
-      "displayName": .first_name + " " + .last_name,
-      "email": .email_address
+      "firstName": .first_name,
+      "lastName": .last_name,
+      "emailAddress": .email_address
+    }
+
+# forward = applied to RESPONSE direction (backend → client)
+forward:
+  lang: jslt
+  expr: |
+    {
+      "user_id": .userId,
+      "first_name": .firstName,
+      "last_name": .lastName,
+      "email_address": .emailAddress
     }
