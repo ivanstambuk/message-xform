@@ -154,7 +154,7 @@ _Last updated:_ 2026-02-15
 
 #### I4b — ExchangeProperty metadata + SPI registration (FR-002-07, FR-002-08)
 
-- [ ] **T-002-15** — **Prerequisite gate:** `TransformResult.specId()`/`.specVersion()` available (FR-002-07)
+- [x] **T-002-15** — **Prerequisite gate:** `TransformResult.specId()`/`.specVersion()` available (FR-002-07)
   _Depends on:_ **T-001-67 (Feature 001)** — per Principle 8 (Feature Ownership
   Boundaries), the core `TransformResult` extension is owned and implemented by
   Feature 001. This task is blocked until T-001-67 is complete.
@@ -162,12 +162,12 @@ _Last updated:_ 2026-02-15
   _Verification commands:_
   - `./gradlew :core:test --tests "*TransformResultSpecMetadataTest*"`
 
-- [ ] **T-002-15a** — `TransformResultSummary` + exchange properties (FR-002-07, S-002-21)
+- [x] **T-002-15a** — `TransformResultSummary` + exchange properties (FR-002-07, S-002-21)
   _Test first:_ `ExchangePropertyTest.transformResultSummary()`.
   _Implement:_ `TRANSFORM_RESULT` + `TRANSFORM_DENIED` property declarations and writes.
   _Verify:_ Exchange property tests pass.
 
-- [ ] **T-002-16** — SPI registration via `AsyncRuleInterceptor` service file (FR-002-08, S-002-19)
+- [x] **T-002-16** — SPI registration via `AsyncRuleInterceptor` service file (FR-002-08, S-002-19)
   _Test first:_ `SpiRegistrationTest` uses `ServiceFactory.isValidImplName(AsyncRuleInterceptor.class, fqcn)`.
   _Implement:_ Add `META-INF/services/com.pingidentity.pa.sdk.policy.AsyncRuleInterceptor`.
   _Verify:_ SPI registration tests pass and `PingAccessAdapter` is not registered as plugin.

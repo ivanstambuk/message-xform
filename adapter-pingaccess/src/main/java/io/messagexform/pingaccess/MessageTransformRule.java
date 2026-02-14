@@ -2,6 +2,7 @@ package io.messagexform.pingaccess;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pingidentity.pa.sdk.http.Exchange;
+import com.pingidentity.pa.sdk.http.ExchangeProperty;
 import com.pingidentity.pa.sdk.interceptor.Outcome;
 import com.pingidentity.pa.sdk.policy.AsyncRuleInterceptorBase;
 import com.pingidentity.pa.sdk.policy.ErrorHandlingCallback;
@@ -59,6 +60,16 @@ import org.slf4j.LoggerFactory;
 public class MessageTransformRule extends AsyncRuleInterceptorBase<MessageTransformConfig> {
 
     private static final Logger LOG = LoggerFactory.getLogger(MessageTransformRule.class);
+
+    // ── ExchangeProperty declarations (FR-002-07) ──
+
+    /** Guard flag — set to {@code true} when DENY mode rejects a request. */
+    static final ExchangeProperty<Boolean> TRANSFORM_DENIED =
+            ExchangeProperty.create("io.messagexform", "transformDenied", Boolean.class);
+
+    /** Summary of the last transform result for downstream rule consumption. */
+    static final ExchangeProperty<TransformResultSummary> TRANSFORM_RESULT =
+            ExchangeProperty.create("io.messagexform", "transformResult", TransformResultSummary.class);
 
     private TransformEngine engine;
     private PingAccessAdapter adapter;
