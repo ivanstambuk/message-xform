@@ -1,0 +1,18 @@
+# Invalid: has an unknown top-level key 'routing'
+id: unknown-root-key
+version: "1.0"
+
+input:
+  schema:
+    type: object
+output:
+  schema:
+    type: object
+
+routing:
+  path: /api/**
+
+transform:
+  lang: jslt
+  expr: |
+    .

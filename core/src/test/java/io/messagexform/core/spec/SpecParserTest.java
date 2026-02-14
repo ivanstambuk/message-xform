@@ -75,15 +75,15 @@ class SpecParserTest {
         TransformSpec spec = parser.parse(fixturePath("jslt-simple-rename.yaml"));
 
         JsonNode input = MAPPER.readTree("""
-        {
-          "user_id": "usr-42",
-          "first_name": "Bob",
-          "last_name": "Jensen",
-          "email_address": "bjensen@example.com",
-          "phone_number": "+31-6-12345678",
-          "is_active": true
-        }
-        """);
+                {
+                  "user_id": "usr-42",
+                  "first_name": "Bob",
+                  "last_name": "Jensen",
+                  "email_address": "bjensen@example.com",
+                  "phone_number": "+31-6-12345678",
+                  "is_active": true
+                }
+                """);
 
         JsonNode output = spec.compiledExpr().evaluate(input, TransformContext.empty());
 
@@ -111,11 +111,11 @@ class SpecParserTest {
         TransformSpec spec = parser.parse(fixturePath("jslt-conditional.yaml"));
 
         JsonNode input = MAPPER.readTree("""
-        {
-          "error": "invalid_grant",
-          "error_description": "The provided grant is invalid"
-        }
-        """);
+                {
+                  "error": "invalid_grant",
+                  "error_description": "The provided grant is invalid"
+                }
+                """);
 
         JsonNode output = spec.compiledExpr().evaluate(input, TransformContext.empty());
 
@@ -129,11 +129,11 @@ class SpecParserTest {
         TransformSpec spec = parser.parse(fixturePath("jslt-conditional.yaml"));
 
         JsonNode input = MAPPER.readTree("""
-        {
-          "id": "usr-42",
-          "name": "Bob Jensen"
-        }
-        """);
+                {
+                  "id": "usr-42",
+                  "name": "Bob Jensen"
+                }
+                """);
 
         JsonNode output = spec.compiledExpr().evaluate(input, TransformContext.empty());
 
@@ -160,28 +160,28 @@ class SpecParserTest {
         TransformSpec spec = parser.parse(fixturePath("jslt-array-reshape.yaml"));
 
         JsonNode input = MAPPER.readTree("""
-        {
-          "totalResults": 2,
-          "startIndex": 1,
-          "itemsPerPage": 10,
-          "Resources": [
-            {
-              "id": "u-1",
-              "userName": "bjensen",
-              "displayName": "Bob Jensen",
-              "emails": [{"value": "bjensen@example.com", "type": "work", "primary": true}],
-              "active": true
-            },
-            {
-              "id": "u-2",
-              "userName": "jsmith",
-              "displayName": "Jane Smith",
-              "emails": [{"value": "jsmith@example.com", "type": "work"}],
-              "active": false
-            }
-          ]
-        }
-        """);
+                {
+                  "totalResults": 2,
+                  "startIndex": 1,
+                  "itemsPerPage": 10,
+                  "Resources": [
+                    {
+                      "id": "u-1",
+                      "userName": "bjensen",
+                      "displayName": "Bob Jensen",
+                      "emails": [{"value": "bjensen@example.com", "type": "work", "primary": true}],
+                      "active": true
+                    },
+                    {
+                      "id": "u-2",
+                      "userName": "jsmith",
+                      "displayName": "Jane Smith",
+                      "emails": [{"value": "jsmith@example.com", "type": "work"}],
+                      "active": false
+                    }
+                  ]
+                }
+                """);
 
         JsonNode output = spec.compiledExpr().evaluate(input, TransformContext.empty());
 
@@ -369,6 +369,40 @@ class SpecParserTest {
                     .satisfies(ex -> {
                         SpecParseException spe = (SpecParseException) ex;
                         assertThat(spe.specId()).isNull();
+                        assertThat(spe.source()).isEqualTo(path.toString());
+                    });
+        }
+
+        @Test
+        @DisplayName("Unknown key in headers block (e.g. headers.request) → SpecParseException")
+        void unknownHeaderKey_throwsSpecParseException() {
+            Path path = invalidFixturePath("unknown-header-key.yaml");
+
+            assertThatThrownBy(() -> parser.parse(path))
+                    .isInstanceOf(SpecParseException.class)
+                    .hasMessageContaining("Unknown key")
+                    .hasMessageContaining("'headers'")
+                    .hasMessageContaining("request")
+                    .satisfies(ex -> {
+                        SpecParseException spe = (SpecParseException) ex;
+                        assertThat(spe.specId()).isEqualTo("unknown-header-key");
+                        assertThat(spe.source()).isEqualTo(path.toString());
+                    });
+        }
+
+        @Test
+        @DisplayName("Unknown top-level key (e.g. routing) → SpecParseException")
+        void unknownRootKey_throwsSpecParseException() {
+            Path path = invalidFixturePath("unknown-root-key.yaml");
+
+            assertThatThrownBy(() -> parser.parse(path))
+                    .isInstanceOf(SpecParseException.class)
+                    .hasMessageContaining("Unknown key")
+                    .hasMessageContaining("'spec root'")
+                    .hasMessageContaining("routing")
+                    .satisfies(ex -> {
+                        SpecParseException spe = (SpecParseException) ex;
+                        assertThat(spe.specId()).isEqualTo("unknown-root-key");
                         assertThat(spe.source()).isEqualTo(path.toString());
                     });
         }

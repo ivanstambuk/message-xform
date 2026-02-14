@@ -1,0 +1,21 @@
+# Invalid: uses "headers.request.add" instead of "headers.add"
+# This is the exact bug pattern that caused silent header injection failure.
+id: unknown-header-key
+version: "1.0"
+
+input:
+  schema:
+    type: object
+output:
+  schema:
+    type: object
+
+headers:
+  request:
+    add:
+      X-Test: "value"
+
+transform:
+  lang: jslt
+  expr: |
+    .

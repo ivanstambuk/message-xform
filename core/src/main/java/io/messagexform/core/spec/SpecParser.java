@@ -28,6 +28,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 /**
  * Parses YAML transform spec files into {@link TransformSpec} instances
@@ -50,6 +52,50 @@ public final class SpecParser {
     /** Valid HTTP methods for url.method.set (T-001-38d, RFC 9110 §9). */
     private static final Set<String> VALID_HTTP_METHODS =
             Set.of("GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS");
+
+    // ── Strict unknown-key detection ──
+    // Each YAML block has a set of recognized keys. Any key not in the set
+    // triggers a SpecParseException so that typos and structural mistakes
+    // (e.g. "headers.request.add" instead of "headers.add") are caught at
+    // load time instead of silently ignored.
+
+    /** Recognized top-level spec keys. */
+    private static final Set<String> KNOWN_ROOT_KEYS = Set.of(
+            "id",
+            "version",
+            "description",
+            "lang",
+            "input",
+            "output",
+            "transform",
+            "forward",
+            "reverse",
+            "headers",
+            "status",
+            "url",
+            "mappers",
+            "sensitive");
+
+    /** Recognized keys inside the {@code headers} block. */
+    private static final Set<String> KNOWN_HEADER_KEYS = Set.of("add", "remove", "rename");
+
+    /** Recognized keys inside the {@code status} block. */
+    private static final Set<String> KNOWN_STATUS_KEYS = Set.of("set", "when");
+
+    /** Recognized keys inside the {@code url} block. */
+    private static final Set<String> KNOWN_URL_KEYS = Set.of("path", "query", "method");
+
+    /** Recognized keys inside the {@code url.query} sub-block. */
+    private static final Set<String> KNOWN_URL_QUERY_KEYS = Set.of("add", "remove");
+
+    /** Recognized keys inside the {@code url.method} sub-block. */
+    private static final Set<String> KNOWN_URL_METHOD_KEYS = Set.of("set", "when");
+
+    /**
+     * Recognized keys inside the {@code transform}/{@code forward}/{@code reverse}
+     * block.
+     */
+    private static final Set<String> KNOWN_TRANSFORM_KEYS = Set.of("lang", "expr", "apply");
 
     private final EngineRegistry engineRegistry;
 
@@ -82,6 +128,9 @@ public final class SpecParser {
         String version = requireString(root, "version", source);
         String description = optionalString(root, "description");
 
+        // Strict key check: reject unknown top-level keys
+        rejectUnknownKeys(root, KNOWN_ROOT_KEYS, "spec root", id, source);
+
         // Resolve expression engine
         String lang = optionalString(root, "lang");
         JsonNode transformBlock = root.get("transform");
@@ -111,10 +160,13 @@ public final class SpecParser {
 
         if (transformBlock != null) {
             // Unidirectional spec
+            rejectUnknownKeys(transformBlock, KNOWN_TRANSFORM_KEYS, "transform", id, source);
             String expr = requireExpr(transformBlock, "transform", id, source);
             compiledExpr = compileExpression(engine, expr, id, source);
         } else if (forwardBlock != null && reverseBlock != null) {
             // Bidirectional spec
+            rejectUnknownKeys(forwardBlock, KNOWN_TRANSFORM_KEYS, "forward", id, source);
+            rejectUnknownKeys(reverseBlock, KNOWN_TRANSFORM_KEYS, "reverse", id, source);
             String forwardExpr = requireExpr(forwardBlock, "forward", id, source);
             String reverseExpr = requireExpr(reverseBlock, "reverse", id, source);
             forward = compileExpression(engine, forwardExpr, id, source);
@@ -166,6 +218,9 @@ public final class SpecParser {
         if (headersNode == null || headersNode.isNull()) {
             return null;
         }
+
+        // Strict key check: reject unknown keys (catches e.g. "headers.request.add")
+        rejectUnknownKeys(headersNode, KNOWN_HEADER_KEYS, "headers", specId, source);
 
         // Parse 'add' — static values (T-001-34) and dynamic expr (T-001-35)
         Map<String, String> staticAdd = new LinkedHashMap<>();
@@ -230,6 +285,9 @@ public final class SpecParser {
             return null;
         }
 
+        // Strict key check
+        rejectUnknownKeys(statusNode, KNOWN_STATUS_KEYS, "status", specId, source);
+
         // Require 'set' field
         JsonNode setNode = statusNode.get("set");
         if (setNode == null || setNode.isNull()) {
@@ -276,6 +334,9 @@ public final class SpecParser {
             return null;
         }
 
+        // Strict key checks
+        rejectUnknownKeys(urlNode, KNOWN_URL_KEYS, "url", specId, source);
+
         // Parse path.expr (T-001-38a)
         CompiledExpression pathExpr = null;
         JsonNode pathNode = urlNode.get("path");
@@ -294,6 +355,7 @@ public final class SpecParser {
         Map<String, CompiledExpression> queryDynamicAdd = new LinkedHashMap<>();
         JsonNode queryNode = urlNode.get("query");
         if (queryNode != null) {
+            rejectUnknownKeys(queryNode, KNOWN_URL_QUERY_KEYS, "url.query", specId, source);
             // Parse query.remove — list of glob patterns
             JsonNode qRemoveNode = queryNode.get("remove");
             if (qRemoveNode != null && qRemoveNode.isArray()) {
@@ -327,6 +389,7 @@ public final class SpecParser {
         CompiledExpression methodWhen = null;
         JsonNode methodNode = urlNode.get("method");
         if (methodNode != null) {
+            rejectUnknownKeys(methodNode, KNOWN_URL_METHOD_KEYS, "url.method", specId, source);
             JsonNode setNode = methodNode.get("set");
             if (setNode != null && setNode.isTextual()) {
                 methodSet = setNode.asText().toUpperCase();
@@ -659,5 +722,39 @@ public final class SpecParser {
     private String extractIdSafe(JsonNode root) {
         JsonNode idNode = root.get("id");
         return idNode != null && idNode.isTextual() ? idNode.asText() : null;
+    }
+
+    /**
+     * Rejects unknown keys in a YAML block by throwing {@link SpecParseException}
+     * if any key is not in the allowed set.
+     *
+     * <p>
+     * This is the primary shift-left guard against spec misconfiguration.
+     * Without this check, typos and structural mistakes (e.g.
+     * {@code headers.request.add}
+     * instead of {@code headers.add}) are silently ignored, leading to specs that
+     * load successfully but don't apply the intended transformations.
+     *
+     * @param node      the YAML object node to check
+     * @param knownKeys the set of recognized key names for this block
+     * @param blockName human-readable block name for error messages
+     * @param specId    spec identifier for error context
+     * @param source    source file path for error context
+     */
+    private void rejectUnknownKeys(
+            JsonNode node, Set<String> knownKeys, String blockName, String specId, String source) {
+        if (node == null || !node.isObject()) {
+            return;
+        }
+        List<String> unknown = StreamSupport.stream(((Iterable<String>) node::fieldNames).spliterator(), false)
+                .filter(key -> !knownKeys.contains(key))
+                .collect(Collectors.toList());
+        if (!unknown.isEmpty()) {
+            throw new SpecParseException(
+                    "Unknown key" + (unknown.size() > 1 ? "s" : "") + " in '" + blockName + "': " + unknown
+                            + " — recognized keys are: " + knownKeys,
+                    specId,
+                    source);
+        }
     }
 }

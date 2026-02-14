@@ -170,6 +170,7 @@ in sequence.
 |--------|--------|
 | Success path | Valid YAML spec → schemas parsed → JSLT expression compiled → immutable `Expression` object cached |
 | Validation path | Invalid YAML → fail fast with descriptive parse error including line/column |
+| Validation path | **Unknown YAML key in any block → fail fast** with diagnostic listing the unknown key(s) and the recognized keys for that block. Prevents typos and structural mistakes (e.g. `headers.request.add` instead of `headers.add`) from silently having no effect. |
 | Failure path | JSLT syntax error → reject at load time, not at evaluation time |
 | Source | JSLT (Schibsted), ADR-0008 |
 
