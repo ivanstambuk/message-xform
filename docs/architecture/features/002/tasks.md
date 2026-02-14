@@ -1,7 +1,7 @@
 # Feature 002 — PingAccess Adapter — Tasks
 
 _Status:_ Ready
-_Last updated:_ 2026-02-14
+_Last updated:_ 2026-02-15
 
 **Governing spec:** `docs/architecture/features/002/spec.md`
 **Implementation plan:** `docs/architecture/features/002/plan.md`
@@ -47,13 +47,13 @@ _Last updated:_ 2026-02-14
 
 #### I1 — MessageTransformConfig + enums + Bean Validation (FR-002-04)
 
-- [ ] **T-002-01** — Implement `ErrorMode` and `SchemaValidation` enums (FR-002-04)
+- [x] **T-002-01** — Implement `ErrorMode` and `SchemaValidation` enums (FR-002-04)
   _Intent:_ Provide typed configuration options for the admin UI.
   _Verify:_ `EnumTest` confirms enum values and serialization labels.
   _Verification commands:_
   - `./gradlew :adapter-pingaccess:test --tests "*EnumTest*"`
 
-- [ ] **T-002-02** — Implement `MessageTransformConfig` with validation and defaults (FR-002-04, S-002-17, S-002-18)
+- [x] **T-002-02** — Implement `MessageTransformConfig` with validation and defaults (FR-002-04, S-002-17, S-002-18)
   _Intent:_ Define config model with `@UIElement`, `@Help`, `@NotNull`, `@Min`, `@Max`.
   _Test first:_ `MessageTransformConfigTest` for required fields, defaults, bounds.
   _Implement:_ `MessageTransformConfig extends SimplePluginConfiguration`.

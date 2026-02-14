@@ -1,23 +1,27 @@
 # Current Session State
 
-**Date:** 2026-02-14
-**Focus:** Feature 002 plan/tasks audit resolution + T-001-67 (TransformResult specId/specVersion)
+**Date:** 2026-02-15
+**Focus:** Feature 002 — PingAccess Adapter — Phase 1 (I1)
 
-## Session Progress
+## Completed This Session
 
-### Completed
-- ✅ Reviewed and verified 2 AI-generated audit reports (plan + tasks) for Feature 002
-- ✅ Fixed 4 audit findings in plan.md: bodyParseFailed skip-guard (F-001), scenario count alignment (F-002/F-003/F-004)
-- ✅ Fixed 3 audit findings in tasks.md: bodyParseFailed guard on T-002-05/07/20, scenario count references
-- ✅ T-001-67: Added specId/specVersion to TransformResult (7 tests, engine wired)
-- ✅ T-001-68: Confirmed already fixed in prior session, closed
-- ✅ Deleted both ephemeral audit reports
+- [x] T-002-01 — `ErrorMode` enum (PASS_THROUGH, DENY) with admin-UI labels
+- [x] T-002-02 — `SchemaValidation` enum (STRICT, LENIENT) with admin-UI labels
+- [x] T-002-02 — `MessageTransformConfig` extends `SimplePluginConfiguration`
+  - 7 `@UIElement`-annotated fields with `@Help`
+  - `@NotNull` on `specsDir`, `errorMode`
+  - `@Min(0) @Max(86400)` on `reloadIntervalSec`
+  - Defaults: `errorMode=PASS_THROUGH`, `reloadIntervalSec=0`, `schemaValidation=LENIENT`, `enableJmxMetrics=false`
+- [x] EnumTest (12 tests) + MessageTransformConfigTest (22 tests) — all green
+- [x] Full quality gate passes (`spotlessApply check`)
+- [x] Committed: `42d0179 feat(pingaccess): config enums + MessageTransformConfig (I1)`
 
-### Key Decisions
-- bodyParseFailed is adapter-internal state (field or wrapper record), not a Message field
-- Chain results use last step's spec identity for provenance metadata
-- Existing factory methods preserved for backward compat (null spec metadata)
+## Key Decisions
 
-### Remaining Work
-- Feature 001 Phase 12 is now fully complete (T-001-67 + T-001-68)
-- Feature 002 implementation can begin: T-002-01 → T-002-02 (Phase 1)
+- Config field order via `@UIElement(order = ...)` — 10/20/30/40/50/60/70
+- `enableJmxMetrics` uses getter `getEnableJmxMetrics()` (not `isEnabled...`) to match JavaBean convention for `boolean` primitive with PA SDK compatibility
+
+## Remaining Work
+
+- **Phase 1 complete** — I1 done
+- **Next:** Phase 2 (I2) — `PingAccessAdapter.wrapRequest()` / T-002-03..T-002-06
