@@ -8,21 +8,17 @@ description: Read-only generated-code audit for quality, security, dependency hy
 
 ```
 /code-audit all
-/code-audit changed
 /code-audit <module>
 ```
 
 **Examples:**
 - `/code-audit all` — audit all production modules.
-- `/code-audit changed` — audit only files changed vs current branch state.
 - `/code-audit adapter-pingaccess` — audit a single module.
 
 **Parameters:**
 - `all` — all active Gradle modules that contain Java source (`src/main/java`).
-- Resolve `all` dynamically from `settings.gradle.kts` includes (do not hardcode module names).
-- `changed` — derive scope from local diffs (+ staged + untracked). If the
-  working tree is clean, fall back to diff vs `origin/main` merge-base.
 - `<module>` — one concrete module directory name.
+- Resolve `all` dynamically from `settings.gradle.kts` includes (do not hardcode module names).
 
 ---
 
@@ -57,8 +53,7 @@ Goal: align findings with current project guardrails and toolchain policy.
 // turbo
 Before running audit checks, verify:
 1. `git`, `rg`, and `./gradlew` are available.
-2. `origin/main` exists locally for merge-base fallback.
-3. Workspace is readable; report path `audit-reports/` is writable.
+2. Workspace is readable; report path `audit-reports/` is writable.
 
 If a tool is missing:
 - continue with available checks,
@@ -71,28 +66,17 @@ If a tool is missing:
 1. Determine target:
    - `all` -> all active modules discovered from `settings.gradle.kts` includes,
      filtered to modules with `src/main/java`
-   - `changed` -> files from:
-     - `git diff --name-only`
-     - `git diff --cached --name-only`
-     - `git ls-files --others --exclude-standard`
-     - if all three are empty: `git diff --name-only $(git merge-base HEAD origin/main)...HEAD`
    - `<module>` -> that module only
 2. Validate module target against `settings.gradle.kts` includes. Unknown module -> stop with clear error.
-3. For `changed`, map files to module scopes and ignore non-code paths with explicit report note.
-4. For `changed`, apply impact expansion rules:
-   - If `core/src/main/java/**` changed -> include all adapter modules in baseline compile/test checks.
-   - If `build.gradle.kts`, `settings.gradle.kts`, or `gradle/libs.versions.toml` changed ->
-     run dependency/baseline checks for all discovered modules.
-   - If shared SPI contracts changed (`core/src/main/java/**/spi/**`) -> include known implementer modules.
-5. Build file sets:
+3. Build file sets:
    - Production: `<module>/src/main/java/**`
    - Tests: `<module>/src/test/java/**`
    - Build files: `<module>/build.gradle.kts`, root `build.gradle.kts`, version catalog
-6. Exclude non-signal paths: `.gradle/`, `build/`, `out/`, `.idea/`, `.agent/session/`,
+4. Exclude non-signal paths: `.gradle/`, `build/`, `out/`, `.idea/`, `.agent/session/`,
    `.sdk-decompile/`, `binaries/`, `docs/`, `audit-reports/`.
-7. Normalize and deduplicate file lists (stable sorted order).
-8. If resolved scope is empty, write a report with "No auditable code in scope" and stop.
-9. Record exact scope in report metadata.
+5. Normalize and deduplicate file lists (stable sorted order).
+6. If resolved scope is empty, write a report with "No auditable code in scope" and stop.
+7. Record exact scope in report metadata.
 
 ### Phase 2 — Baseline Build Signals (Non-Mutating)
 
@@ -119,9 +103,8 @@ Classification guidance for baseline failures:
 - Unable to determine provenance -> finding with provenance `unknown`.
 
 Provenance method (deterministic):
-- `new`: evidence location is in uncommitted changes, untracked files, or introduced in
-  `$(git merge-base HEAD origin/main)..HEAD`.
-- `existing`: evidence location predates the current branch diff range.
+- `new`: evidence location is in uncommitted/staged/untracked changes, or last touched by `HEAD`.
+- `existing`: evidence location was last touched before `HEAD`.
 - `unknown`: provenance cannot be mapped reliably to a line/symbol.
 
 ### Phase 2.5 — Finding Quality Bar
@@ -225,7 +208,7 @@ Evaluate whether tests are strong enough to protect behavior.
 
 | Check ID | What to inspect | Severity guidance |
 |----------|-----------------|-------------------|
-| TQ-01 | Missing tests for changed production code paths | High |
+| TQ-01 | Missing tests for audited production code paths | High |
 | TQ-02 | Weak assertions (asserting only non-null / no behavior) | Medium |
 | TQ-03 | Flakiness signals (`Thread.sleep`, timing races, order dependence) | Medium |
 | TQ-04 | Disabled/ignored tests without rationale | Medium |
@@ -281,7 +264,6 @@ audit-reports/code-audit-<target>-<YYYYMMDD-HHMMSS>.md
 
 Examples:
 - `audit-reports/code-audit-all-20260215-103000.md`
-- `audit-reports/code-audit-changed-20260215-104512.md`
 - `audit-reports/code-audit-adapter-pingaccess-20260215-105901.md`
 
 `audit-reports/` is gitignored and shared with `/audit` findings.
@@ -295,9 +277,8 @@ Examples:
 
 ## Metadata
 - Date: <ISO timestamp>
-- Target: <all|changed|module>
+- Target: <all|module>
 - Resolved modules: <explicit list>
-- Impact expansion applied: yes/no + reason
 - Scope paths: <explicit list>
 - Commands executed: <explicit list>
 - Excluded paths: <explicit list>
