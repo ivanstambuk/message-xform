@@ -20,6 +20,7 @@ The PingAccess E2E script `scripts/pa-e2e-test.sh` is a monolithic Bash workflow
 5. Runtime diagnostics (`docker exec`, `docker logs`, JWT decode, log grep)
 6. Artifact validation (`javap`, `unzip`, `stat`, size constraints)
 7. Aggregated pass/fail accounting and non-trivial skip semantics
+8. Inline data manipulation between calls (JSON parsing, string operations, derived values)
 
 The replacement must cover these behaviors end-to-end, not just HTTP assertions.
 
@@ -60,6 +61,10 @@ These requirements were extracted directly from `scripts/pa-e2e-test.sh` behavio
 | RQ-10 | Modular test composition | 24 tests across phases are too large for one flat file | `scripts/pa-e2e-test.sh:1120`, `scripts/pa-e2e-test.sh:1224`, `scripts/pa-e2e-test.sh:1369` |
 | RQ-11 | CI-friendly machine-readable report output | Needed for GitHub Actions and regression visibility | Implied by overall E2E gate role (`FR-002-12`) |
 | RQ-12 | Local-dev friendly execution model | Current flow runs on a developer machine without Kubernetes | `scripts/pa-e2e-test.sh:213`, `scripts/pa-e2e-test.sh:249`, `scripts/pa-e2e-test.sh:357` |
+| RQ-13 | Pre-request and post-request transformation hooks | Need scriptable payload/header/query preparation and response-derived value shaping | Postman-like workflow requirement; partly mirrored by inline processing in `scripts/pa-e2e-test.sh:926`, `scripts/pa-e2e-test.sh:1426`, `scripts/pa-e2e-test.sh:1510` |
+| RQ-14 | Multi-scope variables (request/local, collection/suite, environment, global) | Need explicit variable lifecycles across steps and suites, not only ad-hoc templates | Postman-like workflow requirement; current script uses process-level globals throughout |
+| RQ-15 | Stateful cookie jar/session container | Automatically persist `Set-Cookie` responses and replay cookies to subsequent requests in-scope | Required for OIDC/web-session chains (currently hand-managed in `scripts/pa-e2e-test.sh:973`, `scripts/pa-e2e-test.sh:1104`) |
+| RQ-16 | Programmatic cookie + arbitrary header mutation | Ability to set/remove/transform cookies and headers before/after requests via script/expression hooks | Needed for Host rewrites and dynamic auth/header shaping (`scripts/pa-e2e-test.sh:119`, `scripts/pa-e2e-test.sh:936`, `scripts/pa-e2e-test.sh:1158`) |
 
 ### Additional governance guardrails
 
@@ -375,22 +380,26 @@ spec:
 
 ## 5. Requirement Coverage Matrix
 
-Legend: `Yes` = native support, `Partial` = possible with custom glue or caveats, `No` = missing/blocking.
+Legend: `✅` = native support, `⚠️` = possible with custom glue/caveats, `❌` = missing/blocking.
 
 | Requirement | Venom | Runn | Hurl | Karate | Tavern | Step CI | BATS | Testkube |
 |-------------|:-----:|:----:|:----:|:------:|:------:|:-------:|:----:|:--------:|
-| RQ-01 Unified HTTP + shell in one suite | Yes | Yes | No | Yes | Partial | No | Yes | Partial |
-| RQ-02 Deterministic teardown/finally | Partial | Yes | No | Partial | Yes | No | Yes | Yes |
-| RQ-03 Branching and skip logic | Partial | Yes | No | Yes | Yes | Partial | Yes | Yes |
-| RQ-04 Retry/loop/timeouts | Yes | Yes | Partial | Yes | Partial | Partial | Partial | Yes |
-| RQ-05 Extraction + templating | Yes | Yes | Yes | Yes | Yes | Yes | Partial | Yes |
-| RQ-06 Header/cookie/redirect/TLS control | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
-| RQ-07 Soft-assert/best-effort checks | Partial | Yes | Partial | Yes | Yes | Partial | Partial | Yes |
-| RQ-08 Continue and aggregate summary | Partial | Yes | Partial | Yes | Yes | Partial | Yes | Yes |
-| RQ-09 Log/JAR command assertions | Yes | Yes | No | Yes | Partial | No | Yes | Yes |
-| RQ-10 Modular composition/splitting | Yes | Yes | Partial | Yes | Yes | Yes | Partial | Yes |
-| RQ-11 CI machine-readable reports | Yes | Partial | Yes | Yes | Yes | Yes | Partial | Yes |
-| RQ-12 Local dev without heavy infra | Yes | Yes | Yes | Yes | Yes | Yes | Yes | No |
+| RQ-01 Unified HTTP + shell in one suite | ✅ | ✅ | ❌ | ✅ | ⚠️ | ❌ | ✅ | ⚠️ |
+| RQ-02 Deterministic teardown/finally | ⚠️ | ✅ | ❌ | ⚠️ | ✅ | ❌ | ✅ | ✅ |
+| RQ-03 Branching and skip logic | ⚠️ | ✅ | ❌ | ✅ | ✅ | ⚠️ | ✅ | ✅ |
+| RQ-04 Retry/loop/timeouts | ✅ | ✅ | ⚠️ | ✅ | ⚠️ | ⚠️ | ⚠️ | ✅ |
+| RQ-05 Extraction + templating | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ |
+| RQ-06 Header/cookie/redirect/TLS control | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| RQ-07 Soft-assert/best-effort checks | ⚠️ | ✅ | ⚠️ | ✅ | ✅ | ⚠️ | ⚠️ | ✅ |
+| RQ-08 Continue and aggregate summary | ⚠️ | ✅ | ⚠️ | ✅ | ✅ | ⚠️ | ✅ | ✅ |
+| RQ-09 Log/JAR command assertions | ✅ | ✅ | ❌ | ✅ | ⚠️ | ❌ | ✅ | ✅ |
+| RQ-10 Modular composition/splitting | ✅ | ✅ | ⚠️ | ✅ | ✅ | ✅ | ⚠️ | ✅ |
+| RQ-11 CI machine-readable reports | ✅ | ⚠️ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ |
+| RQ-12 Local dev without heavy infra | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| RQ-13 Pre/post request transformation hooks | ⚠️ | ✅ | ⚠️ | ✅ | ✅ | ⚠️ | ✅ | ⚠️ |
+| RQ-14 Multi-scope variable hierarchy | ⚠️ | ⚠️ | ⚠️ | ✅ | ⚠️ | ⚠️ | ⚠️ | ⚠️ |
+| RQ-15 Stateful cookie jar/session container | ⚠️ | ⚠️ | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ⚠️ |
+| RQ-16 Programmatic cookie/header mutation | ⚠️ | ✅ | ⚠️ | ✅ | ✅ | ⚠️ | ✅ | ⚠️ |
 
 ### Blocking conclusions from matrix
 
@@ -398,6 +407,8 @@ Legend: `Yes` = native support, `Partial` = possible with custom glue or caveats
 - **Step CI**: blocked by `RQ-01`, `RQ-09`, plus runtime/license preference mismatch.
 - **Testkube**: blocked by `RQ-12` (Kubernetes required).
 - **BATS**: not blocked, but only incremental improvement (still shell-heavy).
+- **Strict Postman parity note (`RQ-14`)**: exact collection/environment/global variable semantics are not first-class in most native CLI tools; this usually needs project conventions or a thin wrapper layer.
+- **Cookie/session parity note (`RQ-15`)**: if automatic cookie persistence and replay is mandatory, require a proof-of-capability spike before tool lock-in (especially for non-Karate options).
 
 ---
 
@@ -415,11 +426,18 @@ Why it ranks first after deep script analysis:
 2. Best native story for deterministic cleanup/finalization (`RQ-02`)
 3. Strong fit for chained PA provisioning + diagnostics (`RQ-01`, `RQ-05`, `RQ-09`)
 4. Latest release recency is strong (`v1.3.1`, 2026-02-14)
+5. Best non-JS fit for request/response transformation logic (`RQ-13`, `RQ-16`)
 
 ### Secondary recommendation: Venom
 
 Venom remains a strong option and may be preferred if built-in report formats
 (JUnit/TAP/HTML) are prioritized over orchestration ergonomics.
+
+### If strict Postman-style variable scopes are non-negotiable
+
+Karate is the closest out-of-the-box match for strict `RQ-14` + `RQ-15` + `RQ-16`
+because it has stronger native scripting and session/cookie handling patterns.
+Trade-off: JVM runtime and JS-heavy DSL.
 
 ### Not recommended as full replacement
 
@@ -432,7 +450,7 @@ Venom remains a strong option and may be preferred if built-in report formats
 ## 7. Migration Path (Runn-first)
 
 ### Phase 0 — Requirement gate (prevent mid-integration surprises)
-Create an acceptance checklist from `RQ-01..RQ-12` and require every migration PR
+Create an acceptance checklist from `RQ-01..RQ-16` and require every migration PR
 to show explicit pass/fail for each requirement.
 
 ### Phase 1 — Keep thin shell for infra only
