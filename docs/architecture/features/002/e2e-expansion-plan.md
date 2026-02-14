@@ -203,8 +203,8 @@ Tests that depend on the profile routing different specs to different paths.
 
 | ID | Task | Scenario(s) | Est. assertions | Status |
 |----|------|-------------|:---------------:|:------:|
-| P3-01 | Test 7: **Header injection** — POST to `/api/headers/test` with JSON body `{"key":"value"}`. Assert: (a) `X-Echo-Req-X-Transformed: true` present in response headers, (b) `X-Echo-Req-X-Transform-Version: 1.0.0` present, (c) response body is `{"key":"value"}` (`.` JSLT passthrough). Uses `$ENGINE_HEADERS` for header verification. | S-002-04 | 3 | ⬜ |
-| P3-02 | Test 8: **Multiple spec routing** — POST to `/api/transform/test` verifies rename spec fires (snake→camel in echo probe). POST to `/api/headers/test` verifies header-inject spec fires. Two different specs routed by profile to different paths. | S-002-09, S-002-15 | 2 | ⬜ |
+| P3-01 | Test 7: **Header injection** — POST to `/api/headers/test` with JSON body `{"key":"value"}`. Assert: (a) `X-Echo-Req-X-Transformed: true` present in response headers, (b) `X-Echo-Req-X-Transform-Version: 1.0.0` present, (c) response body is `{"key":"value"}` (`.` JSLT passthrough). Uses `$ENGINE_HEADERS` for header verification. | S-002-04 | 3 | ✅ |
+| P3-02 | Test 8: **Multiple spec routing** — POST to `/api/transform/test` verifies rename spec fires (snake→camel in echo probe). POST to `/api/headers/test` verifies header-inject spec fires. Two different specs routed by profile to different paths. | S-002-09, S-002-15 | 2 | ✅ |
 
 ### Phase 4 — Context variable tests
 
@@ -214,9 +214,9 @@ Tests that verify JSLT access to `$cookies`, `$queryParams`, and
 
 | ID | Task | Scenario(s) | Est. assertions | Status |
 |----|------|-------------|:---------------:|:------:|
-| P4-01 | Test 9: **Cookies in JSLT** — POST to `/api/context/test` with extra header `Cookie: session_token=abc123; lang=en`. Assert: response body has `session_token` = `abc123` and `page` is null/absent. Uses extra header support in `engine_request()`. | S-002-22 | 2 | ⬜ |
-| P4-02 | Test 10: **Query params in JSLT** — POST to `/api/context/test?page=2&limit=10`. Assert: response body has `page` = `2`. | S-002-23 | 2 | ⬜ |
-| P4-03 | Test 11: **Session is null for unprotected requests** — Use the same response from P4-01 or P4-02. Assert: `session` field is null (no identity attached). Partial coverage of S-002-14 (unauthenticated path). | S-002-14 (partial) | 1 | ⬜ |
+| P4-01 | Test 9: **Cookies in JSLT** — POST to `/api/context/test` with extra header `Cookie: session_token=abc123; lang=en`. Assert: response body has `session_token` = `abc123` and `page` is null/absent. Uses extra header support in `engine_request()`. | S-002-22 | 2 | ✅ |
+| P4-02 | Test 10: **Query params in JSLT** — POST to `/api/context/test?page=2&limit=10`. Assert: response body has `page` = `2`. | S-002-23 | 2 | ✅ |
+| P4-03 | Test 11: **Session is null for unprotected requests** — Use the same response from P4-01 or P4-02. Assert: `session` field is null (no identity attached). Partial coverage of S-002-14 (unauthenticated path). | S-002-14 (partial) | 1 | ✅ |
 
 ### Phase 5 — Body & status edge cases
 
@@ -225,11 +225,11 @@ transforms, and URL rewriting.
 
 | ID | Task | Scenario(s) | Est. assertions | Status |
 |----|------|-------------|:---------------:|:------:|
-| P5-01 | Test 12: **Non-JSON body pass-through** — POST to `/api/transform/test` with `Content-Type: text/plain` and body `Hello, world!`. Adapter detects non-JSON → sets `bodyParseFailed` → skips body JSLT → forwards raw bytes. Assert: (a) response status 200, (b) response body is `Hello, world!`, (c) `X-Echo-Req-Content-Type` contains `text/plain`. Uses Content-Type override in `engine_request()`. | S-002-08 | 3 | ⬜ |
-| P5-02 | Test 13: **Non-JSON response body** — GET to `/api/html/page`. Echo returns `text/html` response. Profile routes response through `e2e-rename` → adapter detects non-JSON → `bodyParseFailed` → skips body JSLT → original HTML forwarded. Assert: (a) response body contains `<html>`, (b) response status 200. | S-002-32 | 2 | ⬜ |
-| P5-03 | Test 14: **Non-standard status code pass-through** — GET to `/api/status/277`. Echo returns HTTP 277 (PA's `ALLOWED` code). Profile routes response through `e2e-rename` → adapter processes the response but doesn't remap the status. Assert: response status is 277. **Risk:** PA engine may reject non-standard codes — if so, document as known limitation. | S-002-35 | 1 | ⬜ |
-| P5-04 | Test 15: **Status code transform** — GET to `/api/status-test/ok`. Profile routes response to `e2e-status-override` which has `status.set: 201`. Echo returns 200. Assert: response status is 201. | S-002-05 | 1 | ⬜ |
-| P5-05 | Test 16: **URL rewrite** — POST to `/api/rewrite/test` with body `{"target": "/api/rewritten"}`. Profile routes to `e2e-url-rewrite` which rewrites path. Assert: `X-Echo-Path` response header shows `/api/rewritten`. Uses `$ENGINE_HEADERS`. | S-002-06 | 1 | ⬜ |
+| P5-01 | Test 12: **Non-JSON body pass-through** — POST to `/api/transform/test` with `Content-Type: text/plain` and body `Hello, world!`. Adapter detects non-JSON → sets `bodyParseFailed` → skips body JSLT → forwards raw bytes. Assert: (a) response status 200, (b) response body is `Hello, world!`, (c) `X-Echo-Req-Content-Type` contains `text/plain`. Uses Content-Type override in `engine_request()`. | S-002-08 | 3 | ✅ |
+| P5-02 | Test 13: **Non-JSON response body** — GET to `/api/html/page`. Echo returns `text/html` response. Profile routes response through `e2e-rename` → adapter detects non-JSON → `bodyParseFailed` → skips body JSLT → original HTML forwarded. Assert: (a) response body contains `<html>`, (b) response status 200. | S-002-32 | 2 | ✅ |
+| P5-03 | Test 14: **Non-standard status code pass-through** — GET to `/api/status/277`. Echo returns HTTP 277 (PA's `ALLOWED` code). Profile routes response through `e2e-rename` → adapter processes the response but doesn't remap the status. Assert: response status is 277. **Risk:** PA engine may reject non-standard codes — if so, document as known limitation. | S-002-35 | 1 | ✅ |
+| P5-04 | Test 15: **Status code transform** — GET to `/api/status-test/ok`. Profile routes response to `e2e-status-override` which has `status.set: 201`. Echo returns 200. Assert: response status is 201. | S-002-05 | 1 | ✅ |
+| P5-05 | Test 16: **URL rewrite** — POST to `/api/rewrite/test` with body `{"target": "/api/rewritten"}`. Profile routes to `e2e-url-rewrite` which rewrites path. Assert: `X-Echo-Path` response header shows `/api/rewritten`. Uses `$ENGINE_HEADERS`. | S-002-06 | 1 | ✅ |
 
 ### Phase 6 — Error mode tests
 

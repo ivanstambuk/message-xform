@@ -611,6 +611,106 @@ info "Test 6: PingAccess health"
 pa_logs=$(docker logs "$PA_CONTAINER" 2>&1)
 assert_contains "  PingAccess started without errors" "PingAccess running" "$pa_logs"
 
+# ============================================================================
+# Phase 3 — Profile routing & header injection tests
+# ============================================================================
+echo ""
+info "=== Phase 3: Profile Routing & Header Injection ==="
+
+# ---- Test 7: Header injection (S-002-04) ----
+# Profile routes /api/headers/** → e2e-header-inject (request direction).
+# Spec injects X-Transformed: true and X-Transform-Version: 1.0.0 headers.
+# Echo backend reflects injected headers back as X-Echo-Req-* response headers.
+info "Test 7: Header injection via profile routing"
+engine_request POST "/api/headers/test" '{"key":"value"}'
+assert_eq "  POST /api/headers/test returns 200" "200" "$ENGINE_HTTP_CODE"
+assert_eq "  X-Transformed header injected" "true" "$(header_value X-Echo-Req-X-Transformed)"
+assert_eq "  X-Transform-Version header injected" "1.0.0" "$(header_value X-Echo-Req-X-Transform-Version)"
+
+# ---- Test 8: Multiple spec routing (S-002-09, S-002-15) ----
+# Two different specs routed by profile to different paths.
+# /api/transform/ → e2e-rename (already verified in Test 1)
+# /api/headers/   → e2e-header-inject (just verified in Test 7)
+# This test confirms both paths are active simultaneously via the profile.
+info "Test 8: Multiple spec routing via profile"
+engine_request POST "/api/transform/multi" '{"user_id":"m1","first_name":"X","last_name":"Y","email_address":"z@z.com"}'
+assert_eq "  Rename spec active on /api/transform" "m1" "$(json_field "$ENGINE_BODY" user_id)"
+engine_request POST "/api/headers/multi" '{"marker":"routing-test"}'
+assert_eq "  Header spec active on /api/headers" "true" "$(header_value X-Echo-Req-X-Transformed)"
+
+# ============================================================================
+# Phase 4 — Context variable tests
+# ============================================================================
+echo ""
+info "=== Phase 4: Context Variables ==="
+
+# ---- Test 9: Cookies in JSLT (S-002-22) ----
+# e2e-context spec reads $cookies.session_token via JSLT.
+# Cookie header is parsed by the PA adapter into TransformContext.cookies.
+info "Test 9: Cookie context variable"
+engine_request POST "/api/context/cookies" '{"data":"test"}' "Cookie: session_token=abc123; lang=en"
+assert_eq "  POST /api/context/cookies returns 200" "200" "$ENGINE_HTTP_CODE"
+assert_eq "  session_token from cookie" "abc123" "$(json_field "$ENGINE_BODY" session_token)"
+
+# ---- Test 10: Query params in JSLT (S-002-23) ----
+# e2e-context spec reads $queryParams.page via JSLT.
+info "Test 10: Query param context variable"
+engine_request POST "/api/context/qp?page=2&limit=10" '{"data":"test"}'
+assert_eq "  POST /api/context/qp returns 200" "200" "$ENGINE_HTTP_CODE"
+assert_eq "  page from queryParams" "2" "$(json_field "$ENGINE_BODY" page)"
+
+# ---- Test 11: Session is null for unprotected (S-002-14 partial) ----
+# Unprotected app → no identity → $session is null.
+info "Test 11: Session null for unprotected request"
+assert_eq "  session is null (unprotected)" "None" "$(json_field "$ENGINE_BODY" session)"
+
+# ============================================================================
+# Phase 5 — Body & status edge cases
+# ============================================================================
+echo ""
+info "=== Phase 5: Body & Status Edge Cases ==="
+
+# ---- Test 12: Non-JSON body pass-through (S-002-08) ----
+# POST with text/plain body → adapter detects non-JSON → bodyParseFailed → skips
+# body JSLT → forwards raw bytes. Profile routes /api/transform/** to e2e-rename
+# for request direction, but body JSLT should be skipped for non-JSON.
+info "Test 12: Non-JSON request body pass-through"
+engine_request POST "/api/transform/plain" "Hello, world!" "Content-Type: text/plain"
+assert_eq "  POST text/plain returns 200" "200" "$ENGINE_HTTP_CODE"
+assert_eq "  Raw body forwarded unchanged" "Hello, world!" "$ENGINE_BODY"
+assert_contains "  Echo saw text/plain Content-Type" "text/plain" "$(header_value X-Echo-Req-Content-Type)"
+
+# ---- Test 13: Non-JSON response body (S-002-32) ----
+# GET /api/html/page → echo returns text/html. Profile routes response through
+# e2e-rename → adapter detects non-JSON response → bodyParseFailed → skips JSLT
+# → original HTML forwarded.
+info "Test 13: Non-JSON response body pass-through"
+engine_request GET "/api/html/page" ""
+assert_eq "  GET /api/html/page returns 200" "200" "$ENGINE_HTTP_CODE"
+assert_contains "  HTML response body preserved" "<html>" "$ENGINE_BODY"
+
+# ---- Test 14: Non-standard status code pass-through (S-002-35) ----
+# GET /api/status/277 → echo returns HTTP 277. Profile routes response through
+# e2e-rename → adapter processes but doesn't remap the status.
+info "Test 14: Non-standard status code pass-through (277)"
+engine_request GET "/api/status/277" ""
+assert_eq "  GET /api/status/277 returns 277" "277" "$ENGINE_HTTP_CODE"
+
+# ---- Test 15: Status code transform (S-002-05) ----
+# GET /api/status-test/ok → echo returns 200. Profile routes response to
+# e2e-status-override → status.set: 201.
+info "Test 15: Status code transform (200 → 201)"
+engine_request GET "/api/status-test/ok" ""
+assert_eq "  Status overridden to 201" "201" "$ENGINE_HTTP_CODE"
+
+# ---- Test 16: URL rewrite (S-002-06) ----
+# POST /api/rewrite/test → profile routes to e2e-url-rewrite → url.path.expr
+# rewrites to "/api/rewritten". Echo reflects the rewritten path in X-Echo-Path.
+info "Test 16: URL path rewrite"
+engine_request POST "/api/rewrite/test" '{"target":"/api/rewritten"}'
+assert_eq "  POST /api/rewrite/test returns 200" "200" "$ENGINE_HTTP_CODE"
+assert_eq "  Echo saw rewritten path" "/api/rewritten" "$(header_value X-Echo-Path)"
+
 # ---------------------------------------------------------------------------
 # Step 7: Summary
 # ---------------------------------------------------------------------------
