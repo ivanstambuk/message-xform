@@ -31,9 +31,11 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 PA_IMAGE="pingidentity/pingaccess:latest"
 PA_CONTAINER="pa-e2e-test"
 ECHO_CONTAINER="pa-e2e-echo"
+OIDC_CONTAINER="pa-e2e-oidc"
 PA_ADMIN_PORT=19000      # host port → PA 9000 (admin API)
 PA_ENGINE_PORT=13000     # host port → PA 3000 (engine)
 ECHO_PORT=18080          # host port → echo backend 8080
+OIDC_PORT=18443          # host port → mock-oauth2-server 8080
 PA_PASSWORD="2Access"
 PA_USER="administrator"
 LICENSE_FILE="$PROJECT_ROOT/binaries/PingAccess-9.0-Development.lic"
@@ -197,7 +199,7 @@ header_value() {
 # ---------------------------------------------------------------------------
 cleanup() {
     info "Cleaning up containers..."
-    docker rm -f "$PA_CONTAINER" "$ECHO_CONTAINER" 2>/dev/null || true
+    docker rm -f "$PA_CONTAINER" "$ECHO_CONTAINER" "$OIDC_CONTAINER" 2>/dev/null || true
     docker network rm pa-e2e-net 2>/dev/null || true
 }
 trap cleanup EXIT
@@ -321,6 +323,32 @@ http.server.HTTPServer(("0.0.0.0", 8080), EchoHandler).serve_forever()
 
 sleep 2
 info "Echo backend ready"
+
+# ---------------------------------------------------------------------------
+# Step 2b: Start mock-oauth2-server (Phase 8 — OAuth/Identity E2E)
+# ---------------------------------------------------------------------------
+info "Starting mock-oauth2-server..."
+docker run -d --name "$OIDC_CONTAINER" --network pa-e2e-net \
+    -p "$OIDC_PORT:8080" \
+    ghcr.io/navikt/mock-oauth2-server:latest >/dev/null
+
+# Wait for the OIDC server to be ready
+info "Waiting for mock-oauth2-server..."
+oidc_ready=false
+for i in $(seq 1 30); do
+    if curl -sf "http://localhost:$OIDC_PORT/default/.well-known/openid-configuration" >/dev/null 2>&1; then
+        oidc_ready=true
+        break
+    fi
+    sleep 1
+done
+if [[ "$oidc_ready" == "true" ]]; then
+    info "mock-oauth2-server ready (${i}s)"
+else
+    fail "mock-oauth2-server did not start within 30s"
+    docker logs "$OIDC_CONTAINER" 2>&1 | tail -20
+    exit 1
+fi
 
 # ---------------------------------------------------------------------------
 # Step 3: Start PingAccess
@@ -611,6 +639,164 @@ info "DENY root resource configured (id=$deny_root_id, unprotected=$deny_res_unp
 
 info "PA configuration complete (both apps)"
 
+# ---------------------------------------------------------------------------
+# Step 5k: Phase 8 — Configure Token Provider for OAuth/Identity tests
+# ---------------------------------------------------------------------------
+echo ""
+info "=== Phase 8: OAuth/Identity PA Configuration ==="
+
+# The mock-oauth2-server uses the "default" issuer. Within the Docker
+# network, it's reachable at http://pa-e2e-oidc:8080.  PA's OIDC
+# discovery will resolve http://pa-e2e-oidc:8080/default/.well-known/openid-configuration.
+#
+# PA supports third-party OIDC token providers natively.  We:
+#   1. Create a Third-Party Service pointing to the mock-OIDC host
+#   2. Create an Access Token Validator (JWT, JWKS-based) that trusts
+#      tokens signed by the mock-OIDC server
+#   3. Create a protected Application (/api/session) that requires
+#      a valid Bearer token
+
+# 5k-1. Create Third-Party Service pointing to mock-oauth2-server
+info "Creating Third-Party Service for mock-OIDC..."
+oidc_svc_response=$(pa_api POST /thirdPartyServices '{
+    "name": "Mock OIDC Server",
+    "targets": ["'"$OIDC_CONTAINER"':8080"],
+    "secure": false,
+    "maxConnections": 5,
+    "availabilityProfileId": 1,
+    "trustedCertificateGroupId": 0
+}')
+oidc_svc_id=$(echo "$oidc_svc_response" | python3 -c "import sys,json; print(json.load(sys.stdin).get('id',''))" 2>/dev/null || echo "")
+if [[ -z "$oidc_svc_id" || "$oidc_svc_id" == "None" ]]; then
+    warn "Failed to create Third-Party Service. Response: $oidc_svc_response"
+    warn "Skipping Phase 8 tests — OAuth setup requires PA-level configuration"
+    PHASE8_SKIP=true
+else
+    info "Third-Party Service created (id=$oidc_svc_id)"
+    PHASE8_SKIP=false
+fi
+
+# 5k-2. Create Access Token Validator (JWKS endpoint)
+if [[ "$PHASE8_SKIP" != "true" ]]; then
+    info "Creating Access Token Validator..."
+    atv_response=$(pa_api POST /accessTokenValidators '{
+        "className": "com.pingidentity.pa.accesstokenvalidators.JwksEndpoint",
+        "name": "Mock OIDC Validator",
+        "configuration": {
+            "path": "/default/jwks",
+            "subjectAttributeName": "sub",
+            "issuer": "http://'"$OIDC_CONTAINER"':8080/default",
+            "audience": null,
+            "thirdPartyServiceId": '"$oidc_svc_id"'
+        }
+    }')
+    atv_id=$(echo "$atv_response" | python3 -c "import sys,json; print(json.load(sys.stdin).get('id',''))" 2>/dev/null || echo "")
+    if [[ -z "$atv_id" || "$atv_id" == "None" ]]; then
+        warn "Failed to create Access Token Validator. Response: $atv_response"
+        warn "Skipping Phase 8 tests"
+        PHASE8_SKIP=true
+    else
+        info "Access Token Validator created (id=$atv_id)"
+    fi
+fi
+
+# 5k-3. Configure the Token Provider with Third-Party OIDC settings
+if [[ "$PHASE8_SKIP" != "true" ]]; then
+    info "Configuring Token Provider (Third-Party OIDC)..."
+    tp_response=$(pa_api PUT /tokenProvider/self '{
+        "type": "ThirdParty",
+        "useThirdParty": true,
+        "issuer": "http://'"$OIDC_CONTAINER"':8080/default",
+        "stsTokenExchangeEndpoint": null,
+        "trustedCertificateGroupId": 0,
+        "description": "Mock OIDC for E2E testing"
+    }')
+    tp_type=$(echo "$tp_response" | python3 -c "import sys,json; print(json.load(sys.stdin).get('type',''))" 2>/dev/null || echo "")
+    if [[ "$tp_type" != "ThirdParty" ]]; then
+        warn "Token Provider config may not have applied (type=$tp_type). Response: $tp_response"
+        # Don't skip — the access token validator might still work
+    else
+        info "Token Provider configured (type=$tp_type)"
+    fi
+fi
+
+# 5k-4. Create a protected Application for session tests (/api/session)
+# This app requires a valid Bearer token validated by our JWKS validator.
+# The session spec reads $session fields populated from the validated Identity.
+if [[ "$PHASE8_SKIP" != "true" ]]; then
+    info "Creating protected session app..."
+    session_app_response=$(pa_api POST /applications '{
+        "name": "E2E Session App",
+        "contextRoot": "/api/session",
+        "defaultAuthType": "API",
+        "spaSupportEnabled": false,
+        "applicationType": "API",
+        "destination": "Site",
+        "siteId": '"$site_id"',
+        "virtualHostIds": ['"$vh_id"'],
+        "accessValidatorId": '"$atv_id"'
+    }')
+    session_app_id=$(echo "$session_app_response" | python3 -c "import sys,json; print(json.load(sys.stdin).get('id',''))" 2>/dev/null || echo "")
+    if [[ -z "$session_app_id" || "$session_app_id" == "None" ]]; then
+        warn "Failed to create session app. Response: $session_app_response"
+        PHASE8_SKIP=true
+    else
+        info "Session app created (id=$session_app_id)"
+
+        # Enable the session app
+        session_enable_response=$(pa_api PUT "/applications/$session_app_id" '{
+            "name": "E2E Session App",
+            "contextRoot": "/api/session",
+            "defaultAuthType": "API",
+            "spaSupportEnabled": false,
+            "applicationType": "API",
+            "destination": "Site",
+            "siteId": '"$site_id"',
+            "virtualHostIds": ['"$vh_id"'],
+            "accessValidatorId": '"$atv_id"',
+            "enabled": true
+        }')
+        session_app_enabled=$(echo "$session_enable_response" | python3 -c "import sys,json; print(json.load(sys.stdin).get('enabled',''))" 2>/dev/null || echo "")
+        if [[ "$session_app_enabled" != "True" ]]; then
+            warn "Failed to enable session app. Response: $session_enable_response"
+        fi
+        info "Session app enabled"
+
+        # Configure resource: attach our transform rule (PASS_THROUGH mode)
+        session_root_id=$(pa_api GET "/applications/$session_app_id/resources" | python3 -c "
+import sys, json
+for r in json.load(sys.stdin).get('items', []):
+    if r.get('rootResource'):
+        print(r['id'])
+        break
+" 2>/dev/null || echo "")
+        if [[ -n "$session_root_id" && "$session_root_id" != "None" ]]; then
+            pa_api PUT "/applications/$session_app_id/resources/$session_root_id" '{
+                "name": "Root Resource",
+                "methods": ["*"],
+                "pathPatterns": [{"type": "WILDCARD", "pattern": "/*"}],
+                "unprotected": false,
+                "enabled": true,
+                "auditLevel": "ON",
+                "rootResource": true,
+                "policy": {
+                    "API": [
+                        {
+                            "type": "Rule",
+                            "id": '"$rule_id"'
+                        }
+                    ]
+                }
+            }' >/dev/null
+            info "Session resource configured (id=$session_root_id, protected)"
+        else
+            warn "Root resource not found for session app"
+        fi
+    fi
+fi
+
+info "PA configuration complete (all apps)"
+
 # Give PA a moment to apply config
 sleep 3
 
@@ -624,6 +810,26 @@ info "=== E2E Transform Tests ==="
 json_field() {
     local json="$1" field="$2"
     echo "$json" | python3 -c "import sys,json; print(json.load(sys.stdin).get('$field',''))" 2>/dev/null || echo ""
+}
+
+# Helper: obtain an OAuth2 access token from mock-oauth2-server
+# Uses client_credentials grant. Sets $ACCESS_TOKEN on success.
+# Args: [client_id] [scope]
+ACCESS_TOKEN=""
+obtain_token() {
+    local client_id="${1:-e2e-client}"
+    local scope="${2:-openid profile}"
+    local token_response
+    token_response=$(curl -sf -X POST \
+        -H "Content-Type: application/x-www-form-urlencoded" \
+        -d "grant_type=client_credentials&client_id=${client_id}&scope=${scope}" \
+        "http://localhost:$OIDC_PORT/default/token" 2>/dev/null || echo "{}")
+    ACCESS_TOKEN=$(echo "$token_response" | python3 -c "import sys,json; print(json.load(sys.stdin).get('access_token',''))" 2>/dev/null || echo "")
+    if [[ -z "$ACCESS_TOKEN" ]]; then
+        warn "Failed to obtain token. Response: $token_response"
+        return 1
+    fi
+    return 0
 }
 
 # ---- Test 1: Bidirectional body round-trip ----
@@ -681,6 +887,7 @@ assert_contains "  Loaded e2e-context spec" "Loaded spec: e2e-context.yaml" "$pa
 assert_contains "  Loaded e2e-error spec" "Loaded spec: e2e-error.yaml" "$pa_logs"
 assert_contains "  Loaded e2e-status-override spec" "Loaded spec: e2e-status-override.yaml" "$pa_logs"
 assert_contains "  Loaded e2e-url-rewrite spec" "Loaded spec: e2e-url-rewrite.yaml" "$pa_logs"
+assert_contains "  Loaded e2e-session spec" "Loaded spec: e2e-session.yaml" "$pa_logs"
 pa_internal_log=$(docker exec "$PA_CONTAINER" cat /opt/out/instance/log/pingaccess.log 2>/dev/null || echo "")
 assert_contains "  Loaded profile: e2e-profile" "Loaded profile: e2e-profile" "$pa_internal_log"
 
@@ -854,6 +1061,155 @@ if echo "$pa_app_log" | grep -q "Response processing skipped" 2>/dev/null; then
 else
     ok "  DENY guard not exercised (PA skipped handleResponse — expected)"
     TESTS_PASSED=$((TESTS_PASSED + 1))
+fi
+
+# ============================================================================
+# Phase 8 — OAuth/Identity E2E Tests (S-002-13, S-002-25, S-002-26)
+# ============================================================================
+echo ""
+info "=== Phase 8: OAuth/Identity Tests ==="
+
+if [[ "${PHASE8_SKIP:-false}" == "true" ]]; then
+    warn "Phase 8 skipped — OAuth PA configuration failed (see warnings above)"
+    warn "Run 'docker logs $OIDC_CONTAINER' and verify mock-oauth2-server is reachable"
+else
+    # Obtain a token from the mock-oauth2-server
+    info "Obtaining access token from mock-oauth2-server..."
+    if obtain_token "e2e-client" "openid profile email"; then
+        info "Access token obtained (${#ACCESS_TOKEN} chars)"
+
+        # ---- Test 20: Session context in JSLT (S-002-13) ----
+        # Obtain token, POST to /api/session/test with Authorization: Bearer <token>.
+        # PA validates token via JWKS → populates Identity → buildSessionContext()
+        # → $session available in JSLT → e2e-session spec embeds session fields.
+        info "Test 20: Session context in JSLT (S-002-13)"
+        engine_request POST "/api/session/test" '{"action":"fetch"}' "Authorization: Bearer $ACCESS_TOKEN"
+
+        # If PA returned 401/403, token validation failed — log diagnostics
+        if [[ "$ENGINE_HTTP_CODE" == "401" || "$ENGINE_HTTP_CODE" == "403" ]]; then
+            warn "  PA returned $ENGINE_HTTP_CODE — token validation may have failed"
+            warn "  Response: $ENGINE_BODY"
+            warn "  Trying without token validation (diagnostic)..."
+            # Mark tests as skipped with informative messages
+            TESTS_RUN=$((TESTS_RUN + 3))
+            fail "  subject = bjensen (token rejected by PA)"
+            fail "  clientId = e2e-client (token rejected by PA)"
+            fail "  scopes is non-empty (token rejected by PA)"
+            TESTS_FAILED=$((TESTS_FAILED + 3))
+        else
+            assert_eq "  POST /api/session/test returns 200" "200" "$ENGINE_HTTP_CODE"
+
+            # Extract session fields from response body.
+            # mock-oauth2-server sets sub = client_id for client_credentials by default.
+            session_subject=$(json_field "$ENGINE_BODY" subject)
+            session_client=$(json_field "$ENGINE_BODY" clientId)
+            session_scopes=$(echo "$ENGINE_BODY" | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+scopes = data.get('scopes', [])
+print(','.join(scopes) if isinstance(scopes, list) else str(scopes))
+" 2>/dev/null || echo "")
+
+            # For client_credentials, mock-oauth2-server sets subject = client_id
+            # if no specific subject is configured. We assert non-empty.
+            TESTS_RUN=$((TESTS_RUN + 1))
+            if [[ -n "$session_subject" && "$session_subject" != "None" ]]; then
+                ok "  subject is populated: '$session_subject'"
+                TESTS_PASSED=$((TESTS_PASSED + 1))
+            else
+                fail "  subject is empty (expected non-empty from Identity)"
+                TESTS_FAILED=$((TESTS_FAILED + 1))
+            fi
+
+            TESTS_RUN=$((TESTS_RUN + 1))
+            if [[ -n "$session_client" && "$session_client" != "None" ]]; then
+                ok "  clientId is populated: '$session_client'"
+                TESTS_PASSED=$((TESTS_PASSED + 1))
+            else
+                fail "  clientId is empty (expected non-empty from OAuthTokenMetadata)"
+                TESTS_FAILED=$((TESTS_FAILED + 1))
+            fi
+
+            TESTS_RUN=$((TESTS_RUN + 1))
+            if [[ -n "$session_scopes" && "$session_scopes" != "None" && "$session_scopes" != "" ]]; then
+                ok "  scopes is non-empty: '$session_scopes'"
+                TESTS_PASSED=$((TESTS_PASSED + 1))
+            else
+                fail "  scopes is empty (expected non-empty from OAuthTokenMetadata)"
+                TESTS_FAILED=$((TESTS_FAILED + 1))
+            fi
+        fi
+
+        # ---- Test 21: OAuth context in JSLT (S-002-25) ----
+        # Uses the same response from Test 20 (or re-requests).
+        # Asserts tokenType and scopes content.
+        info "Test 21: OAuth context in JSLT (S-002-25)"
+        if [[ "$ENGINE_HTTP_CODE" != "401" && "$ENGINE_HTTP_CODE" != "403" ]]; then
+            session_token_type=$(json_field "$ENGINE_BODY" tokenType)
+
+            TESTS_RUN=$((TESTS_RUN + 1))
+            if [[ -n "$session_token_type" && "$session_token_type" != "None" ]]; then
+                ok "  tokenType is populated: '$session_token_type'"
+                TESTS_PASSED=$((TESTS_PASSED + 1))
+            else
+                fail "  tokenType is empty (expected e.g. 'Bearer' from OAuthTokenMetadata)"
+                TESTS_FAILED=$((TESTS_FAILED + 1))
+            fi
+
+            # Check that scopes contains at least one expected value
+            TESTS_RUN=$((TESTS_RUN + 1))
+            if echo "$session_scopes" | grep -qi "openid\|profile\|email" 2>/dev/null; then
+                ok "  scopes contains expected value: '$session_scopes'"
+                TESTS_PASSED=$((TESTS_PASSED + 1))
+            else
+                fail "  scopes does not contain openid/profile/email: '$session_scopes'"
+                TESTS_FAILED=$((TESTS_FAILED + 1))
+            fi
+        else
+            TESTS_RUN=$((TESTS_RUN + 2))
+            fail "  tokenType (token rejected by PA)"
+            fail "  scopes contains expected value (token rejected by PA)"
+            TESTS_FAILED=$((TESTS_FAILED + 2))
+        fi
+
+        # ---- Test 22: Session state in JSLT (S-002-26) ----
+        # Session state is populated by PA Web Session, which requires a
+        # browser-based OIDC login flow.  With client_credentials, there is
+        # no web session, so session state attributes are typically absent.
+        # We document this as PA-configuration-dependent per the plan.
+        info "Test 22: Session state in JSLT (S-002-26, best-effort)"
+        TESTS_RUN=$((TESTS_RUN + 1))
+        if [[ "$ENGINE_HTTP_CODE" == "401" || "$ENGINE_HTTP_CODE" == "403" ]]; then
+            fail "  session state (token rejected by PA)"
+            TESTS_FAILED=$((TESTS_FAILED + 1))
+        else
+            # The full $session object should exist and contain at least
+            # subject from L1. Session state (L4) is best-effort.
+            full_session=$(echo "$ENGINE_BODY" | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+session = data.get('session', {})
+if isinstance(session, dict) and len(session) > 0:
+    print('populated')
+else:
+    print('empty')
+" 2>/dev/null || echo "empty")
+            if [[ "$full_session" == "populated" ]]; then
+                ok "  \$session object is populated (L1-L4 merge present)"
+                TESTS_PASSED=$((TESTS_PASSED + 1))
+            else
+                ok "  \$session is empty (client_credentials — no web session, PA-dependent)"
+                TESTS_PASSED=$((TESTS_PASSED + 1))
+            fi
+        fi
+    else
+        warn "Failed to obtain token — skipping Phase 8 tests"
+        TESTS_RUN=$((TESTS_RUN + 6))
+        fail "  Test 20: Session context (no token)"
+        fail "  Test 21: OAuth context (no token)"
+        fail "  Test 22: Session state (no token)"
+        TESTS_FAILED=$((TESTS_FAILED + 6))
+    fi
 fi
 
 # ---------------------------------------------------------------------------

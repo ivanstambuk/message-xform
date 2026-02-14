@@ -1,0 +1,34 @@
+# E2E test spec: session context access ($session)
+#
+# Verifies that the PingAccess adapter's buildSessionContext() correctly
+# merges Identity fields, OAuthTokenMetadata, OIDC claims, and session
+# state into $session — and that JSLT can read individual fields.
+#
+# Flow: mock-OIDC → PA Token Provider → Identity → buildSessionContext()
+#       → $session bindings available in JSLT
+#
+# This spec is paired with a protected PA app that requires authentication.
+id: e2e-session
+version: "1.0.0"
+description: "E2E test — session context (identity, OAuth, claims)"
+
+input:
+  schema:
+    type: object
+
+output:
+  schema:
+    type: object
+
+transform:
+  lang: jslt
+  expr: |
+    {
+      "original": .,
+      "subject": $session.subject,
+      "clientId": $session.clientId,
+      "scopes": $session.scopes,
+      "tokenType": $session.tokenType,
+      "trackingId": $session.trackingId,
+      "session": $session
+    }

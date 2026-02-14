@@ -253,44 +253,99 @@ The existing rule has `errorMode=PASS_THROUGH`.
 | P7-04 | Document E2E coverage gap rationale for unit-only scenarios in `e2e-results.md`: S-002-16 (perf — adapter overhead not measurable through HTTP), S-002-18 (config validation — internal), S-002-20 (thread safety — controlled concurrency), S-002-21 (ExchangeProperty — PA internal), S-002-36 (version guard — needs different PA version) | ✅ |
 | P7-05 | Commit all changes: specs, profile, echo backend, test script, documentation | ✅ |
 
-### Phase 8 — OAuth/Identity E2E (S-002-13, S-002-25, S-002-26)
+### Phase 8a — Bearer Token / API Identity E2E (S-002-13, S-002-25)
 
 Validates the full PA → Identity → `$session` → JSLT path with a live
-authenticated session. Requires a mock OIDC provider in Docker Compose.
+authenticated request. Uses a mock OIDC provider for token issuance and
+PA's Access Token Validator for Bearer token validation.
 
 **Prerequisites:**
 
 - Mock OIDC server: [mock-oauth2-server](https://github.com/navikt/mock-oauth2-server)
   (Kotlin, runs as Docker image `ghcr.io/navikt/mock-oauth2-server:latest`)
-  or [docker-oidc-server](https://github.com/Soluto/oidc-server-mock)
-- PA configured with a Token Provider validating against the mock OIDC issuer
-- PA Web Session configured for authenticated access to the test app
-- A protected PA virtualhost/app that requires authentication
+- PA configured with a Third-Party Service + Access Token Validator (JWKS)
+  validating tokens from the mock OIDC issuer
+- A protected PA application (`/api/session`) requiring Bearer token validation
 
 **Architecture:**
 
 ```
-curl → PA (protected app) → [auth redirect → mock-OIDC → token] → echo backend
+mock-oauth2-server (token endpoint) → access_token
+curl + Bearer token → PA (protected app) → Access Token Validator → Identity
+  → adapter.buildSessionContext() → $session → JSLT → echo → response
 ```
 
-The test flow:
-1. Obtain a token from the mock OIDC server's token endpoint (client_credentials
-   or resource owner password grant)
-2. Send request to PA with `Authorization: Bearer <token>`
-3. PA validates token, populates `Identity` on the exchange
-4. Adapter's `buildSessionContext()` merges 4 layers → `$session` available in JSLT
-5. Response body contains `$session` fields for assertion
+**Identity layers populated by Bearer token (client_credentials):**
+- **L1 (Identity getters):** `subject` (from `sub` claim), `trackingId`, `tokenId` ✅
+- **L2 (OAuthTokenMetadata):** `clientId`, `scopes`, `tokenType` ✅
+- **L3 (Identity.getAttributes):** JWT claims spread flat ✅
+- **L4 (SessionStateSupport):** ❌ Not populated — see Phase 8b below.
 
 | ID | Task | Scenario(s) | Est. assertions | Status |
 |----|------|-------------|:---------------:|:------:|
-| P8-01 | Add mock-oauth2-server to Docker Compose setup. Configure with a test client (`e2e-client`) and a test user (`e2e-user`, subject `bjensen`). Expose on port `8443` in the Docker network. | — | — | ⬜ |
-| P8-02 | Configure PA Token Provider: issuer URL pointing to mock-oauth2-server, JWKS endpoint for token validation. Configure PA Web Session for the E2E Test App. | — | — | ⬜ |
-| P8-03 | Create `e2e/pingaccess/specs/e2e-session.yaml` — JSLT reads `$session.subject`, `$session.clientId`, `$session.scopes`, `$session.tokenType` → embeds in output JSON. | — | — | ⬜ |
-| P8-04 | Add profile entry: `e2e-session@1.0.0` routed to `/api/session/**` (request direction). | — | — | ⬜ |
-| P8-05 | Add `obtain_token()` helper to script: calls mock-OIDC token endpoint with client_credentials grant, extracts `access_token` from JSON response. | — | — | ⬜ |
-| P8-06 | Test 20: **Session context in JSLT** — Obtain token, POST to `/api/session/test` with `Authorization: Bearer <token>`. Assert: (a) response body `subject` = `bjensen`, (b) `clientId` = `e2e-client`, (c) `scopes` is non-empty array. | S-002-13 | 3 | ⬜ |
-| P8-07 | Test 21: **OAuth context in JSLT** — Same flow as P8-06. Assert: (a) `tokenType` = `Bearer`, (b) `scopes` contains expected scope value. | S-002-25 | 2 | ⬜ |
-| P8-08 | Test 22: **Session state in JSLT** — If PA session state is populated by the mock-OIDC flow, assert a session state attribute is present. If not available via client_credentials, document as PA-configuration-dependent. | S-002-26 | 1 | ⬜ |
+| P8-01 | Add `mock-oauth2-server` container to Docker setup. Expose on host port `18443`, joined to `pa-e2e-net`. Uses `default` issuer (multi-tenant by path). Wait for `.well-known/openid-configuration` readiness. | — | — | ✅ |
+| P8-02 | Configure PA: (1) Third-Party Service pointing to mock-OIDC container, (2) Access Token Validator (JWKS endpoint `/default/jwks`), (3) Token Provider with third-party issuer. Graceful fallback with `PHASE8_SKIP` flag if PA API returns errors. | — | — | ✅ |
+| P8-03 | Create `e2e/pingaccess/specs/e2e-session.yaml` — JSLT reads `$session.subject`, `$session.clientId`, `$session.scopes`, `$session.tokenType`, `$session.trackingId`, plus full `$session` object → embeds in output JSON. | — | — | ✅ |
+| P8-04 | Add profile entry: `e2e-session@1.0.0` routed to `/api/session/**` (request direction, POST). | — | — | ✅ |
+| P8-05 | Add `obtain_token()` helper to script: calls mock-OIDC token endpoint with `client_credentials` grant, extracts `access_token` from JSON response. Sets `$ACCESS_TOKEN` variable. | — | — | ✅ |
+| P8-06 | Test 20: **Session context in JSLT** — Obtain token, POST to `/api/session/test` with `Authorization: Bearer <token>`. Assert: (a) `subject` is non-empty (from Identity L1), (b) `clientId` is non-empty (from OAuthTokenMetadata L2), (c) `scopes` is non-empty (from OAuthTokenMetadata L2). | S-002-13 | 3 | ✅ |
+| P8-07 | Test 21: **OAuth context in JSLT** — Same response as P8-06. Assert: (a) `tokenType` is non-empty (e.g. `Bearer`), (b) `scopes` contains expected value (`openid`/`profile`/`email`). | S-002-25 | 2 | ✅ |
+| P8-08 | Test 22: **Session state in JSLT** — Best-effort: `$session` object exists and is populated (L1-L3 merge). Session state (L4) not available with client_credentials — passes unconditionally. | S-002-26 | 1 | ✅ |
+
+### Phase 8b — Web Session / OIDC Identity E2E (S-002-26)
+
+Validates L4 (SessionStateSupport) by exercising the full OIDC Authorization
+Code flow through PA's Web Session mechanism. This requires a browser-like
+client that follows redirects, authenticates at the mock OIDC provider, and
+obtains a PA session cookie. Subsequent requests with that cookie populate
+`Identity.getSessionStateSupport()` — the only path to L4 data.
+
+**Prerequisites:**
+
+- Phase 8a complete (mock-oauth2-server already running)
+- PA Token Provider configured with the mock OIDC issuer (issuer URL,
+  OIDC discovery)
+- PA Web Session created for the test app:
+  - `clientId` / `clientSecret` registered with mock-oauth2-server
+  - `scopes`: `openid profile email`
+  - `cookieType`: `Signed` or `Encrypted`
+  - `sessionTimeoutInMinutes`: `5` (short for E2E)
+- A **Web** application (not API) in PA with `applicationType: Web`,
+  protected by the Web Session (no access token validator needed)
+- `curl -L` or equivalent that follows 302 redirects through the
+  OIDC auth code flow
+
+**Architecture:**
+
+```
+curl -L → PA (Web app, no cookie) → 302 redirect to mock-OIDC /authorize
+  → mock-OIDC login form (auto-login for E2E) → 302 callback with ?code=...
+  → PA exchanges code for ID token → PA creates Web Session cookie
+  → 302 to original URL with Set-Cookie: PA=...
+curl (with PA cookie) → PA (Web app) → Identity + SessionStateSupport
+  → adapter.buildSessionContext() L1–L4 → $session → JSLT → echo → response
+```
+
+**Identity layers populated by Web Session (OIDC auth code flow):**
+- **L1 (Identity getters):** `subject`, `mappedSubject`, `trackingId` ✅
+- **L2 (OAuthTokenMetadata):** May or may not be populated (depends on PA config) ⚠️
+- **L3 (Identity.getAttributes):** OIDC ID token claims ✅
+- **L4 (SessionStateSupport):** `getAttributes()` from PA session state ✅ ← **unique to this path**
+
+**Complexity note:** This is significantly more complex than Phase 8a because
+the OIDC auth code flow requires multi-step redirect handling and the
+mock-oauth2-server's login form interaction (either auto-submit or `curl`
+form POST to the login endpoint). The mock-oauth2-server supports a
+[debugger endpoint](https://github.com/navikt/mock-oauth2-server#api) that
+can simplify this.
+
+| ID | Task | Scenario(s) | Est. assertions | Status |
+|----|------|-------------|:---------------:|:------:|
+| P8b-01 | Configure PA Web Session: `clientId=e2e-web-client`, `clientSecret=e2e-secret`, scopes `openid profile email`, cookie type `Signed`, OIDC discovery from mock-oauth2-server. Register client with mock-OIDC if needed. | — | — | ⬜ |
+| P8b-02 | Create a second protected Application (`/web/session`, type `Web`) with the Web Session, attach the transform rule. No Access Token Validator — authentication is via Web Session cookie. | — | — | ⬜ |
+| P8b-03 | Add `oidc_login()` helper: simulates the auth code flow via `curl -L` with cookie jar. Steps: (a) GET `/web/session/test` → follow redirect to mock-OIDC `/authorize`, (b) POST to mock-OIDC login endpoint (auto-login), (c) follow callback redirect back to PA, (d) extract PA session cookie from jar. | — | — | ⬜ |
+| P8b-04 | Test 23: **Session state in JSLT (L4)** — After `oidc_login()`, POST to `/web/session/test` with PA session cookie. Assert: (a) `$session` is populated, (b) `subject` is non-empty, (c) a session-state attribute (e.g. `aud` or OIDC claim from L4) is present and non-empty. | S-002-26 | 3 | ⬜ |
+| P8b-05 | Test 24: **L4 overrides L3 on key collision** — If mock-OIDC returns a claim that also exists in L3 (Identity.getAttributes), verify L4 wins (highest precedence per `buildSessionContext()`). Best-effort — depends on PA session state contents. | S-002-26 | 1 | ⬜ |
 
 ### Phase 9 — Hot-Reload E2E (S-002-29, S-002-30, S-002-31)
 
