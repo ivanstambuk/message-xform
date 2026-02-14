@@ -63,7 +63,7 @@ subprojects {
         "testImplementation"(rootCatalog.findLibrary("junit-jupiter").get())
         "testImplementation"(rootCatalog.findLibrary("junit-jupiter-params").get())
         "testImplementation"(rootCatalog.findLibrary("assertj-core").get())
-        "testRuntimeOnly"("org.junit.platform:junit-platform-launcher")
+        "testRuntimeOnly"(rootCatalog.findLibrary("junit-platform-launcher").get())
     }
 }
 

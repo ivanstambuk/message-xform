@@ -172,7 +172,7 @@ public final class UrlTransformer {
                     params.put(paramName, result.asText());
                 }
             } catch (Exception e) {
-                LOG.warn("url.query.add.{}.expr evaluation failed: {}, skipping", paramName, e.getMessage());
+                LOG.warn("url.query.add.{}.expr evaluation failed, skipping", paramName, e);
             }
         }
 
@@ -200,7 +200,7 @@ public final class UrlTransformer {
                     return currentMethod;
                 }
             } catch (Exception e) {
-                LOG.warn("url.method.when evaluation failed: {} — method unchanged", e.getMessage());
+                LOG.warn("url.method.when evaluation failed — method unchanged", e);
                 return currentMethod;
             }
         }

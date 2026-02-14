@@ -712,7 +712,7 @@ public final class TransformEngine {
             telemetryListener.onTransformStarted(
                     new TelemetryListener.TransformStartedEvent(spec.id(), spec.version(), direction));
         } catch (Exception e) {
-            LOG.warn("TelemetryListener.onTransformStarted failed: {}", e.getMessage());
+            LOG.warn("TelemetryListener.onTransformStarted failed", e);
         }
     }
 
@@ -722,7 +722,7 @@ public final class TransformEngine {
             telemetryListener.onTransformCompleted(
                     new TelemetryListener.TransformCompletedEvent(spec.id(), spec.version(), direction, durationMs));
         } catch (Exception e) {
-            LOG.warn("TelemetryListener.onTransformCompleted failed: {}", e.getMessage());
+            LOG.warn("TelemetryListener.onTransformCompleted failed", e);
         }
     }
 
@@ -732,7 +732,7 @@ public final class TransformEngine {
             telemetryListener.onTransformFailed(new TelemetryListener.TransformFailedEvent(
                     spec.id(), spec.version(), direction, durationMs, errorDetail));
         } catch (Exception e) {
-            LOG.warn("TelemetryListener.onTransformFailed failed: {}", e.getMessage());
+            LOG.warn("TelemetryListener.onTransformFailed failed", e);
         }
     }
 
@@ -742,7 +742,7 @@ public final class TransformEngine {
             telemetryListener.onProfileMatched(new TelemetryListener.ProfileMatchedEvent(
                     logCtx.profileId(), spec.id(), spec.version(), logCtx.requestPath(), logCtx.specificityScore()));
         } catch (Exception e) {
-            LOG.warn("TelemetryListener.onProfileMatched failed: {}", e.getMessage());
+            LOG.warn("TelemetryListener.onProfileMatched failed", e);
         }
     }
 
@@ -752,7 +752,7 @@ public final class TransformEngine {
             telemetryListener.onSpecLoaded(
                     new TelemetryListener.SpecLoadedEvent(spec.id(), spec.version(), path.toString()));
         } catch (Exception e) {
-            LOG.warn("TelemetryListener.onSpecLoaded failed: {}", e.getMessage());
+            LOG.warn("TelemetryListener.onSpecLoaded failed", e);
         }
     }
 
@@ -762,7 +762,7 @@ public final class TransformEngine {
             telemetryListener.onSpecRejected(
                     new TelemetryListener.SpecRejectedEvent(path.toString(), cause.getMessage()));
         } catch (Exception e) {
-            LOG.warn("TelemetryListener.onSpecRejected failed: {}", e.getMessage());
+            LOG.warn("TelemetryListener.onSpecRejected failed", e);
         }
     }
 
