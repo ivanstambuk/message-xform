@@ -155,7 +155,38 @@ rg -n "TODO|FIXME|HACK" <scope>/src/main/java
 rg -n "static\\s+(?!final)" <scope>/src/main/java
 ```
 
-### Phase 4 — Security Signals
+### Phase 4 — Architecture Signals
+
+Evaluate architectural quality explicitly (beyond code style/quality).
+
+| Check ID | What to inspect | Severity guidance |
+|----------|-----------------|-------------------|
+| ARCH-01 | Boundary leaks: core depending on adapter or gateway SDK types | Critical |
+| ARCH-02 | Direction violations: adapter/core dependency flow breaks intended layering | High |
+| ARCH-03 | Cyclic package/module dependencies | High |
+| ARCH-04 | Over-coupled classes (high fan-in/fan-out, god classes) | Medium |
+| ARCH-05 | Internal package misuse from external modules (`*.internal.*`) | High |
+| ARCH-06 | Contract bypass: direct low-level wiring where stable ports/SPI exist | Medium |
+| ARCH-07 | Cross-module duplication that should be extracted/shared | Medium |
+| ARCH-08 | Architecture tests missing for newly introduced boundaries | Medium |
+
+Evidence commands (examples):
+
+```bash
+rg -n "import com\\.pingidentity\\.|import jakarta\\.servlet|import io\\.javalin" core/src/main/java
+rg -n "import io\\.messagexform\\.(adapter|standalone|pingaccess)" core/src/main/java
+rg -n "import io\\.messagexform\\.core\\..*internal" adapter-*/src/main/java
+rg -n "class .*Adapter|class .*Rule|class .*Engine" <scope>/src/main/java
+./gradlew --no-daemon test --tests "*ArchUnit*" --tests "*Architecture*"
+```
+
+Architecture recommendation rule:
+- Every `High`/`Critical` architecture finding must include:
+  1. current state (evidence),
+  2. target architecture shape,
+  3. minimal migration path (incremental, low-risk steps).
+
+### Phase 5 — Security Signals
 
 Evaluate common secure-coding risks.
 
@@ -183,7 +214,7 @@ Secret-scan false-positive control:
 - Treat obvious placeholders in tests/docs (e.g., `example`, `dummy`, `test`, `changeme`) as non-findings.
 - If uncertain, keep as `Low` with confidence `MEDIUM`, not `Critical`.
 
-### Phase 5 — Dependency Hygiene Signals
+### Phase 6 — Dependency Hygiene Signals
 
 Evaluate dependency consistency and maintenance risk.
 
@@ -202,7 +233,7 @@ Use:
 ./gradlew --no-daemon :<module>:dependencies --configuration testCompileClasspath
 ```
 
-### Phase 6 — Test Quality Signals
+### Phase 7 — Test Quality Signals
 
 Evaluate whether tests are strong enough to protect behavior.
 
@@ -223,7 +254,7 @@ rg -n "assertThat\\(.*\\)\\.isNotNull\\(\\)" <scope>/src/test/java
 rg -n "verify\\(|times\\(" <scope>/src/test/java
 ```
 
-### Phase 7 — Lightweight Performance Signals
+### Phase 8 — Lightweight Performance Signals
 
 Focus on pragmatic heuristics (not full benchmarking).
 
@@ -239,7 +270,7 @@ Notes:
 - Keep this phase heuristic and evidence-based.
 - Do not claim latency regressions without measured evidence.
 
-### Phase 8 — Guardrail Recommendation Synthesis
+### Phase 9 — Guardrail Recommendation Synthesis
 
 Convert findings into preventive controls.
 
@@ -290,7 +321,7 @@ Finding ID format:
 
 ### Critical
 #### SEC-001 — <title>
-- Category: CQ | SEC | DEP | TQ | PERF
+- Category: ARCH | CQ | SEC | DEP | TQ | PERF
 - Check ID: <e.g., SEC-03>
 - Location: `<path>:<line>`
 - Evidence: `<symbol/signature/command output excerpt>`
