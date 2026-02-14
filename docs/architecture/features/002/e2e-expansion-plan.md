@@ -189,11 +189,11 @@ and new test patterns. Re-run existing tests as regression gate.
 
 | ID | Task | Status |
 |----|------|:------:|
-| P2-01 | Upgrade `engine_request()` helper: (a) capture response headers to `$ENGINE_HEADERS` via `-D` dump-header flag, (b) accept optional extra header arguments after body, (c) skip default `Content-Type: application/json` when caller provides their own | ⬜ |
-| P2-02 | Add `PROFILES_DIR` variable, mount `-v "$PROFILES_DIR:/profiles"` in PA container | ⬜ |
-| P2-03 | Update rule creation JSON: `"profilesDir": "/profiles"`, `"activeProfile": "e2e-profile"` | ⬜ |
-| P2-04 | Run existing 18 assertions — all must still pass (profile routes `/api/transform/**` → `e2e-rename` with both directions, same as before) | ⬜ |
-| P2-05 | Add log assertion: PA logs show `"Loaded profile: e2e-profile"` | ⬜ |
+| P2-01 | Upgrade `engine_request()` helper: (a) capture response headers to `$ENGINE_HEADERS` via `-D` dump-header flag, (b) accept optional extra header arguments after body, (c) skip default `Content-Type: application/json` when caller provides their own | ✅ |
+| P2-02 | Add `PROFILES_DIR` variable, mount `-v "$PROFILES_DIR:/profiles"` in PA container | ✅ |
+| P2-03 | Update rule creation JSON: `"profilesDir": "/profiles"`, `"activeProfile": "e2e-profile"` | ✅ |
+| P2-04 | Run existing 18 assertions — all must still pass (profile routes `/api/transform/**` → `e2e-rename` with both directions, same as before) | 🔲 run |
+| P2-05 | Add log assertion: PA logs show `"Loaded profile: e2e-profile"` | ✅ |
 
 **Exit criteria:** Existing 18/18 pass + profile loaded. No regressions.
 

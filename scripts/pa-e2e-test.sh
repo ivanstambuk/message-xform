@@ -39,6 +39,7 @@ PA_USER="administrator"
 LICENSE_FILE="$PROJECT_ROOT/binaries/PingAccess-9.0-Development.lic"
 SHADOW_JAR="$PROJECT_ROOT/adapter-pingaccess/build/libs/adapter-pingaccess-0.1.0-SNAPSHOT.jar"
 SPECS_DIR="$PROJECT_ROOT/e2e/pingaccess/specs"
+PROFILES_DIR="$PROJECT_ROOT/e2e/pingaccess/profiles"
 SKIP_BUILD=false
 
 # Colours
@@ -88,25 +89,53 @@ pa_api() {
 }
 
 # Send request through PA engine and write results to temp files.
-# Sets ENGINE_HTTP_CODE and ENGINE_BODY after return.
+# Sets ENGINE_HTTP_CODE, ENGINE_BODY, and ENGINE_HEADERS after return.
+#
+# Usage: engine_request METHOD URL [BODY] [EXTRA_HEADERS...]
+#   Extra headers are passed as -H flags (e.g., "Cookie: foo=bar").
+#   If an extra header starts with "Content-Type:", the default
+#   application/json Content-Type is suppressed.
 ENGINE_HTTP_CODE=""
 ENGINE_BODY=""
+ENGINE_HEADERS=""
 engine_request() {
     local method="$1" url="$2" body="${3:-}"
+    shift 2; [[ $# -gt 0 ]] && shift  # skip body arg
+    local extra_headers=("$@")
     local tmp_body; tmp_body=$(mktemp)
+    local tmp_headers; tmp_headers=$(mktemp)
+
+    # Check if caller provided a Content-Type override
+    local has_ct=false
+    for h in "${extra_headers[@]}"; do
+        if [[ "$h" == Content-Type:* || "$h" == content-type:* ]]; then
+            has_ct=true
+            break
+        fi
+    done
+
     # Host header MUST match the PA virtual host (localhost:3000) — not the
     # host-mapped port — otherwise PA treats this as "Unknown Resource".
     local args=(-sk -X "$method"
                 -H "Host: localhost:3000"
-                -H "Content-Type: application/json"
+                -D "$tmp_headers"
                 -o "$tmp_body"
                 -w "%{http_code}")
+    # Add default Content-Type unless caller overrides
+    if [[ "$has_ct" == false ]]; then
+        args+=(-H "Content-Type: application/json")
+    fi
+    # Add extra headers
+    for h in "${extra_headers[@]}"; do
+        args+=(-H "$h")
+    done
     if [[ -n "$body" ]]; then
         args+=(-d "$body")
     fi
     ENGINE_HTTP_CODE=$(curl "${args[@]}" "https://localhost:$PA_ENGINE_PORT$url" 2>/dev/null || echo "000")
     ENGINE_BODY=$(cat "$tmp_body" 2>/dev/null || echo "")
-    rm -f "$tmp_body"
+    ENGINE_HEADERS=$(cat "$tmp_headers" 2>/dev/null || echo "")
+    rm -f "$tmp_body" "$tmp_headers"
 }
 
 wait_for_pa() {
@@ -154,6 +183,13 @@ assert_contains() {
         fail "$label: expected to contain '$needle'"
         TESTS_FAILED=$((TESTS_FAILED + 1))
     fi
+}
+
+# Extract a header value from ENGINE_HEADERS (case-insensitive match).
+# Usage: header_value "X-Echo-Path"  → prints the value, trimmed of \r\n.
+header_value() {
+    local name="$1"
+    echo "$ENGINE_HEADERS" | grep -i "^${name}:" | head -1 | sed "s/^[^:]*: *//; s/\r$//"
 }
 
 # ---------------------------------------------------------------------------
@@ -297,6 +333,7 @@ docker run -d --name "$PA_CONTAINER" --network pa-e2e-net \
     -v "$LICENSE_FILE:/opt/out/instance/conf/pingaccess.lic:ro" \
     -v "$SHADOW_JAR:/opt/server/deploy/message-xform-adapter.jar:ro" \
     -v "$SPECS_DIR:/specs:ro" \
+    -v "$PROFILES_DIR:/profiles:ro" \
     -p "$PA_ADMIN_PORT:9000" \
     -p "$PA_ENGINE_PORT:3000" \
     "$PA_IMAGE" >/dev/null
@@ -379,8 +416,8 @@ rule_response=$(pa_api POST /rules '{
     "supportedDestinations": ["Site"],
     "configuration": {
         "specsDir": "/specs",
-        "profilesDir": "",
-        "activeProfile": "",
+        "profilesDir": "/profiles",
+        "activeProfile": "e2e-profile",
         "errorMode": "PASS_THROUGH",
         "reloadIntervalSec": "0",
         "schemaValidation": "LENIENT",
@@ -542,6 +579,11 @@ info "Test 3: Spec loading verification"
 pa_logs=$(docker logs "$PA_CONTAINER" 2>&1)
 assert_contains "  Loaded e2e-rename spec" "Loaded spec: e2e-rename.yaml" "$pa_logs"
 assert_contains "  Loaded e2e-header-inject spec" "Loaded spec: e2e-header-inject.yaml" "$pa_logs"
+assert_contains "  Loaded e2e-context spec" "Loaded spec: e2e-context.yaml" "$pa_logs"
+assert_contains "  Loaded e2e-error spec" "Loaded spec: e2e-error.yaml" "$pa_logs"
+assert_contains "  Loaded e2e-status-override spec" "Loaded spec: e2e-status-override.yaml" "$pa_logs"
+assert_contains "  Loaded e2e-url-rewrite spec" "Loaded spec: e2e-url-rewrite.yaml" "$pa_logs"
+assert_contains "  Loaded profile: e2e-profile" "Loaded profile: e2e-profile" "$pa_logs"
 
 # Test 4: Shadow JAR class version (Java 17)
 info "Test 4: Shadow JAR verification"
