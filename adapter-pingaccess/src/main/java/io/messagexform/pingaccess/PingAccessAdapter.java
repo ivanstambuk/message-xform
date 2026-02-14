@@ -411,6 +411,54 @@ class PingAccessAdapter implements GatewayAdapter<Exchange> {
         applyHeaderDiff(originalHeaderNames, transformed.headers(), response.getHeaders());
     }
 
+    /**
+     * Like {@link #applyRequestChanges} but skips body replacement (S-002-08).
+     *
+     * <p>
+     * Used when {@link #isBodyParseFailed()} is {@code true}: the original raw
+     * bytes and Content-Type are preserved. Header and URI changes are still
+     * applied.
+     */
+    void applyRequestChangesSkipBody(Message transformed, Exchange exchange, List<String> originalHeaderNames) {
+        Request request = exchange.getRequest();
+
+        // URI reconstruction (path + query)
+        String uri = transformed.queryString() != null
+                ? transformed.requestPath() + "?" + transformed.queryString()
+                : transformed.requestPath();
+        request.setUri(uri);
+
+        // Method
+        request.setMethod(Method.forName(transformed.requestMethod()));
+
+        // Body intentionally NOT applied — original bytes preserved
+
+        // Header diff
+        applyHeaderDiff(originalHeaderNames, transformed.headers(), request.getHeaders());
+    }
+
+    /**
+     * Like {@link #applyResponseChanges} but skips body replacement (S-002-08).
+     *
+     * <p>
+     * Used when {@link #isBodyParseFailed()} is {@code true}: the original
+     * response body bytes and Content-Type are preserved. Header and status
+     * changes are still applied.
+     */
+    void applyResponseChangesSkipBody(Message transformed, Exchange exchange, List<String> originalHeaderNames) {
+        Response response = exchange.getResponse();
+
+        // Status code
+        if (transformed.statusCode() != null) {
+            response.setStatus(HttpStatus.forCode(transformed.statusCode()));
+        }
+
+        // Body intentionally NOT applied — original bytes preserved
+
+        // Header diff
+        applyHeaderDiff(originalHeaderNames, transformed.headers(), response.getHeaders());
+    }
+
     // ── Internal helpers ──
 
     /**

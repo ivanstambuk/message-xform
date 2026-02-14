@@ -203,7 +203,7 @@ _Last updated:_ 2026-02-14
 
 #### I7 — PASS_THROUGH + DENY behavior (FR-002-11)
 
-- [ ] **T-002-20** — Request SUCCESS/PASSTHROUGH/bodyParseFailed orchestration
+- [x] **T-002-20** — Request SUCCESS/PASSTHROUGH/bodyParseFailed orchestration
   _Test first:_ `TransformFlowTest.requestSuccessAndPassthrough()` +
   `TransformFlowTest.bodyParseFailedSkipGuard()` (S-002-08):
   - when `bodyParseFailed`: body JSLT expression NOT evaluated, header/URL
@@ -212,17 +212,17 @@ _Last updated:_ 2026-02-14
   _Implement:_ Request dispatch, `Outcome.CONTINUE` paths, and `bodyParseFailed` skip-guard.
   _Verify:_ Request success/passthrough/skip-guard tests pass.
 
-- [ ] **T-002-21** — Response SUCCESS/PASSTHROUGH orchestration
+- [x] **T-002-21** — Response SUCCESS/PASSTHROUGH orchestration
   _Test first:_ `TransformFlowTest.responseSuccessAndPassthrough()`.
   _Implement:_ Response dispatch paths.
   _Verify:_ Response success/passthrough tests pass.
 
-- [ ] **T-002-22** — PASS_THROUGH error mode (S-002-11)
+- [x] **T-002-22** — PASS_THROUGH error mode (S-002-11)
   _Test first:_ `TransformFlowTest.passThroughOnErrorRequestAndResponse()`.
   _Implement:_ Warning log + preserve original message paths.
   _Verify:_ PASS_THROUGH tests pass.
 
-- [ ] **T-002-23** — DENY error mode for request/response + wrap failure branch (S-002-12)
+- [x] **T-002-23** — DENY error mode for request/response + wrap failure branch (S-002-12)
   _Test first:_ `TransformFlowTest.denyOnErrorAndWrapFailure()`.
   _Implement:_
   - request: build RFC 9457 via `ResponseBuilder`, set response, return `Outcome.RETURN`
@@ -230,7 +230,7 @@ _Last updated:_ 2026-02-14
   - wrap-response failure: adapter-generated RFC 9457 502 body
   _Verify:_ DENY tests pass.
 
-- [ ] **T-002-24** — DENY guard in `handleResponse()` (S-002-28)
+- [x] **T-002-24** — DENY guard in `handleResponse()` (S-002-28)
   _Test first:_ `TransformFlowTest.denyGuard()`.
   _Implement:_ Check `TRANSFORM_DENIED` and skip response processing.
   _Verify:_ Guard tests pass.
