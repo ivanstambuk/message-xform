@@ -283,10 +283,10 @@ _Last updated:_ 2026-02-14
   _Implement:_ Thread-per-exchange isolation verified; no shared mutable state corruption.
   _Verify:_ No data races/corruption.
 
-- [ ] **T-002-31a** — Performance budget verification (<10ms adapter overhead)
-  _Test first:_ `PingAccessAdapterPerformanceTest` over 64KB payload samples.
-  _Implement:_ Measurement harness excluding core transform time.
-  _Verify:_ Average adapter overhead under target.
+- [x] **T-002-31a** — Performance budget verification (<10ms adapter overhead)
+  _Test first:_ `PingAccessAdapterPerformanceTest` (2 tests: request + response, 64KB payload, 500 warmup + 1000 measured iterations).
+  _Implement:_ Zero-cost engine mock isolates adapter-only overhead.
+  _Verify:_ Average adapter overhead under 10ms (NFR-002-01).
 
 #### I12 — Security validation (FR-002-04 security note)
 
@@ -299,10 +299,10 @@ _Last updated:_ 2026-02-14
 
 #### I13/I14 — Final audit and documentation sync
 
-- [ ] **T-002-33** — Full scenario coverage audit (NFR-002-05, all scenarios in `scenarios.md`)
+- [x] **T-002-33** — Full scenario coverage audit (NFR-002-05, all scenarios in `scenarios.md`)
   _Intent:_ Prove all scenarios have executable test evidence.
-  _Verify:_ Coverage matrix updated with test method mapping.
+  _Verify:_ `coverage-matrix.md` created: 36/36 scenarios mapped to test methods (100% coverage).
 
-- [ ] **T-002-34** — Documentation status sync
+- [x] **T-002-34** — Documentation status sync
   _Intent:_ Sync roadmap, AGENTS mirror, knowledge map, `llms.txt`, and session state.
-  _Verify:_ Docs reflect implementation state consistently.
+  _Verify:_ Spec FRs marked ✅ (13/14, FR-002-12 deferred), scenarios marked Complete, plan marked Complete, coverage matrix created.

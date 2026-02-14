@@ -150,7 +150,7 @@ immutable header collection from a new map with lowercase-normalized keys.
 | Success path | `wrapRequest` reads `Exchange.getRequest()` body/headers/URL and returns a populated `Message` record |
 | Validation path | Unit tests with mock `Exchange` objects verify all 7 `Message` fields are populated |
 | Failure path | Null body → `MessageBody.empty()`, null headers → `HttpHeaders.empty()`, malformed JSON → `MessageBody.empty()` + log warning |
-| Status | ⬜ Not yet implemented |
+| Status | ✅ Implemented |
 | Source | G-002-01, SPI-001-04/05/06 |
 
 #### JSON Parse Failure Strategy
@@ -418,7 +418,7 @@ private static final ExchangeProperty<Boolean> TRANSFORM_DENIED =
 | Error mode (response) | `PASS_THROUGH` → original response untouched. `DENY` → **rewrite** the response body/status to a 502 RFC 9457 error. |
 | DENY + handleResponse | `handleRequest()` DENY → `handleResponse()` called (SDK contract) → DENY guard skips processing → client receives DENY error. |
 | Thread safety | Plugin instances may be shared across threads — all adapter state is method-local |
-| Status | ⬜ Not yet implemented |
+| Status | ✅ Implemented |
 | Source | G-002-02 |
 
 ### FR-002-03: @Rule Annotation
@@ -444,7 +444,7 @@ private static final ExchangeProperty<Boolean> TRANSFORM_DENIED =
 
 | Aspect | Detail |
 |--------|--------|
-| Status | ⬜ Not yet implemented |
+| Status | ✅ Implemented |
 | Source | G-002-03, SDK constraint |
 
 ### FR-002-04: Plugin Configuration (Admin UI)
@@ -573,7 +573,7 @@ the adapter SHOULD validate these paths in `configure()` as defense-in-depth:
 | Success path | Admin creates rule → specifies spec directory → plugin loads specs on `configure()` |
 | Validation path | Missing `specsDir` → `ValidationException` on `configure()` |
 | Config discovery | Annotation-driven: `ConfigurationBuilder.from(Config.class)` (recommended, used by adapter) |
-| Status | ⬜ Not yet implemented |
+| Status | ✅ Implemented |
 | Source | G-002-03 |
 
 > **Configuration field discovery patterns** (see Appendix D for details):
@@ -649,7 +649,7 @@ thread flag provides a fallback safety net. See SDK guide §1.
 |--------|--------|
 | Success path | `configure()` initializes engine + loads specs without error |
 | Failure path | Spec parse error → `ValidationException` with detail message → plugin not activated |
-| Status | ⬜ Not yet implemented |
+| Status | ✅ Implemented |
 | Source | G-002-05, SDK lifecycle docs |
 
 ### FR-002-06: Session Context Binding (Identity)
@@ -763,7 +763,7 @@ multi-tenant spec authoring becomes a requirement.
 | Success path | `$session.email` resolves to OIDC claim, `$session.clientId` to OAuth client, `$session.authzCache` to dynamic state |
 | Failure path | No identity (unauthenticated) → `session = SessionContext.empty()` → `$session` is `{}` (empty object) in JSLT — field access returns `null` per JSLT key-absent semantics |
 | Collision path | L4 session state key overrides L3 OIDC claim key (by design — dynamic > static) |
-| Status | ⬜ Not yet implemented |
+| Status | ✅ Implemented |
 | Source | ADR-0030, FR-001-13, G-002-01 |
 
 ### FR-002-07: ExchangeProperty State (cross-rule data)
@@ -818,7 +818,7 @@ exchange.getProperty(TRANSFORM_RESULT).ifPresent(summary -> {
 | Aspect | Detail |
 |--------|--------|
 | Success path | Downstream rule reads `exchange.getProperty(TRANSFORM_RESULT)` → `TransformResultSummary` with populated fields |
-| Status | ⬜ Not yet implemented |
+| Status | ✅ Implemented |
 | Source | SDK ExchangeProperty pattern |
 
 ### FR-002-08: SPI Registration
@@ -836,7 +836,7 @@ This enables PingAccess's `ServiceLoader` discovery.
 | Aspect | Detail |
 |--------|--------|
 | Validation path | `jar tf adapter-pingaccess-*.jar | grep META-INF/services` → shows the SPI file |
-| Status | ⬜ Not yet implemented |
+| Status | ✅ Implemented |
 | Source | G-002-04, SDK SPI pattern |
 
 ### FR-002-09: Deployment Packaging
@@ -924,7 +924,7 @@ The JAR MUST be deployable by copying to `<PA_HOME>/deploy/` (Docker:
 |--------|--------|
 | Success path | `cp adapter-pingaccess-*.jar /opt/server/deploy/ && restart PA` → plugin visible in admin UI |
 | Validation path | `./gradlew :adapter-pingaccess:shadowJar` produces a single JAR < 5 MB (no bundled Jackson/SLF4J) |
-| Status | ⬜ Not yet implemented |
+| Status | ✅ Implemented |
 | Source | G-002-04, ADR-0035 |
 
 ### FR-002-10: Gradle Module Setup
@@ -959,7 +959,7 @@ Gradle subproject with:
 | Aspect | Detail |
 |--------|--------|
 | Success path | `./gradlew :adapter-pingaccess:build` compiles and passes tests |
-| Status | ⬜ Not yet implemented |
+| Status | ✅ Implemented |
 | Source | G-002-04, FR-009-01 (Gradle governance) |
 
 ### FR-002-11: Error Handling
@@ -987,7 +987,7 @@ exceptions are caught by `getErrorHandlingCallback()` (FR-002-02).
 | Success path (PASS_THROUGH) | Malformed JSON body → log + continue with original body |
 | Success path (DENY, request) | JSLT error → build Response via `ResponseBuilder` + `exchange.setResponse()` → `Outcome.RETURN` |
 | Success path (DENY, response) | JSLT error → rewrite response body/status to 502 error in-place |
-| Status | ⬜ Not yet implemented |
+| Status | ✅ Implemented |
 | Source | ADR-0022, ADR-0024 |
 
 > **PA-native error handler integration (design decision):** The adapter does
@@ -1097,7 +1097,7 @@ sizes).
 | Success path | `TransformContext` populated with headers, cookies, query params, session → JSLT `$cookies.sessionToken` resolves correctly |
 | Failure path (URI) | Malformed query string → empty `queryParams` → JSLT `$queryParams.page` evaluates to `null` |
 | Failure path (no identity) | Unauthenticated → `session = SessionContext.empty()` → `$session` is `{}` (empty object) in JSLT — field access returns `null` per JSLT key-absent semantics |
-| Status | ⬜ Not yet implemented |
+| Status | ✅ Implemented |
 | Source | G-002-01, FR-004-37 (StandaloneAdapter reference pattern) |
 
 ### FR-002-14: JMX Observability (Opt-in)
@@ -1199,7 +1199,7 @@ zero configuration.
 | Aspect | Detail |
 |--------|--------|
 | Success path | `enableJmxMetrics=true` → MBean visible in JConsole under `io.messagexform` → counters increment on each request |
-| Status | ⬜ Not yet implemented |
+| Status | ✅ Implemented |
 | Source | PA Monitoring Guide (§Resource metrics), Issue 19 (spec review) |
 
 ---

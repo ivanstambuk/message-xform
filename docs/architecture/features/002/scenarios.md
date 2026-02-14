@@ -2,8 +2,8 @@
 
 | Field | Value |
 |-------|-------|
-| Status | Draft |
-| Last updated | 2026-02-13 |
+| Status | Complete |
+| Last updated | 2026-02-14 |
 | Linked spec | `docs/architecture/features/002/spec.md` |
 | Format | Behavioral Contract (see `docs/architecture/spec-guidelines/scenarios-format.md`) |
 

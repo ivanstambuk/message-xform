@@ -2,8 +2,8 @@
 
 _Linked specification:_ `docs/architecture/features/002/spec.md`
 _Linked tasks:_ `docs/architecture/features/002/tasks.md`
-_Status:_ Ready
-_Last updated:_ 2026-02-14 (audit fixes: bodyParseFailed skip-guard, scenario count alignment)
+_Status:_ Complete (all tasks implemented except FR-002-12 Docker E2E, deferred)
+_Last updated:_ 2026-02-14
 
 > Guardrail: Keep this plan traceable back to the governing spec. Reference
 > FR/NFR/Scenario IDs from `spec.md` where relevant, log any new high- or
