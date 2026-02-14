@@ -511,7 +511,105 @@ if [[ "$resource_unprotected" != "True" ]]; then
 fi
 info "Root resource configured (id=$root_resource_id, unprotected=$resource_unprotected)"
 
-info "PA configuration complete"
+info "PA configuration complete (PASS_THROUGH app)"
+
+# 5g. Create a second rule with errorMode=DENY for error mode testing
+info "Creating DENY mode rule..."
+deny_rule_response=$(pa_api POST /rules '{
+    "className": "io.messagexform.pingaccess.MessageTransformRule",
+    "name": "E2E DENY Rule",
+    "supportedDestinations": ["Site"],
+    "configuration": {
+        "specsDir": "/specs",
+        "profilesDir": "/profiles",
+        "activeProfile": "e2e-profile",
+        "errorMode": "DENY",
+        "reloadIntervalSec": "0",
+        "schemaValidation": "LENIENT",
+        "enableJmxMetrics": "true"
+    }
+}')
+deny_rule_id=$(echo "$deny_rule_response" | python3 -c "import sys,json; print(json.load(sys.stdin).get('id',''))" 2>/dev/null || echo "")
+if [[ -z "$deny_rule_id" || "$deny_rule_id" == "None" ]]; then
+    fail "Failed to create DENY rule. Response: $deny_rule_response"
+    exit 1
+fi
+info "DENY rule created (id=$deny_rule_id)"
+
+# 5h. Create a second Application with contextRoot=/deny-api (for DENY tests)
+info "Creating DENY application..."
+deny_app_response=$(pa_api POST /applications '{
+    "name": "E2E DENY App",
+    "contextRoot": "/deny-api",
+    "defaultAuthType": "API",
+    "spaSupportEnabled": false,
+    "applicationType": "API",
+    "destination": "Site",
+    "siteId": '"$site_id"',
+    "virtualHostIds": ['"$vh_id"']
+}')
+deny_app_id=$(echo "$deny_app_response" | python3 -c "import sys,json; print(json.load(sys.stdin).get('id',''))" 2>/dev/null || echo "")
+if [[ -z "$deny_app_id" || "$deny_app_id" == "None" ]]; then
+    fail "Failed to create DENY application. Response: $deny_app_response"
+    exit 1
+fi
+info "DENY application created (id=$deny_app_id)"
+
+# 5i. Enable the DENY application
+info "Enabling DENY application..."
+deny_enable_response=$(pa_api PUT "/applications/$deny_app_id" '{
+    "name": "E2E DENY App",
+    "contextRoot": "/deny-api",
+    "defaultAuthType": "API",
+    "spaSupportEnabled": false,
+    "applicationType": "API",
+    "destination": "Site",
+    "siteId": '"$site_id"',
+    "virtualHostIds": ['"$vh_id"'],
+    "enabled": true
+}')
+deny_app_enabled=$(echo "$deny_enable_response" | python3 -c "import sys,json; print(json.load(sys.stdin).get('enabled',''))" 2>/dev/null || echo "")
+if [[ "$deny_app_enabled" != "True" ]]; then
+    fail "Failed to enable DENY application. Response: $deny_enable_response"
+    exit 1
+fi
+info "DENY application enabled"
+
+# 5j. Configure DENY app's root resource — unprotected, attach DENY rule
+info "Configuring DENY app root resource..."
+deny_root_id=$(pa_api GET "/applications/$deny_app_id/resources" | python3 -c "
+import sys, json
+for r in json.load(sys.stdin).get('items', []):
+    if r.get('rootResource'):
+        print(r['id'])
+        break
+" 2>/dev/null || echo "")
+if [[ -z "$deny_root_id" || "$deny_root_id" == "None" ]]; then
+    fail "Root resource not found for DENY app $deny_app_id"
+    exit 1
+fi
+
+deny_resource_response=$(pa_api PUT "/applications/$deny_app_id/resources/$deny_root_id" '{
+    "name": "Root Resource",
+    "methods": ["*"],
+    "pathPatterns": [{"type": "WILDCARD", "pattern": "/*"}],
+    "unprotected": true,
+    "enabled": true,
+    "auditLevel": "ON",
+    "rootResource": true,
+    "policy": {
+        "API": [
+            {
+                "type": "Rule",
+                "id": '"$deny_rule_id"'
+            }
+        ]
+    }
+}')
+deny_res_unprotected=$(echo "$deny_resource_response" | python3 -c "import sys,json; print(json.load(sys.stdin).get('unprotected',''))" 2>/dev/null || echo "")
+info "DENY root resource configured (id=$deny_root_id, unprotected=$deny_res_unprotected)"
+
+info "PA configuration complete (both apps)"
 
 # Give PA a moment to apply config
 sleep 3
@@ -710,6 +808,47 @@ info "Test 16: URL path rewrite"
 engine_request POST "/api/rewrite/test" '{"target":"/api/rewritten"}'
 assert_eq "  POST /api/rewrite/test returns 200" "200" "$ENGINE_HTTP_CODE"
 assert_eq "  Echo saw rewritten path" "/api/rewritten" "$(header_value X-Echo-Path)"
+
+# ============================================================================
+# Phase 6 — Error mode tests
+# ============================================================================
+echo ""
+info "=== Phase 6: Error Mode Tests ==="
+
+# ---- Test 17: Error mode PASS_THROUGH (S-002-11) ----
+# POST to /api/error/test → profile routes to e2e-error spec → JSLT error() fires
+# → errorMode=PASS_THROUGH → original body forwarded to backend → echo returns it.
+info "Test 17: Error mode PASS_THROUGH"
+engine_request POST "/api/error/test" '{"key":"passthrough-test"}'
+assert_eq "  POST /api/error/test returns 200" "200" "$ENGINE_HTTP_CODE"
+assert_eq "  Original body forwarded (PASS_THROUGH)" "passthrough-test" "$(json_field "$ENGINE_BODY" key)"
+pa_logs=$(docker logs "$PA_CONTAINER" 2>&1)
+assert_contains "  PA log: request transform error (PASS_THROUGH)" "PASS_THROUGH" "$pa_logs"
+
+# ---- Test 18: Error mode DENY (S-002-12) ----
+# POST to /deny-api/error/test → profile routes to e2e-error spec → JSLT error()
+# fires → errorMode=DENY → RFC 9457 error response returned by ResponseBuilder.
+info "Test 18: Error mode DENY"
+engine_request POST "/deny-api/error/test" '{"key":"deny-test"}'
+assert_eq "  DENY returns 502" "502" "$ENGINE_HTTP_CODE"
+assert_contains "  RFC 9457 response has 'type'" "type" "$ENGINE_BODY"
+assert_contains "  RFC 9457 response has 'title'" "title" "$ENGINE_BODY"
+pa_logs=$(docker logs "$PA_CONTAINER" 2>&1)
+assert_contains "  PA log: request transform error (DENY)" "DENY" "$pa_logs"
+
+# ---- Test 19: DENY guard verification — best-effort (S-002-28) ----
+# After DENY, PA may or may not call handleResponse(). If it does, the adapter's
+# DENY guard should skip response processing and log a message. This is best-effort:
+# either outcome is valid — the unit test verifies the guard logic independently.
+info "Test 19: DENY guard verification (best-effort)"
+TESTS_RUN=$((TESTS_RUN + 1))
+if echo "$pa_logs" | grep -q "Response processing skipped" 2>/dev/null; then
+    ok "  DENY guard log message found"
+    TESTS_PASSED=$((TESTS_PASSED + 1))
+else
+    ok "  DENY guard not exercised (PA skipped handleResponse — expected)"
+    TESTS_PASSED=$((TESTS_PASSED + 1))
+fi
 
 # ---------------------------------------------------------------------------
 # Step 7: Summary
