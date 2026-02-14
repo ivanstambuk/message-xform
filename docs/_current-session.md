@@ -1,29 +1,39 @@
 # Current Session
 
-**Focus**: E2E test validation + expansion planning
+**Focus**: E2E Phase 7 documentation + strict SpecParser + Phases 8–11 planning
 **Date**: 2026-02-14
-**Status**: Complete
+**Status**: Handover
 
 ## Accomplished
 
-1. **E2E validation** — Ran `scripts/pa-e2e-test.sh` against PA 9.0.1.0.
-   All 18/18 assertions pass (bidirectional transforms, echo probe, audit log,
-   shadow JAR, SPI, health).
-2. **FR-002-12 completed** — Updated status from Deferred → Implemented across
-   spec.md, plan.md, knowledge-map.md. Created `e2e-results.md` living record.
-3. **E2E expansion plan** — Created `e2e-expansion-plan.md` with 7 phases to
-   grow coverage from 8 to 22 scenarios (~45 assertions). Adversarially reviewed
-   — found and fixed 4 bugs, 2 gaps, added 2 improvements.
+1. **Strict unknown-key detection in SpecParser** — Added fail-fast validation
+   rejecting unrecognized YAML keys at all spec block levels (root, headers,
+   status, url, transform). Prevents the `headers.request.add` typo class of bugs.
+   Two new tests + FR-001-01 codified + S-001-86 scenario added.
+2. **E2E Phase 7 documentation** — Updated `e2e-results.md` (50/50 assertions,
+   22 scenarios), `coverage-matrix.md` (E2E column), `plan.md` (backlog items),
+   `e2e-expansion-plan.md` (all Phase 1-7 tasks marked complete).
+3. **Phases 8–11 planning** — Full task-level plans for OAuth/Identity (mock OIDC),
+   hot-reload (file mutation), JMX (jmxterm), and multi-rule chain. Projected
+   68 total assertions when complete (31 scenarios E2E, 5 unit-only).
+4. **Retro fixes** — Added S-001-86, updated llms.txt with E2E docs.
 
-## Commits (pushed)
+## Commits (this session)
 
-- `250f137` — docs(002): capture E2E validation — 18/18 pass, FR-002-12 complete
-- `b446a5b` — docs(002): E2E expansion plan — 8→22 scenarios
+- `2e36065` — fix(001): strict unknown-key detection in SpecParser
+- `bd6b6d8` — docs(002): E2E expansion Phase 7 — documentation and coverage matrix
+- `7c5cb4d` — fix(002): revert E2E plan status, remove review log
+- `987c3d2` — docs(002): add Phases 8-11 to E2E expansion plan
+- `a120599` — chore: retro fixes — add S-001-86, update llms.txt
 
 ## Key Decisions
 
-- Profile-based routing required for E2E multi-spec testing (engine fallback
-  picks one arbitrary spec without profile)
-- Two PA rules needed for error mode testing (PASS_THROUGH + DENY)
-- S-002-28 (DENY guard) downgraded to best-effort E2E verification
-- S-002-14 (unauth) partially coverable by checking $session is null
+- E2E plan status is **In Progress** — Phases 8–11 not yet implemented.
+- 5 scenarios are unit-only by design (perf, config, threads, exchange prop, version).
+- mock-oauth2-server (navikt) recommended for Phase 8 OAuth testing.
+- jmxterm recommended for Phase 10 JMX assertions.
+
+## Next Session Focus
+
+Begin **Phase 8** — OAuth/Identity E2E testing (S-002-13, S-002-25, S-002-26).
+First step: add mock-oauth2-server to Docker Compose, configure PA Token Provider.

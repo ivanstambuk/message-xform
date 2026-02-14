@@ -1,22 +1,26 @@
 # Pending Task
 
-**Focus**: Execute E2E expansion plan (Phase 1–7)
-**Status**: Plan created and reviewed — ready to execute
-**Next Step**: Phase 1 — create spec files, profile, enhance echo backend
+**Focus**: E2E Test Expansion — Phases 8–11
+**Status**: Phases 1–7 complete (50/50 assertions). Phases 8–11 planned, not started.
+**Next Step**: Begin Phase 8 (OAuth/Identity E2E) — set up mock-oauth2-server in Docker Compose.
 
 ## Context Notes
-- Plan is at `docs/architecture/features/002/e2e-expansion-plan.md`
-- Phase 2 is the riskiest phase (profile routing activation + regression gate)
-- `engine_request()` helper needs upgrade before Phase 3 (header capture, extra headers)
-- DENY app setup (Phase 6) requires second PA application + rule
-- Profile must include entries for BOTH `/api/error/**` and `/deny-api/error/**`
-  (path mismatch bug found in adversarial review)
-
-## Key Technical Notes
-- Without profile, engine picks first spec arbitrarily (line 462, TransformEngine)
-- PA's contextRoot is part of the request path seen by the rule plugin
-- Echo backend needs Content-Type mirroring (currently hardcodes application/json)
-- `bad-transform.yaml` pattern (JSLT `error()`) already proven in adapter-standalone tests
+- `e2e-expansion-plan.md` has full task-level detail for Phases 8–11.
+- Phase 8 (OAuth) is the highest-value remaining work — validates `$session.*` in live PA.
+- Phase 9 (Hot-Reload) is self-contained — file mutation via `docker cp` + sleep.
+- Phase 10 (JMX) requires exposing JMX port — check `PA_JVM_ARGS` env var.
+- Phase 11 (Multi-Rule) requires two PA rules in chain — most complex PA config.
+- 5 scenarios are unit-only by design (documented in `e2e-results.md` gap analysis).
+- Strict unknown-key detection was added to SpecParser (FR-001-01) this session.
+- S-001-86 was added for the strict key validation (scenarios.md, coverage matrix).
 
 ## SDD Gaps
-- None — retro checks passed clean
+- None remaining — all retro findings resolved.
+
+## Commits This Session
+```
+987c3d2 docs(002): add Phases 8-11 to E2E expansion plan
+7c5cb4d fix(002): revert E2E plan status, remove review log
+bd6b6d8 docs(002): E2E expansion Phase 7 — documentation and coverage matrix
+2e36065 fix(001): strict unknown-key detection in SpecParser
+```
