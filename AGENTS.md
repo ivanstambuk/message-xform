@@ -226,8 +226,8 @@ See `docs/operations/quality-gate.md` for full pipeline documentation.
 15. **Dependency Approval Required**: Never add or upgrade libraries, Gradle plugins, BOMs, or other build dependencies without explicit user approval. When approved, document the rationale in the relevant feature plan or ADR. Automated dependency PRs (e.g., Dependabot) still require owner approval before merging.
 16. **No Reflection**: Do not introduce Java reflection in production or test sources. When existing code requires access to collaborators or internals, prefer explicit seams (constructor parameters, package-private collaborators, or dedicated test fixtures) instead of reflection.
 17. **Learnings Must Be Persisted**: Session learnings (pitfalls, syntax gotchas, tooling workarounds, API surprises) MUST be written to a file — never left as chat-only retro bullets. Target locations:
-    - **Library/API quirks** → the relevant `docs/research/` document.
-    - **Tooling/process pitfalls** → `AGENTS.md` (this file), under "Known Pitfalls" below.
+    - **Library/API quirks** → the module's `PITFALLS.md` (e.g., `core/PITFALLS.md`, `adapter-pingaccess/PITFALLS.md`).
+    - **Tooling/process pitfalls** → the module's `PITFALLS.md`, or `AGENTS.md` if truly project-wide.
     - **Conventions** → `AGENTS.md` operational rules.
 18. **No Cascading Renumber**: When inserting new increments, tasks, scenarios, or requirements between existing ones, use **letter suffixes** (e.g., I11a, T-001-36a, S-001-74a, FR-001-12a) instead of renumbering all downstream IDs. This avoids churn across cross-referencing documents (spec, plan, tasks, scenarios, knowledge-map). A dedicated cleanup pass may renumber IDs at the end of a feature when the structure is stable — never during active refinement.
 19. **Spec Amendment Cascade** ⚡ **(NON-NEGOTIABLE)**: When a feature spec is modified — new FRs added, interfaces changed, scenarios extended, or contracts altered — the agent MUST immediately cascade status and implementation changes through all dependent documents. Do **not** leave a spec amended while surrounding documents still claim "Complete".
@@ -412,59 +412,15 @@ If not running (or after server reboot):
 
 ## Known Pitfalls
 
-### JSLT 0.1.14 Function Availability
-The project uses JSLT `0.1.14` (see `gradle/libs.versions.toml`). Not all JSLT
-built-in functions listed in the latest documentation are available in this version.
-Notably:
-- `uppercase()` is NOT available — calling it silently returns `null` (no compile
-  error, no runtime error). This is a JSLT quirk: unknown function names at
-  evaluation time produce `null` rather than throwing.
-- `upper-case()` (hyphenated) throws `JsltException: No such function` at compile
-  time, which is the correct behavior for a missing function.
-- **Workaround:** Use string concatenation (`+`) or structural transforms in tests
-  rather than relying on version-specific JSLT built-in string functions.
+Each module maintains its own `PITFALLS.md` with library quirks, SDK gotchas,
+and tooling traps discovered during development. **Always read the relevant
+PITFALLS.md before working on a module.**
 
-### JDK HttpClient Restricted Headers
-The JDK `HttpClient` (`java.net.http`) blocks setting the `Host` header via
-`HttpRequest.Builder.header("Host", ...)` — it throws `IllegalArgumentException:
-restricted header name: "Host"`. In integration tests, rely on the auto-generated
-`Host` header (typically `127.0.0.1:<port>`) instead of setting a custom one.
-
-### Javalin 6 — Unknown Methods Return 404, Not 405
-Javalin does not return `405 Method Not Allowed` for HTTP methods without a
-registered handler (e.g. `PROPFIND`). Instead, it returns `404 Not Found`
-because no route matches. To produce a proper `405` with an RFC 9457 body,
-add a `before("/<path>", ...)` filter with a method whitelist check that
-calls `ctx.skipRemainingHandlers()` after writing the 405 response.
-
-### TransformRegistry.specCount() Returns 2× Unique Specs
-`TransformRegistry.specCount()` returns the internal map size, which stores each
-spec under **both** its `id` key and its `id@version` key. This means 1 unique
-spec file = 2 map entries = `specCount() == 2`. For user-facing reporting (e.g.,
-admin reload JSON response), use the number of spec files scanned
-(`specPaths.size()`) instead of `engine.specCount()`.
-
-### JSLT `contains()` Argument Order
-JSLT's `contains(element, sequence)` takes the **element first, then the
-sequence** — the opposite of most `contains()` APIs (e.g., Java's
-`collection.contains(element)`). Writing `contains($session.roles, "admin")`
-silently evaluates to `false` because it checks whether the string `"admin"`
-contains the array `$session.roles` (which is nonsensical). The correct form
-is `contains("admin", $session.roles)`.
-
-### Docker Build in Multi-Module Projects
-The `adapter-standalone/Dockerfile` uses a `builder` stage that runs Gradle.
-Because `settings.gradle.kts` in root references all subprojects and dual
-version catalogs, the Docker build MUST copy root configuration files
-(`gradle/*.toml`, `gradle.properties`), local libs (`libs/`), and ALL
-included subprojects (at least their `build.gradle.kts` files) even if it
-only intends to build the standalone proxy. Failing to copy
-`adapter-pingaccess` or `libs/` will cause the Gradle configuration phase
-to fail inside the container.
-
-### PingAccess SDK Quirks
-See `adapter-pingaccess/PITFALLS.md` for PA SDK-specific gotchas (HeaderField
-API, ErrorHandlerConfiguration, ConfigurationBuilder, test spec requirements).
+| Module | File |
+|--------|------|
+| `core` | `core/PITFALLS.md` — JSLT version quirks, registry internals |
+| `adapter-standalone` | `adapter-standalone/PITFALLS.md` — JDK HttpClient, Javalin, Docker |
+| `adapter-pingaccess` | `adapter-pingaccess/PITFALLS.md` — PA SDK API, config builder, test specs |
 
 ---
 
