@@ -182,6 +182,30 @@ terminology agreements must be captured here immediately.
     but the transformation fails, the engine returns an error response instead
     (ADR-0022).
 
+- **Error mode** (`ErrorMode`, FR-002-11)
+  - A per-rule configuration that controls behavior when the transform engine
+    returns an ERROR result. Two modes: PASS_THROUGH and DENY.
+  - Configured in `MessageTransformConfig.errorMode`.
+
+- **PASS_THROUGH** (error mode)
+  - Error mode that logs a warning and preserves the original message/response
+    unmodified. The request continues to the backend (or the original response
+    returns to the client). Scenario: S-002-11.
+
+- **DENY** (error mode)
+  - Error mode that rejects the request or rewrites the response with an
+    RFC 9457 error body. In request phase: builds a new `Response` via
+    `ResponseBuilder` and returns `Outcome.RETURN`. In response phase:
+    rewrites the existing response in-place. Sets `TRANSFORM_DENIED` exchange
+    property to guard the response phase. Scenarios: S-002-12, S-002-28.
+
+- **bodyParseFailed** (skip-guard, S-002-08)
+  - A flag set by the adapter when the request or response body cannot be
+    parsed as JSON. When true, body JSLT expressions are NOT evaluated and
+    the original raw bytes are preserved. Header, URL, and status transforms
+    still apply. This prevents transform failures when the body is not JSON
+    (e.g. binary, plain text, or malformed).
+
 ## Pipeline chaining & message semantics
 
 - **TransformContext** (`TransformContext`, DO-001-07)

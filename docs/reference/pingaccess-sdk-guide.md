@@ -1270,6 +1270,15 @@ Response build();                                 // creates new Response instan
 ResponseBuilder newInstance(HttpStatus status);
 ```
 
+> **⚠️ Testing pitfall:** `ResponseBuilder.newInstance()` calls
+> `ServiceFactory.getSingleImpl(ResponseBuilder.Factory.class)` internally.
+> Outside the PA runtime (e.g. in unit tests), this throws
+> `ExceptionInInitializerError` → `RuntimeException: No Impl found`.
+> The workaround is to inject a `BiFunction<HttpStatus, String, Response>`
+> factory into your rule class, defaulting to `ResponseBuilder` in production
+> and swapped for a mock/lambda in tests. See `MessageTransformRule.responseFactory`.
+
+
 ### ⚠️ CRITICAL: DENY Mode in handleRequest — Response is NULL
 
 During `handleRequest()`, `exchange.getResponse()` is **`null`** because the
