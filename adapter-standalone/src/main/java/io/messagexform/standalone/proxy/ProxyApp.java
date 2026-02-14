@@ -112,6 +112,12 @@ public final class ProxyApp {
 
         // 7. Start Javalin HTTP server (FR-004-27 step 6)
         Javalin app = Javalin.create(javalinConfig -> {
+            // Configure Jetty graceful-shutdown drain timeout (CFG-004-39)
+            javalinConfig.jetty.modifyServer(server -> {
+                server.setStopTimeout(config.shutdownDrainTimeoutMs());
+                server.setStopAtShutdown(true);
+            });
+
             // Configure inbound TLS if enabled (FR-004-14)
             if (config.proxyTls().enabled()) {
                 TlsConfigurator.configureInboundTls(javalinConfig, config.proxyTls());
