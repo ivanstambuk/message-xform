@@ -29,6 +29,12 @@ dependencies {
     testImplementation(catalog.findLibrary("logback-classic").get())
 }
 
+// Override project-wide --release 17 to 21 — standalone adapter runs on its own
+// JVM (not inside PingAccess) and uses Java 21 APIs (SequencedCollection).
+tasks.withType<JavaCompile>().configureEach {
+    options.release = 21
+}
+
 // --- Shadow JAR configuration (FR-004-30, T-004-51) ---
 
 tasks.withType<ShadowJar>().configureEach {

@@ -28,6 +28,11 @@ subprojects {
 
     tasks.withType<JavaCompile>().configureEach {
         options.encoding = "UTF-8"
+        // Cross-compile to Java 17 bytecode — PingAccess 9.0 runs on Java 17
+        // (Amazon Corretto 17.0.18). The shadow JAR bundles core classes, so all
+        // modules must produce Java 17-compatible class files. JDK 21 toolchain
+        // is still used for compilation and test execution.
+        options.release = 17
         options.compilerArgs.addAll(listOf("-Xlint:all", "-Werror"))
     }
 
