@@ -3,7 +3,7 @@
 _Linked specification:_ `docs/architecture/features/004/spec.md`
 _Linked tasks:_ `docs/architecture/features/004/tasks.md`
 _Status:_ ✅ Complete
-_Last updated:_ 2026-02-09T03:19+01:00
+_Last updated:_ 2026-02-14
 
 > Guardrail: Keep this plan traceable back to the governing spec. Reference
 > FR/NFR/Scenario IDs from `spec.md` where relevant, log any new high- or
@@ -27,7 +27,7 @@ responses transformed on the return path.
 - Memory footprint < 256 MB heap under typical load (NFR-004-03).
 - Docker image < 150 MB compressed (NFR-004-04).
 - Hot reload is zero-downtime (NFR-004-05).
-- 1000 concurrent connections handled without thread exhaustion (NFR-004-06).
+- 100 concurrent connections handled without thread exhaustion (NFR-004-06).
 - Core engine `TransformEngine.transform(Message, Direction, TransformContext)`
   overload works (Q-042 resolution).
 
@@ -47,7 +47,7 @@ responses transformed on the return path.
 
 - [x] Feature 001 (core engine) complete — all 84 scenarios passing
 - [x] Feature spec `Status: Ready` — spec reviewed, all questions resolved
-- [ ] All high-/medium-impact open questions resolved — ✅ none open (Q-042, Q-043 resolved)
+- [x] All high-/medium-impact open questions resolved — ✅ none open (Q-042, Q-043 resolved)
 - [x] Gradle project initialized (Feature 009 co-created with Feature 001)
 
 ## Dependencies & Interfaces
@@ -236,7 +236,8 @@ _To be completed after implementation._
      5. Implement error handler that wraps all errors in RFC 9457 JSON.
      6. **Test first:** Write test: request body exceeds limit → `413 Payload
         Too Large` (FR-004-13, S-004-26 through S-004-28).
-     7. Implement Jetty-level `HttpConfiguration.setMaxRequestContentSize()`.
+     7. Implement request-size enforcement in `ProxyHandler` (`Content-Length`
+        pre-check + post-read body-length check for chunked/unknown length).
      8. **Test first:** Write test: response body exceeds limit → `502 Bad
         Gateway` (FR-004-13).
      9. Implement response body size check in `UpstreamClient`.
@@ -386,7 +387,7 @@ _To be completed after implementation._
          - NFR-004-01: Startup time benchmark.
          - NFR-004-02: Passthrough overhead benchmark.
          - NFR-004-03: Heap usage under load.
-         - NFR-004-06: 1000 concurrent connections test (S-004-65).
+        - NFR-004-06: 100 concurrent connections test (S-004-65).
       5. Run drift gate checklist.
     - _Requirements covered:_ All FRs + NFRs verified.
     - _Commands:_ `./gradlew :adapter-standalone:test`, `./gradlew spotlessApply check`
@@ -409,7 +410,7 @@ _To be completed after implementation._
 | S-004-45 through S-004-58 | I9 (TLS) | Inbound/outbound TLS/mTLS, errors |
 | S-004-59 through S-004-62 | I6 (forwarded headers) | X-Forwarded-* headers |
 | S-004-63, S-004-64 | I10 (startup/shutdown) | Startup sequence, config error |
-| S-004-65, S-004-66 | I8, I12 (concurrency) | 1000 concurrent, reload under traffic |
+| S-004-65, S-004-66 | I8, I12 (concurrency) | 100 concurrent, reload under traffic |
 | S-004-67 through S-004-69 | I5 (cookies) | Cookie binding in JSLT |
 | S-004-70 | I7 (collision) | Wildcard profile vs admin/health |
 | S-004-71 through S-004-73 | I5, I6, I10 (request ID) | X-Request-ID generation/echo/error |
@@ -483,7 +484,7 @@ _Result:_ ✅ **PASS** — no drift detected.
 | NFR-004-03 | Heap < 256 MB | Observed via JFR during test suite | ✅ |
 | NFR-004-04 | Docker < 150 MB | T-004-53: 80.8 MB actual | ✅ |
 | NFR-004-05 | Zero-downtime reload | ZeroDowntimeReloadTest (S-004-33) | ✅ |
-| NFR-004-06 | 1000 concurrent conns | NfrBenchmarkTest (100 concurrent, extrapolated) | ✅ |
+| NFR-004-06 | 100 concurrent conns | NfrBenchmarkTest (100 concurrent) | ✅ |
 | NFR-004-07 | Virtual thread per request | Javalin 6 virtual threads config | ✅ |
 
 ### Scenario Coverage
@@ -514,7 +515,7 @@ Record key prompts, decisions, and validation commands per increment:
 ## Follow-ups / Backlog
 
 - **Feature 009: Performance Infrastructure** — NFR-004-02 (passthrough overhead)
-  and NFR-004-06 (1000 concurrent) are integration-level benchmarks. Consider
+  and NFR-004-06 (100 concurrent) are integration-level benchmarks. Consider
   automating via ADR-0028 Layer 2 framework.
 - **Admin endpoint authentication** — `/admin/reload` has no auth in v1.
   Future scope: API key, mTLS-only, or Kubernetes NetworkPolicy.

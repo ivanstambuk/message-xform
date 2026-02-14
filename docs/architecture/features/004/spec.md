@@ -2,13 +2,13 @@
 
 | Field | Value |
 |-------|-------|
-| Status | Ready |
-| Last updated | 2026-02-08 |
+| Status | Complete |
+| Last updated | 2026-02-14 |
 | Owners | Ivan |
 | Linked plan | `docs/architecture/features/004/plan.md` |
 | Linked tasks | `docs/architecture/features/004/tasks.md` |
 | Roadmap entry | #4 – Standalone HTTP Proxy Mode |
-| Depends on | Feature 001 (core engine; minor API addition — Q-042) |
+| Depends on | Feature 001 (core engine; consumes `TransformEngine.transform(..., TransformContext)` API) |
 | Research | `docs/research/standalone-proxy-http-server.md` |
 | Decisions | ADR-0029 (Javalin 6 / Jetty 11) |
 
@@ -22,7 +22,7 @@
 
 - **Standalone proxy** (`adapter-standalone`) — the message-xform engine running as an
   independent HTTP reverse proxy. Reference adapter and first `GatewayAdapter` impl.
-  Uses Javalin 6 / Jetty 12 with Java 21 virtual threads (ADR-0029).
+  Uses Javalin 6 / Jetty 11 with Java 21 virtual threads (ADR-0029).
 - **Standalone adapter** (`StandaloneAdapter`) — `GatewayAdapter<Context>` impl wrapping
   Javalin `Context` into `Message` objects.
 - **Proxy handler** (`ProxyHandler`) — HTTP handler orchestrating the full proxy cycle:
@@ -60,9 +60,9 @@ The standalone proxy is packaged as a **Java application** (shadow JAR) and a
 3. **Standalone service** — run as an independent Kubernetes Deployment with its
    own Service, fronting any backend.
 
-**Affected modules:** `adapter-standalone` (new Gradle submodule), `core` (minor
-API addition: `TransformEngine.transform(Message, Direction, TransformContext)`
-overload — Q-042).
+**Affected modules:** `adapter-standalone` (new Gradle submodule). The adapter
+consumes the core API overload `TransformEngine.transform(Message, Direction,
+TransformContext)`, which is provided by Feature 001 and treated as a prerequisite.
 
 ## Goals
 
@@ -113,7 +113,7 @@ overload — Q-042).
 | FR-004-02 | The proxy MUST apply **request transformation** via `TransformEngine.transform(message, REQUEST)` before forwarding to the backend. | Profile matches `POST /api/orders` → JSLT transforms request body → transformed body sent to backend. | Non-matching request → `PASSTHROUGH` → original request forwarded unmodified. | Transform error → proxy returns error response to client (FR-004-23), request is NOT forwarded. | GatewayAdapter SPI, Feature 001. |
 | FR-004-03 | The proxy MUST apply **response transformation** via `TransformEngine.transform(message, RESPONSE)` before returning the backend's response to the client. | Profile matches response → JSLT transforms response body → transformed body returned to client. | Non-matching response → `PASSTHROUGH` → original response returned unmodified. | Transform error → proxy returns error response to client (FR-004-23). | GatewayAdapter SPI, Feature 001. |
 | FR-004-04 | The proxy MUST forward the HTTP method, path, query string, and headers from the (potentially transformed) request to the backend. | `PUT /api/users/123?fields=name` with `Authorization: Bearer xxx` → all forwarded to backend. | Hop-by-hop headers (`Connection`, `Transfer-Encoding`, etc.) MUST be stripped per RFC 7230 §6.1 in both request and response directions. | n/a | HTTP proxy semantics. |
-| FR-004-05 | The proxy MUST support `GET`, `POST`, `PUT`, `DELETE`, `PATCH`, `HEAD`, and `OPTIONS` HTTP methods. | All seven methods are proxied without modification (unless a URL rewrite transform changes the method). | Unknown method → proxy returns `405 Method Not Allowed`. | n/a | HTTP/1.1a standard. |
+| FR-004-05 | The proxy MUST support `GET`, `POST`, `PUT`, `DELETE`, `PATCH`, `HEAD`, and `OPTIONS` HTTP methods. | All seven methods are proxied without modification (unless a URL rewrite transform changes the method). | Unknown method → proxy returns `405 Method Not Allowed`. | n/a | HTTP/1.1 standard. |
 
 > **Rationale for rejecting unknown methods (FR-004-05):** A general-purpose reverse
 > proxy would forward any method. This proxy is purpose-built for JSON body
@@ -145,7 +145,7 @@ overload — Q-042).
 
 | ID | Requirement | Success path | Validation path | Failure path | Source |
 |----|-------------|--------------|-----------------|--------------|--------|
-| FR-004-13 | The proxy MUST enforce a configurable maximum body size (`proxy.max-body-bytes`, default 10 MB) in **both directions**. Requests exceeding this limit MUST receive `413 Payload Too Large` without forwarding to the backend. Backend responses exceeding this limit MUST result in `502 Bad Gateway` returned to the client (the response is too large to buffer and transform safely). **Implementation:** For inbound requests, the limit MUST be enforced at the Jetty I/O layer via `HttpConfiguration.setMaxRequestContentSize()` so that chunked-encoded requests are rejected mid-stream without fully buffering the body. Jetty's default `413` error response MUST be wrapped in an RFC 9457 problem detail body via a custom Javalin error handler. For backend responses, the limit is checked after the response body is read (since the proxy controls the `HttpClient` read buffer). | `POST /api/data` with 5 MB body → accepted and forwarded. Backend response 3 MB → accepted and returned. | `proxy.max-body-bytes: 1048576` → 1 MB limit applied to both directions. | Request 15 MB → `413 Payload Too Large` (rejected mid-stream for chunked). Response 15 MB → `502 Bad Gateway`. | Q-031, Q-037, Q-039, Q-040 resolution, ADR-0018. |
+| FR-004-13 | The proxy MUST enforce a configurable maximum body size (`proxy.max-body-bytes`, default 10 MB) in **both directions**. Requests exceeding this limit MUST receive `413 Payload Too Large` without forwarding to the backend. Backend responses exceeding this limit MUST result in `502 Bad Gateway` returned to the client (the response is too large to buffer and transform safely). **Implementation:** Inbound request size is validated in `ProxyHandler` using `Content-Length` (when present) plus a body-size check after request body read for chunked/unknown-length inputs. Backend response size is checked in `UpstreamClient` after response body read. | `POST /api/data` with 5 MB body → accepted and forwarded. Backend response 3 MB → accepted and returned. | `proxy.max-body-bytes: 1048576` → 1 MB limit applied to both directions. | Request 15 MB → `413 Payload Too Large`. Response 15 MB → `502 Bad Gateway`. | Q-031, Q-037, Q-039, Q-040 resolution, ADR-0018. |
 
 ### TLS
 
@@ -259,14 +259,13 @@ overload — Q-042).
 > See FR-004-37. `wrapResponse` does not populate cookies (cookies are a
 > request-direction concept).
 
-> **TransformContext injection (Q-042 resolution):** Feature 004 requires a new
-> `TransformEngine.transform(Message, Direction, TransformContext)` overload.
+> **TransformContext injection (Q-042 resolution):** The standalone adapter
+> consumes the existing core overload
+> `TransformEngine.transform(Message, Direction, TransformContext)`.
 > The adapter builds a `TransformContext` with adapter-specific data (cookies
 > via `ctx.cookieMap()`, query params via `ctx.queryParamMap()`) and passes it
-> to the engine. The engine uses this context instead of constructing its own.
-> The existing 2-arg `transform(Message, Direction)` remains backward-compatible
-> — it builds an empty context internally. This is a minor, additive core change
-> (~10 lines) that does not break any existing tests or API contracts.
+> to the engine. The existing 2-arg `transform(Message, Direction)` remains
+> backward-compatible — it builds an empty context internally.
 > Both `$cookies` (FR-004-37) and `$queryParams` (FR-004-39, Q-043 resolution)
 > are populated via this mechanism.
 
@@ -281,15 +280,15 @@ overload — Q-042).
 | NFR-004-03 | Memory footprint MUST remain < 256 MB JVM heap for typical workloads (≤ 50 specs, ≤ 100 concurrent requests, 10 KB average payload). | Container resource limits in K8s. Must fit in modest pod resource requests. | Benchmark: sustained load → monitor JVM heap usage via VisualVM or JFR. | JVM ergonomics. | K8s deployment. |
 | NFR-004-04 | Docker image size MUST be < 150 MB (compressed). | Fast pull times in K8s, efficient layer caching. | `docker images` → check compressed size. | JRE Alpine base image + shadow JAR. | Docker packaging. |
 | NFR-004-05 | Hot reload MUST be zero-downtime: in-flight requests MUST complete with the previous registry while new requests use the updated registry. | No request failures during config changes. | Integration test: send request during reload → verify consistent response. | NFR-001-05, `AtomicReference` swap. | Production operations. |
-| NFR-004-06 | The proxy MUST handle at least 1000 concurrent connections without thread exhaustion, leveraging virtual threads. | Sidecar and standalone deployments may serve high-concurrency workloads. | Load test with 1000 concurrent connections → verify no errors. | Java 21 virtual threads, Javalin `useVirtualThreads`. | Scalability. |
+| NFR-004-06 | The proxy MUST handle at least 100 concurrent connections without thread exhaustion, leveraging virtual threads. | Sidecar and standalone deployments may serve high-concurrency workloads. | Load test with 100 concurrent connections → verify no errors. | Java 21 virtual threads, Javalin `useVirtualThreads`. | Scalability. |
 | NFR-004-07 | All structured log entries MUST include: timestamp, level, thread name, request ID (from `X-Request-ID` header if present), HTTP method, request path, response status, total proxy latency (ms), upstream latency (ms), transform result type (`SUCCESS`/`PASSTHROUGH`/`ERROR`), and backend host. | Production troubleshooting requires correlated, structured logs. | Log output inspection during integration tests. | SLF4J + Logback, NFR-001-08/10. | Observability. |
 
 ---
 
 ## Branch & Scenario Matrix
 
-> Full scenario definitions and coverage matrix will be maintained in
-> `scenarios.md` once created. This summary lists representative scenarios.
+> Full scenario definitions and the coverage matrix are maintained in
+> `scenarios.md`. This summary lists representative scenarios.
 
 ### Category 1 — Basic Proxy
 

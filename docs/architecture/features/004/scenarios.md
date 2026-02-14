@@ -2,7 +2,7 @@
 
 | Field | Value |
 |-------|-------|
-| Status | Active |
+| Status | Complete |
 | Last updated | 2026-02-14 |
 | Linked spec | `docs/architecture/features/004/spec.md` |
 | Format | Behavioral Contract (see `docs/architecture/spec-guidelines/scenarios-format.md`) |
@@ -1484,9 +1484,10 @@ assertions:
 scenario: S-004-65
 name: 100-concurrent-connections
 description: >
-  100 concurrent connections.
+  100 concurrent connections with benchmark telemetry for latency and load
+  behavior.
 tags: [standalone-proxy, concurrency]
-refs: [NFR-004-06]
+refs: [NFR-004-02, NFR-004-03, NFR-004-06]
 
 setup:
   config:
@@ -1872,6 +1873,8 @@ Mapping of scenario IDs to requirement references.
 | **FR-004-38** | S-004-71, S-004-72, S-004-73 |
 | **FR-004-39** | S-004-74, S-004-75, S-004-76, S-004-77 |
 | **NFR-004-01** | S-004-44 |
+| **NFR-004-02** | S-004-65 |
+| **NFR-004-03** | S-004-65 |
 | **NFR-004-04** | S-004-48 |
 | **NFR-004-05** | S-004-33, S-004-66 |
 | **NFR-004-06** | S-004-65 |
