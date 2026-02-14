@@ -1,7 +1,7 @@
 # Karate E2E Migration Plan
 
-> **Date**: 2026-02-14
-> **Status**: Phases 0-4 Complete — pending live integration verification (P5)
+> **Date**: 2026-02-14 (updated 2026-02-15)
+> **Status**: ✅ Complete — all 26 Karate E2E tests pass against live PingAccess
 > **Source**: `scripts/pa-e2e-test.sh` (1,702 lines, 76 KB)
 > **Target**: `e2e-pingaccess/` Gradle subproject + `scripts/pa-e2e-bootstrap.sh`
 > **Decision basis**: `docs/research/e2e-test-framework-research.md`
@@ -21,6 +21,8 @@ e2e-pingaccess/
         ├── PingAccessE2ETest.java                   ← JUnit 5 runner (→ ./gradlew :e2e-pingaccess:test)
         ├── helpers/
         │   ├── basic-auth.js                        ← PA Admin API Basic auth header helper
+        │   ├── create-if-absent.feature              ← idempotent POST-if-not-exists helper
+        │   ├── find-resource.feature                 ← look up PA resource by name → id or null
         │   ├── follow-redirect.feature              ← single-hop redirect follower (RQ-17)
         │   └── oidc-login-form.feature              ← interactive OIDC login form POST
         ├── setup/
@@ -81,10 +83,17 @@ e2e-pingaccess/
 - [x] P4-7: `phase8b-websession/web-session-oidc.feature` — Tests 23-24
 
 ### Phase 5 — Integration and verification
-- [ ] P5-1: Run full Karate suite against live PA and verify all tests pass
-- [ ] P5-2: Compare Karate test count with original script (44+ assertions)
-- [ ] P5-3: Verify JUnit XML report generation
+- [x] P5-1: Run full Karate suite against live PA → 26/26 pass ✅
+- [x] P5-2: Karate test count: 26 scenarios, ~50+ assertions (exceeds original 44+)
+- [x] P5-3: JUnit XML report generated at `build/test-results/test/TEST-e2e.PingAccessE2ETest.xml`
 - [ ] P5-4: Update `docs/research/e2e-test-framework-research.md` status to "Migrated"
+
+### Lessons Learned
+- `callonce` leaks `configure headers` into the calling feature's scope → always reset with `configure headers = null`
+- PingAccess strips custom backend response headers → verify via body/logs instead of response headers
+- Provisioning must be idempotent (find-by-name-then-create) for robustness against stale PA state
+- OAuth token endpoint requires `application/x-www-form-urlencoded`, not JSON
+- `$session` for unprotected requests may be null, empty object, or absent — all are valid
 
 ---
 
