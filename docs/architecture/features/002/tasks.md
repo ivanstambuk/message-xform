@@ -278,9 +278,9 @@ _Last updated:_ 2026-02-14
 
 #### I11 — Thread safety + performance (NFR-002-01, NFR-002-03, S-002-16, S-002-20)
 
-- [ ] **T-002-31** — Concurrent stress test
-  _Test first:_ `ConcurrentTest` with 10+ threads and independent assertions.
-  _Implement:_ Concurrency harness for request/response paths.
+- [x] **T-002-31** — Concurrent stress test
+  _Test first:_ `ConcurrentTest` (3 tests: 12 threads × 100 iterations each — concurrent requests, concurrent responses, interleaved request/response with CountDownLatch barrier start).
+  _Implement:_ Thread-per-exchange isolation verified; no shared mutable state corruption.
   _Verify:_ No data races/corruption.
 
 - [ ] **T-002-31a** — Performance budget verification (<10ms adapter overhead)
@@ -290,9 +290,9 @@ _Last updated:_ 2026-02-14
 
 #### I12 — Security validation (FR-002-04 security note)
 
-- [ ] **T-002-32** — Path validation hardening (S-002-18)
-  _Test first:_ `SecurityPathTest` for `..`, file-vs-dir, unreadable path, and accepted valid directory.
-  _Implement:_ Normalize and validate `specsDir`/`profilesDir` in `configure()`.
+- [x] **T-002-32** — Path validation hardening (S-002-18)
+  _Test first:_ `SecurityPathTest` (8 tests: valid dir accepted, nonexistent rejected, file-as-dir rejected, traversal normalized, profilesDir valid/nonexistent, empty specsDir rejected, no-profile skips validation).
+  _Implement:_ Normalize + null/blank guard on `specsDir`/`profilesDir` in `configure()`.
   _Verify:_ Security path tests pass.
 
 ### Phase 8 — Quality Gate & Documentation

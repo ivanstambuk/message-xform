@@ -131,10 +131,14 @@ public class MessageTransformRule extends AsyncRuleInterceptorBase<MessageTransf
         // Runtime version guard (ADR-0035, T-002-29) — warn-only, never fail-fast
         PaVersionGuard.check();
 
-        // T-002-13: Validate specsDir exists
-        Path specsPath = Paths.get(config.getSpecsDir());
+        // T-002-13, T-002-32: Validate and normalize specsDir (S-002-18)
+        String specsDirValue = config.getSpecsDir();
+        if (specsDirValue == null || specsDirValue.isBlank()) {
+            throw new ValidationException("specsDir must not be null or empty");
+        }
+        Path specsPath = Paths.get(specsDirValue).normalize();
         if (!Files.isDirectory(specsPath)) {
-            throw new ValidationException("specsDir does not exist or is not a directory: " + config.getSpecsDir());
+            throw new ValidationException("specsDir does not exist or is not a directory: " + specsPath);
         }
 
         // Initialize engine with JSLT expression engine
@@ -170,10 +174,17 @@ public class MessageTransformRule extends AsyncRuleInterceptorBase<MessageTransf
             }
         }
 
-        // Load profile if configured
+        // Load profile if configured (T-002-32: validate profilesDir — S-002-18)
         String activeProfile = config.getActiveProfile();
         if (activeProfile != null && !activeProfile.isEmpty()) {
-            Path profilesPath = Paths.get(config.getProfilesDir());
+            String profilesDirValue = config.getProfilesDir();
+            if (profilesDirValue == null || profilesDirValue.isBlank()) {
+                throw new ValidationException("profilesDir must not be null or empty when activeProfile is set");
+            }
+            Path profilesPath = Paths.get(profilesDirValue).normalize();
+            if (!Files.isDirectory(profilesPath)) {
+                throw new ValidationException("profilesDir does not exist or is not a directory: " + profilesPath);
+            }
             Path profileFile = profilesPath.resolve(activeProfile + ".yaml");
             if (!Files.isRegularFile(profileFile)) {
                 profileFile = profilesPath.resolve(activeProfile + ".yml");
