@@ -251,14 +251,14 @@ _Last updated:_ 2026-02-14
 
 #### I9 — JMX MBean observability (FR-002-14, S-002-33, S-002-34)
 
-- [ ] **T-002-27** — Metrics MXBean + counter implementation
-  _Test first:_ `MessageTransformMetricsTest`.
-  _Implement:_ MXBean + `LongAdder` counters and reset behavior.
+- [x] **T-002-27** — Metrics MXBean + counter implementation
+  _Test first:_ `MessageTransformMetricsTest` (20 tests: initial state, transform counters, reload counters, latency tracking, reset behavior, MXBean contract).
+  _Implement:_ MXBean interface + `LongAdder`-backed implementation with CAS max latency.
   _Verify:_ Metrics unit tests pass.
 
-- [ ] **T-002-28** — Rule wiring: register/unregister + counter updates
-  _Test first:_ `JmxIntegrationTest` for opt-in/opt-out lifecycle and increment behavior.
-  _Implement:_ Configure/shutdown wiring and conditional increment paths.
+- [x] **T-002-28** — Rule wiring: register/unregister + counter updates
+  _Test first:_ `JmxIntegrationTest` (8 tests: opt-in lifecycle, opt-out lifecycle, JMX attribute access, active spec count, resetMetrics via JMX).
+  _Implement:_ Configure/shutdown wiring, MBean register/unregister, reload counter updates.
   _Verify:_ JMX integration tests pass.
 
 ### Phase 7 — Packaging, Thread Safety & Hardening

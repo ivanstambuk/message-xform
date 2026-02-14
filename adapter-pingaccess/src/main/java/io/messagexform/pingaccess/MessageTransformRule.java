@@ -28,6 +28,7 @@ import io.messagexform.core.spec.SpecParser;
 import jakarta.annotation.PreDestroy;
 import jakarta.validation.ValidationException;
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
@@ -41,6 +42,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiFunction;
+import javax.management.MBeanServer;
+import javax.management.ObjectName;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -89,6 +92,8 @@ public class MessageTransformRule extends AsyncRuleInterceptorBase<MessageTransf
     private ErrorMode errorMode = ErrorMode.PASS_THROUGH;
     private ScheduledExecutorService reloadExecutor;
     private MessageTransformConfig currentConfig;
+    private MessageTransformMetrics metrics;
+    private ObjectName jmxObjectName;
 
     /**
      * Factory for building error responses during DENY mode. Defaults to
@@ -197,6 +202,24 @@ public class MessageTransformRule extends AsyncRuleInterceptorBase<MessageTransf
             reloadExecutor.scheduleWithFixedDelay(this::reloadSpecs, reloadSec, reloadSec, TimeUnit.SECONDS);
             LOG.info("Hot-reload scheduler started: interval={}s", reloadSec);
         }
+
+        // Register JMX MBean if enabled (FR-002-14, T-002-28)
+        this.metrics = new MessageTransformMetrics();
+        if (config.getEnableJmxMetrics()) {
+            try {
+                String instanceName = config.getName() != null ? config.getName() : "default";
+                jmxObjectName = new ObjectName("io.messagexform:type=TransformMetrics,instance=" + instanceName);
+                MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
+                if (!mbs.isRegistered(jmxObjectName)) {
+                    mbs.registerMBean(metrics, jmxObjectName);
+                }
+                LOG.info("JMX MBean registered: {}", jmxObjectName);
+            } catch (Exception e) {
+                LOG.warn("Failed to register JMX MBean: {}", e.getMessage());
+                jmxObjectName = null;
+            }
+        }
+        metrics.setActiveSpecCount(engine.specCount());
 
         LOG.info(
                 "MessageTransformRule configured: specsDir={}, specs={}, profile={}",
@@ -489,6 +512,19 @@ public class MessageTransformRule extends AsyncRuleInterceptorBase<MessageTransf
             reloadExecutor.shutdownNow();
             LOG.info("Hot-reload scheduler shut down");
         }
+        // Unregister JMX MBean if registered (FR-002-14, T-002-28)
+        if (jmxObjectName != null) {
+            try {
+                MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
+                if (mbs.isRegistered(jmxObjectName)) {
+                    mbs.unregisterMBean(jmxObjectName);
+                    LOG.info("JMX MBean unregistered: {}", jmxObjectName);
+                }
+            } catch (Exception e) {
+                LOG.warn("Failed to unregister JMX MBean: {}", e.getMessage());
+            }
+            jmxObjectName = null;
+        }
     }
 
     // ── Internal helpers ──
@@ -523,9 +559,16 @@ public class MessageTransformRule extends AsyncRuleInterceptorBase<MessageTransf
 
             engine.reload(specFiles, profilePath);
             LOG.debug("Hot-reload completed: specs={}", engine.specCount());
+            if (metrics != null) {
+                metrics.recordReloadSuccess();
+                metrics.setActiveSpecCount(engine.specCount());
+            }
         } catch (Exception e) {
             // Retain previous valid registry on any failure (S-002-30)
             LOG.warn("Hot-reload failed — retaining previous registry: {}", e.getMessage());
+            if (metrics != null) {
+                metrics.recordReloadFailure();
+            }
         }
     }
 
@@ -542,6 +585,11 @@ public class MessageTransformRule extends AsyncRuleInterceptorBase<MessageTransf
     /** Accessor for the reload executor — used by lifecycle tests. */
     ScheduledExecutorService reloadExecutor() {
         return reloadExecutor;
+    }
+
+    /** Accessor for the metrics — used by JMX integration tests. */
+    MessageTransformMetrics metrics() {
+        return metrics;
     }
 
     /**
