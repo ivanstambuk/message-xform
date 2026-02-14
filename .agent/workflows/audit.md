@@ -646,6 +646,13 @@ After presenting the chat summary:
    file** — do NOT ask the user for confirmation. The report is a gitignored
    ephemeral working artifact; resolved findings are captured by the commits
    that fixed them. Keeping the file after resolution adds noise.
+10. **Tracker-driven delete gate (mandatory):** Before ending the workflow,
+    inspect `## Findings Tracker` in the report file.
+    - If no rows are `Open`, `Deferred`, or `Blocked`, delete the report file
+      in the same turn.
+    - If any row is `Open`, `Deferred`, or `Blocked`, keep the report file.
+    - In the final chat response, explicitly state whether the report was
+      deleted or kept (and why).
 
 ---
 
