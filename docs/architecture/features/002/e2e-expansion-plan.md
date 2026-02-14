@@ -172,12 +172,12 @@ Create all new artefacts. No test assertions yet — purely additive.
 
 | ID | Task | Status |
 |----|------|:------:|
-| P1-01 | Create `e2e/pingaccess/specs/e2e-context.yaml` — JSLT reads `$cookies.session_token`, `$queryParams.page`, and `$session` → embeds all three in output JSON. Adding `$session` partially covers S-002-14 (unauth → session is null). | ⬜ |
-| P1-02 | Create `e2e/pingaccess/specs/e2e-error.yaml` — `error("forced-test-error")` (copies pattern from `adapter-standalone` test-specs `bad-transform.yaml`) | ⬜ |
-| P1-03 | Create `e2e/pingaccess/specs/e2e-status-override.yaml` — `status.set: 201` with passthrough body (`.`) | ⬜ |
-| P1-04 | Create `e2e/pingaccess/specs/e2e-url-rewrite.yaml` — `url.path.expr: '"/api/rewritten"'` with passthrough body | ⬜ |
-| P1-05 | Create `e2e/pingaccess/profiles/e2e-profile.yaml` — full profile with all path routing entries (including `/deny-api/error/**`, `/api/html/**`, `/api/status/**` entries identified during review) | ⬜ |
-| P1-06 | Enhance echo backend: (a) return `text/html` body for paths containing `/html/`, (b) return custom status codes for `/status/{code}`, (c) mirror request Content-Type in response instead of hardcoding `application/json` | ⬜ |
+| P1-01 | Create `e2e/pingaccess/specs/e2e-context.yaml` — JSLT reads `$cookies.session_token`, `$queryParams.page`, and `$session` → embeds all three in output JSON. Adding `$session` partially covers S-002-14 (unauth → session is null). | ✅ |
+| P1-02 | Create `e2e/pingaccess/specs/e2e-error.yaml` — `error("forced-test-error")` (copies pattern from `adapter-standalone` test-specs `bad-transform.yaml`) | ✅ |
+| P1-03 | Create `e2e/pingaccess/specs/e2e-status-override.yaml` — `status.set: 201` with passthrough body (`.`) | ✅ |
+| P1-04 | Create `e2e/pingaccess/specs/e2e-url-rewrite.yaml` — `url.path.expr: '"/api/rewritten"'` with passthrough body | ✅ |
+| P1-05 | Create `e2e/pingaccess/profiles/e2e-profile.yaml` — full profile with all path routing entries (including `/deny-api/error/**`, `/api/html/**`, `/api/status/**` entries identified during review) | ✅ |
+| P1-06 | Enhance echo backend: (a) return `text/html` body for paths containing `/html/`, (b) return custom status codes for `/status/{code}`, (c) mirror request Content-Type in response instead of hardcoding `application/json` | ✅ |
 
 **Verification:** All spec files are valid YAML. Echo backend handles
 special paths correctly (manually tested via `curl` during live PA run).

@@ -1,0 +1,29 @@
+# E2E test spec: context variable access ($cookies, $queryParams, $session)
+#
+# Verifies that the PingAccess adapter correctly populates TransformContext
+# with cookies (from request Cookie header), query parameters (from URI),
+# and session context (from PA session API — null for unprotected requests).
+#
+# The JSLT expression reads all three context variables and embeds them into
+# the output JSON for assertion by the E2E test script.
+id: e2e-context
+version: "1.0.0"
+description: "E2E test — context variable access (cookies, query params, session)"
+
+input:
+  schema:
+    type: object
+
+output:
+  schema:
+    type: object
+
+transform:
+  lang: jslt
+  expr: |
+    {
+      "original": .,
+      "session_token": $cookies.session_token,
+      "page": $queryParams.page,
+      "session": $session
+    }

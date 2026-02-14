@@ -1,0 +1,87 @@
+# E2E transform profile — routes specs to dedicated path prefixes
+#
+# Each spec is bound to its own URL path pattern so tests can exercise
+# different transformation capabilities independently. Two apps use
+# this profile:
+#   - Main app (contextRoot=/api, errorMode=PASS_THROUGH)
+#   - Deny app (contextRoot=/deny-api, errorMode=DENY)
+#
+# See: docs/architecture/features/002/e2e-expansion-plan.md
+
+profile: e2e-profile
+version: "1.0.0"
+description: "Routes E2E specs to dedicated path prefixes"
+
+transforms:
+  # ── Bidirectional rename (Tests 1–2) ──
+  - spec: e2e-rename@1.0.0
+    direction: request
+    match:
+      path: "/api/transform/**"
+      method: POST
+
+  - spec: e2e-rename@1.0.0
+    direction: response
+    match:
+      path: "/api/transform/**"
+      method: POST
+
+  # ── Header injection (Test 7) ──
+  - spec: e2e-header-inject@1.0.0
+    direction: request
+    match:
+      path: "/api/headers/**"
+      method: POST
+
+  # ── Context variables — cookies, query params, session (Tests 9–11) ──
+  - spec: e2e-context@1.0.0
+    direction: request
+    match:
+      path: "/api/context/**"
+      method: POST
+
+  # ── Error mode — PASS_THROUGH app (Test 17) ──
+  - spec: e2e-error@1.0.0
+    direction: request
+    match:
+      path: "/api/error/**"
+      method: POST
+
+  # ── Error mode — DENY app (Tests 18–19) ──
+  # Same spec, different path prefix (the DENY app uses contextRoot=/deny-api)
+  - spec: e2e-error@1.0.0
+    direction: request
+    match:
+      path: "/deny-api/error/**"
+      method: POST
+
+  # ── Status code override (Test 15) ──
+  - spec: e2e-status-override@1.0.0
+    direction: response
+    match:
+      path: "/api/status-test/**"
+
+  # ── URL rewrite (Test 16) ──
+  - spec: e2e-url-rewrite@1.0.0
+    direction: request
+    match:
+      path: "/api/rewrite/**"
+      method: POST
+
+  # ── Non-JSON response pass-through (Test 12) ──
+  # Routes through e2e-rename on response direction so the adapter's
+  # wrapResponse/handleResponse code path runs (detects non-JSON → skip body JSLT).
+  # Without this entry, the profile returns PASSTHROUGH and the adapter code
+  # path is never exercised (identified during adversarial review, BUG 4).
+  - spec: e2e-rename@1.0.0
+    direction: response
+    match:
+      path: "/api/html/**"
+
+  # ── Non-standard status code pass-through (Test 13) ──
+  # Same rationale as above — routes through a response spec so the adapter
+  # actually processes the 277 status instead of just PASSTHROUGHing.
+  - spec: e2e-rename@1.0.0
+    direction: response
+    match:
+      path: "/api/status/**"

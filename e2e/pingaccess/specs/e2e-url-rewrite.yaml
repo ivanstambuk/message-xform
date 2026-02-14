@@ -1,0 +1,27 @@
+# E2E test spec: URL rewrite
+#
+# Applied in the REQUEST direction. Rewrites the request path to "/api/rewritten"
+# so the echo backend sees the rewritten path (visible in X-Echo-Path header).
+# Body passes through unchanged.
+#
+# Exercises: UrlTransformer, url.path.expr, original-body evaluation context.
+id: e2e-url-rewrite
+version: "1.0.0"
+description: "E2E test — URL path rewrite"
+
+input:
+  schema:
+    type: object
+
+output:
+  schema:
+    type: object
+
+transform:
+  lang: jslt
+  expr: |
+    .
+
+url:
+  path:
+    expr: '"/api/rewritten"'

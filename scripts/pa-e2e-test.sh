@@ -211,7 +211,10 @@ info "Creating Docker network..."
 docker network create pa-e2e-net >/dev/null
 
 info "Starting echo backend..."
-# Echo backend that returns the RAW request body as the response body.
+# Echo backend with path-specific behavior:
+#   /html/*        → text/html response (non-JSON body test)
+#   /status/{code} → arbitrary HTTP status code (edge-case test)
+#   default        → echo raw request body, mirror request Content-Type
 # Request metadata (method, path, headers) is exposed via X-Echo-* response
 # headers so the response body remains untouched for the response JSLT to
 # operate on cleanly.  This enables full round-trip payload verification.
@@ -219,28 +222,60 @@ docker run -d --name "$ECHO_CONTAINER" --network pa-e2e-net \
     -p "$ECHO_PORT:8080" \
     python:3.12-alpine \
     python3 -c '
-import http.server, json, sys
+import http.server, json, sys, re
 
 class EchoHandler(http.server.BaseHTTPRequestHandler):
-    def do_POST(self):
+    def handle_request(self):
         length = int(self.headers.get("Content-Length", 0))
         body = self.rfile.read(length) if length > 0 else b"{}"
-        # Return the raw request body as-is — no wrapper envelope.
-        # Expose request metadata in response headers for test inspection.
+
+        # --- Path-specific behavior ---
+
+        # (a) /html/* → return text/html body
+        if "/html/" in self.path:
+            html_body = b"<html><body><h1>Test Page</h1></body></html>"
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html")
+            self.send_header("Content-Length", str(len(html_body)))
+            self._send_echo_headers()
+            self.end_headers()
+            self.wfile.write(html_body)
+            return
+
+        # (b) /status/{code} → return that status code with echo body
+        status_match = re.search(r"/status/(\d+)", self.path)
+        if status_match:
+            code = int(status_match.group(1))
+            self.send_response(code)
+            ct = self.headers.get("Content-Type", "application/json")
+            self.send_header("Content-Type", ct)
+            self.send_header("Content-Length", str(len(body)))
+            self._send_echo_headers()
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        # (c) Default: echo raw request body, mirror request Content-Type
+        ct = self.headers.get("Content-Type", "application/json")
         self.send_response(200)
-        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Type", ct)
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("X-Echo-Method", self.command)
-        self.send_header("X-Echo-Path", self.path)
-        # Forward all request headers as X-Echo-Req-* for header injection tests
-        for name, value in self.headers.items():
-            safe_name = name.replace(" ", "-")
-            self.send_header(f"X-Echo-Req-{safe_name}", value)
+        self._send_echo_headers()
         self.end_headers()
         self.wfile.write(body)
 
-    do_GET = do_POST
-    do_PUT = do_POST
+    def _send_echo_headers(self):
+        """Expose request metadata as X-Echo-* response headers."""
+        self.send_header("X-Echo-Method", self.command)
+        self.send_header("X-Echo-Path", self.path)
+        for name, value in self.headers.items():
+            safe_name = name.replace(" ", "-")
+            self.send_header(f"X-Echo-Req-{safe_name}", value)
+
+    do_POST = handle_request
+    do_GET = handle_request
+    do_PUT = handle_request
+    do_DELETE = handle_request
 
     def log_message(self, format, *args):
         pass  # suppress logging

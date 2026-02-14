@@ -1,0 +1,22 @@
+# E2E test spec: always-failing transform for error mode testing
+#
+# Compiles successfully but always fails at runtime via JSLT error().
+# Used to exercise both errorMode=PASS_THROUGH (original body forwarded)
+# and errorMode=DENY (RFC 9457 error response returned).
+#
+# Same pattern as adapter-standalone test-specs/bad-transform.yaml.
+id: e2e-error
+version: "1.0.0"
+description: "E2E test — always-failing transform for error mode testing"
+
+input:
+  schema:
+    type: object
+output:
+  schema:
+    type: object
+
+transform:
+  lang: jslt
+  expr: |
+    error("forced-test-error")

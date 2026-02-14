@@ -1,0 +1,26 @@
+# E2E test spec: status code override (200 → 201)
+#
+# Applied in the RESPONSE direction. The echo backend returns 200; this spec
+# remaps it to 201 via the declarative status block. Body passes through
+# unchanged.
+#
+# Exercises: StatusTransformer, status.set, response-direction transforms.
+id: e2e-status-override
+version: "1.0.0"
+description: "E2E test — status code override 200 → 201"
+
+input:
+  schema:
+    type: object
+
+output:
+  schema:
+    type: object
+
+transform:
+  lang: jslt
+  expr: |
+    .
+
+status:
+  set: 201
