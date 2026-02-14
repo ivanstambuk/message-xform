@@ -14,3 +14,4 @@ dependencyResolutionManagement {
 include("core")
 include("adapter-standalone")
 include("adapter-pingaccess")
+include("e2e-pingaccess")
