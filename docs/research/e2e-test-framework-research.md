@@ -1,11 +1,13 @@
 # E2E Test Framework Research: Replacing the Shell Script
 
-> **Date**: 2026-02-14
-> **Author**: Ivan (AI-assisted)
-> **Status**: Research — revised with script-derived requirements
-> **Context**: `scripts/pa-e2e-test.sh` is 1,701 lines and growing. This research
-> evaluates open-source alternatives that can replace it without sacrificing any
-> capability.
+## Metadata
+
+- **Date**: 2026-02-14
+- **Author**: Ivan (AI-assisted)
+- **Status**: Research — revised with script-derived requirements
+- **Context**: `scripts/pa-e2e-test.sh` is 1,701 lines and growing. This research
+  evaluates open-source alternatives that can replace it without sacrificing any
+  capability.
 
 ---
 
@@ -65,11 +67,19 @@ These requirements were extracted directly from `scripts/pa-e2e-test.sh` behavio
 | RQ-14 | Multi-scope variables (request/local, collection/suite, environment, global) | Need explicit variable lifecycles across steps and suites, not only ad-hoc templates | Postman-like workflow requirement; current script uses process-level globals throughout |
 | RQ-15 | Stateful cookie jar/session container | Automatically persist `Set-Cookie` responses and replay cookies to subsequent requests in-scope | Required for OIDC/web-session chains (currently hand-managed in `scripts/pa-e2e-test.sh:973`, `scripts/pa-e2e-test.sh:1104`) |
 | RQ-16 | Programmatic cookie + arbitrary header mutation | Ability to set/remove/transform cookies and headers before/after requests via script/expression hooks | Needed for Host rewrites and dynamic auth/header shaping (`scripts/pa-e2e-test.sh:119`, `scripts/pa-e2e-test.sh:936`, `scripts/pa-e2e-test.sh:1158`) |
+| RQ-17 | Multi-step redirect following with per-hop header/status inspection | OIDC auth code flow: 4+ chained redirects, each hop must be individually inspected for Location header, status code, and cookies before following; must support **controlled** redirect following (not automatic) | `scripts/pa-e2e-test.sh:974–1117` — `oidc_login()` does: GET PA (302) → extract Location → rewrite hostname → GET OIDC (302 or 200) → POST login form (302) → follow callback → extract cookie from jar |
+| RQ-18 | Inline complex JSON/data processing beyond simple JSONPath | Some assertions require iterating arrays, filtering by predicate, extracting nested keys, computing set differences — more than `$.field` | `scripts/pa-e2e-test.sh:395–402` (iterate array, filter by field), `scripts/pa-e2e-test.sh:881–887` (find rootResource in items array), `scripts/pa-e2e-test.sh:1426–1431` (join list to string), `scripts/pa-e2e-test.sh:1607–1627` (compute L4 vs L1L2 key sets) |
+| RQ-19 | Host-local filesystem artifact inspection | Some tests run against host-side files (not inside containers): JAR class version via `javap`, JAR size via `stat`, SPI file contents via `unzip -p` | `scripts/pa-e2e-test.sh:1193` (`javap` on local JAR), `scripts/pa-e2e-test.sh:1196` (`stat` on local JAR), `scripts/pa-e2e-test.sh:1209` (`unzip -p` on local JAR) |
+| RQ-20 | Numeric/arithmetic comparisons and floating-point formatting | JAR size check requires byte→MB conversion via `bc` and numeric less-than comparison, not string equality | `scripts/pa-e2e-test.sh:1196–1205` (`bc` for float, `-lt` for integer comparison) |
+| RQ-21 | Embedded test infrastructure (echo server) startup | The echo backend is an inline Python HTTP server started via `docker run ... python3 -c '...'` with path-specific routing behavior; any replacement must either keep this pattern or provide an equivalent fixture mechanism | `scripts/pa-e2e-test.sh:259–322` (60+ lines of inline Python echo server) |
+| RQ-22 | Preflight validation and CLI argument parsing | Script validates prerequisites (Docker available, license file exists, image present, JAR exists) and supports `--skip-build` flag before any test runs | `scripts/pa-e2e-test.sh:62–67` (CLI args), `scripts/pa-e2e-test.sh:213–226` (preflight), `scripts/pa-e2e-test.sh:237–240` (JAR existence) |
 
 ### Additional governance guardrails
 
 - Prefer non-JS runtime if possible (project preference)
 - Avoid introducing infrastructure-heavy dependencies (e.g., mandatory Kubernetes)
+- The echo server (RQ-21) will remain as a Docker container regardless of tool choice; this is infra, not test logic
+- Preflight checks (RQ-22) likely remain in shell or `docker compose` — they are infrastructure gating, not test assertions
 
 ---
 
@@ -400,15 +410,24 @@ Legend: `✅` = native support, `⚠️` = possible with custom glue/caveats, `�
 | RQ-14 Multi-scope variable hierarchy | ⚠️ | ⚠️ | ⚠️ | ✅ | ⚠️ | ⚠️ | ⚠️ | ⚠️ |
 | RQ-15 Stateful cookie jar/session container | ⚠️ | ⚠️ | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ⚠️ |
 | RQ-16 Programmatic cookie/header mutation | ⚠️ | ✅ | ⚠️ | ✅ | ✅ | ⚠️ | ✅ | ⚠️ |
+| RQ-17 Multi-step redirect w/ per-hop inspection | ⚠️ | ✅ | ⚠️ | ✅ | ⚠️ | ⚠️ | ✅ | ⚠️ |
+| RQ-18 Complex JSON processing (filter, iterate, set diff) | ⚠️ | ✅ | ❌ | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ |
+| RQ-19 Host-local artifact inspection | ✅ | ✅ | ❌ | ✅ | ⚠️ | ❌ | ✅ | ⚠️ |
+| RQ-20 Numeric/arithmetic comparisons | ⚠️ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ |
+| RQ-21 Embedded test infra fixture startup | ⚠️ | ⚠️ | ❌ | ⚠️ | ⚠️ | ❌ | ✅ | ✅ |
+| RQ-22 Preflight validation + CLI args | ⚠️ | ⚠️ | ❌ | ⚠️ | ⚠️ | ❌ | ✅ | ⚠️ |
 
 ### Blocking conclusions from matrix
 
-- **Hurl**: blocked for full replacement by `RQ-01`, `RQ-02`, `RQ-09`.
-- **Step CI**: blocked by `RQ-01`, `RQ-09`, plus runtime/license preference mismatch.
+- **Hurl**: blocked for full replacement by `RQ-01`, `RQ-02`, `RQ-09`, `RQ-18`, `RQ-19`, `RQ-21`, `RQ-22`.
+- **Step CI**: blocked by `RQ-01`, `RQ-09`, `RQ-19`, `RQ-21`, `RQ-22`, plus runtime/license preference mismatch.
 - **Testkube**: blocked by `RQ-12` (Kubernetes required).
 - **BATS**: not blocked, but only incremental improvement (still shell-heavy).
 - **Strict Postman parity note (`RQ-14`)**: exact collection/environment/global variable semantics are not first-class in most native CLI tools; this usually needs project conventions or a thin wrapper layer.
 - **Cookie/session parity note (`RQ-15`)**: if automatic cookie persistence and replay is mandatory, require a proof-of-capability spike before tool lock-in (especially for non-Karate options).
+- **Complex JSON note (`RQ-18`)**: Runn's `expr` engine handles array filtering and arithmetic natively; Venom would fall back to `exec` + `jq`/`python3` for complex cases. This is a meaningful ergonomic gap.
+- **Multi-step redirect note (`RQ-17`)**: The OIDC flow is the hardest single pattern to port. Runn's `if`/`loop` + `bind` + HTTP step chaining can express it declaratively; Venom would need an `exec` step wrapping `curl` with manual redirect control.
+- **Infra fixtures (`RQ-21`, `RQ-22`)**: Both are best left in shell or `docker compose`. The tool evaluation should focus on test logic migration, not infra bootstrapping.
 
 ---
 
