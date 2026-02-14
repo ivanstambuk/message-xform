@@ -3,7 +3,7 @@
 | Field | Value |
 |-------|-------|
 | Status | Draft |
-| Last updated | 2026-02-13 |
+| Last updated | 2026-02-14 |
 | Linked spec | `docs/architecture/features/001/spec.md` |
 | Format | Data Transform (see `docs/architecture/spec-guidelines/scenarios-format.md`) |
 
@@ -1269,6 +1269,79 @@ expected_error_response:
   detail_contains: "nonexistent-function"
   # Original message is NOT passed through
 expected_passthrough: false
+```
+
+---
+
+
+### S-001-86: Unknown Key in Spec → SpecParseException
+
+Strict unknown-key detection in spec parsing. Unrecognized keys at any level
+of the YAML spec are rejected immediately with a diagnostic message.
+
+
+---
+
+```yaml
+scenario: S-001-86
+name: unknown-key-in-spec-rejected
+description: >
+  When a spec YAML contains an unrecognized key (e.g. 'headers.request.add'
+  instead of 'headers.add'), the SpecParser MUST throw a SpecParseException
+  listing the unknown key(s) and the recognized keys for that block.
+  This is the fail-fast validation rule added to FR-001-01.
+tags: [error, spec-parse, strict-validation, fail-fast]
+refs: [FR-001-01]
+
+# No transform — this tests spec loading, not evaluation.
+# The spec file itself is the "input".
+
+spec_yaml: |
+  id: unknown-header-key
+  version: "1.0.0"
+  description: Spec with unknown key in headers block
+  headers:
+    request:
+      add:
+        X-Custom: "value"
+
+expected_error:
+  type: SpecParseException
+  message_contains:
+    - "Unknown key"
+    - "'headers'"
+    - "request"
+  spec_id: "unknown-header-key"
+```
+
+---
+
+```yaml
+scenario: S-001-86b
+name: unknown-root-key-in-spec-rejected
+description: >
+  Unknown top-level key in spec YAML (e.g. 'routing') is rejected.
+tags: [error, spec-parse, strict-validation, fail-fast]
+refs: [FR-001-01]
+
+spec_yaml: |
+  id: unknown-root-key
+  version: "1.0.0"
+  description: Spec with unknown root-level key
+  routing:
+    paths: ["/api/**"]
+  transform:
+    lang: jslt
+    expr: |
+      .
+
+expected_error:
+  type: SpecParseException
+  message_contains:
+    - "Unknown key"
+    - "'spec root'"
+    - "routing"
+  spec_id: "unknown-root-key"
 ```
 
 ---
@@ -4710,5 +4783,6 @@ expected_error:
 | S-001-83 | `ScenarioSuiteTest`, `SessionContextBindingTest` | `$session.roles` conditional response (FR-001-13, ADR-0030) |
 | S-001-84 | `ScenarioSuiteTest`, `SessionContextBindingTest`, `SessionContextE2ETest` | `$session` null — null-safe access (FR-001-13, ADR-0030) |
 | S-001-85 | `SessionContextJoltRejectionTest` | JOLT + `$session` → rejected at load time (FR-001-13, ADR-0030) |
+| S-001-86 | `SpecParserTest` | Unknown key in spec → SpecParseException (FR-001-01 strict validation) |
 
 
