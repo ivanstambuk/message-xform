@@ -19,7 +19,8 @@ description: Read-only generated-code audit for quality, security, dependency hy
 
 **Parameters:**
 - `all` — `core`, `adapter-standalone`, `adapter-pingaccess` (if present).
-- `changed` — derive scope from `git diff --name-only` (+ staged + untracked).
+- `changed` — derive scope from local diffs (+ staged + untracked). If the
+  working tree is clean, fall back to diff vs `origin/main` merge-base.
 - `<module>` — one concrete module directory name.
 
 ---
@@ -30,6 +31,7 @@ description: Read-only generated-code audit for quality, security, dependency hy
 2. **Informational only:** rank findings by severity; do not block progress.
 3. **One report only:** produce a detailed report file (no mandatory chat scorecard).
 4. **Centralized output:** all audit reports live under `audit-reports/`.
+5. **Deterministic evidence:** every finding must include reproducible evidence.
 
 ---
 
@@ -56,12 +58,16 @@ Goal: align findings with current project guardrails and toolchain policy.
      - `git diff --name-only`
      - `git diff --cached --name-only`
      - `git ls-files --others --exclude-standard`
+     - if all three are empty: `git diff --name-only $(git merge-base HEAD origin/main)...HEAD`
    - `<module>` -> that module only
 2. Build file sets:
    - Production: `<module>/src/main/java/**`
    - Tests: `<module>/src/test/java/**`
    - Build files: `<module>/build.gradle.kts`, root `build.gradle.kts`, version catalog
-3. Record exact scope in report metadata.
+3. Exclude non-signal paths: `.gradle/`, `build/`, `out/`, `.idea/`, `.agent/session/`.
+4. Normalize and deduplicate file lists (stable sorted order).
+5. If resolved scope is empty, write a report with "No auditable code in scope" and stop.
+6. Record exact scope in report metadata.
 
 ### Phase 2 — Baseline Build Signals (Non-Mutating)
 
@@ -82,6 +88,15 @@ Recommended commands:
 
 Capture failures/warnings as findings when relevant.
 
+### Phase 2.5 — Finding Quality Bar
+
+Before recording a finding, verify all of the following:
+1. **Evidence present:** command output or concrete symbol/location.
+2. **Reproducible:** include one command that reproduces the signal.
+3. **Actionable:** recommendation is specific enough for a follow-up task.
+4. **Confidence:** mark as `HIGH` or `MEDIUM`.
+5. **False-positive note:** include when heuristic signals are uncertain.
+
 ### Phase 3 — Code Quality & Design Signals
 
 Evaluate maintainability and engineering quality in audited code.
@@ -94,6 +109,8 @@ Evaluate maintainability and engineering quality in audited code.
 | CQ-04 | API contract drift risks (null handling, inconsistent invariants) | High |
 | CQ-05 | TODO/FIXME/HACK markers in production paths | Low |
 | CQ-06 | Inconsistent naming/layering vs module boundaries | Medium |
+| CQ-07 | Mutable static/shared state in request-processing paths | High |
+| CQ-08 | Copy-paste duplication across adapters/tests without shared helper | Medium |
 
 Evidence commands (examples):
 
@@ -101,6 +118,7 @@ Evidence commands (examples):
 rg -n "Class\\.forName|setAccessible\\(|getDeclared(Field|Method|Constructor)" <scope>
 rg -n "catch \\(Exception|catch \\(Throwable" <scope>
 rg -n "TODO|FIXME|HACK" <scope>/src/main/java
+rg -n "static\\s+(?!final)" <scope>/src/main/java
 ```
 
 ### Phase 4 — Security Signals
@@ -115,6 +133,7 @@ Evaluate common secure-coding risks.
 | SEC-04 | Unsafe deserialization / dynamic code loading | High |
 | SEC-05 | TLS/hostname verification weakening, insecure crypto defaults | Medium |
 | SEC-06 | Sensitive data over-logging risk | Medium |
+| SEC-07 | SSRF risk (outbound URL/host built from untrusted input) | High |
 
 Evidence commands (examples):
 
@@ -123,6 +142,7 @@ rg -n "(password|secret|token|apikey|api_key|private_key)\\s*[:=]" <scope>
 rg -n "Runtime\\.getRuntime\\(\\)\\.exec|ProcessBuilder\\(" <scope>
 rg -n "ObjectInputStream|readObject\\(|URLClassLoader|ScriptEngineManager" <scope>
 rg -n "disableHostnameVerification|TrustAll|X509TrustManager|setHostnameVerifier" <scope>
+rg -n "HttpClient|HttpURLConnection|URI\\.create|new URI\\(" <scope>/src/main/java
 ```
 
 ### Phase 5 — Dependency Hygiene Signals
@@ -135,6 +155,7 @@ Evaluate dependency consistency and maintenance risk.
 | DEP-02 | Duplicate/conflicting dependency paths in classpath graph | Medium |
 | DEP-03 | Unused or unjustified dependencies in module scope | Low |
 | DEP-04 | Shadow packaging/excludes consistency with module intent | Medium |
+| DEP-05 | Dependency declared outside version catalog without explicit rationale | Medium |
 
 Use:
 
@@ -154,12 +175,14 @@ Evaluate whether tests are strong enough to protect behavior.
 | TQ-03 | Flakiness signals (`Thread.sleep`, timing races, order dependence) | Medium |
 | TQ-04 | Disabled/ignored tests without rationale | Medium |
 | TQ-05 | Missing failure-branch tests for error handling | High |
+| TQ-06 | Over-mocked tests that assert interactions but not outcomes | Medium |
 
 Evidence commands (examples):
 
 ```bash
 rg -n "@Disabled|@Ignore|Thread\\.sleep\\(" <scope>/src/test/java
 rg -n "assertThat\\(.*\\)\\.isNotNull\\(\\)" <scope>/src/test/java
+rg -n "verify\\(|times\\(" <scope>/src/test/java
 ```
 
 ### Phase 7 — Lightweight Performance Signals
@@ -172,6 +195,7 @@ Focus on pragmatic heuristics (not full benchmarking).
 | PERF-02 | Repeated heavyweight object creation in loops/hot paths | Medium |
 | PERF-03 | Unbounded in-memory collections/caches | Medium |
 | PERF-04 | Excessive payload copy/serialization churn | Medium |
+| PERF-05 | Regex compilation or expensive parsing repeated in hot paths | Medium |
 
 Notes:
 - Keep this phase heuristic and evidence-based.
@@ -186,6 +210,7 @@ For each High/Critical finding, recommend one or more:
 2. Workflow check update (`/audit`, `/init`, `/retro`, `/code-audit`)
 3. Spec/plan/tasks template guardrail
 4. CI non-blocking signal (reporting-only)
+5. Test-template strengthening for failure-path coverage
 
 Recommendations must be concrete and directly tied to findings.
 
@@ -218,16 +243,21 @@ Examples:
 - Target: <all|changed|module>
 - Scope paths: <explicit list>
 - Commands executed: <explicit list>
+- Excluded paths: <explicit list>
 
 ## Findings by Severity
 
 ### Critical
 #### CA-001 — <title>
 - Category: CQ | SEC | DEP | TQ | PERF
+- Check ID: <e.g., SEC-03>
 - Location: `<path>:<line>`
 - Evidence: `<symbol/signature/command output excerpt>`
+- Repro command: `<exact command>`
 - Risk: <impact in practical terms>
 - Recommendation: <concrete remediation path>
+- Confidence: HIGH | MEDIUM
+- False-positive note: <optional>
 
 ### High
 ...
@@ -260,6 +290,10 @@ Examples:
 | **High** | Strong risk to reliability, security, or maintainability; should be prioritized soon. |
 | **Medium** | Important quality gap; manageable short-term risk. |
 | **Low** | Hygiene or polish issue with limited immediate impact. |
+
+Notes:
+- Use `Critical` sparingly; require concrete exploitability/correctness evidence.
+- Heuristic-only signals without hard evidence should not exceed `High`.
 
 ---
 

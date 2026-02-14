@@ -1,7 +1,11 @@
 package io.messagexform.pingaccess;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pingidentity.pa.sdk.http.*;
+import com.pingidentity.pa.sdk.identity.Identity;
+import com.pingidentity.pa.sdk.identity.OAuthTokenMetadata;
+import com.pingidentity.pa.sdk.identity.SessionStateSupport;
 import com.pingidentity.pa.sdk.policy.AccessException;
 import io.messagexform.core.model.HttpHeaders;
 import io.messagexform.core.model.Message;
@@ -80,9 +84,10 @@ class PingAccessAdapter implements GatewayAdapter<Exchange> {
         MessageBody messageBody = readAndParseBody(request.getBody());
 
         // T-002-06: statusCode = null for requests (ADR-0020)
-        // T-002-06: session = empty placeholder (FR-002-06 deferred)
+        // T-002-18/19: session = identity merge (FR-002-06)
+        SessionContext session = buildSessionContext(exchange);
         return new Message(
-                messageBody, httpHeaders, null, requestPath, requestMethod, queryString, SessionContext.empty());
+                messageBody, httpHeaders, null, requestPath, requestMethod, queryString, session);
     }
 
     @Override
@@ -115,10 +120,13 @@ class PingAccessAdapter implements GatewayAdapter<Exchange> {
         // Response body (same parse strategy as request)
         MessageBody messageBody = readAndParseBody(response.getBody());
 
+        // T-002-18/19: session = identity merge (FR-002-06)
+        SessionContext session = buildSessionContext(exchange);
+
         LOG.debug("wrapResponse: {} {} -> status={}", requestMethod, requestPath, statusCode);
 
         return new Message(
-                messageBody, httpHeaders, statusCode, requestPath, requestMethod, queryString, SessionContext.empty());
+                messageBody, httpHeaders, statusCode, requestPath, requestMethod, queryString, session);
     }
 
     @Override
@@ -136,6 +144,143 @@ class PingAccessAdapter implements GatewayAdapter<Exchange> {
      */
     boolean isBodyParseFailed() {
         return bodyParseFailed;
+    }
+
+    // ── Session context construction (T-002-18, T-002-19, FR-002-06) ──
+
+    /**
+     * Builds a {@link SessionContext} from the PA exchange's Identity by
+     * merging four layers in ascending precedence order (FR-002-06).
+     *
+     * <p>
+     * <strong>Layer precedence:</strong>
+     * <ol>
+     * <li>L1 (base): Identity getters — {@code subject}, {@code mappedSubject},
+     * {@code trackingId}, {@code tokenId}, {@code tokenExpiration}.</li>
+     * <li>L2: OAuthTokenMetadata — {@code clientId}, {@code scopes},
+     * {@code tokenType}, {@code realm}, {@code tokenExpiresAt},
+     * {@code tokenRetrievedAt}.</li>
+     * <li>L3: Identity.getAttributes() — OIDC claims / token introspection,
+     * spread flat into the session.</li>
+     * <li>L4 (top): SessionStateSupport.getAttributes() — dynamic session state,
+     * spread flat into the session.</li>
+     * </ol>
+     *
+     * <p>
+     * Later layers override earlier layers on key collision. If the exchange
+     * has no Identity ({@code exchange.getIdentity() == null}), returns
+     * {@link SessionContext#empty()} (S-002-14).
+     *
+     * <p>
+     * Jackson {@link JsonNode} values from L3/L4 are converted to plain Java
+     * objects ({@code String}, {@code List}, {@code Map}, etc.) so that
+     * {@link SessionContext} remains Jackson-free (ADR-0032, ADR-0033).
+     *
+     * @param exchange the native PA exchange
+     * @return session context for engine evaluation
+     */
+    SessionContext buildSessionContext(Exchange exchange) {
+        Identity identity = exchange.getIdentity();
+        if (identity == null) {
+            return SessionContext.empty();
+        }
+
+        Map<String, Object> flat = new LinkedHashMap<>();
+
+        // Layer 1: PA identity fields (base)
+        flat.put("subject", identity.getSubject());
+        flat.put("mappedSubject", identity.getMappedSubject());
+        flat.put("trackingId", identity.getTrackingId());
+        flat.put("tokenId", identity.getTokenId());
+        if (identity.getTokenExpiration() != null) {
+            flat.put("tokenExpiration", identity.getTokenExpiration().toString());
+        }
+
+        // Layer 2: OAuth metadata
+        OAuthTokenMetadata oauth = identity.getOAuthTokenMetadata();
+        if (oauth != null) {
+            flat.put("clientId", oauth.getClientId());
+            flat.put("tokenType", oauth.getTokenType());
+            flat.put("realm", oauth.getRealm());
+            if (oauth.getExpiresAt() != null) {
+                flat.put("tokenExpiresAt", oauth.getExpiresAt().toString());
+            }
+            if (oauth.getRetrievedAt() != null) {
+                flat.put("tokenRetrievedAt", oauth.getRetrievedAt().toString());
+            }
+            List<String> scopesList = new ArrayList<>();
+            if (oauth.getScopes() != null) {
+                scopesList.addAll(oauth.getScopes());
+            }
+            flat.put("scopes", scopesList);
+        }
+
+        // Layer 3: OIDC claims / token attributes (spread into flat namespace)
+        // Convert JsonNode → plain Java (ADR-0032: core port types are Jackson-free)
+        JsonNode paAttributes = identity.getAttributes();
+        if (paAttributes != null && paAttributes.isObject()) {
+            paAttributes.fields()
+                    .forEachRemaining(entry -> flat.put(entry.getKey(), jsonNodeToJavaObject(entry.getValue())));
+        }
+
+        // Layer 4: Session state (spread into flat namespace — highest precedence)
+        SessionStateSupport sss = identity.getSessionStateSupport();
+        if (sss != null && sss.getAttributes() != null) {
+            sss.getAttributes().forEach((key, value) -> flat.put(key, jsonNodeToJavaObject(value)));
+        }
+
+        return SessionContext.of(flat);
+    }
+
+    /**
+     * Converts a Jackson {@link JsonNode} to a plain Java object.
+     *
+     * <p>
+     * This ensures {@link SessionContext} remains Jackson-free (ADR-0032,
+     * ADR-0033). The conversion is:
+     * <ul>
+     * <li>Text → {@code String}</li>
+     * <li>Number (int) → {@code Integer}</li>
+     * <li>Number (long/double) → {@code Long} or {@code Double}</li>
+     * <li>Boolean → {@code Boolean}</li>
+     * <li>Array → {@code List<Object>} (recursive)</li>
+     * <li>Object → {@code Map<String, Object>} (recursive)</li>
+     * <li>Null/missing → {@code null}</li>
+     * </ul>
+     */
+    private Object jsonNodeToJavaObject(JsonNode node) {
+        if (node == null || node.isNull() || node.isMissingNode()) {
+            return null;
+        }
+        if (node.isTextual()) {
+            return node.asText();
+        }
+        if (node.isInt()) {
+            return node.intValue();
+        }
+        if (node.isLong()) {
+            return node.longValue();
+        }
+        if (node.isDouble() || node.isFloat()) {
+            return node.doubleValue();
+        }
+        if (node.isBoolean()) {
+            return node.booleanValue();
+        }
+        if (node.isArray()) {
+            List<Object> list = new ArrayList<>(node.size());
+            for (JsonNode element : node) {
+                list.add(jsonNodeToJavaObject(element));
+            }
+            return list;
+        }
+        if (node.isObject()) {
+            Map<String, Object> map = new LinkedHashMap<>();
+            node.fields().forEachRemaining(entry -> map.put(entry.getKey(), jsonNodeToJavaObject(entry.getValue())));
+            return map;
+        }
+        // Fallback: use text representation
+        return node.asText();
     }
 
     // ── TransformContext construction (T-002-17, FR-002-13) ──

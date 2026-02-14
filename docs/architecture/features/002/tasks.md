@@ -1,7 +1,7 @@
 # Feature 002 — PingAccess Adapter — Tasks
 
 _Status:_ Ready
-_Last updated:_ 2026-02-15
+_Last updated:_ 2026-02-14
 
 **Governing spec:** `docs/architecture/features/002/spec.md`
 **Implementation plan:** `docs/architecture/features/002/plan.md`
@@ -187,15 +187,17 @@ _Last updated:_ 2026-02-15
 
 #### I6 — Identity -> `$session` flat merge (FR-002-06, ADR-0030)
 
-- [ ] **T-002-18** — Merge layers L1-L3 (identity, OAuth metadata, identity attributes) (S-002-13, S-002-25)
-  _Test first:_ `IdentityMappingTest.layers123()` with precedence validation.
-  _Implement:_ `buildSessionContext()` layers 1-3.
+- [x] **T-002-18** — Merge layers L1-L3 (identity, OAuth metadata, identity attributes) (S-002-13, S-002-25)
+  _Test first:_ `IdentityMappingTest.Layers123` with precedence validation.
+  _Implement:_ `buildSessionContext()` layers 1-3 + `jsonNodeToJavaObject()` for
+  ADR-0032 boundary conversion.
   _Verify:_ Layer merge tests pass.
 
-- [ ] **T-002-19** — Merge layer L4 session state + null identity behavior (S-002-14, S-002-26)
-  _Test first:_ `IdentityMappingTest.layer4PrecedenceAndNullIdentity()`.
-  _Implement:_ SessionStateSupport merge and null-safe behavior.
-  _Verify:_ L4 + null identity tests pass.
+- [x] **T-002-19** — Merge layer L4 session state + null identity behavior (S-002-14, S-002-26)
+  _Test first:_ `IdentityMappingTest.Layer4AndNullIdentity`.
+  _Implement:_ SessionStateSupport merge, null-safe identity → `SessionContext.empty()`.
+  Wire `buildSessionContext()` into `wrapRequest()` and `wrapResponse()`.
+  _Verify:_ L4 + null identity tests pass, all existing adapter tests pass.
 
 ### Phase 5 — Error Mode Dispatch
 

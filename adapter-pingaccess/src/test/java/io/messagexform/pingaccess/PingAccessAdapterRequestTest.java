@@ -294,7 +294,8 @@ class PingAccessAdapterRequestTest {
         }
 
         @Test
-        void sessionIsEmptyPlaceholder() {
+        void nullIdentityProducesEmptySession() {
+            // exchange.getIdentity() returns null (no identity mock set up)
             Message msg = adapter.wrapRequest(exchange);
 
             assertThat(msg.session()).isEqualTo(SessionContext.empty());
