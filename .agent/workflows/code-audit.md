@@ -18,7 +18,8 @@ description: Read-only generated-code audit for quality, security, dependency hy
 - `/code-audit adapter-pingaccess` — audit a single module.
 
 **Parameters:**
-- `all` — `core`, `adapter-standalone`, `adapter-pingaccess` (if present).
+- `all` — all active Gradle modules that contain Java source (`src/main/java`).
+- Resolve `all` dynamically from `settings.gradle.kts` includes (do not hardcode module names).
 - `changed` — derive scope from local diffs (+ staged + untracked). If the
   working tree is clean, fall back to diff vs `origin/main` merge-base.
 - `<module>` — one concrete module directory name.
@@ -68,7 +69,8 @@ If a tool is missing:
 
 // turbo
 1. Determine target:
-   - `all` -> all active modules
+   - `all` -> all active modules discovered from `settings.gradle.kts` includes,
+     filtered to modules with `src/main/java`
    - `changed` -> files from:
      - `git diff --name-only`
      - `git diff --cached --name-only`
@@ -77,15 +79,20 @@ If a tool is missing:
    - `<module>` -> that module only
 2. Validate module target against `settings.gradle.kts` includes. Unknown module -> stop with clear error.
 3. For `changed`, map files to module scopes and ignore non-code paths with explicit report note.
-4. Build file sets:
+4. For `changed`, apply impact expansion rules:
+   - If `core/src/main/java/**` changed -> include all adapter modules in baseline compile/test checks.
+   - If `build.gradle.kts`, `settings.gradle.kts`, or `gradle/libs.versions.toml` changed ->
+     run dependency/baseline checks for all discovered modules.
+   - If shared SPI contracts changed (`core/src/main/java/**/spi/**`) -> include known implementer modules.
+5. Build file sets:
    - Production: `<module>/src/main/java/**`
    - Tests: `<module>/src/test/java/**`
    - Build files: `<module>/build.gradle.kts`, root `build.gradle.kts`, version catalog
-5. Exclude non-signal paths: `.gradle/`, `build/`, `out/`, `.idea/`, `.agent/session/`,
+6. Exclude non-signal paths: `.gradle/`, `build/`, `out/`, `.idea/`, `.agent/session/`,
    `.sdk-decompile/`, `binaries/`, `docs/`, `audit-reports/`.
-6. Normalize and deduplicate file lists (stable sorted order).
-7. If resolved scope is empty, write a report with "No auditable code in scope" and stop.
-8. Record exact scope in report metadata.
+7. Normalize and deduplicate file lists (stable sorted order).
+8. If resolved scope is empty, write a report with "No auditable code in scope" and stop.
+9. Record exact scope in report metadata.
 
 ### Phase 2 — Baseline Build Signals (Non-Mutating)
 
@@ -111,6 +118,12 @@ Classification guidance for baseline failures:
 - Failure clearly outside scope -> record as contextual note, not a scoped finding.
 - Unable to determine provenance -> finding with provenance `unknown`.
 
+Provenance method (deterministic):
+- `new`: evidence location is in uncommitted changes, untracked files, or introduced in
+  `$(git merge-base HEAD origin/main)..HEAD`.
+- `existing`: evidence location predates the current branch diff range.
+- `unknown`: provenance cannot be mapped reliably to a line/symbol.
+
 ### Phase 2.5 — Finding Quality Bar
 
 Before recording a finding, verify all of the following:
@@ -119,6 +132,7 @@ Before recording a finding, verify all of the following:
 3. **Actionable:** recommendation is specific enough for a follow-up task.
 4. **Confidence:** mark as `HIGH` or `MEDIUM`.
 5. **False-positive note:** include when heuristic signals are uncertain.
+6. **Not style-noise:** if `spotlessCheck` passes, avoid emitting pure formatting findings.
 
 ### Phase 2.6 — Root-Cause Grouping
 
@@ -126,6 +140,13 @@ Before finalizing findings:
 1. Group symptom-level signals under one root-cause finding when they share the same source.
 2. Keep one canonical finding with multiple affected locations.
 3. Avoid emitting N nearly identical findings for the same issue class.
+
+### Phase 2.7 — Noise Control
+
+To keep reports actionable:
+1. Merge repetitive low-severity signals into one grouped finding per check ID.
+2. Cap low-severity listing to the top 10 most actionable entries; summarize the rest.
+3. Prefer high-confidence findings over broad speculative scans.
 
 ### Phase 3 — Code Quality & Design Signals
 
@@ -275,6 +296,8 @@ Examples:
 ## Metadata
 - Date: <ISO timestamp>
 - Target: <all|changed|module>
+- Resolved modules: <explicit list>
+- Impact expansion applied: yes/no + reason
 - Scope paths: <explicit list>
 - Commands executed: <explicit list>
 - Excluded paths: <explicit list>
@@ -309,7 +332,10 @@ Finding ID format:
 ## Check Execution Matrix
 | Check ID | Status | Notes |
 |----------|--------|-------|
-| CQ-01 | Executed / Skipped / N/A | <reason or short result> |
+| CQ-01 | Executed / Skipped / N/A / Timed out | <reason or short result> |
+
+## Suppressed / Collapsed Signals
+- <optional list of intentionally collapsed low-value signals with reason>
 
 ## Passed Checks
 - <check id> — <short note>
