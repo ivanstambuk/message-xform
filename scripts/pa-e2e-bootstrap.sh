@@ -230,7 +230,7 @@ elapsed=0
 while [[ $elapsed -lt $max_wait ]]; do
     if docker logs "$PA_CONTAINER" 2>&1 | grep -q "PingAccess is up" 2>/dev/null; then
         sleep 5
-        version=$(curl -sk -u "$PA_PASSWORD:$PA_PASSWORD" \
+        version=$(curl -sk -u "administrator:$PA_PASSWORD" \
             -H "X-XSRF-Header: PingAccess" \
             "https://localhost:$PA_ADMIN_PORT/pa-admin-api/v3/version" 2>/dev/null \
             | python3 -c "import sys,json; print(json.load(sys.stdin)['version'])" 2>/dev/null || echo "")

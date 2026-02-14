@@ -1,12 +1,14 @@
 Feature: Plugin Discovery & JAR Verification
-  # Tests 1-6: Plugin discovery, bidirectional transform, spec loading,
-  # shadow JAR inspection, SPI registration, PA health.
-  # Ports shell lines 1120-1222.
+    # Tests 1-6: Plugin discovery, bidirectional transform, spec loading,
+    # shadow JAR inspection, SPI registration, PA health.
+    # Ports shell lines 1120-1222.
 
   Background:
     * callonce read('classpath:e2e/setup/pa-provision.feature')
     * url 'https://localhost:' + paEnginePort
     * configure ssl = true
+    # Reset headers — callonce leaks paAdminHeaders into this scope
+    * configure headers = null
 
   Scenario: Test 1 — Bidirectional body round-trip (snake_case → camelCase → snake_case)
     # Reverse (request):  snake_case → camelCase

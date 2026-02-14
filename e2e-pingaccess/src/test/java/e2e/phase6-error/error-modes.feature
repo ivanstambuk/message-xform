@@ -1,10 +1,12 @@
 Feature: Error Mode Tests
-  # Tests 17-19: PASS_THROUGH, DENY, DENY guard verification.
-  # Ports shell lines 1327-1367.
+    # Tests 17-19: PASS_THROUGH, DENY, DENY guard verification.
+    # Ports shell lines 1327-1367.
 
   Background:
     * callonce read('classpath:e2e/setup/pa-provision.feature')
     * configure ssl = true
+    # Reset headers — callonce leaks paAdminHeaders into this scope
+    * configure headers = null
 
   Scenario: Test 17 — Error mode PASS_THROUGH (S-002-11)
     # POST to /api/error/test → e2e-error spec → JSLT error() fires
