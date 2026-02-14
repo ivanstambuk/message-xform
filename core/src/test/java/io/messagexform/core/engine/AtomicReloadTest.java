@@ -14,6 +14,7 @@ import io.messagexform.core.spec.SpecParser;
 import io.messagexform.core.testkit.TestMessages;
 import java.nio.file.Path;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -210,6 +211,7 @@ class AtomicReloadTest {
         int numReaders = 10;
         CountDownLatch startLatch = new CountDownLatch(1);
         CountDownLatch doneLatch = new CountDownLatch(numReaders);
+        CountDownLatch firstReadLatch = new CountDownLatch(1);
         AtomicReference<Throwable> error = new AtomicReference<>();
 
         Message msg = stubMessage("x", "test");
@@ -221,6 +223,9 @@ class AtomicReloadTest {
                     startLatch.await();
                     for (int j = 0; j < 50; j++) {
                         TransformResult r = engine.transform(msg, Direction.RESPONSE);
+                        if (j == 0) {
+                            firstReadLatch.countDown();
+                        }
                         assertThat(r.isSuccess()).isTrue();
                         JsonNode body = TestMessages.parseBody(r.message().body());
                         // Must see either v1 or v2, but the result must be consistent
@@ -239,7 +244,9 @@ class AtomicReloadTest {
 
         // Fire all readers + trigger reload mid-flight
         startLatch.countDown();
-        Thread.sleep(5); // Let some reads happen
+        assertThat(firstReadLatch.await(2, TimeUnit.SECONDS))
+                .as("at least one reader should run before reload")
+                .isTrue();
         engine.reload(java.util.List.of(specV2), null);
 
         doneLatch.await();
