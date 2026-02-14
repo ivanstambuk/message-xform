@@ -1,0 +1,23 @@
+# E2E test spec: header injection
+id: e2e-header-inject
+version: "1.0.0"
+description: "E2E test — inject X-Transformed header"
+
+input:
+  schema:
+    type: object
+
+output:
+  schema:
+    type: object
+
+headers:
+  request:
+    add:
+      X-Transformed: "true"
+      X-Transform-Version: "1.0.0"
+
+transform:
+  lang: jslt
+  expr: |
+    .

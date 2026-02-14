@@ -1,0 +1,37 @@
+# E2E test spec: rename snake_case → camelCase
+id: e2e-rename
+version: "1.0.0"
+description: "E2E test — rename snake_case fields to camelCase"
+
+input:
+  schema:
+    type: object
+    properties:
+      user_id:
+        type: string
+      first_name:
+        type: string
+      last_name:
+        type: string
+      email_address:
+        type: string
+
+output:
+  schema:
+    type: object
+    properties:
+      userId:
+        type: string
+      displayName:
+        type: string
+      email:
+        type: string
+
+transform:
+  lang: jslt
+  expr: |
+    {
+      "userId": .user_id,
+      "displayName": .first_name + " " + .last_name,
+      "email": .email_address
+    }
