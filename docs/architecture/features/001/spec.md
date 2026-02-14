@@ -984,7 +984,7 @@ Processing order (updated — see also FR-001-10, FR-001-11):
 | Validation path | Invalid glob in `query.remove` → reject at load time |
 | Validation path | `url` block on response-direction transform → warning at load time |
 | Failure path | `path.expr` returns null or non-string → `ExpressionEvalException` |
-| Failure path | `path.expr` evaluation error → abort, keep original URL |
+| Failure path | `path.expr` evaluation error → `ExpressionEvalException` → error response (ADR-0022) |
 | Failure path | `method.when` evaluation error → abort, keep original method |
 | Source | PingAccess URL Rewrite Rules, ADR-0027 |
 
