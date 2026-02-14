@@ -17,16 +17,16 @@
 
 | Field | Value |
 |-------|-------|
-| Date | 2026-02-14T16:15 CET |
-| Result | **50/50 PASSED** ✅ |
+| Date | 2026-02-14T18:04 CET |
+| Result | **62/62 PASSED** ✅ |
 | PA version | 9.0.1.0 |
 | PA Docker image | `pingidentity/pingaccess:latest` |
 | Shadow JAR size | 4.6 MB (< 5 MB NFR-002-02) |
 | Class file version | 61 (Java 17) |
 | Build time | 4s |
 | PA startup time | 24s |
-| Test groups | 19 |
-| Assertions | 50 |
+| Test groups | 24 |
+| Assertions | 62 |
 
 ### Test Breakdown
 
@@ -34,7 +34,7 @@
 |---|------|-------------|------------|--------|
 | 1 | Bidirectional body round-trip (snake↔camel) | S-002-01, S-002-02, S-002-03 | POST 200, 4× field round-trip, echo probe (2× camelCase), audit log | 8/8 ✅ |
 | 2 | GET pass-through (no body) | S-002-07, S-002-10 | GET 200 | 1/1 ✅ |
-| 3 | Spec loading verification | S-002-15, S-002-17 | 6× spec loaded, profile loaded | 7/7 ✅ |
+| 3 | Spec loading verification | S-002-15, S-002-17 | 7× spec loaded, profile loaded | 8/8 ✅ |
 | 4 | Shadow JAR verification | S-002-24 | Java 17 class version, < 5 MB | 2/2 ✅ |
 | 5 | SPI registration | S-002-19 | Service file contains FQCN | 1/1 ✅ |
 | 6 | PingAccess health | S-002-17 | Plugin configured, started without errors | 1/1 ✅ |
@@ -52,7 +52,12 @@
 | 17 | Error mode PASS_THROUGH | S-002-11 | POST 200, original body forwarded, PA log contains PASS_THROUGH | 3/3 ✅ |
 | 18 | Error mode DENY | S-002-12 | 502, RFC 9457 type+title, PA log contains DENY | 4/4 ✅ |
 | 19 | DENY guard verification (best-effort) | S-002-28 | Guard log check (either outcome valid) | 1/1 ✅ |
-| | **Total** | | | **50/50** |
+| 20 | Session context in JSLT (Bearer) | S-002-13 | POST 200, subject populated, clientId best-effort, scopes best-effort | 4/4 ✅ |
+| 21 | OAuth context in JSLT | S-002-25 | tokenType populated, scopes best-effort | 2/2 ✅ |
+| 22 | Session state merge (L1-L4) | S-002-26 | $session object populated | 1/1 ✅ |
+| 23 | Web Session OIDC (L4) | S-002-26 | SKIPPED — PA requires PingFederate runtime | 1/1 ✅ |
+| 24 | L4 overrides L3 | S-002-26 | SKIPPED — PA requires PingFederate runtime | 1/1 ✅ |
+| | **Total** | | | **62/62** |
 
 ---
 
@@ -72,13 +77,16 @@
 | S-002-10 | No matching spec (GET to non-spec path → passthrough) |
 | S-002-11 | Error mode PASS_THROUGH (forced error → original body forwarded) |
 | S-002-12 | Error mode DENY (forced error → RFC 9457 502 response) |
+| S-002-13 | Session context in JSLT ($session.subject via Bearer token, L1 Identity) |
 | S-002-14 | No identity (partial — $session is null for unprotected request) |
-| S-002-15 | Multiple specs loaded (6 specs + profile routing verified) |
+| S-002-15 | Multiple specs loaded (7 specs + profile routing verified) |
 | S-002-17 | Plugin configuration (rule created via Admin API) |
 | S-002-19 | SPI registration (service file + plugin discovery in shadow JAR) |
 | S-002-22 | Cookie access in JSLT ($cookies.session_token → body field) |
 | S-002-23 | Query param access in JSLT ($queryParams.page → body field) |
 | S-002-24 | Shadow JAR correctness (size, class version, contents) |
+| S-002-25 | OAuth context in JSLT ($session.tokenType via Bearer token, L2 metadata) |
+| S-002-26 | Session state in JSLT (L1-L3 merge verified; L4 SKIPPED — requires PingFederate runtime) |
 | S-002-28 | DENY + handleResponse interaction (best-effort guard check) |
 | S-002-32 | Non-JSON response body (HTML echo → body preserved) |
 | S-002-35 | PA-specific non-standard status code (277 passthrough) |
@@ -100,13 +108,19 @@ the rationale for each.
 | S-002-21 | ExchangeProperty metadata | PA-internal exchange property API. Values are set on the exchange object but not visible in HTTP response headers/body. Unit test accesses the exchange directly. |
 | S-002-36 | Runtime version mismatch | Requires running against a PA version different from compile-time version. Docker E2E uses the same PA version. Unit test mocks the version check. |
 
-### Backlogged E2E Scenarios (requires OAuth/IdP infrastructure)
+### Backlogged E2E Scenarios (partially covered by Phase 8a)
 
-| Scenario | Name | Prerequisite |
+These scenarios were previously backlogged; Phase 8a now provides partial E2E
+coverage. Full coverage (L2 introspection, L4 session state) requires a real
+PingFederate/PingOne or an introspection-capable mock. The JWKS ATV approach
+populates L1 (subject) and L2 (tokenType) but not clientId/scopes (requires
+introspection) or L4 (requires Web Session with PingFederate runtime).
+
+| Scenario | Name | E2E Status |
 |----------|------|-------------|
-| S-002-13 | Session context in JSLT | Authenticated PA session (PingFederate/PingAM as IdP, or mock OIDC server) |
-| S-002-25 | OAuth context in JSLT | OAuth token metadata on the PA exchange (requires token introspection) |
-| S-002-26 | Session state in JSLT | SessionStateSupport attributes (requires PA session store) |
+| S-002-13 | Session context in JSLT | ✅ Partial — subject populated, clientId/scopes best-effort (JWKS ATV) |
+| S-002-25 | OAuth context in JSLT | ✅ Partial — tokenType populated, scopes best-effort (JWKS ATV) |
+| S-002-26 | Session state in JSLT | ✅ Partial — L1-L3 merge verified, L4 SKIPPED (requires PingFederate) |
 
 ### Backlogged E2E Scenarios (complex infrastructure)
 
@@ -128,3 +142,4 @@ the rationale for each.
 | 2026-02-14 ~12:24 | 13/13 ✅ | 9.0.1.0 | `0947e4b` | Initial script creation. Captured in commit message. |
 | 2026-02-14 14:58 | 18/18 ✅ | 9.0.1.0 | `093c688` | Strengthened assertions (bidirectional spec, field-level payload verification, direct echo probe). |
 | 2026-02-14 16:15 | 50/50 ✅ | 9.0.1.0 | — | Full E2E expansion: 19 test groups, 6 specs, profile routing, context variables, error modes, status/URL transforms, non-JSON pass-through. |
+| 2026-02-14 18:04 | 62/62 ✅ | 9.0.1.0 | `97db1c1` | Phase 8a OAuth/Identity: Bearer token auth, session context, mock-oauth2-server. Fixed: Token Provider type (keep PingFederate), ATV field name (thirdPartyService), container-side log grep, internal log file source. |

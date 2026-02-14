@@ -8,7 +8,7 @@
 | Status       | Living document                                         |
 | Last updated | 2026-02-14                                              |
 | Audience     | Developers, operators, CI/CD pipeline authors           |
-| See also     | [`pingaccess-deployment.md`](pingaccess-deployment.md) (architecture), [`pingaccess-sdk-guide.md`](../reference/pingaccess-sdk-guide.md) (SDK reference) |
+| See also     | [`pingaccess-sdk-guide.md`](../reference/pingaccess-sdk-guide.md) (SDK reference) |
 
 ---
 
@@ -31,6 +31,12 @@
 15. [Common Pitfalls & Solutions](#15-common-pitfalls--solutions)
 16. [Admin API Endpoint Reference](#16-admin-api-endpoint-reference)
 17. [Vendor Documentation](#17-vendor-documentation)
+18. [Deployment Architecture](#18-deployment-architecture)
+19. [Per-Instance Configuration](#19-per-instance-configuration)
+20. [File System Layout](#20-file-system-layout)
+21. [Deployment Patterns](#21-deployment-patterns)
+22. [Spec Hot-Reload](#22-spec-hot-reload)
+23. [Deployment FAQ](#23-deployment-faq)
 
 ---
 
@@ -1003,6 +1009,30 @@ Located in `e2e/pingaccess/specs/`:
 |-------|-----|
 | Unidirectional spec runs same JSLT on response | Use a **bidirectional spec** with separate `forward`/`reverse` expressions (§9). Unidirectional specs apply the same JSLT to both directions, which only works if the input and output JSON structures are identical. |
 
+### Pitfall: Admin API silently ignores unknown fields
+
+| Cause | Fix |
+|-------|-----|
+| PA accepts unknown JSON fields without error | Always verify field names against the live API docs at `/pa-admin-api/v3/api-docs`. E.g., the ATV uses `thirdPartyService` (not `thirdPartyServiceId`). |
+
+### Pitfall: Token Provider "Common" type requires OAS
+
+| Cause | Fix |
+|-------|-----|
+| PA 9.0's `Common` token provider type requires an OAuth Authorization Server via `/tokenProvider/oauthAuthorizationServer`, which is non-functional without real PingFederate | Keep the default `PingFederate` token provider type. Use a Third-Party Service + JWKS ATV for token validation against external OIDC providers. |
+
+### Pitfall: Plugin LOG.info not in docker logs
+
+| Cause | Fix |
+|-------|-----|
+| Plugin `LOG.info()` goes to `pingaccess.log`, not docker stdout | Use `docker exec grep -qF` inside the container instead of `docker logs`. Never capture the entire log into a shell variable — it can exceed bash argument limits. |
+
+### Pitfall: JWKS ATV doesn't populate all OAuth fields
+
+| Cause | Fix |
+|-------|-----|
+| JWKS ATV populates `subject` and `tokenType` but not `clientId`/`scopes` | These fields require introspection or a PingFederate Token Provider connection. Use best-effort assertions in E2E tests. |
+
 ---
 
 ## 16. Admin API Endpoint Reference
@@ -1085,10 +1115,8 @@ are relative to `https://<host>:9000/pa-admin-api/v3`.
 | `docs/reference/vendor/pingaccess-9.0.pdf` | Official PA 9.0 documentation | PDF |
 | `docs/reference/vendor/pingaccess-9.0.txt` | Same content, plain text (searchable) | ~49,500 lines |
 | `docs/reference/vendor/pingaccess-sdk/pingaccess-sdk-9.0.1.0.jar` | SDK JAR | 131 KB |
-| `docs/reference/pingaccess-sdk-guide.md` | Our SDK guide (~2000 lines) | Markdown |
-| `docs/research/pingaccess-docker-and-sdk.md` | Docker image research notes | Markdown |
+| `docs/reference/pingaccess-sdk-guide.md` | Our SDK guide (~3000 lines) | Markdown |
 | `docs/research/pingaccess-plugin-api.md` | Plugin API research notes | Markdown |
-| `docs/operations/pingaccess-deployment.md` | Deployment architecture guide | Markdown |
 
 ### Key Sections in the Vendor Documentation (`pingaccess-9.0.txt`)
 
@@ -1115,8 +1143,183 @@ including all request/response schemas.
 
 ---
 
+## 18. Deployment Architecture
+
+The message-xform PingAccess adapter is a **Rule plugin** deployed into PingAccess.
+PingAccess administrators bind rule instances to Applications (API endpoints) through
+the PA admin console. The plugin itself does not control *which* requests it processes —
+PingAccess decides that. The plugin only controls *what* happens to the request/response
+once PA hands it the `Exchange`.
+
+This creates a clean **two-level matching** architecture:
+
+```
+Level 1: PingAccess routing          Level 2: Engine profile matching
+─────────────────────────────        ──────────────────────────────────
+PA decides WHICH rule fires    →     Engine decides WHICH spec applies
+(Application → Site → Rules)         (profile path/method/content-type)
+```
+
+### Level 1 — PingAccess Routing (Product-Defined)
+
+PingAccess owns request routing. The admin binds rule instances to Applications.
+Key points:
+- Each Application can have **zero or more** MessageTransform rule instances.
+- Each rule instance is an **independent plugin instance** with its own configuration.
+- PA fires rules in order for every request matching the Application's context root.
+- Our plugin has **no visibility** into which Application it belongs to.
+
+### Level 2 — Engine Profile Matching (message-xform)
+
+Once PA fires our rule, the engine performs its own matching within the active
+**transform profile** using `requestPath`, `requestMethod`, and `contentType`.
+The engine uses **most-specific-wins** resolution (ADR-0006). If no profile entry
+matches, the request **passes through** untouched.
+
+---
+
+## 19. Per-Instance Configuration
+
+Each rule instance has its **own configuration**, set through the PA admin UI or
+REST API. There is no "global" configuration shared between instances.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `specsDir` | Path | `/specs` | Directory containing transform spec YAML files |
+| `profilesDir` | Path | `/profiles` | Directory containing transform profile files |
+| `activeProfile` | String | (empty) | Profile name to activate (empty = no profile) |
+| `errorMode` | Enum | `PASS_THROUGH` | Behaviour on transform failure |
+| `reloadIntervalSec` | Integer | `0` | Seconds between spec file re-reads (0 = disabled) |
+| `schemaValidation` | Enum | `LENIENT` | JSON Schema validation mode |
+| `enableJmxMetrics` | Boolean | `false` | Enable JMX MBean metrics |
+
+Each instance initializes its own `TransformEngine` during the plugin lifecycle's
+`configure()` step. Instances are **completely independent** — they don't share
+state, specs, or profiles.
+
+---
+
+## 20. File System Layout
+
+### Single-Instance Layout (Simple)
+
+```
+/opt/server/
+├── deploy/
+│   └── message-xform-adapter.jar        ← plugin JAR (shadow JAR)
+│
+├── specs/                                ← specsDir (volume mount)
+│   ├── customer-transform.yaml
+│   ├── payment-transform.yaml
+│   └── order-transform.yaml
+│
+└── profiles/                             ← profilesDir (volume mount)
+    └── api-transforms.yaml              ← active profile
+```
+
+### Multi-Instance Layout (Per-Team / Per-API)
+
+```
+/opt/server/
+├── deploy/
+│   └── message-xform-adapter.jar        ← single JAR, shared by all instances
+│
+├── specs/
+│   ├── customer/                         ← Instance A: specsDir=/specs/customer
+│   │   ├── create-customer.yaml
+│   │   └── update-customer.yaml
+│   └── payment/                          ← Instance B: specsDir=/specs/payment
+│       ├── process-payment.yaml
+│       └── refund-payment.yaml
+│
+└── profiles/
+    ├── customer-api.yaml                ← Instance A: activeProfile=customer-api
+    └── payment-api.yaml                 ← Instance B: activeProfile=payment-api
+```
+
+---
+
+## 21. Deployment Patterns
+
+### Pattern 1: Single Rule, One Profile (Simplest)
+
+One MessageTransform rule instance, bound globally or to a single Application.
+The profile handles all path matching internally.
+
+**Pros:** Simple to manage. One place for all transforms.
+**Cons:** All specs reload together. One misconfigured spec can block all others.
+
+### Pattern 2: Per-Application Rules (Recommended)
+
+Separate MessageTransform rule instances per Application. Each instance has its
+own spec directory and profile.
+
+**Pros:** Team isolation. Independent error modes. Targeted reload.
+**Cons:** More rule instances to manage.
+
+### Pattern 3: Shared Specs, Separate Profiles
+
+All instances point to the same `specsDir` but use different `activeProfile` values
+to select which specs apply.
+
+**Pros:** Single source of truth for specs. Profile controls routing.
+**Cons:** Both instances load all specs (wasted memory for unused specs).
+
+---
+
+## 22. Spec Hot-Reload
+
+When `reloadIntervalSec > 0`, the plugin periodically re-reads spec YAML files from
+disk. This enables **zero-downtime spec updates** — operators can update the volume-
+mounted files without restarting PingAccess.
+
+**Failure is safe:** If a reload fails (malformed YAML, I/O error), the previous
+valid registry stays active. No requests are affected.
+
+**Note:** Hot-reload applies to spec/profile **YAML files only** — not to the plugin
+JAR itself. Updating the JAR requires a PA restart.
+
+---
+
+## 23. Deployment FAQ
+
+**Q: Can two rule instances process the same request?**
+Yes, if the PA admin binds two MessageTransform rules to the same Application.
+They execute independently in rule-chain order (ADR-0023).
+
+**Q: What if no profile entry matches the request?**
+The engine returns `PASSTHROUGH` — the request/response goes through **completely
+untouched**.
+
+**Q: Can I use the plugin without profiles?**
+Yes. Set `activeProfile` to empty. The engine will match specs directly by their
+`match` blocks. Profiles are recommended for explicit control.
+
+**Q: Does the plugin see the original client URL or the rewritten URL?**
+The **rewritten URL** — i.e., `Request.getUri()` after any upstream rule rewrites.
+
+**Q: How do I update specs without downtime?**
+Set `reloadIntervalSec` to a value like `30`. Update the YAML files on disk.
+The plugin picks up changes at the next poll. No PA restart needed.
+
+**Q: What happens during a reload if a spec is invalid?**
+The reload fails gracefully — the previous valid registry stays active.
+
+---
+
+## See Also
+
+- [Feature 002 Spec](../architecture/features/002/spec.md) — Full functional requirements
+- [PingAccess SDK Guide](../reference/pingaccess-sdk-guide.md) — SDK class reference
+- [ADR-0023](../decisions/ADR-0023-cross-profile-routing-is-product-defined.md) — Cross-profile routing is product-defined
+- [ADR-0006](../decisions/ADR-0006-profile-match-resolution.md) — Most-specific-wins match resolution
+- [ADR-0031](../decisions/ADR-0031-pa-provided-dependencies.md) — PA-provided dependencies
+
+---
+
 ## Changelog
 
 | Date       | Change                                           |
 |------------|--------------------------------------------------|
 | 2026-02-14 | Initial version — consolidated from E2E debugging sessions |
+| 2026-02-14 | Merged `pingaccess-deployment.md` and `pingaccess-docker-and-sdk.md` into this single file |

@@ -9,7 +9,7 @@
 | Linked tasks | `docs/architecture/features/002/tasks.md` |
 | Roadmap entry | #2 – PingAccess Adapter |
 | Depends on | Feature 001 (core engine) |
-| Linked architecture | [`pingaccess-deployment.md`](../../../operations/pingaccess-deployment.md) |
+| Linked architecture | [`pingaccess-operations-guide.md`](../../../operations/pingaccess-operations-guide.md) |
 
 > Guardrail: This specification is the single normative source of truth for the feature.
 > Track questions in `docs/architecture/open-questions.md`, encode resolved answers
@@ -55,7 +55,7 @@ The adapter is a **thin bridge layer** — all transformation logic lives in
 ## Key Research
 
 - PingAccess Plugin API: `docs/research/pingaccess-plugin-api.md` (COMPLETE)
-- PingAccess Docker & SDK: `docs/research/pingaccess-docker-and-sdk.md` (COMPLETE)
+- PingAccess Docker & SDK: consolidated into `docs/operations/pingaccess-operations-guide.md`
 - PingAM Authentication API: `docs/research/pingam-authentication-api.md` (COMPLETE)
 - SDK JAR: `docs/reference/vendor/pingaccess-sdk/pingaccess-sdk-9.0.1.0.jar`
 - PingAccess SDK guide: `docs/reference/pingaccess-sdk-guide.md`
@@ -1473,9 +1473,8 @@ Client                    PingAccess                        Backend
 
 | Document | Relevance |
 |----------|-----------|
-| [`pingaccess-deployment.md`](../../../operations/pingaccess-deployment.md) | Two-level matching, per-instance config, Docker/K8s layout |
+| [`pingaccess-operations-guide.md`](../../../operations/pingaccess-operations-guide.md) | Two-level matching, per-instance config, Docker/K8s layout, Admin API gotchas |
 | `docs/research/pingaccess-plugin-api.md` | SDK research (complete) |
-| `docs/research/pingaccess-docker-and-sdk.md` | Docker + SDK samples (complete) |
 | `docs/research/pingam-authentication-api.md` | PingAM callback format (transform target) |
 | `docs/reference/pingaccess-sdk-guide.md` | SDK guide (authored from PA 9.0 docs + decompilation) |
 | `docs/reference/vendor/pingaccess-sdk/pingaccess-sdk-9.0.1.0.jar` | SDK JAR |

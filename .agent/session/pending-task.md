@@ -1,17 +1,24 @@
 # Pending Task
 
-**Focus**: E2E Test Expansion — Phase 8b or Phase 9
-**Status**: Phase 8a complete, choosing next phase
-**Next Step**: Decide whether to implement Phase 8b (Web Session OIDC, L4) or
-skip to Phase 9 (Hot-Reload). Phase 8b is higher complexity.
+**Focus**: E2E Test Expansion — Phase 9 (Hot-Reload) or Phase 8b (Web Session)
+**Status**: Phase 8a complete (62/62 passing). Ready for next phase.
+**Next Step**: Choose between Phase 9 (Hot-Reload E2E, lower risk) or Phase 8b
+(Web Session OIDC for L4 session state, higher complexity).
 
 ## Context Notes
-- mock-oauth2-server is already in Docker setup (Phase 8a) — reused by Phase 8b
-- PA Identity with Bearer token populates L1-L3 only; L4 needs Web Session cookie
-- Phase 8b requires simulating OIDC auth code flow via curl redirect chain
-- mock-oauth2-server has a debugger API that may simplify the login simulation
-- All unit tests pass (258 tests), build is green
-- E2E script syntax-checks clean (`bash -n`)
+- Phase 8a is fully operational with mock-oauth2-server + JWKS ATV approach
+- The `PingFederate` token provider type must be kept (not `Common`) — PA 9.0
+  OAS endpoint is non-functional without real PingFederate
+- PA silently ignores unknown API fields — always verify field names against
+  PA API docs, not intuition
+- PA internal log (`pingaccess.log`) can be very large — use `docker exec grep`
+  inside the container, never load into shell variables
+- clientId and scopes from $session require introspection (not JWKS ATV) —
+  these are best-effort in current E2E tests
+- User raised the question of whether configuring mock-oauth2-server to mimic
+  PingFederate responses could populate missing fields via "Common" token
+  provider type + introspection — this is a viable path but would require
+  fixing the Docker networking (PA→mock-oauth2-server issuer URL resolution)
 
 ## SDD Gaps (if any)
 - None — all checks passed in retro audit

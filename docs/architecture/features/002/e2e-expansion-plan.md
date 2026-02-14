@@ -10,9 +10,9 @@ Expand the E2E test suite from smoke-level (8 scenarios) to comprehensive
 coverage of all scenarios that exercise **live PA behavior** — things mocks
 cannot fully substitute.
 
-**Current state:** 50/50 assertions across 19 test groups covering 22 scenarios.
+**Current state:** 62/62 assertions across 24 test groups covering 25 scenarios.
 **Starting baseline:** 18/18 assertions across 8 scenarios.
-**Net additions:** 32 assertions, 11 test groups, 14 new scenarios.
+**Net additions:** 44 assertions, 16 test groups, 17 new scenarios (including Phase 8a).
 
 ---
 
@@ -468,11 +468,13 @@ Each has comprehensive unit test coverage documented in `coverage-matrix.md`.
 | Phase 5 | 8 | 37 |
 | Phase 6 | 8 | 45 |
 | Plugin discovery | 5 | 50 |
-| Phase 8 (OAuth) | 6 | 56 |
-| Phase 9 (Hot-Reload) | 6 | 62 |
-| Phase 10 (JMX) | 4 | 66 |
-| Phase 11 (Multi-Rule) | 2 | 68 |
-| **Total** | **50** | **68** |
+| Phase 8a (OAuth Bearer) | 12 | 62 |
+| Phase 8b (Web Session) | — | — (SKIPPED — requires PingFederate runtime) |
+| Phase 9 (Hot-Reload) | 6 | 68 |
+| Phase 10 (JMX) | 4 | 72 |
+| Phase 11 (Multi-Rule) | 2 | 74 |
+| **Total** | **62** | **74** |
+
 
 ---
 
@@ -486,6 +488,6 @@ Each has comprehensive unit test coverage documented in `coverage-matrix.md`.
 | Non-standard status codes (277) rejected by PA engine | **Medium** | PA SDK's `HttpStatus.forCode()` handles arbitrary codes; if rejected, document as known limitation and remove test |
 | PA skips `handleResponse()` after `Outcome.RETURN` | **Low** — DENY guard test inconclusive | Best-effort log check; unit test provides definitive coverage |
 | JSLT `$cookies`/`$queryParams` binding fails in PA runtime | **Low** | Same engine code path as unit tests; PA's cookie parsing is the only new variable |
-| Mock OIDC server token format rejected by PA Token Provider | **High** — blocks Phase 8 | Verify mock-oauth2-server's JWKS endpoint is compatible with PA's token validation. Fall back to PA's built-in test token provider if available. |
+| Mock OIDC server token format rejected by PA Token Provider | **High** — blocks Phase 8 | ✅ **Resolved:** Keep `PingFederate` type, use JWKS ATV with Third-Party Service pointing to mock-oauth2-server's JWKS endpoint. |
 | PA JVM doesn't expose JMX with custom args | **Medium** — blocks Phase 10 | PA Docker image may override JVM args. Check `JAVA_OPTS` or `PA_JVM_ARGS` env var. Fall back to JMX agent JAR injection. |
 | Multi-rule ordering non-deterministic | **Medium** — blocks Phase 11 | PA applies rules in resource-order. Verify via Admin API that Rule A precedes Rule B. |

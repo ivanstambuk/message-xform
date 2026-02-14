@@ -28,8 +28,7 @@ JSONata). Message envelope abstraction. Profile loading. Hot-reload. Error handl
 (Site-only — Agent rules cannot access body or handle responses).
 Wraps PingAccess `Exchange` (request/response) as the core `Message` record via
 `GatewayAdapter<Exchange>`. PingAccess 9.0 supports Java 21 — same toolchain as core.
-Research complete: `docs/research/pingaccess-plugin-api.md`,
-`docs/research/pingaccess-docker-and-sdk.md`.
+Research complete: `docs/research/pingaccess-plugin-api.md`.
 
 ### Feature 003 — PingGateway Adapter
 

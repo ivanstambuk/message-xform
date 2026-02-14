@@ -173,7 +173,6 @@ ADR-0035 (Version Parity)    governs ── FR-002-09, supersedes ADR-0031 §7-�
 | `docs/research/t-001-12-jslt-context-variables.md` | JSLT context variable binding approach | T-001-10 (JsltExpressionEngine), ADR-0021 |
 | `docs/research/standalone-proxy-http-server.md` | HTTP server evaluation for standalone proxy | Feature 004, ADR-0029 |
 | `docs/research/pingaccess-plugin-api.md` | PingAccess Add-on SDK, RuleInterceptor SPI, Exchange model | Feature 002 spec |
-| `docs/research/pingaccess-docker-and-sdk.md` | PingAccess Docker image, SDK samples, Java version | Feature 002 spec |
 | `docs/research/pingam-authentication-api.md` | PingAM /json/authenticate endpoint, callback format | Feature 002 scenarios |
 | `docs/reference/pingaccess-sdk-guide.md` | Standalone PingAccess 9.0 SDK reference (19 sections, 112 classes) | Feature 002 spec, all adapter implementation |
-| `docs/operations/pingaccess-deployment.md` | PA adapter deployment model: two-level matching, per-instance config, Docker/K8s layout | Feature 002 spec, ADR-0023, ADR-0006 |
+| `docs/operations/pingaccess-operations-guide.md` | PA operations, deployment architecture, Docker/K8s layout, Admin API gotchas | Feature 002 spec, ADR-0023, ADR-0006 |
