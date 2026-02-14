@@ -31,6 +31,7 @@ description: Read-only generated-code audit for architecture, concurrency, lifec
 5. **Deterministic evidence:** every finding must include reproducible evidence.
 6. **Root-cause first:** do not emit duplicate findings for the same underlying issue.
 7. **Signal provenance:** classify findings as `new`, `existing`, or `unknown`.
+8. **No speculative criticals:** `Critical` requires concrete, reproducible evidence.
 
 ---
 
@@ -124,6 +125,9 @@ Before finalizing findings:
 1. Group symptom-level signals under one root-cause finding when they share the same source.
 2. Keep one canonical finding with multiple affected locations.
 3. Avoid emitting N nearly identical findings for the same issue class.
+4. If one root cause spans multiple categories, assign:
+   - one **primary category** (owning/root cause),
+   - optional related categories list (`related: [ARCH, RES, ...]`).
 
 ### Phase 2.7 — Noise Control
 
@@ -131,6 +135,24 @@ To keep reports actionable:
 1. Merge repetitive low-severity signals into one grouped finding per check ID.
 2. Cap low-severity listing to the top 10 most actionable entries; summarize the rest.
 3. Prefer high-confidence findings over broad speculative scans.
+
+### Phase 2.8 — Prioritization Model
+
+Compute a priority score for each finding to drive the **Critical Path (Top 3)**.
+
+Scoring:
+- `SeverityWeight`: Critical=4, High=3, Medium=2, Low=1
+- `BlastRadius`: 1 (localized), 2 (module-wide), 3 (cross-module/runtime-wide)
+- `Exploitability/TriggerLikelihood`: 1 (rare/hard), 2 (plausible), 3 (easy/common)
+- `ConfidenceFactor`: HIGH=1.0, MEDIUM=0.7
+
+Formula:
+- `PriorityScore = (SeverityWeight * BlastRadius * Exploitability) * ConfidenceFactor`
+
+Rules:
+1. Sort findings by `PriorityScore` descending.
+2. If scores tie, prefer newer findings (`provenance: new`) over existing.
+3. Critical Path must contain at most 3 findings and at least 1 when any High/Critical exists.
 
 ### Phase 3 — Code Quality & Design Signals
 
@@ -452,6 +474,18 @@ Examples:
 
 `audit-reports/` is gitignored and shared with `/audit` findings.
 
+Owner assignment heuristics (default):
+
+| Path pattern | Owner |
+|--------------|-------|
+| `core/**` | `core` |
+| `adapter-standalone/**` | `adapter-standalone` |
+| `adapter-pingaccess/**` | `adapter-pingaccess` |
+| `build.gradle.kts`, `settings.gradle.kts`, `gradle/**` | `build/tooling` |
+| `AGENTS.md`, `.agent/workflows/**`, `docs/**` | `docs/process` |
+
+If ambiguous, keep owner as `unknown` and note in "Cannot Validate (Gaps)".
+
 ### Required report template
 
 ````markdown
@@ -467,6 +501,12 @@ Examples:
 - Commands executed: <explicit list>
 - Excluded paths: <explicit list>
 
+## Delta vs Previous Code Audit (Optional)
+- Previous report: `<path or none>`
+- New findings: <count>
+- Regressed findings (severity increased): <count>
+- Resolved findings (present previously, absent now): <count>
+
 ## Findings by Severity
 
 Finding ID format:
@@ -480,6 +520,7 @@ Finding ID format:
 ### Critical
 #### SEC-001 — <title>
 - Category: ARCH | CQ | CONC | LIFE | RES | API | OBS | DATA | SEC | DEP | SUP | TQ | TE | PERF
+- Related categories: [optional list]
 - Check ID: <e.g., SEC-03>
 - Location: `<path>:<line>`
 - Evidence: `<symbol/signature/command output excerpt>`
@@ -488,6 +529,9 @@ Finding ID format:
 - Recommendation: <concrete remediation path>
 - Owner: <core | adapter-standalone | adapter-pingaccess | build/tooling | docs/process>
 - Fix Cost: S | M | L
+- Blast Radius: 1 | 2 | 3
+- Exploitability/TriggerLikelihood: 1 | 2 | 3
+- Priority Score: <numeric score>
 - Confidence: HIGH | MEDIUM
 - Provenance: new | existing | unknown
 - False-positive note: <optional>
@@ -504,7 +548,7 @@ Finding ID format:
 ## Check Execution Matrix
 | Check ID | Status | Notes |
 |----------|--------|-------|
-| CQ-01 | Executed / Skipped / N/A / Timed out | <reason or short result> |
+| CQ-01 | Executed / Skipped / N/A / Timed out / Not Run | <reason or short result> |
 
 ## Cannot Validate (Gaps)
 - <check or claim that could not be validated>
