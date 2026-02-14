@@ -253,17 +253,154 @@ The existing rule has `errorMode=PASS_THROUGH`.
 | P7-04 | Document E2E coverage gap rationale for unit-only scenarios in `e2e-results.md`: S-002-16 (perf — adapter overhead not measurable through HTTP), S-002-18 (config validation — internal), S-002-20 (thread safety — controlled concurrency), S-002-21 (ExchangeProperty — PA internal), S-002-36 (version guard — needs different PA version) | ✅ |
 | P7-05 | Commit all changes: specs, profile, echo backend, test script, documentation | ✅ |
 
+### Phase 8 — OAuth/Identity E2E (S-002-13, S-002-25, S-002-26)
+
+Validates the full PA → Identity → `$session` → JSLT path with a live
+authenticated session. Requires a mock OIDC provider in Docker Compose.
+
+**Prerequisites:**
+
+- Mock OIDC server: [mock-oauth2-server](https://github.com/navikt/mock-oauth2-server)
+  (Kotlin, runs as Docker image `ghcr.io/navikt/mock-oauth2-server:latest`)
+  or [docker-oidc-server](https://github.com/Soluto/oidc-server-mock)
+- PA configured with a Token Provider validating against the mock OIDC issuer
+- PA Web Session configured for authenticated access to the test app
+- A protected PA virtualhost/app that requires authentication
+
+**Architecture:**
+
+```
+curl → PA (protected app) → [auth redirect → mock-OIDC → token] → echo backend
+```
+
+The test flow:
+1. Obtain a token from the mock OIDC server's token endpoint (client_credentials
+   or resource owner password grant)
+2. Send request to PA with `Authorization: Bearer <token>`
+3. PA validates token, populates `Identity` on the exchange
+4. Adapter's `buildSessionContext()` merges 4 layers → `$session` available in JSLT
+5. Response body contains `$session` fields for assertion
+
+| ID | Task | Scenario(s) | Est. assertions | Status |
+|----|------|-------------|:---------------:|:------:|
+| P8-01 | Add mock-oauth2-server to Docker Compose setup. Configure with a test client (`e2e-client`) and a test user (`e2e-user`, subject `bjensen`). Expose on port `8443` in the Docker network. | — | — | ⬜ |
+| P8-02 | Configure PA Token Provider: issuer URL pointing to mock-oauth2-server, JWKS endpoint for token validation. Configure PA Web Session for the E2E Test App. | — | — | ⬜ |
+| P8-03 | Create `e2e/pingaccess/specs/e2e-session.yaml` — JSLT reads `$session.subject`, `$session.clientId`, `$session.scopes`, `$session.tokenType` → embeds in output JSON. | — | — | ⬜ |
+| P8-04 | Add profile entry: `e2e-session@1.0.0` routed to `/api/session/**` (request direction). | — | — | ⬜ |
+| P8-05 | Add `obtain_token()` helper to script: calls mock-OIDC token endpoint with client_credentials grant, extracts `access_token` from JSON response. | — | — | ⬜ |
+| P8-06 | Test 20: **Session context in JSLT** — Obtain token, POST to `/api/session/test` with `Authorization: Bearer <token>`. Assert: (a) response body `subject` = `bjensen`, (b) `clientId` = `e2e-client`, (c) `scopes` is non-empty array. | S-002-13 | 3 | ⬜ |
+| P8-07 | Test 21: **OAuth context in JSLT** — Same flow as P8-06. Assert: (a) `tokenType` = `Bearer`, (b) `scopes` contains expected scope value. | S-002-25 | 2 | ⬜ |
+| P8-08 | Test 22: **Session state in JSLT** — If PA session state is populated by the mock-OIDC flow, assert a session state attribute is present. If not available via client_credentials, document as PA-configuration-dependent. | S-002-26 | 1 | ⬜ |
+
+### Phase 9 — Hot-Reload E2E (S-002-29, S-002-30, S-002-31)
+
+Validates spec hot-reload behavior by mutating spec files inside the PA
+container while it's running. Requires `reloadIntervalSec > 0` in the
+rule configuration.
+
+**Prerequisites:**
+
+- Rule configured with `reloadIntervalSec: 5` (short interval for E2E)
+- Spec directory mounted as a writable Docker volume
+- `docker exec` or `docker cp` to modify files inside the container
+
+**Architecture:**
+
+1. PA starts with existing specs (confirmed by Phase 2 log assertions)
+2. Copy a new spec file into the container's spec directory
+3. Wait for reload interval to elapse
+4. Hit the new spec's path and verify transformation applied
+5. For failure test: introduce malformed YAML, wait, verify old specs still work
+
+| ID | Task | Scenario(s) | Est. assertions | Status |
+|----|------|-------------|:---------------:|:------:|
+| P9-01 | Update rule creation JSON: set `"reloadIntervalSec": 5`. Verify existing tests still pass with reload enabled. | — | — | ⬜ |
+| P9-02 | Create `e2e/pingaccess/specs/e2e-reload-addition.yaml` — a simple passthrough spec with id `e2e-reload-addition` that adds a distinctive header (`X-Reloaded: true`). **Do not** mount this spec initially — it gets copied in at test time. | — | — | ⬜ |
+| P9-03 | Add profile entry for reload test: `e2e-reload-addition@1.0.0` routed to `/api/reload/**` (request direction). The profile is loaded at startup; the spec doesn't exist yet, so this route returns PASSTHROUGH until the spec is hot-loaded. | — | — | ⬜ |
+| P9-04 | Test 23: **Spec hot-reload success** — (a) POST to `/api/reload/test` → 200, no `X-Reloaded` header (spec not loaded yet). (b) `docker cp` `e2e-reload-addition.yaml` into the container's spec directory. (c) `sleep 7` (reload interval + margin). (d) POST to `/api/reload/test` again → assert `X-Echo-Req-X-Reloaded: true` present. (e) Check PA log for `"Reload completed"` or similar. | S-002-29 | 3 | ⬜ |
+| P9-05 | Test 24: **Spec hot-reload failure** — (a) `docker exec` to overwrite `e2e-reload-addition.yaml` with invalid YAML (`!!!bad`). (b) `sleep 7`. (c) POST to `/api/reload/test` → assert `X-Echo-Req-X-Reloaded: true` still present (previous registry retained). (d) Check PA log for reload failure warning. | S-002-30 | 2 | ⬜ |
+| P9-06 | Test 25: **Concurrent requests during reload** — While reload is in progress (after copying a modified spec), fire 5 parallel `curl` requests to `/api/transform/test`. Assert: all return 200 with valid JSON (no corruption, no 500 errors). Best-effort: exact timing of reload vs request is non-deterministic. | S-002-31 | 1 | ⬜ |
+
+### Phase 10 — JMX E2E (S-002-33, S-002-34)
+
+Validates JMX MBean registration and counter behavior via a JMX client
+connecting to the PA JVM.
+
+**Prerequisites:**
+
+- PA Docker container configured with JMX remote access:
+  `-Dcom.sun.management.jmxremote.port=9999`
+  `-Dcom.sun.management.jmxremote.authenticate=false`
+  `-Dcom.sun.management.jmxremote.ssl=false`
+- JMX port `9999` exposed from container to host
+- `jmxterm` CLI JAR downloaded for programmatic MBean queries
+  (or use `jmx_exporter` for Prometheus-format scraping)
+- Rule configured with `"enableJmxMetrics": true`
+- MBean ObjectName: `io.messagexform:type=TransformMetrics,instance=<ruleName>`
+
+**Architecture:**
+
+```
+jmxterm → PA JVM:9999 → MBeanServer → MessageTransformMetrics
+```
+
+| ID | Task | Scenario(s) | Est. assertions | Status |
+|----|------|-------------|:---------------:|:------:|
+| P10-01 | Update PA Docker run command: add JMX system properties, expose port 9999. Download `jmxterm` JAR to `e2e/tools/`. Add `jmx_query()` helper to script (runs `jmxterm` in batch mode, returns attribute value). | — | — | ⬜ |
+| P10-02 | Update rule creation JSON: set `"enableJmxMetrics": true`. | — | — | ⬜ |
+| P10-03 | Test 26: **JMX MBean registered** — Query `io.messagexform:type=TransformMetrics,instance=*` using jmxterm. Assert: (a) MBean exists, (b) `ActiveSpecCount` ≥ 1, (c) after sending a POST to `/api/transform/test`, `TotalRequestCount` ≥ 1. | S-002-33 | 3 | ⬜ |
+| P10-04 | Test 27: **JMX disabled by default** — Create a second rule with `"enableJmxMetrics": false` (or absent). Query MBeanServer for that rule's instance name. Assert: MBean does NOT exist. | S-002-34 | 1 | ⬜ |
+
+### Phase 11 — Multi-Rule Chain E2E (S-002-27)
+
+Validates that when a prior PA rule rewrites the request URI, the adapter
+sees the rewritten URI (not the original).
+
+**Prerequisites:**
+
+- Two PA rules applied to the same app in sequence
+- Rule 1: a URL rewrite rule (can be our own `e2e-url-rewrite` spec
+  applied as a first rule)
+- Rule 2: our main transform rule that reads the request path
+
+**Architecture:**
+
+```
+curl /api/chain/test → Rule 1 (rewrites to /api/chained) → Rule 2 (reads path) → echo
+```
+
+| ID | Task | Scenario(s) | Est. assertions | Status |
+|----|------|-------------|:---------------:|:------:|
+| P11-01 | PA configuration: create a second MessageTransformRule instance (Rule A) with its own spec directory containing only `e2e-url-rewrite.yaml`. Create an app + resource with Rule A applied first, Rule B (existing main rule) applied second. Both read specs from the same profile. | — | — | ⬜ |
+| P11-02 | Create `e2e/pingaccess/specs-chain/e2e-chain-rewrite.yaml` — rewrites path from `/api/chain/test` to `/api/chained`. This spec lives in Rule A's separate spec directory. | — | — | ⬜ |
+| P11-03 | Test 28: **Prior rule URI rewrite** — POST to `/api/chain/test` with JSON body. Rule A rewrites URI to `/api/chained`. Rule B's `wrapRequest()` reads `exchange.getRequest().getUri()` which should reflect `/api/chained` (after Rule A). Assert: (a) `X-Echo-Path` header shows `/api/chained`, (b) response body is valid JSON (transform succeeded on both rules). | S-002-27 | 2 | ⬜ |
+
 ---
 
-## E2E Coverage Summary (projected after completion)
+## E2E Coverage Summary (projected after all phases)
 
 | Category | Scenarios | Count |
 |----------|-----------|:-----:|
-| ✅ E2E validated | S-002-01/02/03/04/05/06/07/08/09/10/11/12/14(partial)/15/17/19/22/23/24/28(best-effort)/32/35 | 22 |
-| 🔶 Needs OAuth/IdP (backlogged) | S-002-13/25/26 | 3 |
-| 🔶 Complex E2E (backlogged) | S-002-27 (prior rule), S-002-29/30/31 (hot reload), S-002-33/34 (JMX) | 6 |
-| ❌ Unit-only (with rationale) | S-002-16 (perf), S-002-18 (config), S-002-20 (threads), S-002-21 (ExchProp), S-002-36 (version guard) | 5 |
+| ✅ E2E validated (Phases 1–7) | S-002-01/02/03/04/05/06/07/08/09/10/11/12/14(partial)/15/17/19/22/23/24/28(best-effort)/32/35 | 22 |
+| ⬜ Phase 8 (OAuth/Identity) | S-002-13/25/26 | 3 |
+| ⬜ Phase 9 (Hot-Reload) | S-002-29/30/31 | 3 |
+| ⬜ Phase 10 (JMX) | S-002-33/34 | 2 |
+| ⬜ Phase 11 (Multi-Rule) | S-002-27 | 1 |
+| ❌ Unit-only (see rationale below) | S-002-16/18/20/21/36 | 5 |
 | **Total** | | **36** |
+
+### Unit-Only Scenarios (E2E not feasible)
+
+These 5 scenarios cannot be meaningfully validated through HTTP round-trips.
+Each has comprehensive unit test coverage documented in `coverage-matrix.md`.
+
+| Scenario | Reason E2E is not feasible |
+|----------|---------------------------|
+| S-002-16 | Adapter overhead (< 10 ms) is unmeasurable through HTTP — network latency dominates |
+| S-002-18 | Config validation fires during `configure()` before engine starts — invalid config prevents PA rule creation |
+| S-002-20 | Thread safety requires deterministic per-thread assertion on 10 concurrent threads — HTTP can't isolate |
+| S-002-21 | ExchangeProperty is PA-internal API — values not visible in HTTP response |
+| S-002-36 | Version mismatch warning requires a PA version different from compile-time — single Docker image |
 
 ### Assertion Count Projection
 
@@ -276,7 +413,11 @@ The existing rule has `errorMode=PASS_THROUGH`.
 | Phase 5 | 8 | 37 |
 | Phase 6 | 8 | 45 |
 | Plugin discovery | 5 | 50 |
-| **Total** | **32** | **50** |
+| Phase 8 (OAuth) | 6 | 56 |
+| Phase 9 (Hot-Reload) | 6 | 62 |
+| Phase 10 (JMX) | 4 | 66 |
+| Phase 11 (Multi-Rule) | 2 | 68 |
+| **Total** | **50** | **68** |
 
 ---
 
@@ -290,3 +431,6 @@ The existing rule has `errorMode=PASS_THROUGH`.
 | Non-standard status codes (277) rejected by PA engine | **Medium** | PA SDK's `HttpStatus.forCode()` handles arbitrary codes; if rejected, document as known limitation and remove test |
 | PA skips `handleResponse()` after `Outcome.RETURN` | **Low** — DENY guard test inconclusive | Best-effort log check; unit test provides definitive coverage |
 | JSLT `$cookies`/`$queryParams` binding fails in PA runtime | **Low** | Same engine code path as unit tests; PA's cookie parsing is the only new variable |
+| Mock OIDC server token format rejected by PA Token Provider | **High** — blocks Phase 8 | Verify mock-oauth2-server's JWKS endpoint is compatible with PA's token validation. Fall back to PA's built-in test token provider if available. |
+| PA JVM doesn't expose JMX with custom args | **Medium** — blocks Phase 10 | PA Docker image may override JVM args. Check `JAVA_OPTS` or `PA_JVM_ARGS` env var. Fall back to JMX agent JAR injection. |
+| Multi-rule ordering non-deterministic | **Medium** — blocks Phase 11 | PA applies rules in resource-order. Verify via Admin API that Rule A precedes Rule B. |
