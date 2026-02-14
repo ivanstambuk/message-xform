@@ -3,29 +3,25 @@
 | Field | Value |
 |-------|-------|
 | Date | 2026-02-14 |
-| Focus | Documentation governance + E2E test quality |
-| Status | **Complete** |
+| Focus | E2E Test Verification + FR-002-12 completion |
+| Status | **In Progress** |
 
 ## Summary
 
-Two focused improvements:
+1. **E2E Test Verification** — Ran `scripts/pa-e2e-test.sh` against live PA
+   9.0.1.0 Docker instance. All 18/18 tests passed, including the strengthened
+   payload assertions from `da9b1da`.
 
-1. **AGENTS.md Rule 17** — Expanded from pitfalls-only to a three-tier knowledge
-   persistence model (Pitfalls → Reference Guides → Conventions). Ensures
-   operational discoveries and SDK knowledge are captured immediately in living
-   reference guides per gateway/product.
+2. **FR-002-12 Status Update** — Updated from `⬜ Deferred` to `✅ Implemented`
+   across spec.md, plan.md, and knowledge-map.md.
 
-2. **E2E test infrastructure overhaul** — Fixed a test design flaw where
-   unidirectional specs + envelope-wrapping echo backend made payload assertions
-   impossible. Now uses bidirectional spec (forward/reverse) + raw-body echo
-   backend for full round-trip payload verification.
+3. **E2E Validation Record** — Created `docs/architecture/features/002/e2e-results.md`
+   as a living document to capture structured results of each live PA E2E run.
 
 ## Commits This Session
 
-- `ea29745` docs: expand Rule 17 with three-tier knowledge persistence model
-- `da9b1da` fix(002): strengthen E2E tests with payload assertions
+- _(pending)_ docs(002): capture E2E validation — 18/18 pass, FR-002-12 complete
 
 ## Outstanding
 
-- `da9b1da` is unpushed (1 commit ahead of origin/main)
-- E2E tests need a live PA run to verify the new assertions pass
+- Commit and push the documentation updates

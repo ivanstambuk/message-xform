@@ -1037,13 +1037,13 @@ that:
    transformed responses.
 6. Tears down the Docker containers.
 
-**Note:** This script is planned for implementation **after** the adapter
-code is complete. It is listed here for traceability.
+**Validation record:** See `docs/architecture/features/002/e2e-results.md`
+for structured results of each live PA E2E run.
 
 | Aspect | Detail |
 |--------|--------|
 | Success path | `./scripts/pa-e2e-test.sh` → builds + configures PA + runs assertions + exits 0 |
-| Status | ⬜ Not yet implemented (planned, implementation deferred) |
+| Status | ✅ Implemented — 18/18 tests pass (validated 2026-02-14) |
 | Source | G-002-05 |
 
 ### FR-002-13: TransformContext Construction
@@ -1326,8 +1326,8 @@ zero configuration.
 
 ### Integration Tests
 
-- **Docker-based E2E** (FR-002-12) — deferred to post-implementation phase.
-  Script-based, runs against real PingAccess container.
+- **Docker-based E2E** (FR-002-12) — ✅ Implemented. Script-based, runs
+  against real PingAccess container. See `e2e-results.md` for validation record.
 
 ---
 

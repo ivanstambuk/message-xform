@@ -2,7 +2,7 @@
 
 _Linked specification:_ `docs/architecture/features/002/spec.md`
 _Linked tasks:_ `docs/architecture/features/002/tasks.md`
-_Status:_ Complete (all tasks implemented except FR-002-12 Docker E2E, deferred)
+_Status:_ Complete (all tasks implemented, FR-002-12 Docker E2E validated)
 _Last updated:_ 2026-02-14
 
 > Guardrail: Keep this plan traceable back to the governing spec. Reference
@@ -42,8 +42,7 @@ The PingAccess Adapter bridges the message-xform core engine into PingAccess
 - **In scope:** FR-002-01 through FR-002-11, FR-002-13, FR-002-14; all NFRs
   (NFR-002-01 through NFR-002-05); all scenarios defined in `scenarios.md`;
   SPI registration and shadow JAR packaging.
-- **Out of scope (for this implementation pass):** Docker E2E test script
-  (FR-002-12 — deferred to post-implementation, per spec). Agent deployment
+- **Out of scope (for this implementation pass):** Agent deployment
   (N-002-01). Groovy scripts (N-002-02). Async HTTP calls (N-002-03).
   Third-party metrics frameworks (N-002-05).
 
@@ -121,7 +120,7 @@ _To be completed after implementation._
 | FR-002-09 | Deployment packaging | | |
 | FR-002-10 | Gradle module setup | | |
 | FR-002-11 | Error handling | | |
-| FR-002-12 | Docker E2E test script | _(deferred)_ | _(deferred)_ |
+| FR-002-12 | Docker E2E test script | `scripts/pa-e2e-test.sh` | `e2e-results.md` — 18/18 pass (2026-02-14) |
 | FR-002-13 | TransformContext construction | | |
 | FR-002-14 | JMX observability (opt-in) | | |
 
@@ -638,8 +637,8 @@ _To be completed after implementation._
       adapter implementation.
     - _Preconditions:_ I13 complete.
     - _Steps:_
-      1. Update `roadmap.md`: F002 → `✅ Complete` (or `🔨 In Progress` if
-         FR-002-12 Docker E2E is still deferred).
+      1. Update `roadmap.md`: F002 → `✅ Complete` (FR-002-12 Docker E2E
+         validated — see `e2e-results.md`).
       2. Sync `AGENTS.md` roadmap mirror.
       3. Update `knowledge-map.md` with new source files.
       4. Update `llms.txt` with adapter source files.
@@ -647,8 +646,7 @@ _To be completed after implementation._
       6. Commit all docs changes.
     - _Requirements covered:_ Documentation sync (Rule 19).
     - _Commands:_ N/A (documentation only).
-    - _Exit:_ All docs consistent. Feature ready for Docker E2E (FR-002-12)
-      as a follow-up.
+    - _Exit:_ All docs consistent. FR-002-12 Docker E2E validated.
 
 ---
 
@@ -740,8 +738,8 @@ _To be filled during implementation._
 
 ## Follow-ups / Backlog
 
-- [ ] **FR-002-12: Docker E2E test script** — Deferred to post-implementation.
-      Script-based, runs against real PingAccess 9.0 container.
+- [x] **FR-002-12: Docker E2E test script** — ✅ Complete.
+      18/18 tests pass against PA 9.0.1.0. See `e2e-results.md`.
 - [ ] **Compressed body support** (Constraint 10) — Decompress `gzip`/`deflate`/`br`
       response bodies before JSON parsing. Requires adding `java.util.zip` handling.
 - [ ] **SessionContextFilter** — Selective `$session` field whitelisting for
