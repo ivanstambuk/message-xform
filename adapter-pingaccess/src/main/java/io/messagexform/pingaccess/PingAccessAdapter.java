@@ -86,8 +86,7 @@ class PingAccessAdapter implements GatewayAdapter<Exchange> {
         // T-002-06: statusCode = null for requests (ADR-0020)
         // T-002-18/19: session = identity merge (FR-002-06)
         SessionContext session = buildSessionContext(exchange);
-        return new Message(
-                messageBody, httpHeaders, null, requestPath, requestMethod, queryString, session);
+        return new Message(messageBody, httpHeaders, null, requestPath, requestMethod, queryString, session);
     }
 
     @Override
@@ -125,8 +124,7 @@ class PingAccessAdapter implements GatewayAdapter<Exchange> {
 
         LOG.debug("wrapResponse: {} {} -> status={}", requestMethod, requestPath, statusCode);
 
-        return new Message(
-                messageBody, httpHeaders, statusCode, requestPath, requestMethod, queryString, session);
+        return new Message(messageBody, httpHeaders, statusCode, requestPath, requestMethod, queryString, session);
     }
 
     @Override
@@ -219,7 +217,8 @@ class PingAccessAdapter implements GatewayAdapter<Exchange> {
         // Convert JsonNode → plain Java (ADR-0032: core port types are Jackson-free)
         JsonNode paAttributes = identity.getAttributes();
         if (paAttributes != null && paAttributes.isObject()) {
-            paAttributes.fields()
+            paAttributes
+                    .fields()
                     .forEachRemaining(entry -> flat.put(entry.getKey(), jsonNodeToJavaObject(entry.getValue())));
         }
 

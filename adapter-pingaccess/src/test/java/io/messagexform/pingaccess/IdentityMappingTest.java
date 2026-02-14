@@ -269,9 +269,10 @@ class IdentityMappingTest {
             when(identity.getSessionStateSupport()).thenReturn(sessionState);
             when(identity.getAttributes()).thenReturn(null);
 
-            when(sessionState.getAttributes()).thenReturn(Map.of(
-                    "authzCache", MAPPER.getNodeFactory().textNode("PERMIT"),
-                    "lastAccess", MAPPER.getNodeFactory().textNode("2026-02-14T10:00:00Z")));
+            when(sessionState.getAttributes())
+                    .thenReturn(Map.of(
+                            "authzCache", MAPPER.getNodeFactory().textNode("PERMIT"),
+                            "lastAccess", MAPPER.getNodeFactory().textNode("2026-02-14T10:00:00Z")));
 
             SessionContext session = adapter.buildSessionContext(exchange);
 
@@ -298,8 +299,8 @@ class IdentityMappingTest {
             when(identity.getSessionStateSupport()).thenReturn(sessionState);
             when(identity.getAttributes()).thenReturn(attrs);
 
-            when(sessionState.getAttributes()).thenReturn(Map.of(
-                    "subject", MAPPER.getNodeFactory().textNode("session-override")));
+            when(sessionState.getAttributes())
+                    .thenReturn(Map.of("subject", MAPPER.getNodeFactory().textNode("session-override")));
 
             SessionContext session = adapter.buildSessionContext(exchange);
 
