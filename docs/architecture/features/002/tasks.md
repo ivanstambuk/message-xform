@@ -65,17 +65,17 @@ _Last updated:_ 2026-02-15
 
 #### I2 — `wrapRequest()` mapping (FR-002-01)
 
-- [ ] **T-002-03** — Request URI split: path + query string (FR-002-01, S-002-06, S-002-27)
+- [x] **T-002-03** — Request URI split: path + query string (FR-002-01, S-002-06, S-002-27)
   _Test first:_ `PingAccessAdapterRequestTest.pathAndQueryMapping()` with URI containing `?`, multi-params, and no params.
   _Implement:_ Parse `Request.getUri()` into `requestPath` and `queryString`.
   _Verify:_ Path/query mapping tests pass.
 
-- [ ] **T-002-04** — Header mapping: single-value + multi-value normalized maps (FR-002-01, S-002-04)
+- [x] **T-002-04** — Header mapping: single-value + multi-value normalized maps (FR-002-01, S-002-04)
   _Test first:_ `PingAccessAdapterRequestTest.headerMapping()` with mixed-case and repeated headers.
   _Implement:_ Convert `Map<String, String[]>` to `HttpHeaders.ofMulti(multiMap)` (provides both single-value and multi-value views).
   _Verify:_ Header normalization and first-value semantics tests pass.
 
-- [ ] **T-002-05** — Request body read + JSON parse fallback + bodyParseFailed tracking (FR-002-01, Constraint 5, S-002-01, S-002-07, S-002-08)
+- [x] **T-002-05** — Request body read + JSON parse fallback + bodyParseFailed tracking (FR-002-01, Constraint 5, S-002-01, S-002-07, S-002-08)
   _Test first:_ `PingAccessAdapterRequestTest.bodyReadAndParseFallback()` covering:
   - `!body.isRead()` -> `body.read()` invoked.
   - `IOException`/`AccessException` from `body.read()` -> `MessageBody.empty()` + warning.
@@ -84,7 +84,7 @@ _Last updated:_ 2026-02-15
   _Implement:_ Body pre-read, parse strategy, and `bodyParseFailed` flag tracking in `wrapRequest()`.
   _Verify:_ Body fallback and flag tests pass.
 
-- [ ] **T-002-06** — Request metadata mapping: method, content-type, request status, session placeholder (FR-002-01)
+- [x] **T-002-06** — Request metadata mapping: method, content-type, request status, session placeholder (FR-002-01)
   _Test first:_ `PingAccessAdapterRequestTest.requestMetadataMapping()`.
   _Implement:_ Map `requestMethod`, `statusCode=null` and `session` placeholder (`SessionContext.empty()`).
   _Verify:_ Metadata mapping tests pass.

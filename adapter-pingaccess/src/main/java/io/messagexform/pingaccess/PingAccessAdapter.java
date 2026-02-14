@@ -32,6 +32,9 @@ class PingAccessAdapter implements GatewayAdapter<Exchange> {
 
     private static final Logger LOG = LoggerFactory.getLogger(PingAccessAdapter.class);
 
+    /** Headers excluded from diff-based application (Constraint 3). */
+    private static final Set<String> PROTECTED_HEADERS = Set.of("content-length", "transfer-encoding");
+
     private final ObjectMapper objectMapper;
 
     /**
@@ -84,8 +87,38 @@ class PingAccessAdapter implements GatewayAdapter<Exchange> {
 
     @Override
     public Message wrapResponse(Exchange exchange) {
-        // Stub — implemented in I3 (T-002-07)
-        throw new UnsupportedOperationException("wrapResponse not yet implemented");
+        bodyParseFailed = false;
+
+        Request request = exchange.getRequest();
+        Response response = exchange.getResponse();
+
+        // Request-side metadata (for profile matching on response transforms)
+        String uri = request.getUri();
+        String requestPath;
+        String queryString;
+        int qIndex = uri.indexOf('?');
+        if (qIndex >= 0) {
+            requestPath = uri.substring(0, qIndex);
+            queryString = uri.substring(qIndex + 1);
+        } else {
+            requestPath = uri;
+            queryString = null;
+        }
+        String requestMethod = request.getMethod().getName();
+
+        // Response status
+        int statusCode = response.getStatusCode();
+
+        // Response headers
+        HttpHeaders httpHeaders = mapHeaders(response.getHeaders());
+
+        // Response body (same parse strategy as request)
+        MessageBody messageBody = readAndParseBody(response.getBody());
+
+        LOG.debug("wrapResponse: {} {} -> status={}", requestMethod, requestPath, statusCode);
+
+        return new Message(
+                messageBody, httpHeaders, statusCode, requestPath, requestMethod, queryString, SessionContext.empty());
     }
 
     @Override
@@ -105,6 +138,56 @@ class PingAccessAdapter implements GatewayAdapter<Exchange> {
         return bodyParseFailed;
     }
 
+    // ── Direction-specific apply helpers (T-002-08, T-002-09, T-002-10) ──
+
+    /**
+     * Applies transformed message fields back to the request side of the exchange.
+     *
+     * @param transformed         the message after engine transformation
+     * @param exchange            the native exchange
+     * @param originalHeaderNames lowercase header names captured at wrap time
+     */
+    void applyRequestChanges(Message transformed, Exchange exchange, List<String> originalHeaderNames) {
+        Request request = exchange.getRequest();
+
+        // T-002-08: URI reconstruction (path + query)
+        String uri = transformed.queryString() != null
+                ? transformed.requestPath() + "?" + transformed.queryString()
+                : transformed.requestPath();
+        request.setUri(uri);
+
+        // T-002-08: Method
+        request.setMethod(Method.forName(transformed.requestMethod()));
+
+        // T-002-10: Body replacement
+        applyBody(transformed.body(), request, request.getHeaders());
+
+        // T-002-09: Header diff
+        applyHeaderDiff(originalHeaderNames, transformed.headers(), request.getHeaders());
+    }
+
+    /**
+     * Applies transformed message fields back to the response side of the exchange.
+     *
+     * @param transformed         the message after engine transformation
+     * @param exchange            the native exchange
+     * @param originalHeaderNames lowercase header names captured at wrap time
+     */
+    void applyResponseChanges(Message transformed, Exchange exchange, List<String> originalHeaderNames) {
+        Response response = exchange.getResponse();
+
+        // T-002-08: Status code
+        if (transformed.statusCode() != null) {
+            response.setStatus(HttpStatus.forCode(transformed.statusCode()));
+        }
+
+        // T-002-10: Body replacement
+        applyBody(transformed.body(), response, response.getHeaders());
+
+        // T-002-09: Header diff
+        applyHeaderDiff(originalHeaderNames, transformed.headers(), response.getHeaders());
+    }
+
     // ── Internal helpers ──
 
     /**
@@ -116,7 +199,7 @@ class PingAccessAdapter implements GatewayAdapter<Exchange> {
      * {@link HttpHeaders#ofMulti(Map)} which provides both single-value and
      * multi-value views (spec §FR-002-01, Header normalization pattern).
      */
-    private HttpHeaders mapHeaders(Headers paHeaders) {
+    HttpHeaders mapHeaders(Headers paHeaders) {
         List<HeaderField> fields = paHeaders.getHeaderFields();
         if (fields == null || fields.isEmpty()) {
             return HttpHeaders.empty();
@@ -129,6 +212,26 @@ class PingAccessAdapter implements GatewayAdapter<Exchange> {
             multiMap.computeIfAbsent(name, k -> new ArrayList<>()).add(value);
         }
         return HttpHeaders.ofMulti(multiMap);
+    }
+
+    /**
+     * Extracts lowercase header names from PA SDK {@link Headers} for diff
+     * computation. Called at wrap time to capture a snapshot of original
+     * header names before passing to the engine.
+     *
+     * @return list of lowercase header names (may contain duplicates from
+     *         multi-value headers, but the diff only cares about presence)
+     */
+    List<String> snapshotHeaderNames(Headers paHeaders) {
+        List<HeaderField> fields = paHeaders.getHeaderFields();
+        if (fields == null || fields.isEmpty()) {
+            return List.of();
+        }
+        Set<String> names = new LinkedHashSet<>();
+        for (HeaderField field : fields) {
+            names.add(field.getHeaderName().toString().toLowerCase(Locale.ROOT));
+        }
+        return List.copyOf(names);
     }
 
     /**
@@ -156,7 +259,7 @@ class PingAccessAdapter implements GatewayAdapter<Exchange> {
             try {
                 paBody.read();
             } catch (IOException e) {
-                LOG.warn("Failed to read request body: {}", e.getMessage(), e);
+                LOG.warn("Failed to read body: {}", e.getMessage(), e);
                 bodyParseFailed = true;
                 return MessageBody.empty();
             } catch (AccessException e) {
@@ -177,9 +280,68 @@ class PingAccessAdapter implements GatewayAdapter<Exchange> {
             objectMapper.readTree(content);
             return MessageBody.json(content);
         } catch (IOException e) {
-            LOG.warn("Request body is not valid JSON ({} bytes), using empty body: {}", content.length, e.getMessage());
+            LOG.warn("Body is not valid JSON ({} bytes), using empty body: {}", content.length, e.getMessage());
             bodyParseFailed = true;
             return MessageBody.empty();
+        }
+    }
+
+    /**
+     * Writes body bytes to a native PA message and sets Content-Type
+     * (T-002-10). Empty bodies are not written — the original body is
+     * preserved unchanged.
+     *
+     * @param body      the transformed body
+     * @param paMessage the native PA message (Request or Response, both extend
+     *                  {@code com.pingidentity.pa.sdk.http.Message})
+     * @param paHeaders the native PA headers to set Content-Type on
+     */
+    private void applyBody(MessageBody body, com.pingidentity.pa.sdk.http.Message paMessage, Headers paHeaders) {
+        if (!body.isEmpty()) {
+            paMessage.setBodyContent(body.content());
+            paHeaders.setFirstValue("Content-Type", "application/json; charset=utf-8");
+        }
+    }
+
+    /**
+     * Diff-based header application (T-002-09). Computes the diff between
+     * original header names and transformed header names, excluding
+     * protected headers ({@code content-length}, {@code transfer-encoding}).
+     *
+     * @param originalNames      lowercase original header names from wrap-time
+     *                           snapshot
+     * @param transformedHeaders the transformed headers from the engine
+     * @param paHeaders          the native PA headers to write to
+     */
+    private void applyHeaderDiff(List<String> originalNames, HttpHeaders transformedHeaders, Headers paHeaders) {
+        Map<String, String> transformedMap = transformedHeaders.toSingleValueMap();
+
+        // Filter protected headers from both sets
+        Set<String> origSet = new LinkedHashSet<>(originalNames);
+        origSet.removeAll(PROTECTED_HEADERS);
+
+        Set<String> transSet = new LinkedHashSet<>(transformedMap.keySet());
+        transSet.removeAll(PROTECTED_HEADERS);
+
+        // Headers in transformed but not in original → add (new headers)
+        for (String name : transSet) {
+            if (!origSet.contains(name)) {
+                paHeaders.add(name, transformedMap.get(name));
+            }
+        }
+
+        // Headers in both → update
+        for (String name : transSet) {
+            if (origSet.contains(name)) {
+                paHeaders.setValues(name, List.of(transformedMap.get(name)));
+            }
+        }
+
+        // Headers in original but not in transformed → remove
+        for (String name : origSet) {
+            if (!transSet.contains(name)) {
+                paHeaders.removeFields(name);
+            }
         }
     }
 }
