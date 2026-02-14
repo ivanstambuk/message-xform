@@ -86,7 +86,7 @@ e2e-pingaccess/
 - [x] P5-1: Run full Karate suite against live PA → 26/26 pass ✅
 - [x] P5-2: Karate test count: 26 scenarios, ~50+ assertions (exceeds original 44+)
 - [x] P5-3: JUnit XML report generated at `build/test-results/test/TEST-e2e.PingAccessE2ETest.xml`
-- [ ] P5-4: Update `docs/research/e2e-test-framework-research.md` status to "Migrated"
+- [x] P5-4: Update `docs/research/e2e-test-framework-research.md` status to "Migrated" ✅
 
 ### Lessons Learned
 - `callonce` leaks `configure headers` into the calling feature's scope → always reset with `configure headers = null`

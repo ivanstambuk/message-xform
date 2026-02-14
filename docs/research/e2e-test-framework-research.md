@@ -2,12 +2,16 @@
 
 ## Metadata
 
-- **Date**: 2026-02-14
+- **Date**: 2026-02-14 (updated 2026-02-15)
 - **Author**: Ivan (AI-assisted)
-- **Status**: Research — revised with script-derived requirements
+- **Status**: ✅ Migrated — Karate DSL selected and implemented (26/26 E2E tests pass)
 - **Context**: `scripts/pa-e2e-test.sh` is 1,701 lines and growing. This research
   evaluates open-source alternatives that can replace it without sacrificing any
   capability.
+- **Outcome**: Karate DSL was selected (§4.4 / §6 tertiary recommendation) for its
+  native cookie/session handling (RQ-15), multi-scope variables (RQ-14), and complex
+  JSON processing (RQ-18). See `docs/research/karate-migration-plan.md` for the
+  migration plan and results.
 
 ---
 
