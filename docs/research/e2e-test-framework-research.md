@@ -391,9 +391,12 @@ spec:
 ## 5. Requirement Coverage Matrix
 
 Legend: `✅` = native support, `⚠️` = possible with custom glue/caveats, `❌` = missing/blocking.
+Metadata rows (`Stars`, `Confidence`) are ecosystem signals, not direct capability fit.
 
-| Requirement | Venom | Runn | Hurl | Karate | Tavern | Step CI | BATS | Testkube |
+| Requirement | Venom (Go) | Runn (Go) | Hurl (Rust) | Karate (Java) | Tavern (Python) | Step CI (TypeScript) | BATS (Shell) | Testkube (Go) |
 |-------------|:-----:|:----:|:----:|:------:|:------:|:-------:|:----:|:--------:|
+| Stars (GitHub, checked 2026-02-14) | 1,178 | 606 | 18,505 | 8,784 | 1,125 | 1,837 | 5,830 | 1,558 |
+| Maturity confidence | Medium-High | Medium | High | High | Medium | Medium-Low | High | Medium-High |
 | RQ-01 Unified HTTP + shell in one suite | ✅ | ✅ | ❌ | ✅ | ⚠️ | ❌ | ✅ | ⚠️ |
 | RQ-02 Deterministic teardown/finally | ⚠️ | ✅ | ❌ | ⚠️ | ✅ | ❌ | ✅ | ✅ |
 | RQ-03 Branching and skip logic | ⚠️ | ✅ | ❌ | ✅ | ✅ | ⚠️ | ✅ | ✅ |
@@ -446,11 +449,13 @@ Why it ranks first after deep script analysis:
 3. Strong fit for chained PA provisioning + diagnostics (`RQ-01`, `RQ-05`, `RQ-09`)
 4. Latest release recency is strong (`v1.3.1`, 2026-02-14)
 5. Best non-JS fit for request/response transformation logic (`RQ-13`, `RQ-16`)
+6. Trade-off: lower community-size confidence signal than Venom/Karate/Hurl (`606` stars)
 
 ### Secondary recommendation: Venom
 
 Venom remains a strong option and may be preferred if built-in report formats
-(JUnit/TAP/HTML) are prioritized over orchestration ergonomics.
+(JUnit/TAP/HTML) and higher ecosystem confidence signal are prioritized over
+orchestration ergonomics.
 
 ### If strict Postman-style variable scopes are non-negotiable
 
