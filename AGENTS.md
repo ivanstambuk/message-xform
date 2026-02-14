@@ -462,6 +462,10 @@ only intends to build the standalone proxy. Failing to copy
 `adapter-pingaccess` or `libs/` will cause the Gradle configuration phase
 to fail inside the container.
 
+### PingAccess SDK Quirks
+See `adapter-pingaccess/PITFALLS.md` for PA SDK-specific gotchas (HeaderField
+API, ErrorHandlerConfiguration, ConfigurationBuilder, test spec requirements).
+
 ---
 
 *Created: 2026-02-07*

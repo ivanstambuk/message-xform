@@ -1,19 +1,23 @@
 # Pending Task
 
-**Focus**: Feature 002 (PingAccess Adapter) — begin implementation
-**Status**: All prerequisites cleared. F001 Phase 12 complete. F002 plan/tasks audited and fixed.
-**Next Step**: Start T-002-01 (ErrorMode enum) + T-002-02 (SchemaValidation enum)
+**Focus**: Feature 002 — PingAccess Adapter — Phase 4 (Session Context Binding)
+**Status**: Phases 1–3 complete (18 tasks). Phase 4 is next.
+**Next Step**: Implement T-002-18 (merge identity layers L1–L3 into SessionContext)
 
 ## Context Notes
-- T-001-67 (specId/specVersion on TransformResult) is committed and wired into the engine.
-  Feature 002's T-002-15 (ExchangeProperty metadata) can now proceed when reached in I4b.
-- T-001-68 (GatewayAdapter Javadoc) was already fixed in a prior audit session — closed.
-- Plan.md and tasks.md both updated with bodyParseFailed skip-guard behavior:
-  - I2: wrapRequest tracks bodyParseFailed flag
-  - I4a: handleRequest skips body JSLT expression when bodyParseFailed, still applies headers/URL
-  - T-002-05, T-002-07, T-002-20: explicit test steps for skip-guard
-- Scenario count alignment: all "36" references replaced with dynamic "all scenarios in scenarios.md"
-- Three suffixed scenarios (S-002-09b, S-002-15b, S-002-33b) added to plan tracking table
+- T-002-14 (cleanup hooks) is blocked on I8 (reload scheduler) — intentionally deferred.
+- `buildTransformContext()` accepts a `SessionContext` parameter — Phase 4 will
+  implement the identity → session merge that produces it.
+- PingAccess `Exchange.getIdentity()` returns `IdentityMappingContext` which provides
+  OAuth metadata, identity attributes, and session state. Need to decompile/javap
+  this interface to understand the full API before implementing T-002-18.
+- The coverage matrix in scenarios.md is complete for all implemented FRs.
+
+## Gotchas
+- PA SDK `HeaderField` uses `getHeaderName()` not `getName()` (see AGENTS.md pitfall)
+- `ErrorHandlerConfiguration` must be inline-implemented (config doesn't implement it)
+- Test specs need `input.schema` + `output.schema` blocks even for minimal tests
+- `ConfigurationBuilder.from()` is the pattern for `getConfigurationFields()`
 
 ## SDD Gaps
-- None. All checks passed.
+- None — all checks passed. Findings ledger was empty.
