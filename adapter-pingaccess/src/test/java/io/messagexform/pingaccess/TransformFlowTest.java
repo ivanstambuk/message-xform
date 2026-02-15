@@ -61,6 +61,7 @@ class TransformFlowTest {
         MessageTransformConfig config = new MessageTransformConfig();
         config.setSpecsDir(specsDir.toString());
         rule.configure(config);
+        rule.metrics().resetMetrics(); // Clear shared-instance counters from prior tests
         rule.setEngine(engine);
         rule.setAdapter(adapter);
 

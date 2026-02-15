@@ -1,5 +1,7 @@
 package io.messagexform.pingaccess;
 
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.LongAdder;
 
@@ -13,10 +15,30 @@ import java.util.concurrent.atomic.LongAdder;
  * Latency tracking uses {@link AtomicLong} for max/last values.
  *
  * <p>
+ * PingAccess creates multiple rule instances per configuration (one per
+ * engine/app binding). To ensure all instances share the same counters,
+ * use {@link #forInstance(String)} which returns a shared, canonical instance
+ * keyed by the rule's instance name.
+ *
+ * <p>
  * The {@code activeSpecCount} is set externally by the rule after each
  * reload/configure cycle — it is not auto-tracked.
  */
 final class MessageTransformMetrics implements MessageTransformMetricsMXBean {
+
+    /**
+     * Shared registry — all rule instances with the same name share one metrics
+     * object.
+     */
+    private static final ConcurrentMap<String, MessageTransformMetrics> REGISTRY = new ConcurrentHashMap<>();
+
+    /**
+     * Returns the canonical metrics instance for the given instance name.
+     * Creates one on first access; subsequent calls return the same object.
+     */
+    static MessageTransformMetrics forInstance(String instanceName) {
+        return REGISTRY.computeIfAbsent(instanceName, k -> new MessageTransformMetrics());
+    }
 
     // --- Transform counters ---
     private final LongAdder successCount = new LongAdder();

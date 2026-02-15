@@ -218,16 +218,19 @@ public class MessageTransformRule extends AsyncRuleInterceptorBase<MessageTransf
         }
 
         // Register JMX MBean if enabled (FR-002-14, T-002-28)
-        this.metrics = new MessageTransformMetrics();
+        // Use forInstance() — PA may create multiple rule objects for the same
+        // configuration (one per engine/app binding). All must share one
+        // metrics instance so the MBean reads the same counters they increment.
+        String instanceName = config.getName() != null ? config.getName() : "default";
+        this.metrics = MessageTransformMetrics.forInstance(instanceName);
         if (config.getEnableJmxMetrics()) {
             try {
-                String instanceName = config.getName() != null ? config.getName() : "default";
                 jmxObjectName = new ObjectName("io.messagexform:type=TransformMetrics,instance=" + instanceName);
                 MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
                 if (!mbs.isRegistered(jmxObjectName)) {
                     mbs.registerMBean(metrics, jmxObjectName);
+                    LOG.info("JMX MBean registered: {}", jmxObjectName);
                 }
-                LOG.info("JMX MBean registered: {}", jmxObjectName);
             } catch (Exception e) {
                 LOG.warn("Failed to register JMX MBean: {}", e.getMessage());
                 jmxObjectName = null;
