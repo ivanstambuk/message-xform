@@ -1,8 +1,18 @@
 version: 1
 artifacts:
+  # Shared durable storage for ignored artifacts (outside all worktrees).
+  # All bind-mounted paths below will resolve to this root.
+  shared_root: /home/ivan/dev/message-xform-shared
+
   # Canonical repository/worktree that currently contains the downloaded vendor binaries.
   # Override at runtime with MESSAGE_XFORM_ARTIFACTS_CANONICAL_ROOT when needed.
   canonical_repo_root: /home/ivan/dev/message-xform
+
+  # Relative paths that should be bind-mounted from shared_root into each worktree.
+  # Keep this list focused on durable ignored artifacts, not build caches.
+  bind_mount_paths:
+    - binaries
+    - docs/reference/vendor
 
   # Relative paths from canonical_repo_root and current repo root.
   source_subdir: binaries
