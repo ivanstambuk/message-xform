@@ -86,9 +86,13 @@ Update both `docs/architecture/roadmap.md` and the Roadmap table above when stat
     NFR tasks (performance benchmarks, CI gates). **Rule**: tasks that are not
     specific to a single feature belong here, not in feature task lists.
   - `docs/research/` — Research notes (API analysis, gateway evaluations, etc.).
+  - `artifacts/manifest.yaml` — Canonical map for ignored vendor artifacts shared across worktrees.
   - `docs/reference/pingaccess-sdk/pingaccess-sdk-9.0.1.0.jar` — SDK JAR (166 classes).
   - `binaries/pingaccess/dist/pingaccess-9.0.1/` — Extracted PingAccess 9.0.1 distribution (not committed).
   - `binaries/pingaccess/dist/pingaccess-9.0.1/sdk/` — SDK subtree (samples, apidocs).
+  - `scripts/artifacts-sync.sh` — Sync ignored artifacts from canonical repo/worktree into current worktree.
+  - `scripts/artifacts-verify.sh` — Verify required ignored artifacts are present in current worktree.
+  - `scripts/worktree-bootstrap.sh` — One-shot helper to run artifact sync + verify for a new worktree.
   - `docs/templates/` — Spec, plan, tasks, and ADR templates.
   - `docs/_current-session.md` — Session state for agent handoffs.
   - `.agent/workflows/` — Session lifecycle workflows.
@@ -301,6 +305,7 @@ See `docs/operations/quality-gate.md` for full pipeline documentation.
   2. **Only use small `WaitMsBeforeAsync` (500)** for genuinely long-running commands (E2E bootstrap, Docker operations, builds expected to exceed 10 seconds).
   3. **For backgrounded commands**: after `command_status` output shows the command completed (e.g., `BUILD SUCCESSFUL`, a shell prompt, or `Exit code: 0`), **immediately call `send_command_input` with `Terminate: true`** to kill the shell — do NOT keep polling.
   4. **Never poll `command_status` more than 3 times** for the same command. If 3 polls all show `RUNNING` with no new output, the command is likely stuck at a shell prompt — terminate it.
+- **Git worktrees + ignored artifacts** (2026-02-15): Worktrees share Git history but **not** ignored/untracked files (for example `binaries/`). New worktrees can appear "missing" vendor assets even when canonical repo has them. **Fix**: run `scripts/worktree-bootstrap.sh` (or `scripts/artifacts-sync.sh`) in each new worktree. Canonical source and required artifact entries are tracked in `artifacts/manifest.yaml`.
 
 ## Pre-Implementation Checklist (Mandatory)
 

@@ -1,0 +1,18 @@
+version: 1
+artifacts:
+  # Canonical repository/worktree that currently contains the downloaded vendor binaries.
+  # Override at runtime with MESSAGE_XFORM_ARTIFACTS_CANONICAL_ROOT when needed.
+  canonical_repo_root: /home/ivan/dev/message-xform
+
+  # Relative paths from canonical_repo_root and current repo root.
+  source_subdir: binaries
+  local_subdir: binaries
+
+  # Paths that must exist under local_subdir after sync.
+  required_entries:
+    - pingaccess
+    - pingam
+    - pingdirectory
+    - pingds
+    - pingfederate
+    - pinggateway
