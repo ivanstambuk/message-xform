@@ -754,10 +754,6 @@ identity subsystem and the transform engine.
   paths, but cannot prevent JSLT from **reading** session data.
 - In production, restrict write access to `specsDir` to authorized operators.
 
-**Future consideration:** A `SessionContextFilter` that selectively exposes
-only whitelisted `$session` fields could be added as a follow-up feature if
-multi-tenant spec authoring becomes a requirement.
-
 | Aspect | Detail |
 |--------|--------|
 | Success path | `$session.email` resolves to OIDC claim, `$session.clientId` to OAuth client, `$session.authzCache` to dynamic state |

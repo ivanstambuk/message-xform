@@ -512,18 +512,3 @@ Record key prompts, decisions, and validation commands per increment:
 - **I1:** _Pending — core API change for TransformContext injection._
 - **I2:** …
 
-## Follow-ups / Backlog
-
-- **Feature 009: Performance Infrastructure** — NFR-004-02 (passthrough overhead)
-  and NFR-004-06 (100 concurrent) are integration-level benchmarks. Consider
-  automating via ADR-0028 Layer 2 framework.
-- **Admin endpoint authentication** — `/admin/reload` has no auth in v1.
-  Future scope: API key, mTLS-only, or Kubernetes NetworkPolicy.
-- **Metrics endpoint** — Prometheus/Micrometer integration for p95 latency,
-  request count, error rate, upstream latency. Currently covered by structured
-  JSON logging.
-- **HTTP/2 upstream** — Outbound connections use HTTP/1.1 in v1. If needed,
-  JDK HttpClient supports HTTP/2 natively — minimal code change.
-- **Multi-backend routing** — Each proxy instance targets one backend. Multi-backend
-  requires product-level routing logic (e.g., path-based dispatch to different
-  upstreams).

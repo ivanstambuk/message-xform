@@ -531,21 +531,6 @@ Record key prompts, decisions, and validation commands per increment:
 - **I1:** _Pending — decisions logged when Gradle project is initialized._
 - **I2:** …
 
-## Follow-ups / Backlog
-
-- **T-001-53: TransformEngineBenchmark** (Phase 9) — Lightweight opt-in benchmark
-  verifying NFR-001-03 (< 5ms for < 50KB). Uses openauth-sim pattern: plain JUnit +
-  `assumeTrue` + `System.nanoTime()`. See ADR-0028.
-- **Feature 009: Performance Infrastructure** — JMH Gradle plugin, CI performance
-  gate, regression tracking, and cross-feature load test harness. The existing
-  `docs/operations/performance-testing.md` is seed material. See ADR-0028.
-- **Alternative engine implementations** — JOLT, jq, JSONata engine adapters.
-  SPI stubs are defined in Feature 001; actual implementations are a follow-up
-  or community contribution.
-- **Feature 004** (Standalone Proxy) — implements GatewayAdapter for HTTP.
-  Enables E2E testing with real HTTP traffic.
-- **Feature 009** (Toolchain) — formalize Gradle/formatter/CI decisions made
-  during I1 into a lightweight spec.
 
 ---
 
