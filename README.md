@@ -21,7 +21,7 @@ message-xform is a **gateway-agnostic transformation engine** that rewrites HTTP
 
 ## Two Deployment Modes
 
-### 🔀 Mode 1: Standalone Reverse Proxy
+### 🔀 Standalone Reverse Proxy
 
 Run message-xform as an **independent HTTP proxy** with zero external dependencies. Ideal for:
 
@@ -47,7 +47,7 @@ docker run -v ./specs:/specs -v ./config.yaml:/config.yaml \
 java -jar message-xform-proxy.jar
 ```
 
-### 🔌 Mode 2: Gateway Plugin
+### 🔌 Gateway Plugin
 
 Embed message-xform **directly into your existing API gateway** as a native plugin, rule, or filter. The core engine runs inside the gateway's JVM — no network hop, no sidecar overhead.
 
