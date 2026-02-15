@@ -18,7 +18,7 @@ message-xform is a **gateway-agnostic transformation engine** that rewrites HTTP
 ### 🔀 Standalone Reverse Proxy
 
 <p align="center">
-  <img src="docs/images/standalone-proxy.png" alt="message-xform standalone reverse proxy — API client to proxy to backend API" width="100%">
+  <img src="docs/images/standalone-proxy.png" alt="message-xform standalone reverse proxy — API client to proxy to backend API" width="720">
 </p>
 
 Run message-xform as an **independent HTTP proxy** with zero external dependencies. Ideal for:
@@ -48,7 +48,7 @@ java -jar message-xform-proxy.jar
 ### 🔌 Gateway Plugin
 
 <p align="center">
-  <img src="docs/images/gateway-plugin.png" alt="message-xform gateway plugin — API client to gateway with embedded engine to backend API" width="100%">
+  <img src="docs/images/gateway-plugin.png" alt="message-xform gateway plugin — API client to gateway with embedded engine to backend API" width="720">
 </p>
 
 Embed message-xform **directly into your existing API gateway** as a native plugin, rule, or filter. The core engine runs inside the gateway's JVM — no network hop, no sidecar overhead.
@@ -59,24 +59,24 @@ Embed message-xform **directly into your existing API gateway** as a native plug
 |---------|-------------------|--------|
 | **Standalone Proxy** | Embedded HTTP proxy (Javalin/Jetty) | ✅ Complete |
 | **PingAccess** | Java plugin via `AsyncRuleInterceptor` SPI | ✅ Complete |
-| **PingGateway** | Java/Groovy filter chain | 🔲 Planned (Tier 2) |
-| **WSO2 API Manager** | Java extension API | 🔲 Planned (Tier 3) |
-| **Apache APISIX** | Java Plugin Runner | 🔲 Planned (Tier 3) |
-| **Kong** | Sidecar proxy (Lua ecosystem) | 🔲 Planned (Tier 4) |
-| **NGINX** | Sidecar proxy (njs/C ecosystem) | 🔲 Planned (Tier 4) |
+| **PingGateway** | Java/Groovy filter chain | 🔲 Planned |
+| **WSO2 API Manager** | Java extension API | 🔲 Planned |
+| **Apache APISIX** | Java Plugin Runner | 🔲 Planned |
+| **Kong** | Sidecar proxy (Lua ecosystem) | 🔲 Planned |
+| **NGINX** | Sidecar proxy (njs/C ecosystem) | 🔲 Planned |
 
-> **Tier 1–3** gateways support **direct Java integration** — the core engine runs natively inside the gateway.
-> **Tier 4** gateways use a **sidecar pattern** — the standalone proxy runs alongside the gateway, which proxies through it.
+> Gateways with a **Java runtime** support direct JVM integration — the core engine runs natively inside the gateway.
+> Non-Java gateways use a **sidecar pattern** — the standalone proxy runs alongside the gateway, which proxies through it.
 
 ---
 
 ## What Can It Transform?
 
 <p align="center">
-  <img src="docs/images/transform-pipeline.png" alt="message-xform transformation pipeline — body, headers, status, URL rewriting" width="100%">
+  <img src="docs/images/transform-pipeline.png" alt="message-xform transformation pipeline — body, headers, status, URL rewriting" width="720">
 </p>
 
-message-xform operates on **four dimensions** of an HTTP message:
+message-xform operates on **every layer** of an HTTP message:
 
 ### 📦 JSON Body Transformation
 
@@ -166,6 +166,15 @@ transform:
       "payload": .
     }
 ```
+
+---
+
+## Use Cases
+
+- **Legacy API migration** — rename fields, restructure nested objects, and map between old and new schemas without touching backend code
+- **API versioning** — transform v1 payloads to v2 format (and back) using bidirectional specs, enabling gradual client migration
+- **Polymorphic endpoint rectification** — decompose dispatch-style endpoints (`POST /api?action=delete`) into RESTful resources (`DELETE /api/users/{id}`) via URL rewriting and method mapping
+- **Header-based routing enrichment** — promote payload fields to headers (e.g., extract a tenant ID from the body into `X-Tenant-ID`) for downstream routing decisions
 
 ---
 
@@ -267,34 +276,6 @@ cp adapter-pingaccess/build/libs/adapter-pingaccess-*-all.jar \
 ```
 
 ---
-
-## Project Structure
-
-```
-message-xform/
-├── core/                    # Gateway-agnostic transformation engine
-│   ├── model/               # TransformSpec, TransformProfile, Message
-│   ├── engine/              # TransformEngine, TransformRegistry
-│   ├── spi/                 # ExpressionEngine, TelemetryListener
-│   └── schema/              # JSON Schema validation
-├── adapter-standalone/      # Standalone HTTP reverse proxy
-│   ├── adapter/             # GatewayAdapter SPI implementation
-│   ├── proxy/               # ProxyHandler, UpstreamClient, FileWatcher
-│   ├── config/              # YAML config loader with env var overlay
-│   └── tls/                 # TLS/mTLS configuration
-├── adapter-pingaccess/      # PingAccess 9.0 gateway plugin
-│   ├── adapter/             # GatewayAdapter + RuleInterceptor SPI
-│   ├── config/              # Plugin descriptor + SnakeYAML config
-│   └── metrics/             # JMX MBean metrics (optional)
-├── e2e-pingaccess/          # End-to-end Karate tests against live PA
-│   ├── docker-compose.yml   # PA + echo backend + mock OAuth2
-│   └── src/test/            # Karate feature files (31 scenarios)
-├── docs/                    # Specifications, ADRs, research
-│   ├── architecture/        # Feature specs, roadmap, terminology
-│   ├── decisions/           # Architecture Decision Records (36 ADRs)
-│   └── operations/          # Deployment and operations guides
-└── Dockerfile               # Multi-stage build (~100 MB image)
-```
 
 ## Tech Stack
 

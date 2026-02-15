@@ -1,18 +1,19 @@
-# Image Assets
+# Image Generation Prompts
 
 Generated infographics for the project README. Each image has its generation
 prompt stored below so it can be regenerated or refined.
+
+---
 
 ## standalone-proxy.png
 
 **Generator:** Gemini (image generation)
 **Created:** 2026-02-15
-**Replaces:** Left half of `architecture-overview.png`
 
 ### Prompt
 
 ```
-Technical infographic for an open-source project called "message-xform" — the STANDALONE REVERSE PROXY deployment mode. Clean, modern developer infographic on a white/light gray background with dark navy text and vibrant cyan, orange, and green accents.
+Technical infographic for an open-source project called "message-xform" — the STANDALONE REVERSE PROXY deployment mode. Clean, modern developer infographic on a PURE WHITE background with dark navy text and vibrant cyan, orange, and green accents. Do NOT use a dark background.
 
 A horizontal flow from left to right:
 
@@ -30,7 +31,7 @@ At the bottom: Feature badges in rounded pills: "YAML Config" · "Env Var Overri
 
 Do NOT render any layout metadata text like "left", "right", "center", "row 1", "row 2", "top", or "bottom" as visible labels in the image. These are placement instructions only.
 
-Style: Clean flat vector illustration, subtle grid pattern background, no photorealism, high contrast dark text on light background, professional GitHub README quality. Wide aspect ratio 16:7.
+Style: Clean flat vector illustration, pure white background with no patterns, no photorealism, high contrast dark text on white background, professional GitHub README quality. Wide aspect ratio 16:7.
 ```
 
 ---
@@ -39,12 +40,11 @@ Style: Clean flat vector illustration, subtle grid pattern background, no photor
 
 **Generator:** Gemini (image generation)
 **Created:** 2026-02-15
-**Replaces:** Right half of `architecture-overview.png`
 
 ### Prompt
 
 ```
-Technical infographic for an open-source project called "message-xform" — the GATEWAY PLUGIN deployment mode. Clean, modern developer infographic on a white/light gray background with dark navy text and vibrant cyan, orange, and green accents.
+Technical infographic for an open-source project called "message-xform" — the GATEWAY PLUGIN deployment mode. Clean, modern developer infographic on a PURE WHITE background with dark navy text and vibrant cyan, orange, and green accents. Do NOT use a dark background.
 
 A horizontal flow from left to right:
 
@@ -66,7 +66,7 @@ At the bottom: Feature badges in rounded pills: "Native JVM Plugin" · "Shadow J
 
 Do NOT render any layout metadata text like "left", "right", "center", "top", or "bottom" as visible labels in the image. These are placement instructions only.
 
-Style: Clean flat vector illustration, subtle grid pattern background, no photorealism, high contrast dark text on light background, professional GitHub README quality. Wide aspect ratio 16:7.
+Style: Clean flat vector illustration, pure white background with no patterns, no photorealism, high contrast dark text on white background, professional GitHub README quality. Wide aspect ratio 16:7.
 ```
 
 ---
@@ -79,38 +79,38 @@ Style: Clean flat vector illustration, subtle grid pattern background, no photor
 ### Prompt
 
 ```
-Technical infographic showing HTTP message transformation pipeline for "message-xform". White/light gray background with dark navy text and vibrant cyan, teal, and orange accents.
+Technical infographic showing the HTTP message transformation pipeline for "message-xform". PURE WHITE background with dark navy text and vibrant cyan, teal, and orange accents. Do NOT use a dark background.
 
-A horizontal flow from left to right:
+A horizontal layout with three boxes and BIDIRECTIONAL arrows (double-headed or opposing arrow pairs) between them:
 
-An HTTP request box showing:
+Left: "API Client" box showing an example HTTP message:
 - "POST /api/legacy" as the request line
 - JSON body snippet: { "legacy": { "first_name": "John" } }
 - Headers: "X-Auth-Token: abc123"
 
-Then an arrow flowing into a large glowing transformation engine box with six capability cards arranged in 2 rows of 3:
-"Payload Rewrite" with JSON curly braces icon, "Header Ops" with list icon, "Payload↔Header" with swap arrows icon, "Status Code" with numbered badge icon, "URL Rewrite" with link chain icon, "Bidirectional" with two-way arrow icon
+Center: A large glowing "message-xform Engine" box with capability cards arranged in a compact grid (2 rows of 4):
+"Payload Rewrite" · "Header Ops" · "URL Rewrite" · "Status Code"
+"Bidirectional" · "Session Context" · "Schema Validation" · "Pipeline Chaining"
 
-Then an arrow flowing out to a transformed HTTP response box showing:
+Right: "Backend API" box showing the transformed HTTP message:
 - "PUT /api/v2/users" as the request line
 - JSON body snippet: { "user": { "firstName": "John" } }
 - Headers: "Authorization: Bearer abc123"
 
-The arrows between the boxes should be stylized dotted or dashed cyan lines suggesting data flow.
+The arrows MUST be bidirectional — showing requests flowing right AND responses flowing left through the engine.
 
-A strip of feature badges at the bottom in rounded pills: "Declarative YAML" · "Pluggable Engines" · "Schema Validation" · "Zero Downtime Reload"
+Bottom strip of feature badges in rounded pills: "Declarative YAML" · "Pluggable Engines" · "Sensitive Field Redaction" · "Zero Downtime Reload"
 
-Do NOT render any layout metadata text like "left", "right", "center", "input", "output", "row 1", "row 2" as visible labels in the image. These are placement instructions only.
+Do NOT render any layout metadata text as visible labels in the image. These are placement instructions only.
 
-Style: Clean flat vector illustration, professional technical documentation quality, wide 16:7 aspect ratio, high contrast dark text on light background, subtle circuit board trace pattern in background.
+Style: Clean flat vector illustration, professional technical documentation quality, wide 16:7 aspect ratio, high contrast dark text on pure white background, no background patterns.
 ```
 
 ---
 
 ## architecture-overview.png (DEPRECATED)
 
-**Status:** Replaced by `standalone-proxy.png` + `gateway-plugin.png`
 **Created:** 2026-02-09
 
 Original combined image showing both deployment modes side by side.
-Kept for reference until the new images are generated and placed.
+Replaced by `standalone-proxy.png` + `gateway-plugin.png`.
