@@ -1,0 +1,1 @@
+../../../docs/reference/vendor/pingds-8.txt

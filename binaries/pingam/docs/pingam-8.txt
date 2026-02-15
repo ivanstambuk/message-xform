@@ -1,0 +1,1 @@
+../../../docs/reference/vendor/pingam-8.txt
