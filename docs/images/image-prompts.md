@@ -18,8 +18,10 @@ Technical infographic for an open-source project called "message-xform" — the 
 A horizontal flow from left to right:
 
 1. "API Client" box on the left (with a browser/app icon)
-2. Arrow flowing into a large, prominently glowing "message-xform Proxy" box in the center. Inside this box, show the Core Engine as a contained component with these capability labels arranged neatly: "Payload Rewrite (JSLT)" · "Header Manipulation" · "URL Rewriting" · "Status Code Mapping" · "Session Context" · "JSON Schema Validation" · "Bidirectional Transforms" · "Hot Reload"
-3. Arrow flowing out to a "Backend API" box on the right (with a server/database icon)
+2. BIDIRECTIONAL arrows (double-headed or opposing arrow pairs) connecting to a large, prominently glowing "message-xform Proxy" box in the center. Inside this box, show the Core Engine as a contained component with these capability labels arranged neatly: "Payload Rewrite (JSLT)" · "Header Manipulation" · "URL Rewriting" · "Status Code Mapping" · "Session Context" · "JSON Schema Validation" · "Bidirectional Transforms" · "Hot Reload"
+3. BIDIRECTIONAL arrows connecting to a "Backend API" box on the right (with a server/database icon)
+
+The arrows MUST show traffic flowing in BOTH directions — requests flowing right AND responses flowing left. This is a bidirectional proxy.
 
 Below the proxy box, show two rows of deployment context:
 - Row 1: Docker whale icon + Kubernetes helm icon + "Java 21" badge
@@ -49,8 +51,10 @@ Technical infographic for an open-source project called "message-xform" — the 
 A horizontal flow from left to right:
 
 1. "API Client" box on the left (with a browser/app icon)
-2. Arrow flowing into a large "API Gateway" box in the center. Inside this gateway box, show a smaller embedded "message-xform" component containing the Core Engine. The Core Engine shows capability labels: "Payload Rewrite (JSLT)" · "Header Manipulation" · "URL Rewriting" · "Status Code Mapping" · "Session Context" · "JSON Schema Validation" · "Bidirectional Transforms" · "Hot Reload". The gateway box surrounds the engine, showing that message-xform runs INSIDE the gateway's JVM — no network hop.
-3. Arrow flowing out to a "Backend API" box on the right (with a server/database icon)
+2. BIDIRECTIONAL arrows (double-headed or opposing arrow pairs) connecting to a large "API Gateway" box in the center. Inside this gateway box, show a smaller embedded "message-xform" component containing the Core Engine. The Core Engine shows capability labels: "Payload Rewrite (JSLT)" · "Header Manipulation" · "URL Rewriting" · "Status Code Mapping" · "Session Context" · "JSON Schema Validation" · "Bidirectional Transforms" · "Hot Reload". The gateway box surrounds the engine, showing that message-xform runs INSIDE the gateway's JVM — no network hop.
+3. BIDIRECTIONAL arrows connecting to a "Backend API" box on the right (with a server/database icon)
+
+The arrows MUST show traffic flowing in BOTH directions — requests flowing right AND responses flowing left through the gateway.
 
 Below the gateway box, show supported gateways in a grid with status badges:
 - "PingAccess ✅" (complete, highlighted in green)

@@ -1,79 +1,15 @@
 # message-xform
 
-**Payload & Header Transformation Engine for API Gateways**
+**Declarative HTTP Message Transformation Engine**
 
-Transform HTTP message payloads and headers declaratively — no code changes per API.
-Deploy as a **standalone reverse proxy** or embed as a **plugin** in your existing API gateway.
-
----
-
-## What is message-xform?
-
-message-xform is a **gateway-agnostic transformation engine** that rewrites HTTP request and response messages based on declarative YAML configuration. It sits between your clients and backend APIs, transforming JSON payloads, manipulating headers, rewriting URLs, and mapping status codes — all without touching application code.
-
-**The problem it solves:** API gateways often need to transform messages between different formats — legacy systems speaking one schema, modern APIs expecting another, headers that need to be promoted into payloads or vice versa. Instead of writing custom code for each gateway product, message-xform provides a **single transformation engine** that works across all of them.
-
----
-
-### 🔀 Standalone Reverse Proxy
-
-<p align="center">
-  <img src="docs/images/standalone-proxy.png" alt="message-xform standalone reverse proxy — API client to proxy to backend API" width="720">
-</p>
-
-Run message-xform as an **independent HTTP proxy** with zero external dependencies. Ideal for:
-
-- **Development & testing** — validate transforms locally before deploying to a gateway
-- **Kubernetes sidecar** — run alongside your backend in the same pod
-- **Gateway-free environments** — when you don't need a full API gateway
-
-**Key features:**
-- Docker image (~100 MB) with multi-stage build
-- Java 21 virtual threads for high-concurrency request handling
-- TLS termination (inbound + outbound) with mTLS support
-- Environment variable overrides for all configuration
-- Health (`/health`) and readiness (`/ready`) endpoints
-- Hot reload via file watcher + admin API (`POST /admin/reload`)
-- Connection pooling with configurable timeouts
-
-```bash
-# Quick start with Docker
-docker run -v ./specs:/specs -v ./config.yaml:/config.yaml \
-  -p 8080:8080 message-xform-proxy
-
-# Or run directly with Java 21
-java -jar message-xform-proxy.jar
-```
-
-### 🔌 Gateway Plugin
-
-<p align="center">
-  <img src="docs/images/gateway-plugin.png" alt="message-xform gateway plugin — API client to gateway with embedded engine to backend API" width="720">
-</p>
-
-Embed message-xform **directly into your existing API gateway** as a native plugin, rule, or filter. The core engine runs inside the gateway's JVM — no network hop, no sidecar overhead.
-
-**Supported gateways:**
-
-| Gateway | Integration Model | Status |
-|---------|-------------------|--------|
-| **Standalone Proxy** | Embedded HTTP proxy (Javalin/Jetty) | ✅ Complete |
-| **PingAccess** | Java plugin via `AsyncRuleInterceptor` SPI | ✅ Complete |
-| **PingGateway** | Java/Groovy filter chain | 🔲 Planned |
-| **WSO2 API Manager** | Java extension API | 🔲 Planned |
-| **Apache APISIX** | Java Plugin Runner | 🔲 Planned |
-| **Kong** | Sidecar proxy (Lua ecosystem) | 🔲 Planned |
-| **NGINX** | Sidecar proxy (njs/C ecosystem) | 🔲 Planned |
-
-> Gateways with a **Java runtime** support direct JVM integration — the core engine runs natively inside the gateway.
-> Non-Java gateways use a **sidecar pattern** — the standalone proxy runs alongside the gateway, which proxies through it.
+Rewrite JSON payloads, manipulate headers, map status codes, rewrite URLs, and access session context — all from YAML configuration, no code changes per API. Transformations work **across layers**: promote a payload field into a header, inject session claims into the request body, derive a URL path from body content, or any combination. Deploy as a **standalone reverse proxy** or embed as a **plugin** in your existing API gateway.
 
 ---
 
 ## What Can It Transform?
 
 <p align="center">
-  <img src="docs/images/transform-pipeline.png" alt="message-xform transformation pipeline — body, headers, status, URL rewriting" width="720">
+  <img src="docs/images/transform-pipeline.png" alt="message-xform transformation pipeline — body, headers, status, URL rewriting, session context" width="720">
 </p>
 
 message-xform operates on **every layer** of an HTTP message:
@@ -175,6 +111,63 @@ transform:
 - **API versioning** — transform v1 payloads to v2 format (and back) using bidirectional specs, enabling gradual client migration
 - **Polymorphic endpoint rectification** — decompose dispatch-style endpoints (`POST /api?action=delete`) into RESTful resources (`DELETE /api/users/{id}`) via URL rewriting and method mapping
 - **Header-based routing enrichment** — promote payload fields to headers (e.g., extract a tenant ID from the body into `X-Tenant-ID`) for downstream routing decisions
+
+---
+
+## Deployment Modes
+
+### 🔀 Standalone Reverse Proxy
+
+<p align="center">
+  <img src="docs/images/standalone-proxy.png" alt="message-xform standalone reverse proxy — API client to proxy to backend API" width="720">
+</p>
+
+Run message-xform as an **independent HTTP proxy** with zero external dependencies. Ideal for:
+
+- **Development & testing** — validate transforms locally before deploying to a gateway
+- **Kubernetes sidecar** — run alongside your backend in the same pod
+- **Gateway-free environments** — when you don't need a full API gateway
+
+**Key features:**
+- Docker image (~100 MB) with multi-stage build
+- Java 21 virtual threads for high-concurrency request handling
+- TLS termination (inbound + outbound) with mTLS support
+- Environment variable overrides for all configuration
+- Health (`/health`) and readiness (`/ready`) endpoints
+- Hot reload via file watcher + admin API (`POST /admin/reload`)
+- Connection pooling with configurable timeouts
+
+```bash
+# Quick start with Docker
+docker run -v ./specs:/specs -v ./config.yaml:/config.yaml \
+  -p 8080:8080 message-xform-proxy
+
+# Or run directly with Java 21
+java -jar message-xform-proxy.jar
+```
+
+### 🔌 Gateway Plugin
+
+<p align="center">
+  <img src="docs/images/gateway-plugin.png" alt="message-xform gateway plugin — API client to gateway with embedded engine to backend API" width="720">
+</p>
+
+Embed message-xform **directly into your existing API gateway** as a native plugin, rule, or filter. The core engine runs inside the gateway's JVM — no network hop, no sidecar overhead.
+
+**Supported gateways:**
+
+| Gateway | Integration Model | Status |
+|---------|-------------------|--------|
+| **Standalone Proxy** | Embedded HTTP proxy (Javalin/Jetty) | ✅ Complete |
+| **PingAccess** | Java plugin via `AsyncRuleInterceptor` SPI | ✅ Complete |
+| **PingGateway** | Java/Groovy filter chain | 🔲 Planned |
+| **WSO2 API Manager** | Java extension API | 🔲 Planned |
+| **Apache APISIX** | Java Plugin Runner | 🔲 Planned |
+| **Kong** | Sidecar proxy (Lua ecosystem) | 🔲 Planned |
+| **NGINX** | Sidecar proxy (njs/C ecosystem) | 🔲 Planned |
+
+> Gateways with a **Java runtime** support direct JVM integration — the core engine runs natively inside the gateway.
+> Non-Java gateways use a **sidecar pattern** — the standalone proxy runs alongside the gateway, which proxies through it.
 
 ---
 
