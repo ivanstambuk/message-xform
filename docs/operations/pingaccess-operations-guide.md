@@ -6,7 +6,7 @@
 | Field        | Value                                                   |
 |--------------|---------------------------------------------------------|
 | Status       | Living document                                         |
-| Last updated | 2026-02-14                                              |
+| Last updated | 2026-02-15                                              |
 | Audience     | Developers, operators, CI/CD pipeline authors           |
 | See also     | [`pingaccess-sdk-guide.md`](../reference/pingaccess-sdk-guide.md) (SDK reference) |
 
@@ -38,6 +38,7 @@
 22. [Spec Hot-Reload](#22-spec-hot-reload)
 23. [Deployment FAQ](#23-deployment-faq)
 24. [Rule Execution Order](#24-rule-execution-order)
+25. [OIDC / Common Token Provider Configuration](#25-oidc--common-token-provider-configuration)
 
 ---
 
@@ -947,7 +948,7 @@ docker run --network pa-e2e-net --name pa-e2e-test ...
 | `13000`   | `3000`         | PA Engine            |
 | `18080`   | `8080`         | Echo backend (direct)|
 | `18443`   | `8080`         | Mock OIDC server     |
-| `19999`   | `9999`         | JMX RMI (Phase 10)   |
+| `19999`   | `19999`        | JMX RMI (Phase 10)   |
 
 ### Enabling JMX in Docker
 
@@ -957,16 +958,131 @@ PA's `run.sh` appends `$JVM_OPTS` to the Java command separately from
 
 ```bash
 docker run -e JVM_OPTS="-Dcom.sun.management.jmxremote \
-  -Dcom.sun.management.jmxremote.port=9999 \
-  -Dcom.sun.management.jmxremote.rmi.port=9999 \
+  -Dcom.sun.management.jmxremote.port=19999 \
+  -Dcom.sun.management.jmxremote.rmi.port=19999 \
   -Dcom.sun.management.jmxremote.authenticate=false \
   -Dcom.sun.management.jmxremote.ssl=false \
   -Djava.rmi.server.hostname=localhost" \
-  -p 19999:9999 ...
+  -p 19999:19999 ...
 ```
+
+> **Critical:** The container-side JMX port **must equal** the host-mapped
+> port. JMX uses RMI, which returns the server-side port number in its
+> connection stub. If container port (9999) ≠ host port (19999), the RMI
+> stub tells the client "connect to localhost:9999" — but only port 19999
+> is Docker-mapped. Use the same port on both sides (e.g., `19999:19999`).
 
 > **Key:** Both `jmxremote.port` and `jmxremote.rmi.port` must be the same
 > to avoid RMI using a random ephemeral port, which can't be Docker-mapped.
+
+### JMX Pitfalls
+
+#### Pitfall 1 — RMI Port Mapping in Docker
+
+JMX uses a **two-phase RMI connection**: the client connects to the JMX
+registry port, which returns an RMI stub containing the *server-side* port.
+The client then opens a *second* connection to that port. If the container
+port differs from the host-mapped port, the second connection fails with
+`Connection refused`. **Always use the same port number on both sides**
+(e.g., `19999:19999`), and set both `jmxremote.port` and
+`jmxremote.rmi.port` to the same value.
+
+#### Pitfall 2 — PA Creates Multiple Rule Instances (Shared Metrics Required)
+
+PingAccess instantiates **multiple objects** per rule configuration — one per
+engine/application binding. For example, with two applications referencing
+the same rule, PA creates ~7 instances of "E2E Transform Rule":
+
+```
+INFO [ruleU4pDu9HXRSTNohp_SQ] JMX MBean registered: ...instance=E2E Transform Rule
+INFO []                         JMX MBean registered: ...instance=E2E Transform Rule  ← re-registered
+INFO []                         JMX MBean registered: ...instance=E2E Transform Rule  ← re-registered
+INFO []                         JMX MBean registered: ...instance=E2E Transform Rule  ← re-registered
+WARN [aPZ6SYHJ3iiJSRmkHC2WcQ]  Failed to register JMX MBean: ...instance=E2E Transform Rule
+INFO [0J1IpL2FuTeeKEVD5SZ3bw]  JMX MBean registered: ...instance=E2E Transform Rule  ← re-registered
+INFO []                         JMX MBean registered: ...instance=E2E Transform Rule  ← final winner
+```
+
+If each `configure()` call creates a **new** `MessageTransformMetrics`
+object:
+
+1. Instance A `configure()` → creates `metrics_A`, registers MBean → OK
+2. Instance B `configure()` → creates `metrics_B`, MBean already registered
+   → skips (or re-registers pointing to `metrics_B`)
+3. Instance C (the one that handles HTTP requests) `configure()` → creates
+   `metrics_C`, MBean points to `metrics_B`
+4. HTTP requests increment `metrics_C` via `this.metrics`, but JMX reads
+   `metrics_B` → **counters stuck at 0**
+
+**Solution:** Use a static `ConcurrentHashMap` registry keyed by instance
+name. All PA rule objects sharing the same name get the **same**
+`MessageTransformMetrics` instance:
+
+```java
+// MessageTransformMetrics.java
+private static final ConcurrentMap<String, MessageTransformMetrics> REGISTRY
+        = new ConcurrentHashMap<>();
+
+static MessageTransformMetrics forInstance(String instanceName) {
+    return REGISTRY.computeIfAbsent(instanceName, k -> new MessageTransformMetrics());
+}
+
+// MessageTransformRule.java — in configure()
+String instanceName = config.getName() != null ? config.getName() : "default";
+this.metrics = MessageTransformMetrics.forInstance(instanceName);
+```
+
+**Side effect for unit tests:** Because the registry is JVM-wide, tests
+that run in the same JVM share the same metrics instance (keyed by
+`"default"` since test configs have no name). Add
+`rule.metrics().resetMetrics()` in `@BeforeEach` to isolate test counters.
+
+#### Pitfall 3 — Wildcard MBean Queries with Multiple Rules
+
+When multiple rules have JMX enabled, querying with `instance=*` returns
+a `Set<ObjectName>`. The `iterator().next()` call picks one
+non-deterministically. If baseline and after-request reads hit
+*different* MBeans, the counter-diff assertion becomes flaky.
+
+**Solution:** Always query with the **exact** instance name:
+
+```
+# BAD — non-deterministic with 2+ JMX-enabled rules
+objectName: 'io.messagexform:type=TransformMetrics,instance=*'
+
+# GOOD — deterministic
+objectName: 'io.messagexform:type=TransformMetrics,instance=E2E Transform Rule'
+```
+
+#### Pitfall 4 — Gradle Build Cache Hides Code Changes
+
+When iterating on adapter Java code and re-running E2E tests, Gradle's
+build cache may return a stale shadow JAR even after `clean`:
+
+```
+> Task :adapter-pingaccess:shadowJar FROM-CACHE   ← stale!
+```
+
+**Solution:** Use `--no-build-cache` when debugging Java changes:
+
+```bash
+./gradlew clean :adapter-pingaccess:shadowJar --no-build-cache
+```
+
+#### Debugging Checklist
+
+When JMX counters read as 0 despite requests flowing through:
+
+1. **Check MBean exists:** `attributeName: '__exists__'` → must be `true`
+2. **Check `ActiveSpecCount`:** If non-zero, the MBean IS connected to a
+   configured instance — the issue is counter increment, not registration
+3. **Check PA logs:** Count "JMX MBean registered" lines for the target
+   instance name. Multiple lines = multiple instances = shared-metrics fix
+   needed
+4. **Check build cache:** Ensure `shadowJar` says `EXECUTED`, not
+   `FROM-CACHE` or `UP-TO-DATE` after code changes
+5. **Query exact ObjectName:** Don't use wildcards when multiple rules are
+   JMX-enabled
 
 ### Test Specs
 
@@ -1660,6 +1776,649 @@ evaluation.
 
 ---
 
+## 25. OIDC / Common Token Provider Configuration
+
+PingAccess supports two token provider types for OIDC-based authentication:
+**PingFederate** (default, tightly coupled to Ping's own OAuth server) and
+**Common** (standards-based, works with any OIDC provider). This section
+documents the Common token provider in detail, based on a hands-on spike
+that successfully integrated PA 9.0 with a third-party mock OIDC server
+(2026-02-15).
+
+### Token Provider Types
+
+| Type | Default? | Description | Use case |
+|------|:--------:|-------------|----------|
+| **PingFederate** | ✅ | PA issues proprietary requests to PingFederate for token validation and session management | Production PingFederate deployments |
+| **Common** | ❌ | Standards-based OIDC. PA uses `.well-known/openid-configuration` discovery. | Third-party OIDC providers (Keycloak, Auth0, Azure AD, custom) or E2E testing with mock servers |
+
+> **Key finding:** The token provider type is **not exposed** in the default
+> configuration. When PA boots, the `/auth/tokenProvider` endpoint returns an
+> object without a `type` field. Switching to Common requires a PUT with the
+> `issuer` field pointing to a valid OIDC discovery endpoint.
+
+### Switching to Common Token Provider
+
+```bash
+# Check current token provider
+curl -sk -u 'administrator:2Access' \
+  -H 'X-XSRF-Header: PingAccess' \
+  'https://localhost:9000/pa-admin-api/v3/auth/tokenProvider' | python3 -m json.tool
+# Default response: {"description": null, "issuer": null, "trustedCertificateGroupId": 1, ...}
+
+# Switch to Common by setting issuer to an OIDC discovery base URL
+curl -sk -u 'administrator:2Access' \
+  -H 'X-XSRF-Header: PingAccess' \
+  -H 'Content-Type: application/json' \
+  -X PUT \
+  -d '{
+    "issuer": "https://my-oidc-provider:8443/default",
+    "description": "Common OIDC provider",
+    "trustedCertificateGroupId": 2,
+    "useProxy": false,
+    "sslProtocols": [],
+    "sslCiphers": []
+  }' \
+  'https://localhost:9000/pa-admin-api/v3/auth/tokenProvider'
+```
+
+PA appends `/.well-known/openid-configuration` to the issuer URL and fetches
+the OIDC discovery document. If successful, the metadata is cached and
+available at:
+
+```bash
+curl -sk -u 'administrator:2Access' \
+  -H 'X-XSRF-Header: PingAccess' \
+  'https://localhost:9000/pa-admin-api/v3/auth/tokenProvider/metadata'
+```
+
+### Three Separate OIDC Configurations
+
+PA requires **three separate** OIDC-related configurations for Web Session apps:
+
+| Step | Endpoint | Purpose | Scope |
+|:----:|----------|---------|-------|
+| 1 | `PUT /auth/tokenProvider` | Admin-level token provider — validates tokens globally | All token validation (Bearer + Web Session) |
+| 2 | `PUT /pingfederate/runtime` | PingFederate Runtime config — **required before Web Session app creation** | Web Session OIDC flows |
+| 3 | `PUT /oidc/provider` | Application-level OIDC provider — used by Web Sessions | Web application OIDC flows only |
+
+All three must point to the **same issuer URL**. Example:
+
+```bash
+# Step 1: Token Provider (admin-level)
+curl -sk $AUTH -H 'Content-Type: application/json' -X PUT \
+  -d '{
+    "issuer": "https://my-oidc-provider:8443/default",
+    "trustedCertificateGroupId": 2
+  }' \
+  'https://localhost:9000/pa-admin-api/v3/auth/tokenProvider'
+
+# Step 2: PingFederate Runtime (REQUIRED before Web Session app creation!)
+curl -sk $AUTH -H 'Content-Type: application/json' -X PUT \
+  -d '{
+    "issuer": "https://my-oidc-provider:8443/default",
+    "trustedCertificateGroupId": 2,
+    "skipHostnameVerification": true
+  }' \
+  'https://localhost:9000/pa-admin-api/v3/pingfederate/runtime'
+
+# Step 3: OIDC Provider (application-level — separate endpoint!)
+curl -sk $AUTH -H 'Content-Type: application/json' -X PUT \
+  -d '{
+    "issuer": "https://my-oidc-provider:8443/default",
+    "description": "OIDC provider for Web Sessions",
+    "trustedCertificateGroupId": 2
+  }' \
+  'https://localhost:9000/pa-admin-api/v3/oidc/provider'
+```
+
+> **Gotcha (PingFederate Runtime):** PA will **reject** Web Session app
+> creation (`POST /applications` with `webSessionId`) if the PingFederate
+> Runtime (`/pingfederate/runtime`) has not been configured with a valid
+> issuer. The error message says "PingFederate Runtime must be configured".
+> This is true even when using the "Common" token provider type — PA still
+> validates the PingFederate Runtime endpoint before allowing Web Session apps.
+
+> **Gotcha (OIDC Provider):** If you only configure `/auth/tokenProvider`
+> but skip `/oidc/provider`, Web Session apps will redirect to PA's default
+> OIDC endpoint (which doesn't exist with the Common provider) and fail with
+> a 500 error.
+
+### Admin API PUT Pattern (GET-Modify-PUT)
+
+PA's Admin API endpoints use a **full-replacement PUT** pattern. You cannot
+send a partial payload — PA will null out any fields not included. The safe
+pattern is:
+
+1. `GET` the current configuration
+2. Modify the returned JSON
+3. `PUT` the modified JSON back
+
+```bash
+# Example: updating token provider
+current=$(curl -sk $AUTH 'https://localhost:9000/pa-admin-api/v3/auth/tokenProvider')
+updated=$(echo "$current" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+d['issuer'] = 'https://my-oidc-provider:8443/default'
+d['trustedCertificateGroupId'] = 2
+print(json.dumps(d))
+")
+curl -sk $AUTH -H 'Content-Type: application/json' -X PUT \
+  -d "$updated" \
+  'https://localhost:9000/pa-admin-api/v3/auth/tokenProvider'
+```
+
+> **Gotcha:** Sending a minimal payload (e.g., only `{"issuer": "..."}`) to
+> a PUT endpoint may return 200 but silently null out other fields (SSL
+> settings, DPoP config, etc.). Always GET first, modify, then PUT.
+
+### OIDC Discovery Requirements
+
+PA enforces strict requirements on the `.well-known/openid-configuration`
+response. The following fields are **mandatory**:
+
+| Field | PA requirement | Typical mock-server gap |
+|-------|---------------|------------------------|
+| `issuer` | Must match the configured issuer URL exactly | ✅ Usually correct |
+| `authorization_endpoint` | Must be present | ✅ Usually correct |
+| `token_endpoint` | Must be present | ✅ Usually correct |
+| `jwks_uri` | Must be present | ✅ Usually correct |
+| `end_session_endpoint` | Must be present | ✅ Usually correct |
+| `ping_end_session_endpoint` | **Must be present** — PingFederate-specific extension field. PA's runtime validation checks for this field when configuring Web Sessions. | ❌ **Always missing** — this is a PingFederate extension, not part of the OIDC spec. Proxy must inject it (copy from `end_session_endpoint`). |
+| `token_endpoint_auth_methods_supported` | **Must contain at least one of:** `client_secret_basic`, `client_secret_post`, `private_key_jwt`, `tls_client_auth` | ❌ **Often empty or missing** — mock servers omit this |
+| `response_types_supported` | Must include `code` | ✅ Usually correct |
+
+If `token_endpoint_auth_methods_supported` is empty (`[]`) or missing, PA
+throws `InvalidMetadataException` with the message:
+
+```
+"The token endpoint auth methods supported for the OpenID Connect provider 
+must include support for at least one of the following authentication methods: 
+client_secret_post, private_key_jwt, tls_client_auth, client_secret_basic"
+```
+
+**Fix:** If using a mock server that omits this field, place a metadata-
+patching proxy in front (see [§25.7](#257-mock-oidc-proxy-for-e2e-testing)).
+
+### Issuer URL Matching (Critical)
+
+PA performs **strict issuer matching**: the `iss` claim in received JWTs
+(id_token, access_token) must exactly match the issuer URL configured in
+`/auth/tokenProvider`. If there is any mismatch (scheme, hostname, port,
+path), PA rejects the token silently and returns **403 Forbidden**.
+
+Common mismatch scenarios:
+
+| Configured issuer | JWT `iss` claim | Result | Root cause |
+|-------------------|-----------------|--------|------------|
+| `https://host:8443/default` | `http://host:8443/default` | ❌ 403 | Backend serves HTTP, scheme is `http://` |
+| `https://host:8443/default` | `https://internal-host:8080/default` | ❌ 403 | JWT picks up backend hostname, not public |
+| `https://host:8443/default` | `https://host:8443/default` | ✅ Works | Exact match |
+
+> **Debugging tip:** Decode the JWT payload (base64url-decode the second
+> `.`-delimited segment) and compare the `iss` field with your configured
+> issuer URL. This is the #1 cause of unexplained 403s after the token
+> exchange succeeds.
+
+### Web Session Configuration
+
+A Web Session is required for OIDC auth code flow (browser-based login).
+It tells PA how to create and manage the session cookie after a successful
+OIDC authentication.
+
+```bash
+curl -sk $AUTH -H 'Content-Type: application/json' -X POST \
+  -d '{
+    "name": "My OIDC Web Session",
+    "audience": "my-web-session",
+    "clientCredentials": {
+      "clientId": "my-client-id",
+      "clientSecret": {"value": "my-client-secret"}
+    },
+    "cookieType": "Signed",
+    "oidcLoginType": "Code",
+    "requestPreservationType": "None",
+    "sessionTimeoutInMinutes": 5,
+    "idleTimeoutInMinutes": 5,
+    "webStorageType": "SessionStorage",
+    "scopes": ["openid", "profile", "email"],
+    "sendRequestedUrlToProvider": false,
+    "enableRefreshUser": false,
+    "pkceChallengeType": "OFF",
+    "cacheUserAttributes": true,
+    "requestProfile": true
+  }' \
+  'https://localhost:9000/pa-admin-api/v3/webSessions'
+```
+
+**Key fields:**
+
+| Field | Value | Notes |
+|-------|-------|-------|
+| `oidcLoginType` | `"Code"` | Authorization Code flow (recommended) |
+| `cookieType` | `"Signed"` or `"Encrypted"` | `Signed` is simpler for debugging (JWT is readable) |
+| `pkceChallengeType` | `"OFF"`, `"SHA256"` | Set to `OFF` for mock servers that don't support PKCE |
+| `requestProfile` | `true` | Enables fetching user profile from the OIDC userinfo endpoint |
+| `clientCredentials.clientId` | String | Must match the OIDC provider's client registration |
+| `scopes` | `["openid", ...]` | Must include `openid` for OIDC compliance |
+
+> **Note:** `mock-oauth2-server` accepts **any** `client_id`/`client_secret`
+> without pre-registration. This makes it ideal for E2E testing — no client
+> setup step needed.
+
+### Web Application for OIDC
+
+A Web Session requires a **Web** application type (not API). The application
+must reference the Web Session's ID:
+
+```bash
+curl -sk $AUTH -H 'Content-Type: application/json' -X POST \
+  -d '{
+    "name": "OIDC Web App",
+    "contextRoot": "/web/session",
+    "applicationType": "Web",
+    "defaultAuthTypeOverride": "Web",
+    "spaSupportEnabled": false,
+    "destination": "Site",
+    "siteId": 1,
+    "virtualHostIds": [1],
+    "webSessionId": 1,
+    "enabled": true
+  }' \
+  'https://localhost:9000/pa-admin-api/v3/applications'
+```
+
+Then add a resource to allow traffic through:
+
+```bash
+curl -sk $AUTH -H 'Content-Type: application/json' -X POST \
+  -d '{
+    "name": "OIDC Resource",
+    "defaultAuthTypeOverride": "Inherited",
+    "methods": ["*"],
+    "pathPatterns": [{"pattern": "/*", "type": "WILDCARD"}],
+    "unprotected": false,
+    "policy": {
+      "Web": [{"type": "Rule", "id": 1}]
+    }
+  }' \
+  "https://localhost:9000/pa-admin-api/v3/applications/2/resources"
+```
+
+Note: `unprotected: false` is required for OIDC-protected resources. The Web
+Session handles authentication — setting `unprotected: true` would bypass
+the OIDC login redirect.
+
+### OIDC Auth Code Flow Through PA
+
+When a browser (or curl) hits a PA Web application protected by a Web Session
+without an existing session cookie, PA initiates the OIDC Authorization Code
+flow:
+
+```
+Step 1: Client → PA Web App (no session cookie)
+          PA returns: 302 → https://oidc-provider/authorize?
+            response_type=code
+            client_id=my-client-id
+            redirect_uri=https://pa-host:engine-port/pa/oidc/cb
+            state=<encrypted-state>
+            nonce=<random-nonce>
+            scope=openid profile email
+          + Set-Cookie: nonce.<suffix>=<nonce-value>
+
+Step 2: Client → OIDC Provider /authorize
+          Provider authenticates user (login form, auto-login, etc.)
+          Returns: 302 → https://pa-host:engine-port/pa/oidc/cb?code=<code>&state=<state>
+
+Step 3: Client → PA /pa/oidc/cb?code=<code>&state=<state>
+          (Must include the nonce cookie from Step 1!)
+          PA performs server-side:
+            POST /token → exchanges code for id_token + access_token
+            GET /jwks → validates JWT signature
+            GET /userinfo → fetches user profile
+          Returns: 302 → original URL
+          + Set-Cookie: PA.<session-name>=<signed-JWT>
+
+Step 4: Client → PA Web App (with session cookie)
+          PA validates session cookie → populates Identity (L1–L4)
+          Request/response proceeds normally through the transform rule
+```
+
+> **Critical:** Steps must be executed individually (not with `curl -L`).
+> The nonce cookie from Step 1 must be forwarded in Step 3. PA validates the
+> nonce to prevent CSRF attacks — without it, the callback returns 403.
+
+### PA Session Cookie Format
+
+After a successful OIDC login, PA issues a session cookie named
+`PA.<audience>` (e.g., `PA.my-web-session`). When `cookieType: "Signed"`,
+the cookie is a standard JWT (signed with ES256):
+
+**JWT Header:**
+```json
+{"kid": "oZDl2WxGK...", "alg": "ES256"}
+```
+
+**JWT Payload:**
+```json
+{
+  "sub": "e2e-test-user",
+  "iat": 1771160330,
+  "iss": "PingAccess",
+  "aud": "my-web-session",
+  "jti": "80f89bc5-...",
+  "exp": 1771160630,
+  "pi.pa.rat": 1771160330,
+  "access_token": "eyJra..."
+}
+```
+
+Key observations:
+- `iss` is always `"PingAccess"` (not the OIDC provider)
+- `aud` matches the Web Session's `audience` field
+- `sub` contains the user's subject from the OIDC provider
+- `access_token` is the full OIDC access token (embedded in the session JWT)
+- Session lifetime is controlled by `sessionTimeoutInMinutes`
+
+### Trusted Certificate Groups
+
+PA validates TLS certificates against Trusted Certificate Groups. The
+pre-configured groups are:
+
+| ID | Name | Behaviour |
+|----|------|-----------|
+| 1 | Trust Any (system default for token provider) | Trusts only well-known CAs |
+| 2 | Trust Any | Trusts **all** certificates (including self-signed) |
+
+For E2E testing with self-signed certificates, use `"trustedCertificateGroupId": 2`
+in both the token provider and OIDC provider configurations.
+
+### Mock OIDC Proxy for E2E Testing
+
+When using `mock-oauth2-server` (`ghcr.io/navikt/mock-oauth2-server`) as the
+OIDC provider for E2E tests, a TLS-terminating proxy is required to solve
+three issues:
+
+#### Issue 1: SSL Certificate SANs
+
+PA validates TLS certificates against the hostname in the issuer URL.
+mock-oauth2-server's auto-generated certificate has CN-only (no SANs),
+which causes `SSLPeerUnverifiedException`.
+
+**Solution:** Generate a custom PKCS12 keystore with SANs:
+
+```bash
+# Generate cert with SANs for Docker hostname, localhost, and loopback
+keytool -genkeypair \
+  -alias mock-oauth2 \
+  -keyalg RSA -keysize 2048 \
+  -storetype PKCS12 \
+  -keystore /tmp/oidc-ssl/keystore.p12 \
+  -storepass changeit \
+  -keypass changeit \
+  -dname "CN=pa-e2e-oidc" \
+  -ext "SAN=dns:pa-e2e-oidc,dns:pa-e2e-oidc-backend,dns:localhost,ip:127.0.0.1"
+
+# Extract PEM cert and key (for the Python proxy)
+openssl pkcs12 -in /tmp/oidc-ssl/keystore.p12 -nokeys -out /tmp/oidc-ssl/cert.pem -passin pass:changeit
+openssl pkcs12 -in /tmp/oidc-ssl/keystore.p12 -nocerts -nodes -out /tmp/oidc-ssl/key.pem -passin pass:changeit
+```
+
+#### Issue 2: Missing `token_endpoint_auth_methods_supported`
+
+mock-oauth2-server's `.well-known/openid-configuration` returns an empty
+array for `token_endpoint_auth_methods_supported`, which PA rejects. The
+proxy intercepts the discovery response and injects the missing field.
+
+#### Issue 3: id_token Issuer Mismatch
+
+mock-oauth2-server constructs the issuer URL from the request's scheme +
+Host header. If the backend receives HTTP requests, the `iss` claim in
+id_tokens will use `http://` instead of `https://`, causing PA to reject
+the token with a silent 403.
+
+**Solution architecture:**
+
+```
+pa-e2e-oidc (Python TLS proxy, :8443)
+  ├─ Terminates TLS (custom cert)
+  ├─ Sets Host: pa-e2e-oidc:8443 → forces correct issuer
+  ├─ Patches .well-known (injects auth methods)
+  └─ Forwards to pa-e2e-oidc-backend:8443 (HTTPS)
+
+pa-e2e-oidc-backend (mock-oauth2-server, native HTTPS :8443)
+  ├─ Uses custom PKCS12 keystore (SANs match Docker hostname)
+  └─ Issues id_tokens with iss=https://pa-e2e-oidc:8443/default
+```
+
+The backend must run with **native HTTPS** (via the custom keystore) so that
+mock-oauth2-server uses `https://` in the issuer URL. The proxy sets the
+`Host` header to the public identity so the hostname matches too.
+
+#### Proxy Implementation
+
+The proxy is a ~100-line Python script using `http.server` and `http.client`:
+
+```python
+# Key design decisions:
+# 1. Use http.client (not urllib.request) — urllib follows redirects
+#    automatically, which breaks the /authorize → /callback redirect chain
+# 2. Set Host header to public identity — forces correct iss claim in JWTs
+# 3. Connect to HTTPS backend (not HTTP) — ensures https:// scheme in iss
+# 4. Intercept .well-known responses — inject missing auth methods
+# 5. Don't follow redirects — return 302 responses as-is to the client
+
+def raw_request(method, path, body=None, headers=None):
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    conn = http.client.HTTPSConnection(backend_host, backend_port, context=ctx)
+    headers['Host'] = 'pa-e2e-oidc:8443'  # Public identity
+    conn.request(method, path, body=body, headers=headers)
+    # ... return status, headers, body without following redirects
+```
+
+#### Docker Setup
+
+```bash
+# 1. Backend: mock-oauth2-server with native HTTPS
+# Uses Spring Boot's native SERVER_SSL_* environment variables.
+# NOTE: Do NOT use JSON_CONFIG with NettyWrapper for SSL — it doesn't
+# properly bind to the configured port. Use SERVER_SSL_* env vars instead,
+# which use Spring Boot's embedded Tomcat with full SSL support.
+docker run -d --name pa-e2e-oidc-backend --network pa-e2e-net \
+  -v /tmp/oidc-ssl/keystore.p12:/tmp/oidc.p12:ro \
+  -e SERVER_SSL_ENABLED=true \
+  -e SERVER_SSL_KEY_STORE=/tmp/oidc.p12 \
+  -e SERVER_SSL_KEY_STORE_PASSWORD=changeit \
+  -e SERVER_SSL_KEY_STORE_TYPE=PKCS12 \
+  -e SERVER_PORT=8080 \
+  ghcr.io/navikt/mock-oauth2-server:latest
+
+# 2. Proxy: patches metadata + ensures correct issuer
+docker run -d --name pa-e2e-oidc --network pa-e2e-net \
+  -p 18443:8443 \
+  -v /tmp/oidc-proxy.py:/proxy.py:ro \
+  -v /tmp/oidc-ssl/cert.pem:/cert.pem:ro \
+  -v /tmp/oidc-ssl/key.pem:/key.pem:ro \
+  -e UPSTREAM=https://pa-e2e-oidc-backend:8443 \
+  -e PROXY_PORT=8443 \
+  -e PUBLIC_BASE=https://pa-e2e-oidc:8443 \
+  python:3.12-slim python /proxy.py
+```
+
+### Metadata Caching Gotcha
+
+PA caches OIDC metadata **aggressively** in the engine runtime. Once the
+engine fetches metadata from the discovery endpoint (at startup or on first
+use), it caches the result. If the metadata was invalid at the time of
+the first fetch (e.g., the proxy wasn't running yet), subsequent fixes to
+the proxy will **not** take effect until PA is restarted.
+
+#### Method 1: Programmatic Metadata Pre-Fetch (Preferred for E2E)
+
+After configuring the token provider and OIDC provider, pause briefly to
+let PA initialize, then explicitly fetch the metadata via the Admin API.
+This forces the engine to cache the discovery document before any Web
+Session request arrives:
+
+```bash
+# Wait for PA to process the config change
+sleep 3
+
+# Force metadata fetch via Admin API
+curl -sk $AUTH 'https://localhost:9000/pa-admin-api/v3/auth/tokenProvider/metadata'
+
+# If the above returns non-200, retry after a longer delay
+sleep 5
+curl -sk $AUTH 'https://localhost:9000/pa-admin-api/v3/auth/tokenProvider/metadata'
+```
+
+In Karate tests, this pattern translates to:
+
+```gherkin
+# Force PA to fetch and cache OIDC metadata
+* def pause = function(millis){ java.lang.Thread.sleep(millis) }
+* eval pause(3000)
+
+Given path '/auth/tokenProvider/metadata'
+And header Authorization = call read('classpath:e2e/helpers/basic-auth.js')
+When method GET
+* def metaStatus = responseStatus
+
+# Retry if metadata wasn't ready yet
+* if (metaStatus != 200) pause(5000)
+Given path '/auth/tokenProvider/metadata'
+When method GET
+```
+
+> **Why this matters:** Without the pre-fetch, the first Web Session
+> request triggers metadata discovery. If the OIDC proxy hasn't fully
+> started or PA hasn't processed the config change yet, the engine caches
+> an error/empty response, causing all subsequent requests to fail with 403.
+
+#### Method 2: PA Restart (Brute Force)
+
+```bash
+# Force PA to re-fetch metadata
+docker restart pa-e2e-test
+
+# Wait for readiness
+for i in $(seq 1 60); do
+  curl -sk $AUTH 'https://localhost:9000/pa-admin-api/v3/version' \
+    2>/dev/null | grep -q 'version' && break
+  sleep 1
+done
+
+# Verify metadata is correct
+curl -sk $AUTH 'https://localhost:9000/pa-admin-api/v3/auth/tokenProvider/metadata' \
+  | python3 -m json.tool
+```
+
+> **Startup order matters:** Always start the OIDC proxy before PingAccess
+> to ensure PA fetches valid metadata on its first request.
+
+### Debugging OIDC 403 Errors
+
+OIDC-related 403 errors are particularly difficult to debug because PA
+provides no error details in the HTTP response. Use this diagnostic
+procedure:
+
+```
+OIDC 403 Forbidden
+     │
+     ├─ Check engine audit log
+     │     │
+     │     ├─ "Unknown Resource Proxy" → Host header mismatch (§6)
+     │     │
+     │     ├─ App name shown, resource matched, but 403
+     │     │     │
+     │     │     ├─ Is /pa/oidc/cb in the request path?
+     │     │     │     YES → Token exchange issue (see below)
+     │     │     │     NO  → Standard 403; check resource protection (§10)
+     │     │     │
+     │     │     └─ Token exchange issue:
+     │     │           │
+     │     │           ├─ Check proxy logs for POST /token
+     │     │           │     │
+     │     │           │     ├─ Token endpoint returned 200?
+     │     │           │     │     YES → JWT validation failed
+     │     │           │     │     NO  → Client credentials wrong
+     │     │           │     │
+     │     │           │     └─ JWT validation failed:
+     │     │           │           Decode id_token (base64url 2nd segment)
+     │     │           │           Compare iss with PA's configured issuer
+     │     │           │           → MISMATCH = root cause of 403
+     │     │           │
+     │     │           └─ Check proxy logs for GET /jwks
+     │     │                 JWKS fetch failed → cert validation error
+     │     │
+     │     └─ "OIDC Authorization Response Endpoint" with 302
+     │           → SUCCESS! Check what URL it redirects to
+     │
+     └─ Check PA main log for errors
+           │
+           ├─ "InvalidMetadataException" → Missing required metadata fields
+           ├─ "SSLPeerUnverifiedException" → Certificate SAN mismatch
+           └─ "metadata is invalid" → Discovery document missing required fields
+```
+
+**Quick diagnostic commands:**
+
+```bash
+# Check engine audit for OIDC-related entries
+docker exec pa-e2e-test grep -i 'oidc\|403\|forbidden' \
+  /opt/out/instance/log/pingaccess_engine_audit.log | tail -10
+
+# Check for errors in main log
+docker exec pa-e2e-test grep 'ERROR\|metadata\|SSLPeer\|InvalidMetadata' \
+  /opt/out/instance/log/pingaccess.log | tail -10
+
+# Decode an id_token to check the issuer
+curl -sk ... | python3 -c "
+import sys, json, base64
+jwt = sys.stdin.read()
+parts = jwt.split('.')
+payload = json.loads(base64.urlsafe_b64decode(parts[1] + '=='))
+print('issuer:', payload.get('iss'))
+print('subject:', payload.get('sub'))
+"
+
+# Check what PA thinks the metadata is
+curl -sk $AUTH \
+  'https://localhost:9000/pa-admin-api/v3/auth/tokenProvider/metadata' \
+  | python3 -m json.tool
+```
+
+### OIDC-Related Admin API Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/auth/tokenProvider` | Get token provider config |
+| PUT | `/auth/tokenProvider` | Set token provider (Common/PingFederate) |
+| DELETE | `/auth/tokenProvider` | Reset to default |
+| GET | `/auth/tokenProvider/metadata` | Get cached OIDC discovery metadata |
+| GET | `/pingfederate/runtime` | Get PingFederate Runtime config |
+| PUT | `/pingfederate/runtime` | **Set PingFederate Runtime — required before Web Session app creation** |
+| GET | `/oidc/provider` | Get OIDC provider config |
+| PUT | `/oidc/provider` | Set OIDC provider for Web Sessions |
+| DELETE | `/oidc/provider` | Reset OIDC provider |
+| GET | `/oidc/provider/metadata` | Get OIDC provider metadata |
+| GET | `/oidc/provider/descriptors` | List OIDC provider plugin types |
+| GET | `/webSessions` | List web sessions |
+| POST | `/webSessions` | Create web session |
+| GET | `/webSessions/{id}` | Get web session |
+| PUT | `/webSessions/{id}` | Update web session |
+| DELETE | `/webSessions/{id}` | Delete web session |
+| GET | `/webSessionManagement/oidcLoginTypes` | List supported OIDC login types |
+| GET | `/webSessionManagement/oidcScopes` | List available OIDC scopes |
+| GET | `/auth/oidc` | Get admin OIDC auth config |
+| PUT | `/auth/oidc` | Set admin OIDC auth config |
+| GET | `/auth/oidc/scopes` | Get admin OIDC scopes |
+
+---
+
 ## See Also
 
 - [Feature 002 Spec](../architecture/features/002/spec.md) — Full functional requirements
@@ -1679,3 +2438,5 @@ evaluation.
 | 2026-02-15 | Added §24 — Rule Execution Order analysis |
 | 2026-02-15 | Expanded §21 — Profile-as-operation-router guidance, anti-pattern for multi-rule chaining, per-Resource pattern, new FAQ entries in §23 |
 | 2026-02-15 | Expanded §18 — Request/Response Lifecycle diagram, PA Object Model table, destination constraint |
+| 2026-02-15 | Added §25 — OIDC / Common Token Provider: token provider types, discovery requirements, issuer matching, Web Session config, auth code flow, session cookie format, mock-OIDC proxy architecture, metadata caching, OIDC 403 debugging, API endpoint reference |
+| 2026-02-15 | §25 major update — expanded to three OIDC configurations (added PingFederate Runtime requirement), added `ping_end_session_endpoint` to discovery requirements, fixed mock-oauth2-server HTTPS config (SERVER_SSL_* env vars, not JSON_CONFIG/NettyWrapper), added Admin API GET-modify-PUT pattern, added programmatic metadata pre-fetch for E2E tests |

@@ -135,7 +135,8 @@ examples below use PingAccess. When porting, refer to
 |-----------|-------|-----------|---------|
 | `pa-e2e-test` | `pingidentity/pingaccess:latest` | 19000 (admin), 13000 (engine), 19999 (JMX) | Gateway under test |
 | `pa-e2e-echo` | `python:3.12-alpine` | 18080 | Echo backend (shared across gateways) |
-| `pa-e2e-oidc` | `ghcr.io/navikt/mock-oauth2-server:latest` | 18443 | Mock OAuth2/OIDC (shared across gateways) |
+| `pa-e2e-oidc-backend` | `ghcr.io/navikt/mock-oauth2-server:latest` | — (internal only) | OIDC backend with native HTTPS via `SERVER_SSL_*` env vars |
+| `pa-e2e-oidc` | `python:3.12-alpine` | 18443 | TLS proxy: patches OIDC metadata (`token_endpoint_auth_methods_supported`, `ping_end_session_endpoint`), sets `Host` header for correct issuer |
 
 All containers share the `pa-e2e-net` Docker network.
 
@@ -791,6 +792,75 @@ Use flexible assertions:
 * assert s == null || (typeof s == 'object' && Object.keys(s).length == 0)
 ```
 
+#### P11: HTTP Response Header Casing Is Case-Sensitive in Karate Bracket Notation
+
+Karate's `responseHeaders['Location']` uses **case-sensitive** JavaScript
+object property access. Different servers return different casings:
+
+- PingAccess: `Location` (capital L)
+- mock-oauth2-server: `location` (lowercase l)
+- Some proxies: mixed casing
+
+Use a helper function to try both casings:
+
+```gherkin
+* def getLocation = function(hdrs){ return (hdrs['Location'] || hdrs['location'] || [null])[0] }
+
+# Then use it:
+* def redirectUrl = getLocation(responseHeaders)
+```
+
+> **Note:** Karate's `responseHeaders` has case-insensitive access via
+> **dot notation** (`responseHeaders.Location`), but this doesn't work
+> when the header name contains special characters or when accessed from
+> JavaScript expressions. Bracket notation is always case-sensitive.
+
+#### P12: mock-oauth2-server HTTPS Configuration
+
+The `ghcr.io/navikt/mock-oauth2-server` supports two HTTPS configuration
+methods. Only one works reliably for E2E testing:
+
+| Method | Env vars / Config | Works? | Issue |
+|--------|-------------------|:------:|-------|
+| `SERVER_SSL_*` env vars | `SERVER_SSL_ENABLED=true`, `SERVER_SSL_KEY_STORE=...`, `SERVER_PORT=8080` | ✅ | Uses Spring Boot's embedded Tomcat with full SSL support |
+| `JSON_CONFIG` with `NettyWrapper` | `JSON_CONFIG='{"httpServer": {"type": "NettyWrapper", "ssl": {...}}}'` | ❌ | Binds to wrong port; SSL initialization is unreliable |
+| `JSON_CONFIG` with `MockWebServerWrapper` | `JSON_CONFIG='{"httpServer": {"type": "MockWebServerWrapper", "ssl": {...}}}'` | ⚠️ | Works but ignores `SERVER_PORT`; binds to 8080 regardless |
+
+**Recommendation:** Use `SERVER_SSL_*` environment variables. Set
+`SERVER_PORT=8080` (the default) and connect to port 8080 over HTTPS.
+
+#### P13: JMX/RMI Port Mapping Through Docker
+
+JMX uses RMI (Remote Method Invocation), which has a **two-phase connection**:
+
+1. Client connects to the RMI registry at `hostname:port`
+2. The registry returns an RMI stub containing the **server-side** port number
+3. Client re-connects to `hostname:stubPort`
+
+If the container port (9999) ≠ host port (19999), the stub tells the client
+to connect to `localhost:9999`, which **doesn't exist** on the host (only
+19999 is mapped). Result: `Connection refused`.
+
+**Fix:** Use the **same** port number on both sides:
+
+```bash
+JMX_PORT=19999
+JMX_CONTAINER_PORT=19999  # Must equal JMX_PORT!
+
+# JVM args
+-Dcom.sun.management.jmxremote.port=$JMX_CONTAINER_PORT
+-Dcom.sun.management.jmxremote.rmi.port=$JMX_CONTAINER_PORT
+-Djava.rmi.server.hostname=localhost
+
+# Docker port mapping
+-p "$JMX_PORT:$JMX_CONTAINER_PORT"  # 19999:19999
+```
+
+> **Note:** `java.rmi.server.hostname=localhost` ensures RMI returns
+> `localhost` (not the container's internal hostname) in the stub. Combined
+> with matching port numbers, the client sees `localhost:19999` — exactly
+> what Docker maps.
+
 ### Known Limitations
 
 1. **No parallel test execution:** Tests modify shared gateway state (rules, apps).
@@ -803,10 +873,6 @@ Use flexible assertions:
 3. **Log inspection fragility:** `grep` against container logs is inherently
    fragile — log format changes across gateway versions. Prefer body/status
    assertions when possible.
-
-4. **Web Session/OIDC (Phase 8b):** Skipped — requires PingFederate for full L4
-   session state validation. Mock OIDC server handles JWKS/token but not the
-   complete WebSession→OIDC redirect flow PA expects.
 
 ---
 
@@ -930,6 +996,12 @@ e2e-common/
 | Tests pass but `BUILD FAILED` | Config cache warnings | Fixed by using `enabled` instead of `onlyIf` |
 | Docker teardown destroys manual infra | Marker file from earlier Gradle run | Delete `.e2e-infra-started` or use `--force` flag |
 | Gateway started but tests fail | Adapter JAR stale after code change | Run `./gradlew :adapter-<gw>:shadowJar` then restart |
+| JMX `Connection refused` | Container JMX port ≠ host-mapped port | Set `JMX_CONTAINER_PORT` = `JMX_PORT` (same value). See [P13](#p13-jmxrmi-port-mapping-through-docker) |
+| OIDC 403 on Web Session request | PingFederate Runtime not configured | `PUT /pingfederate/runtime` with OIDC issuer. See [PA Ops Guide §25](pingaccess-operations-guide.md#25-oidc--common-token-provider-configuration) |
+| OIDC metadata missing fields | Proxy not injecting required fields | Ensure proxy injects `token_endpoint_auth_methods_supported` and `ping_end_session_endpoint` |
+| JMX counters always 0 | PA creates multiple rule instances; MBean points to a different instance than the one handling requests | Use `MessageTransformMetrics.forInstance()` static registry for shared counters. See [PA Ops Guide — JMX Pitfall 2](pingaccess-operations-guide.md#pitfall-2--pa-creates-multiple-rule-instances-shared-metrics-required) |
+| JMX counter diff assertion flaky | Wildcard `instance=*` with 2+ JMX-enabled rules returns non-deterministic MBean | Query exact instance name. See [PA Ops Guide — JMX Pitfall 3](pingaccess-operations-guide.md#pitfall-3--wildcard-mbean-queries-with-multiple-rules) |
+| Code changes not reflected in E2E | Gradle build cache returns stale shadow JAR | Use `--no-build-cache`: `./gradlew clean :adapter-pingaccess:shadowJar --no-build-cache` |
 
 ---
 
@@ -956,7 +1028,7 @@ e2e-common/
 | 19000 | PA Admin API | HTTPS |
 | 13000 | PA Engine | HTTPS |
 | 18080 | Echo Backend | HTTP |
-| 18443 | Mock OIDC Server | HTTP |
+| 18443 | Mock OIDC Proxy (TLS) | HTTPS |
 | 19999 | JMX Remote | TCP |
 
 ### Dependencies
