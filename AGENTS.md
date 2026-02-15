@@ -259,6 +259,14 @@ See `docs/operations/quality-gate.md` for full pipeline documentation.
     - Create/rename/update custom skills only in `.agents/skills/<skill-name>/`.
     - Keep `.agents/` local-only via `.git/info/exclude` unless the owner explicitly asks to commit those files.
     - If asked to install globally, implement the equivalent project-scoped skill and note the policy.
+21. **Concurrent Agent Coordination Board** ⚡ **(NON-NEGOTIABLE)**: All mutating work MUST coordinate through `.agent/session/active-work.yaml`.
+    - **YAML only**: this file is machine-oriented for LLM agents, not human prose.
+    - **Active entries only**: no history, no completed section, no `done` status. Remove entries immediately when work finishes or is aborted.
+    - **Register only mutating work**: edits, generated files, config/script changes, workflow operations that modify workspace state. Read-only research MUST NOT register.
+    - **Required entry fields**: `agent`, `task_id`, `kind` (`edit` or `workflow`), `locks.paths`, `locks.resources`, `started_at`, `updated_at`, and optional `note`.
+    - **Conflict rule**: if another active entry overlaps the same file/directory lock or resource lock, wait on that scope.
+    - **Special lock**: if `workflow:retro` is active, no other mutating workflow may start until it is removed.
+    - **No busy waiting**: do not spin/poll in a loop waiting for lock release. Continue with non-conflicting work; if none exists, report blocked state and stop.
 
 ### Known Pitfalls
 

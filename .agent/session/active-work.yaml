@@ -1,0 +1,6 @@
+# Active work only.
+# Remove an entry immediately when the work completes or is aborted.
+# This file is machine-oriented for LLM agent coordination, not a history log.
+
+version: 1
+active_work: []
