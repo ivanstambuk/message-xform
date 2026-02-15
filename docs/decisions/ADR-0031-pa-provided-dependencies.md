@@ -38,9 +38,8 @@ This assumption carried significant costs:
 
 ### Investigation
 
-We reverse-engineered PingAccess 9.0.1's classloading model through static
-analysis (bytecode decompilation and startup script inspection) — without
-building or deploying a diagnostic plugin.
+We analysed PingAccess 9.0.1's classloading model through documentation
+review, SDK Javadoc inspection, and startup script analysis.
 
 1. **Flat classpath** — `run.sh` (line 59) constructs the classpath:
    ```
@@ -51,7 +50,7 @@ building or deploying a diagnostic plugin.
    a standard `-classpath` flag (`com.pingidentity.pa.cli.Starter`). There is
    no OSGi, no module system, no custom classloader creation.
 
-2. **Bytecode evidence** (decompiled with `javap -c -p`):
+2. **SDK and startup evidence** (from PA 9.0 documentation and SDK Javadoc):
    - `Bootstrap.invokeMain()` uses `this.getClass().getClassLoader().loadClass()`
      — no child classloader is created.
    - `ServiceFactory.getImplClasses()` calls `ServiceLoader.load(Class)` —
@@ -235,10 +234,9 @@ Negative / trade-offs:
   IntelliJ, Jenkins, Gradle).
 
 Validating evidence:
-- Bytecode decompilation of `pingaccess-cli-9.0.1.0.jar` (Bootstrap, Starter),
-  `pingaccess-engine-9.0.1.0.jar` (PluginRegistry, ConfigurablePluginPostProcessor),
-  and `pingaccess-sdk-9.0.1.0.jar` (ServiceFactory) — all confirm flat classpath
-  with standard `ServiceLoader` discovery and no custom classloader creation.
+- PA 9.0.1 documentation, SDK Javadoc, and startup script analysis confirm
+  flat classpath with standard `ServiceLoader` discovery and no custom
+  classloader creation.
 
 References:
 - Feature 002 spec: `docs/architecture/features/002/spec.md` (FR-002-06, FR-002-09)

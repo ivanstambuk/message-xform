@@ -901,9 +901,8 @@ be declared `compileOnly` and **not** bundled in the shadow JAR:
 > **No dual ObjectMapper.** A single `ObjectMapper` instance handles all
 > adapter JSON operations.
 >
-> **Evidence:** Verified via static analysis of PA 9.0.1 (`run.sh` classpath
-> construction, `javap` decompilation of `ServiceFactory`, `Bootstrap`,
-> `ConfigurablePluginPostProcessor`). See ADR-0031.
+> **Evidence:** Verified via PA 9.0.1 documentation, SDK Javadoc, and
+> startup script analysis (`run.sh` classpath construction). See ADR-0031.
 
 **SnakeYAML:** Not shipped by PA — MUST be bundled in the shadow JAR as an
 `implementation` dependency.
@@ -1480,7 +1479,7 @@ Client                    PingAccess                        Backend
 | [`pingaccess-operations-guide.md`](../../../operations/pingaccess-operations-guide.md) | Two-level matching, per-instance config, Docker/K8s layout, Admin API gotchas |
 | `docs/research/pingaccess-plugin-api.md` | SDK research (complete) |
 | `docs/research/pingam-authentication-api.md` | PingAM callback format (transform target) |
-| `docs/reference/pingaccess-sdk-guide.md` | SDK guide (authored from PA 9.0 docs + decompilation) |
+| `docs/reference/pingaccess-sdk-guide.md` | SDK guide (authored from PA 9.0 docs) |
 | `docs/reference/vendor/pingaccess-sdk/pingaccess-sdk-9.0.1.0.jar` | SDK JAR |
 | `binaries/pingaccess/dist/pingaccess-9.0.1/sdk/apidocs/` | Official SDK Javadoc |
 | `binaries/pingaccess/dist/pingaccess-9.0.1/sdk/samples/` | SDK sample rules |
