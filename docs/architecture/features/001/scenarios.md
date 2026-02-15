@@ -5215,19 +5215,19 @@ assertions:
 | S-001-84 | `ScenarioSuiteTest`, `SessionContextBindingTest`, `SessionContextE2ETest` | `$session` null — null-safe access (FR-001-13, ADR-0030) |
 | S-001-85 | `SessionContextJoltRejectionTest` | JOLT + `$session` → rejected at load time (FR-001-13, ADR-0030) |
 | S-001-86 | `SpecParserTest` | Unknown key in spec → SpecParseException (FR-001-01 strict validation) |
-| S-001-87 | `ProfileMatcherTest` | Status class routing: 2xx matches, 4xx doesn't (FR-001-15, ADR-0036) |
-| S-001-88 | `ProfileMatcherTest` | Status exact match: 404 fires, 200 doesn't (FR-001-15, ADR-0036) |
+| S-001-87 | `ProfileMatcherTest`, `status-routing.feature` | Status class routing: 2xx matches, 4xx doesn't (FR-001-15, ADR-0036) |
+| S-001-88 | `ProfileMatcherTest`, `status-routing.feature` | Status exact match: 404 fires, 200 doesn't (FR-001-15, ADR-0036) |
 | S-001-89 | `StatusPatternTest` | Status range: 400-499 matches (FR-001-15, ADR-0036) |
 | S-001-90 | `StatusPatternParserTest` | Status on request direction → load-time error (FR-001-15, ADR-0036) |
 | S-001-91 | `StatusPatternTest` | Status negation: !5xx matches 200, doesn't match 502 (FR-001-15, ADR-0036) |
 | S-001-92 | `ProfileMatcherTest` | Status specificity: exact beats class for same code (FR-001-15, ADR-0006) |
-| S-001-93 | — | Phase 2: Body when predicate matches → spec fires (FR-001-16) |
-| S-001-94 | — | Phase 2: Body when predicate fails → fail-safe (FR-001-16) |
-| S-001-95 | — | Phase 2: Combined status + when routing (FR-001-15, FR-001-16) |
-| S-001-96 | — | Phase 2: No match on status + when → passthrough (FR-001-15, FR-001-16) |
-| S-001-97 | — | Phase 2: Non-JSON body with when → graceful skip (FR-001-16) |
-| S-001-98 | — | Phase 2: When on request direction (FR-001-16) |
-| S-001-99 | — | Phase 2: When + pipeline chaining (FR-001-16, ADR-0012) |
+| S-001-93 | `ProfileMatcherTest`, `polymorphic-routing.feature` | Body when predicate matches → spec fires (FR-001-16, ADR-0036) |
+| S-001-94 | `ProfileMatcherTest`, `polymorphic-routing.feature` | Body when predicate fails → user spec / fail-safe (FR-001-16, ADR-0036) |
+| S-001-95 | `ProfileMatcherTest`, `polymorphic-routing.feature` | Combined status + when routing (FR-001-15, FR-001-16, ADR-0036) |
+| S-001-96 | `ProfileMatcherTest` | No match on status + when → passthrough (FR-001-15, FR-001-16) |
+| S-001-97 | `ProfileMatcherTest`, `polymorphic-routing.feature` | Non-JSON body with when → graceful skip (FR-001-16) |
+| S-001-98 | `ProfileParserTest` | When on request direction — validates compile + match (FR-001-16) |
+| S-001-99 | `ProfileMatcherTest` | When + pipeline chaining — mixed entries (FR-001-16, ADR-0012) |
 | S-001-100 | `StatusPatternParserTest` | Status unquoted integer YAML parsing (FR-001-15, ADR-0036) |
 
 

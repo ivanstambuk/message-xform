@@ -49,8 +49,8 @@ runs on JUnit 5.
 
 The E2E suite was migrated from a monolithic 1,701-line Bash script
 (`scripts/pa-e2e-test.sh`) to Karate across 5 phases. The original migration
-preserved all 26 test scenarios; subsequent phases (9–10) added 5 more, bringing
-the total to **31 scenarios** across 9 feature files. The migration gained
+preserved all 26 test scenarios; subsequent phases added more, bringing
+the total to **39 scenarios** across 11 feature files. The migration gained
 type-safe JSON assertions, IDE test runner support, and Gradle task-graph
 integration for automatic Docker lifecycle.
 
@@ -58,7 +58,7 @@ integration for automatic Docker lifecycle.
 
 | Module | Gateway | Scenarios | Status |
 |--------|---------|:---------:|--------|
-| `e2e-pingaccess` | PingAccess 9.x | 31 | ✅ Active |
+| `e2e-pingaccess` | PingAccess 9.x | 39 | ✅ Active |
 | `e2e-pinggateway` | PingGateway | — | 📋 Planned |
 | `e2e-standalone` | Standalone Proxy | — | 📋 Planned |
 
@@ -184,7 +184,9 @@ message-xform/
 │           ├── oauth-identity.feature      # Bearer token / L1-L3 identity
 │           ├── web-session-oidc.feature    # OIDC web session / L4 identity
 │           ├── hot-reload.feature          # Spec hot-reload tests
-│           └── jmx-metrics.feature         # JMX MBean metrics verification
+│           ├── jmx-metrics.feature         # JMX MBean metrics verification
+│           ├── status-routing.feature      # Status-based response routing (match.status)
+│           └── polymorphic-routing.feature # Body-predicate routing (match.when)
 │
 ├── .vscode/settings.json          # Karate Runner extension configuration
 └── .gitignore                     # Includes .e2e-infra-started marker
@@ -267,6 +269,8 @@ The echo backend is a lightweight Python HTTP server that supports three modes:
 | `POST/GET/PUT /` | Echoes request body back as response body | Transform verification |
 | `GET /html/*` | Returns static HTML body | Content-type handling tests |
 | `ANY /status/{code}` | Returns the given HTTP status code | Error mode / edge case tests |
+| (header) `X-Echo-Status` | Override response status code | Status routing tests |
+| (header) `X-Echo-Body` | Override response body (raw JSON) | Polymorphic routing tests |
 
 All responses include `X-Echo-*` headers with request metadata (method, path,
 original request headers). These are useful for **direct echo probe** tests
