@@ -1,6 +1,6 @@
 @ignore
 Feature: Create Web Session and Web Application for OIDC auth code flow
-  # Called from pa-provision.feature for Phase 8b (L4 session state).
+  # Called from pa-provision.feature for Web Session (L4 session state).
   # Requires: siteId, vhId, ruleId, oidcContainer
 
   Background:
@@ -37,9 +37,9 @@ Feature: Create Web Session and Web Application for OIDC auth code flow
       """
     When method POST
     * def webSessionId = responseStatus == 200 ? response.id : null
-    * def phase8bSkip = webSessionId == null
-    * if (phase8bSkip) karate.log('WARN: Web Session creation failed — Phase 8b skipped')
-    * if (phase8bSkip) karate.abort()
+    * def oidcSkip = webSessionId == null
+    * if (oidcSkip) karate.log('WARN: Web Session creation failed — OIDC tests skipped')
+    * if (oidcSkip) karate.abort()
 
     # Create Web Application
     Given path '/applications'
@@ -60,7 +60,7 @@ Feature: Create Web Session and Web Application for OIDC auth code flow
       """
     When method POST
     * def webAppId = responseStatus == 200 ? response.id : null
-    * if (webAppId == null) phase8bSkip = true
+    * if (webAppId == null) oidcSkip = true
     * if (webAppId == null) karate.abort()
 
     # Enable

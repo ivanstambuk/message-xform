@@ -1,6 +1,6 @@
 @ignore
 Feature: Create Access Token Validator
-  # Called from pa-provision.feature when Phase 8 is not skipped.
+  # Called from pa-provision.feature when OAuth is configured.
   # Requires: oidcSvcId, oidcContainer
 
   Background:

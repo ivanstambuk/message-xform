@@ -11,7 +11,7 @@ Feature: OAuth/Identity Tests
   Scenario: Test 20 — Session context in JSLT (S-002-13)
     # Obtain token, POST to /api/session/test with Authorization: Bearer.
     # PA validates token via JWKS → Identity → $session available in JSLT.
-    * if (typeof phase8Skip !== 'undefined' && phase8Skip) karate.abort()
+    * if (typeof oauthSkip !== 'undefined' && oauthSkip) karate.abort()
 
     # Obtain access token from mock-oauth2-server
     Given url 'https://localhost:' + oidcPort + '/default/token'
@@ -56,7 +56,7 @@ Feature: OAuth/Identity Tests
     * karate.log('scopes: ' + scopes + ' (may be empty for JWKS ATV)')
 
   Scenario: Test 21 — OAuth context in JSLT (S-002-25)
-    * if (typeof phase8Skip !== 'undefined' && phase8Skip) karate.abort()
+    * if (typeof oauthSkip !== 'undefined' && oauthSkip) karate.abort()
 
     # Obtain fresh token
     Given url 'https://localhost:' + oidcPort + '/default/token'
@@ -92,7 +92,7 @@ Feature: OAuth/Identity Tests
     # Session state requires PA Web Session (OIDC login flow).
     # With client_credentials, no web session → session state absent.
     # We verify the $session object is at least populated with L1 data.
-    * if (typeof phase8Skip !== 'undefined' && phase8Skip) karate.abort()
+    * if (typeof oauthSkip !== 'undefined' && oauthSkip) karate.abort()
 
     # Obtain fresh token
     Given url 'https://localhost:' + oidcPort + '/default/token'

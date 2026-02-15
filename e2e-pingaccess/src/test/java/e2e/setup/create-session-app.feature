@@ -1,6 +1,6 @@
 @ignore
 Feature: Create protected Session Application
-  # Called from pa-provision.feature for Phase 8 OAuth tests.
+  # Called from pa-provision.feature for OAuth tests.
   # Requires: siteId, vhId, atvId, ruleId
 
   Background:

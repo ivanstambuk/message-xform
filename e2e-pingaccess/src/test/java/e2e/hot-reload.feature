@@ -1,4 +1,4 @@
-Feature: Hot-Reload E2E (Phase 9)
+Feature: Hot-Reload E2E
     # Tests 25-27: Spec hot-reload success, failure resilience, concurrent safety.
     # Validates FR-002-04 (hot-reload scheduler) and related scenarios:
     #   S-002-29 — modified spec picked up after reload interval
@@ -20,7 +20,6 @@ Feature: Hot-Reload E2E (Phase 9)
     # Helper: sleep for reload interval + margin
     * def sleep = function(ms){ java.lang.Thread.sleep(ms) }
 
-    @phase9
   Scenario: Test 25 — Spec hot-reload success (S-002-29)
     # ── (a) Verify the IDENTITY version is active at startup ──
     # /api/reload/** routes to e2e-reload-addition@1.0.0, which is the
@@ -58,7 +57,6 @@ Feature: Hot-Reload E2E (Phase 9)
     * def paLog = karate.exec('docker exec ' + paContainer + ' cat ' + paLogFile)
     * match paLog contains 'Hot-reload scheduler started'
 
-    @phase9
   Scenario: Test 26 — Spec hot-reload failure retains previous registry (S-002-30)
     # Precondition: marker spec should still be active from Test 25.
     # If tests run in isolation, first copy the marker spec.
@@ -99,7 +97,6 @@ Feature: Hot-Reload E2E (Phase 9)
     # ── Cleanup: restore identity spec ──
     * karate.exec('cp ' + hostStagingDir + '/e2e-reload-identity.yaml ' + hostSpecsDir + '/e2e-reload-addition.yaml')
 
-    @phase9
   Scenario: Test 27 — Concurrent requests during reload (S-002-31)
     # Fire 5 sequential requests to /api/transform/ while reload may be active.
     # All should return 200 with valid JSON — no corruption, no 500 errors.

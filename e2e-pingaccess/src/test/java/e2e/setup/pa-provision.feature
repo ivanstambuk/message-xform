@@ -6,7 +6,7 @@ Feature: PA Admin API provisioning (idempotent)
     # idempotent anyway for resilience against stale PA state from prior runs.
     #
     # Exports: siteId, ruleId, denyRuleId, appId, denyAppId, vhId,
-    #          phase8Skip, phase8bSkip
+    #          oauthSkip, oidcSkip
 
   Background:
     * url paAdminUrl
@@ -162,39 +162,35 @@ Feature: PA Admin API provisioning (idempotent)
     Then status 200
     * karate.log('DENY app configured (id=' + denyAppId + ')')
 
-    # -----------------------------------------------------------------------
-    # Phase 8: OAuth — Third-Party Service + ATV + Session App
-    # -----------------------------------------------------------------------
-    * def phase8Skip = false
+    # OAuth — Third-Party Service + ATV + Session App
+    * def oauthSkip = false
 
     # Third-Party Service now points to OIDC proxy (HTTPS :8443, Trust Any certs)
     * def oidcSvcId = findId('/thirdPartyServices', 'Mock OIDC Server')
     * if (oidcSvcId == null) karate.set('oidcSvcId', karate.call('classpath:e2e/helpers/create-if-absent.feature', { path: '/thirdPartyServices', body: { name: 'Mock OIDC Server', targets: [oidcContainer + ':8443'], secure: true, maxConnections: 5, availabilityProfileId: 1, trustedCertificateGroupId: 2 } }).resourceId)
-    * if (oidcSvcId == null) phase8Skip = true
-    * if (phase8Skip) karate.log('WARN: Third-Party Service unavailable — skipping Phase 8')
+    * if (oidcSvcId == null) oauthSkip = true
+    * if (oauthSkip) karate.log('WARN: Third-Party Service unavailable — skipping OAuth provisioning')
 
     # ATV (issuer now uses HTTPS via proxy)
     * def atvId = null
-    * if (!phase8Skip) atvId = findId('/accessTokenValidators', 'Mock OIDC Validator')
-    * if (!phase8Skip && atvId == null) karate.call('classpath:e2e/setup/create-atv.feature', { oidcSvcId: oidcSvcId, oidcContainer: oidcContainer })
+    * if (!oauthSkip) atvId = findId('/accessTokenValidators', 'Mock OIDC Validator')
+    * if (!oauthSkip && atvId == null) karate.call('classpath:e2e/setup/create-atv.feature', { oidcSvcId: oidcSvcId, oidcContainer: oidcContainer })
 
     # Session App
     * def sessionAppId = null
-    * if (!phase8Skip) sessionAppId = findId('/applications', 'E2E Session App')
-    * if (!phase8Skip && sessionAppId == null) karate.call('classpath:e2e/setup/create-session-app.feature', { siteId: siteId, vhId: vhId, atvId: atvId, ruleId: ruleId })
+    * if (!oauthSkip) sessionAppId = findId('/applications', 'E2E Session App')
+    * if (!oauthSkip && sessionAppId == null) karate.call('classpath:e2e/setup/create-session-app.feature', { siteId: siteId, vhId: vhId, atvId: atvId, ruleId: ruleId })
 
-    # -----------------------------------------------------------------------
-    # Phase 8b: Web Session / OIDC
+    # Web Session / OIDC
     # Common Token Provider + OIDC Provider + Web Session + Web App
     # See operations guide §25 for full architecture details.
-    # -----------------------------------------------------------------------
-    * def phase8bSkip = phase8Skip
+    * def oidcSkip = oauthSkip
 
     # Configure Common Token Provider + OIDC Provider (idempotent PUTs)
-    * if (!phase8bSkip) karate.call('classpath:e2e/setup/create-oidc-provider.feature', { oidcContainer: oidcContainer })
+    * if (!oidcSkip) karate.call('classpath:e2e/setup/create-oidc-provider.feature', { oidcContainer: oidcContainer })
 
     # Web Session + Web Application
     * def webSessionId = null
     * def webAppId = null
-    * if (!phase8bSkip) karate.call('classpath:e2e/setup/create-web-session.feature', { siteId: siteId, vhId: vhId, ruleId: ruleId, oidcContainer: oidcContainer })
+    * if (!oidcSkip) karate.call('classpath:e2e/setup/create-web-session.feature', { siteId: siteId, vhId: vhId, ruleId: ruleId, oidcContainer: oidcContainer })
 

@@ -1,5 +1,5 @@
     @ignore
-Feature: JMX query helper (Phase 10)
+Feature: JMX query helper
     # Helper feature called by jmx-metrics.feature to query a single
     # JMX MBean attribute.  Uses javax.management.remote to connect
     # to the PA JVM's MBeanServer via RMI.

@@ -1,5 +1,5 @@
     @ignore
-Feature: Concurrent request helper (Phase 9)
+Feature: Concurrent request helper
     # Helper feature called by hot-reload.feature to make a single
     # HTTPS request to the PA engine.  Returns the response status
     # and body for assertion by the caller.

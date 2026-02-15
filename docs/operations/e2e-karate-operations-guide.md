@@ -176,24 +176,15 @@ message-xform/
 │           │   ├── follow-redirect.feature     # Manual redirect following
 │           │   ├── jmx-query.feature           # JMX MBean query via docker exec
 │           │   └── oidc-login-form.feature     # OIDC login flow helper
-│           ├── phase1-plugin/
-│           │   └── plugin-discovery.feature    # Plugin registration + descriptor tests
-│           ├── phase3-routing/
-│           │   └── profile-routing.feature     # Profile-based spec routing
-│           ├── phase4-context/
-│           │   └── context-variables.feature   # Cookie, query, session context
-│           ├── phase5-edge/
-│           │   └── body-status-edge.feature    # Edge cases: empty body, status codes
-│           ├── phase6-error/
-│           │   └── error-modes.feature         # PASS_THROUGH vs DENY error handling
-│           ├── phase8-oauth/
-│           │   └── oauth-identity.feature      # Bearer token / L1-L3 identity
-│           ├── phase8b-websession/
-│           │   └── web-session-oidc.feature    # OIDC web session / L4 identity
-│           ├── phase9-reload/
-│           │   └── hot-reload.feature          # Spec hot-reload tests
-│           └── phase10-jmx/
-│               └── jmx-metrics.feature         # JMX MBean metrics verification
+│           ├── plugin-discovery.feature    # Plugin registration + descriptor tests
+│           ├── profile-routing.feature     # Profile-based spec routing
+│           ├── context-variables.feature   # Cookie, query, session context
+│           ├── body-status-edge.feature    # Edge cases: empty body, status codes
+│           ├── error-modes.feature         # PASS_THROUGH vs DENY error handling
+│           ├── oauth-identity.feature      # Bearer token / L1-L3 identity
+│           ├── web-session-oidc.feature    # OIDC web session / L4 identity
+│           ├── hot-reload.feature          # Spec hot-reload tests
+│           └── jmx-metrics.feature         # JMX MBean metrics verification
 │
 ├── .vscode/settings.json          # Karate Runner extension configuration
 └── .gitignore                     # Includes .e2e-infra-started marker
@@ -441,7 +432,7 @@ When you click "Karate: Run" on a scenario at line 23, the extension generates:
 ```bash
 ./gradlew clean test \
     --tests e2e.PingAccessE2ETest \
-    -Dkarate.options="classpath:e2e/phase4-context/context-variables.feature:23"
+    -Dkarate.options="classpath:e2e/context-variables.feature:23"
 ```
 
 This triggers the full Gradle task graph: `shadowJar → dockerUp → test → dockerDown`.
@@ -584,14 +575,14 @@ handles everything automatically (build → Docker → test → teardown).
 
 # Single scenario by line number:
 ./gradlew :e2e-pingaccess:test \
-    -Dkarate.options="classpath:e2e/phase4-context/context-variables.feature:12"
+    -Dkarate.options="classpath:e2e/context-variables.feature:12"
 
 # Single phase — use karate.options with a directory path:
 ./gradlew :e2e-pingaccess:test \
-    -Dkarate.options="classpath:e2e/phase3-routing"
+    -Dkarate.options="classpath:e2e/profile-routing.feature"
 ```
 
-> **Note:** `--tests '*phase3*'` does NOT filter by Karate feature path — it
+> **Note:** `--tests '*routing*'` does NOT filter by Karate feature path — it
 > filters by JUnit class name. Since all scenarios run through a single runner
 > class, this pattern always resolves to the full suite. Use `-Dkarate.options`
 > with a classpath directory to run a subset.
@@ -607,7 +598,7 @@ bash scripts/pa-e2e-infra-up.sh
 # 2. Run individual tests as many times as needed — dockerUp skips (gateway
 #    already responding), dockerDown skips (no marker file)
 ./gradlew :e2e-pingaccess:test \
-    -Dkarate.options="classpath:e2e/phase4-context/context-variables.feature:12"
+    -Dkarate.options="classpath:e2e/context-variables.feature:12"
 
 # 3. Tear down when done
 bash scripts/pa-e2e-infra-down.sh --force
@@ -745,7 +736,7 @@ When optional infrastructure (e.g., OAuth/OIDC server) may not be available,
 use `karate.abort()` for clean no-op skipping:
 
 ```gherkin
-* eval if (__arg.phase8Skip) karate.abort()
+* eval if (__arg.oauthSkip) karate.abort()
 ```
 
 Provisioning detects availability and exports skip flags. Test features check

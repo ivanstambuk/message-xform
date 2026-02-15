@@ -17,7 +17,7 @@ Feature: Web Session / OIDC Tests
     #   2. GET/POST OIDC /authorize → 302 callback with auth code
     #   3. GET PA callback with auth code + nonce cookie → PA sets session cookie
     #   4. Use session cookie to access protected resource → authenticated
-    * if (typeof phase8bSkip !== 'undefined' && phase8bSkip) karate.abort()
+    * if (typeof oidcSkip !== 'undefined' && oidcSkip) karate.abort()
 
     # Step 1: Hit protected PA Web app → expect 302 to OIDC authorize
     Given url 'https://localhost:' + paEnginePort
@@ -92,7 +92,7 @@ Feature: Web Session / OIDC Tests
 
   Scenario: Test 24 — L4 overrides L3 on key collision (S-002-26)
     # Verify session cookie authentication is repeatable (session persists)
-    * if (typeof phase8bSkip !== 'undefined' && phase8bSkip) karate.abort()
+    * if (typeof oidcSkip !== 'undefined' && oidcSkip) karate.abort()
 
     # Perform OIDC login to get session cookie
     Given url 'https://localhost:' + paEnginePort

@@ -1,6 +1,6 @@
 @ignore
 Feature: Configure Common Token Provider, PingFederate Runtime, and OIDC Provider
-  # Called from pa-provision.feature for Phase 8b (Web Session / OIDC).
+  # Called from pa-provision.feature for Web Session / OIDC provisioning.
   # Requires: oidcContainer
   #
   # PA needs THREE separate OIDC configurations:
@@ -99,4 +99,4 @@ Feature: Configure Common Token Provider, PingFederate Runtime, and OIDC Provide
     When method GET
     * karate.log('Token Provider metadata (final): status=' + responseStatus)
     * if (responseStatus == 200) karate.log('OIDC metadata cached successfully')
-    * if (responseStatus != 200) karate.log('WARN: OIDC metadata NOT cached — Phase 8b tests may fail')
+    * if (responseStatus != 200) karate.log('WARN: OIDC metadata NOT cached — web session tests may fail')

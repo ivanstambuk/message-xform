@@ -1,4 +1,4 @@
-Feature: JMX Metrics E2E (Phase 10)
+Feature: JMX Metrics E2E
     # Tests 28-29: JMX MBean registration and counter verification.
     # Validates FR-002-14 (JMX metrics) and related scenarios:
     #   S-002-33 — MBean registered, ActiveSpecCount ≥ 1, counters increment
@@ -23,7 +23,6 @@ Feature: JMX Metrics E2E (Phase 10)
     # JMX service URL — connects to PA JVM via RMI
     * def jmxUrl = 'service:jmx:rmi:///jndi/rmi://localhost:' + jmxPort + '/jmxrmi'
 
-    @phase10
   Scenario: Test 28 — JMX MBean registered and counters work (S-002-33)
     # ── (a) Verify MBean exists ──
     # Use exact instance name (not wildcard) — there are 2 rules with JMX enabled
@@ -60,7 +59,6 @@ Feature: JMX Metrics E2E (Phase 10)
     * def paLog = karate.exec('docker exec ' + paContainer + ' cat ' + paLogFile)
     * match paLog contains 'JMX MBean registered'
 
-    @phase10
   Scenario: Test 29 — JMX MBean not registered for non-existent instance (S-002-34)
     # Query for a rule instance name that does not exist.
     # This proves the ObjectName pattern is instance-specific.
