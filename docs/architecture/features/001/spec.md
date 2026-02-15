@@ -1285,7 +1285,7 @@ the constraint count tie-break.
 | Failure path | No matching status → no entry matches → passthrough |
 | Source | ADR-0036, ADR-0006+0036 interaction |
 
-### FR-001-16: Body Predicate Matching in Profiles (Planned)
+### FR-001-16: Body Predicate Matching in Profiles
 
 **Requirement:** The profile matching engine MUST support an optional `match.when`
 field on profile entries. When present, the parsed JSON body of the message is
@@ -1316,9 +1316,9 @@ entries:
         expr: '.role == "user"'
 ```
 
-**Status:** Planned for Phase 2. Design is finalized in ADR-0036. The `when`
-expression is compiled at load time via the Expression Engine SPI. Evaluation
-order: direction → path → method → content-type → status → when (cheapest first).
+**Status:** Implemented (Phase 2, ADR-0036). The `when` expression is compiled
+at load time via the Expression Engine SPI. Evaluation order:
+direction → path → method → content-type → status → when (cheapest first).
 
 | Aspect | Detail |
 |--------|--------|
@@ -1346,7 +1346,7 @@ order: direction → path → method → content-type → status → when (cheap
 ## Branch & Scenario Matrix
 
 > Full scenario definitions, test vectors, and coverage matrix are maintained in
-> [`scenarios.md`](scenarios.md) (73 scenarios: S-001-01 through S-001-73).
+> [`scenarios.md`](scenarios.md) (109 scenarios: S-001-01 through S-001-100).
 > This summary lists representative scenarios for quick reference.
 
 | Scenario ID | Description / Expected outcome |
