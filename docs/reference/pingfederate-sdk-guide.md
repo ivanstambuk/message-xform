@@ -1,214 +1,163 @@
 # PingFederate SDK Implementation Guide
 
-> Single-source reference for implementing PingFederate 13.0 plugins.
-> Sourced from the official PingFederate Server documentation (SDK Developer's Guide section),
-> SDK Javadocs, and all SDK sample projects bundled in the distribution.
-> This document is optimized for LLM context and implementation planning.
-> **Goal:** self-contained guidance for day-to-day plugin development.
-> **Completeness:** includes the entire official SDK section plus sample-derived implementation notes.
+> Single-source, implementation-focused guide for PingFederate 13.0 SDK development.
+> This file is intentionally dense and self-contained.
+> It consolidates the full SDK chapter from the official server documentation and concrete behavior from every bundled SDK sample project.
 
 | Field | Value |
-|-------|-------|
+|---|---|
 | Product | PingFederate Server |
 | Version | 13.0 |
 | SDK root | `binaries/pingfederate/dist/pingfederate-13.0.1/pingfederate/sdk/` |
-| Javadocs | `binaries/pingfederate/dist/pingfederate-13.0.1/pingfederate/sdk/doc/index.html` |
 | Official source text | `docs/reference/vendor/pingfederate_server-13.0.txt` |
-| Official SDK range in source text | approx. lines `82582-84395` (SDK Developer's Guide section) |
-
----
+| Official SDK chapter region | approx. lines `82690-84430` |
+| Sample source root | `binaries/pingfederate/dist/pingfederate-13.0.1/pingfederate/sdk/plugin-src/` |
 
 ## Topic Index
 
-| # | Section | One-liner | Tags |
-|---|---------|-----------|------|
-| 1 | [SDK Scope and Extension Surface](#1-sdk-scope-and-extension-surface) | What the SDK is for and what extension points it exposes | `scope`, `overview`, `spi` |
-| 2 | [SDK Directory Layout](#2-sdk-directory-layout) | Where source, docs, libs, and build files live | `layout`, `paths` |
-| 3 | [Plugin Lifecycle and Shared Interfaces](#3-plugin-lifecycle-and-shared-interfaces) | `configure()` + descriptor-driven model used by most plugin types | `lifecycle`, `configure`, `descriptor` |
-| 4 | [Descriptor and Admin UI Model](#4-descriptor-and-admin-ui-model) | Field descriptors, validators, actions, and table config patterns | `admin-ui`, `descriptor`, `validation` |
-| 5 | [Build and Deploy with Ant](#5-build-and-deploy-with-ant) | Supported build pipeline and outputs | `ant`, `build`, `deploy` |
-| 6 | [Manual Build and PF-INF Metadata](#6-manual-build-and-pf-inf-metadata) | Required discovery marker files for manual packaging | `pf-inf`, `jar`, `discovery` |
-| 7 | [IdP Adapter SPI](#7-idp-adapter-spi) | Core flow contract for `IdpAuthenticationAdapterV2` | `idp`, `adapter`, `sso` |
-| 8 | [SP Adapter SPI](#8-sp-adapter-spi) | Session creation, logout, and account linking methods | `sp`, `adapter`, `linking` |
-| 9 | [STS Token Processor and Generator SPI](#9-sts-token-processor-and-generator-spi) | WS-Trust token translation contracts | `sts`, `token`, `wstrust` |
-| 10 | [Authentication Selector SPI](#10-authentication-selector-spi) | Source selection and callback behavior | `selector`, `routing`, `callback` |
-| 11 | [Custom Data Source Connector SPI](#11-custom-data-source-connector-spi) | Connection tests, fields, and runtime retrieval | `datasource`, `attribute`, `lookup` |
-| 12 | [Password Credential Validator SPI](#12-password-credential-validator-spi) | Username/password validation plus optional reset/change contracts | `pcv`, `password`, `validation` |
-| 13 | [Notification Publisher SPI](#13-notification-publisher-spi) | Publishing event notifications from PingFederate | `notification`, `publisher` |
-| 14 | [Authentication API-Capable Plugins](#14-authentication-api-capable-plugins) | `AuthnApiPlugin`, states/actions/models, runtime handling | `authn-api`, `state-machine`, `json` |
-| 15 | [Session State Management](#15-session-state-management) | Session helpers for global and transaction-scoped state | `session`, `state`, `security` |
-| 16 | [Identity Store Provisioner SPI](#16-identity-store-provisioner-spi) | SCIM-oriented provisioning/deprovisioning contracts | `provisioning`, `scim`, `users`, `groups` |
-| 17 | [SDK Sample Inventory](#17-sdk-sample-inventory) | What each bundled sample demonstrates | `samples`, `reference` |
-| 18 | [Sample-Derived Patterns Not Explicit in Official Text](#18-sample-derived-patterns-not-explicit-in-official-text) | Practical behavior observed in code examples | `patterns`, `implementation` |
-| 19 | [Production Hardening Checklist](#19-production-hardening-checklist) | What to change before shipping | `hardening`, `ops`, `ha` |
-| 20 | [Quick Start Recipe](#20-quick-start-recipe) | Minimal end-to-end plugin flow | `quickstart`, `workflow` |
-| 21 | [References](#21-references) | Source files used to build this guide | `sources` |
+| # | Section | Coverage |
+|---|---|---|
+| 1 | SDK Layout and Build Pipeline | Directory layout, Ant targets, build properties, output paths |
+| 2 | Core Plugin Model | `ConfigurablePlugin`, describable plugins, descriptor contracts |
+| 3 | Packaging and Discovery | Ant descriptor generation, PF-INF markers, manual packaging |
+| 4 | Logging | Logging expectations and sample logging patterns |
+| 5 | IdP Adapter SPI | `IdpAuthenticationAdapterV2` full runtime contract |
+| 6 | SP Adapter SPI | `SpAuthenticationAdapter` methods and flow semantics |
+| 7 | STS Token SPI | `TokenProcessor` and `TokenGenerator` contracts |
+| 8 | Authentication Selector SPI | `selectContext`/`callback` runtime behavior |
+| 9 | Custom Data Source SPI | `testConnection`, `getAvailableFields`, `retrieveValues` |
+| 10 | Password Credential Validator SPI | Validation, reset/change/recovery interfaces |
+| 11 | Notification Publisher SPI | `publishNotification` contract and response mapping |
+| 12 | Authentication API-Capable Plugins | `AuthnApiPlugin`, states/actions/models/errors, runtime handling |
+| 13 | Session State and Transaction State | `SessionStateSupport`, `TransactionalStateSupport`, cleanup rules |
+| 14 | Error Localization | `AuthnErrorDetail`, `userMessage`, language packs |
+| 15 | Identity Store Provisioner SPI | User/group CRUD, filtering, pagination, sort, deletion semantics |
+| 16 | Additional SDK Extension SPIs in Samples | OOB/CIBA, Secret Manager, Dynamic Client Registration, Access Grant, Client Storage |
+| 17 | Full Sample Inventory and Deep Notes | Every sample directory with concrete implementation learnings |
+| 18 | Cross-Sample Reusable Patterns | Practical patterns not obvious from interface docs |
+| 19 | Hardening Checklist | Production readiness deltas from sample code |
+| 20 | SDK-Relevant Release Deltas | Important SDK-related additions surfaced in docs |
+| 21 | Build-Deploy Quick Start | End-to-end plugin creation flow |
+| 22 | Source Inventory | Files reviewed for this guide |
 
----
-
-## 1. SDK Scope and Extension Surface
-
-The PingFederate SDK is for custom plugin implementations that integrate PingFederate with external identity, data, and messaging systems.
-
-Officially documented extension categories:
-
-- Authentication adapters (IdP and SP)
-- Authentication selectors
-- WS-Trust token translators (token processors and token generators)
-- Custom data source drivers
-- Password credential validators
-- Identity store provisioners
-- Notification publishers
-
-Important official upgrade warning:
-
-- Custom components can change behavior after PingFederate upgrades; retest all customizations in non-critical upgraded environments.
-
----
-
-## 2. SDK Directory Layout
+## 1. SDK Layout and Build Pipeline
 
 SDK root:
 `binaries/pingfederate/dist/pingfederate-13.0.1/pingfederate/sdk/`
 
-Key files and directories:
+Main directories and files:
 
-- `plugin-src/` - custom plugin projects and bundled examples.
-- `doc/` - SDK Javadocs (`index.html`).
-- `lib/` - SDK compile-time libraries.
-- `build.xml` - supported Ant build/deploy script.
-- `build.properties` - shared build defaults and output paths.
-- `build.local.properties` - local override for `target-plugin.name` and `pingfederate.home`.
+- `plugin-src/`: custom plugin projects plus all bundled examples.
+- `doc/`: SDK API docs.
+- `lib/`: SDK compilation support libraries.
+- `build.xml`: canonical Ant build/deploy workflow.
+- `build.properties`: shared immutable defaults.
+- `build.local.properties`: local overrides (`target-plugin.name`, `pingfederate.home`).
 
-Build script defaults (from SDK files):
+Official SDK chapter notes:
 
-- JAR name pattern: `pf.plugins.<target-plugin.name>.jar`
-- Deploy directory: `<pf_install>/pingfederate/server/default/deploy`
-- Build output directory: `plugin-src/<plugin>/build/`
+- Supported SDK JDK baseline is JDK 11.
+- Recommended target order: `clean-plugin`, `jar-plugin`, `deploy-plugin`.
 
-Official note:
+Build property values (from shipped files):
 
-- SDK guide states plugin build workflow supports JDK 11.
+- Plugin source root: `${plugin-src.dir}` -> `plugin-src`
+- Selected plugin folder: `${target-plugin.dir}` -> `plugin-src/${target-plugin.name}`
+- Plugin JAR prefix: `pf.plugins.`
+- Plugin JAR name: `pf.plugins.${target-plugin.name}.jar`
+- Deploy dir: `${pingfederate.home}/server/default/deploy`
+- Conf copy dir: `${pingfederate.home}/server/default/conf`
 
----
+Key Ant targets:
 
-## 3. Plugin Lifecycle and Shared Interfaces
+- `clean-plugin`: remove `${target-plugin.build.dir}`
+- `compile-plugin`: compile `java/` sources to `build/classes`
+- `jar-plugin`: generate deployment descriptors + package plugin JAR
+- `deploy-plugin`: copy plugin JAR plus `lib/*.jar` to deploy dir and copy optional `conf/`
 
-### 3.1 Core plugin types
+What `jar-plugin` adds beyond raw compilation:
 
-The official SDK flow is centered around two interface families:
+- Runs SDK task `BuildSdkDeploymentDesc`
+- Produces plugin discovery metadata in `PF-INF` so PingFederate can find plugin classes
 
-1. Configurable plugins
-2. Describable plugins
+## 2. Core Plugin Model
 
-### 3.2 Configurable plugins
+Official model distinguishes two core behaviors:
 
-All configurable plugins implement:
+1. Configurable plugin behavior
+2. Describable plugin behavior
+
+### 2.1 Configurable behavior
+
+Configurable plugins implement:
 
 ```java
 void configure(Configuration configuration)
 ```
 
-Behavior:
+Runtime contract:
 
 - PingFederate calls `configure()` with admin-saved configuration.
-- Plugin should cache required runtime values in instance fields.
-- The instance becomes active only after configuration is complete.
+- Plugin should cache runtime values from `Configuration`.
+- Server finishes creation/configuration before exposing instance to live traffic.
 
-### 3.3 Describable plugins
+### 2.2 Describable behavior
 
-Plugins that need admin UI metadata return descriptors.
+Most plugin types provide descriptor metadata used to render admin UI.
 
-Descriptor methods by plugin family:
+Descriptor methods by family:
 
-- `PluginDescriptor getPluginDescriptor()`
-- `AuthnAdapterDescriptor getAdapterDescriptor()`
-- `SourceDescriptor getSourceDescriptor()`
+```java
+PluginDescriptor getPluginDescriptor();
+AuthnAdapterDescriptor getAdapterDescriptor();
+SourceDescriptor getSourceDescriptor();
+```
 
-Special case from official docs:
+Important documented nuance:
 
-- Adapters and custom data sources are describable but do not implement `DescribablePlugin` directly; they still expose descriptor methods.
+- Adapter plugins and custom data source plugins are describable even though they do not directly implement `DescribablePlugin`.
 
-### 3.4 Descriptor stability rule
+Descriptor contents commonly include:
 
-Examples repeatedly document this requirement:
+- Field descriptors
+- Field validators
+- Row/config validators
+- Actions
+- Attribute contracts
+- Extended contract support flags
 
-- Return the same descriptor instance across calls.
+Descriptor stability rule:
 
----
+- Return the same descriptor object instance on each call.
 
-## 4. Descriptor and Admin UI Model
+## 3. Packaging and Discovery
 
-Descriptors define admin UI schema and runtime metadata.
+### 3.1 Ant-based packaging (recommended)
 
-Common building blocks used in samples:
+Ant build path automatically creates required discovery metadata and JAR layout.
 
-- Field types: `TextFieldDescriptor`, `CheckBoxFieldDescriptor`, `SelectFieldDescriptor`, `RadioGroupFieldDescriptor`, `TextAreaFieldDescriptor`, `UploadFileFieldDescriptor`, `TableDescriptor`
-- Validators: `RequiredFieldValidator`, `IntegerValidator`, `EmailValidator`, `HostnameValidator`, custom `FieldValidator`, `RowValidator`, `ConfigurationValidator`
-- Actions: `ActionDescriptor` (including parameterized actions)
+High-level flow:
 
-Sample-level behaviors worth reusing:
+1. Set `target-plugin.name` in `build.local.properties`.
+2. Place third-party JARs in `plugin-src/<plugin>/lib` if needed.
+3. Run `ant deploy-plugin` or `clean-plugin -> jar-plugin -> deploy-plugin`.
+4. Restart PingFederate.
 
-- `sp-adapter-example` shows mixed field types, table validation, and config-level cross-field validation.
-- `secret-manager-example` shows action parameters and action invocation overload with `SimpleFieldList`.
-- `ciba-auth-plugin-example` shows a "Test" action used for connectivity checks.
+### 3.2 Manual packaging rules
 
----
+Manual builds must produce proper `PF-INF` markers at JAR root.
 
-## 5. Build and Deploy with Ant
-
-Official supported flow:
-
-1. Set `target-plugin.name` in `sdk/build.local.properties`.
-2. Optionally place third-party dependencies in `sdk/plugin-src/<plugin>/lib`.
-3. Run Ant targets.
-
-Main targets:
-
-- `ant clean-plugin`
-- `ant compile-plugin`
-- `ant jar-plugin`
-- `ant deploy-plugin`
-
-Recommended order:
-
-- `clean-plugin` -> `jar-plugin` -> `deploy-plugin`
-
-What `jar-plugin` does:
-
-- Compiles classes
-- Invokes SDK task `BuildSdkDeploymentDesc` to generate deployment metadata
-- Builds plugin JAR in `plugin-src/<plugin>/build/jar/`
-
-What `deploy-plugin` does:
-
-- Copies plugin JAR + `lib/*.jar` dependencies into deploy directory
-- Copies optional `conf/` contents into PingFederate conf directory
-
-Server restart:
-
-- Required after deploy for plugin discovery/activation.
-
----
-
-## 6. Manual Build and PF-INF Metadata
-
-Manual build is supported but requires explicit discovery metadata.
-
-Classpaths required to compile manually:
+Required classpath roots for manual compile:
 
 - `<pf_install>/pingfederate/server/default/lib`
 - `<pf_install>/pingfederate/lib`
 - `<pf_install>/pingfederate/sdk/lib`
 - `<pf_install>/pingfederate/sdk/plugin-src/<subproject>/lib`
 
-### 6.1 PF-INF directory requirements
+PF-INF marker mapping:
 
-- JAR must include `PF-INF/` at JAR root.
-- Each plugin type needs a marker file listing fully qualified class names, one per line.
-
-| Plugin type | PF-INF marker file |
-|-------------|--------------------|
+| Plugin type | PF-INF file |
+|---|---|
 | IdP Adapter | `idp-authn-adapters` |
 | SP Adapter | `sp-authn-adapters` |
 | Custom Data Source | `custom-drivers` |
@@ -217,20 +166,33 @@ Classpaths required to compile manually:
 | Authentication Selector | `authentication-selectors` |
 | Password Credential Validator | `password-credential-validators` |
 | Identity Store Provisioner | `identity-store-provisioners` |
-| CIBA Authenticator | `oob-auth-plugins` |
+| CIBA/OOB Auth Plugin | `oob-auth-plugins` |
 | Notification Publisher | `notification-sender` |
 
-### 6.2 Manual deployment target
+Each marker file format:
 
-- Copy plugin JAR and dependency JARs to `<pf_install>/pingfederate/server/default/deploy`.
+- one fully-qualified implementation class per line
+- class must implement the corresponding SPI
 
----
+Manual deployment destination:
 
-## 7. IdP Adapter SPI
+- copy plugin JAR and dependent third-party JARs to `<pf_install>/pingfederate/server/default/deploy`
 
-### 7.1 Primary interface
+## 4. Logging
 
-Implement:
+Official SDK chapter includes a dedicated logging note:
+
+- Use normal Java logging patterns (examples commonly use Apache Commons logging or Log4j wrappers).
+- `sp-adapter-example` demonstrates structured logging usage.
+
+Sample reality:
+
+- Legacy samples use `commons-logging` (`LogFactory`), Log4j, and one sample uses `System.out` (`SampleSubnetAdapter`) as a demonstration only.
+- Production plugins should use a consistent logger and avoid `System.out`.
+
+## 5. IdP Adapter SPI
+
+Primary SPI:
 
 - `com.pingidentity.sdk.IdpAuthenticationAdapterV2`
 
@@ -251,62 +213,93 @@ boolean logoutAuthN(
 throws AuthnAdapterException, IOException;
 ```
 
-### 7.2 lookupAuthN behavior
+### 5.1 `lookupAuthN` execution semantics
 
 Official behavior:
 
-- Called for IdP-initiated SSO, SP-initiated SSO, OAuth transactions, and direct IdP-to-SP adapter processing.
-- If response is committed, PingFederate pauses flow and resumes by reinvoking `lookupAuthN()` at resume path.
+- Called for IdP-initiated SSO, SP-initiated SSO, OAuth transactions, and direct IdP-to-SP processing.
+- Also used when adapter is in password reset/change policy.
+- If response is committed, PingFederate pauses transaction and re-invokes adapter at resume path.
 - Return value is ignored for committed responses.
-- For non-committed completion:
-  - set `authnStatus`
-  - when `SUCCESS`, provide user attributes in `attributeMap`
+- For a non-committed return:
+  - `authnStatus` must be set.
+  - On `SUCCESS`, `attributeMap` must contain user attributes.
 
-Common styles:
+Observed sample status usage:
 
-- Interactive form adapter (template rendering)
-- Redirect-to-external-auth-system adapter
+- `AUTHN_STATUS.SUCCESS`
+- `AUTHN_STATUS.FAILURE`
+- `AUTHN_STATUS.IN_PROGRESS` when adapter writes response and awaits next invocation.
 
-### 7.3 inParameters map usage
+### 5.2 `inParameters` map keys used in shipped samples
 
-`inParameters` contains runtime keys documented in `IdpAuthenticationAdapterV2`.
-Observed sample usage includes:
+Samples consume the following `IdpAuthenticationAdapterV2` keys:
 
 - `IN_PARAMETER_NAME_RESUME_PATH`
 - `IN_PARAMETER_NAME_PARTNER_ENTITYID`
 - `IN_PARAMETER_NAME_CHAINED_ATTRIBUTES`
-- `IN_PARAMETER_NAME_AUTHN_POLICY`
 - `IN_PARAMETER_NAME_ADAPTER_ACTION`
 - `IN_PARAMETER_NAME_OAUTH_SCOPE`
 - `IN_PARAMETER_NAME_OAUTH_SCOPE_DESCRIPTIONS`
 - `IN_PARAMETER_NAME_DEFAULT_SCOPE`
 - `IN_PARAMETER_NAME_OAUTH_CLIENT_ID`
 - `IN_PARAMETER_NAME_OAUTH_AUTHORIZATION_DETAIL_DESCRIPTIONS`
+- `IN_PARAMETER_NAME_AUTHN_POLICY`
 
-### 7.4 Session and logout guidance
+SDK release note addition relevant to adapters:
+
+- `IN_PARAMETER_NAME_SRI` exposed in SDK (`pi.sri` value).
+
+### 5.3 Adapter style patterns from samples
+
+`template-render-adapter-example`:
+
+- Interactive form + API-capable mode in same adapter.
+- HTML path uses `TemplateRendererUtil` and language pack messages.
+- API path uses `AuthnApiSupport` and JSON state/action flow.
+
+`idp-adapter-example` (`SampleSubnetAdapter`):
+
+- Non-interactive adapter validates client IPv4 subnet.
+- Uses chained attributes to assign role (`GUEST` vs `CORP_USER`).
+- Implements non-interactive API mode (`getApiSpec() == null`, `interactive(false)`).
+
+`external-consent-page-example`:
+
+- Enforces adapter action `ADAPTER_ACTION_EXTERNAL_CONSENT`.
+- Displays OAuth scope and authorization detail approval page.
+- Persists CSRF token and authorization-detail identifier map in `SessionStateSupport`.
+- Supports returning approved scopes and authorization details in multiple accepted formats.
+- Returns adapter info flag `ADAPTER_INFO_EXTERNAL_CONSENT_ADAPTER=true`.
+
+### 5.4 Session and reauthentication rules
 
 Official guidance:
 
-- Prefer PingFederate-managed authentication session over custom session tracking.
-- If storing session attributes, use SDK state helpers (`SessionStateSupport`, `TransactionalStateSupport`).
-- Remove transaction-scoped state before returning from `lookupAuthN()` to reduce heap usage and avoid security issues.
-- In logout, clear internal session state and optionally redirect to external logout endpoint, then return to `resumePath`.
+- Prefer PingFederate-managed authentication sessions over internal session tracking.
+- If maintaining custom state, use:
+  - `SessionStateSupport` for global/session state
+  - `TransactionalStateSupport` for transaction-scoped state
+- Remove transaction-scoped attributes before returning from `lookupAuthN()`.
+- For password reset/change flows, respect reauthentication policy in `IN_PARAMETER_NAME_AUTHN_POLICY` and do not reuse stale session state.
 
-### 7.5 Password reset/change policy considerations
+### 5.5 Logout (`logoutAuthN`) behavior
 
 Official behavior:
 
-- In those flows, `IN_PARAMETER_NAME_USERID` is the username entered at flow start.
-- Reauthentication policy is conveyed via `IN_PARAMETER_NAME_AUTHN_POLICY`.
-- Adapter should ignore previously cached auth state when reauthenticate is required.
+- Called during IdP-initiated and SP-initiated SLO.
+- Can run asynchronously using response + resume path.
+- If adapter has internal session state, clear it here.
+- If external auth system exists, redirect to external logout endpoint and return to `resumePath`.
 
----
+Sample behaviors:
 
-## 8. SP Adapter SPI
+- `TemplateRenderAdapter` and `SampleSubnetAdapter`: return `true` (no-op logout).
+- `ExternalConsentPageAdapter`: throws adapter exception (explicitly not supporting logout).
 
-### 8.1 Primary interface
+## 6. SP Adapter SPI
 
-Implement:
+Primary SPI:
 
 - `org.sourceid.saml20.adapter.sp.authn.SpAuthenticationAdapter`
 
@@ -335,28 +328,25 @@ String lookupLocalUserId(
 throws AuthnAdapterException, IOException;
 ```
 
-### 8.2 Responsibilities
+Runtime semantics:
 
-- `createAuthN`: establish SP-side security context for SSO request.
-- `logoutAuthN`: terminate SP-side session for SLO.
-- `lookupLocalUserId`: support account linking when no link exists yet.
+- `createAuthN`: establish SP-side security context during SSO.
+- `logoutAuthN`: terminate SP-side session during SLO.
+- `lookupLocalUserId`: used for account linking when no link exists yet.
 
-### 8.3 Account linking flow notes
+`sp-adapter-example` specifics:
 
-Official and sample guidance:
+- Uses `LocalIdPasswordLookup` against uploaded user/password properties file.
+- Demonstrates returning serializable authn state from `createAuthN` and receiving it in `logoutAuthN`.
+- Provides the richest descriptor/GUI validation patterns in the SDK samples.
 
-- Use `resumePath` for asynchronous local authentication.
-- Return local user ID to allow PingFederate to establish persistent link.
+## 7. STS Token SPI
 
----
+### 7.1 Token Processor
 
-## 9. STS Token Processor and Generator SPI
+SPI:
 
-### 9.1 Token processor
-
-Implement:
-
-- `org.sourceid.wstrust.plugin.process.TokenProcessor<T extends SecurityToken>`
+- `TokenProcessor<T extends SecurityToken>`
 
 Core method:
 
@@ -364,16 +354,17 @@ Core method:
 TokenContext processToken(T token)
 ```
 
-Notes:
+`token-processor-example` behavior:
 
-- `T` can be `BinarySecurityToken` for custom Base64-transported token formats.
-- Processor returns subject/context attributes used downstream.
+- Implements `TokenProcessor<BinarySecurityToken>`.
+- Decodes binary token payload as UTF-8 subject string.
+- Returns `TokenContext` with subject attributes map containing `subject`.
 
-### 9.2 Token generator
+### 7.2 Token Generator
 
-Implement:
+SPI:
 
-- `org.sourceid.wstrust.plugin.generate.TokenGenerator`
+- `TokenGenerator`
 
 Core method:
 
@@ -381,18 +372,15 @@ Core method:
 SecurityToken generateToken(TokenContext attributeContext)
 ```
 
-Notes:
+`token-generator-example` behavior:
 
-- Generator consumes subject data from `TokenContext` and emits a token.
-- `BinarySecurityToken` is available for custom token formats.
+- Reads `subject` from `TokenContext`.
+- Builds `BinarySecurityToken` with token type `urn:sample:token`.
+- Encodes subject bytes to Base64 payload.
 
----
+## 8. Authentication Selector SPI
 
-## 10. Authentication Selector SPI
-
-### 10.1 Primary interface
-
-Implement:
+Primary SPI:
 
 - `com.pingidentity.sdk.AuthenticationSelector`
 
@@ -414,28 +402,33 @@ void callback(
     AuthenticationSelectorContext authnSelectorContext);
 ```
 
-### 10.2 Behavior rules
+Runtime semantics:
 
-- `selectContext()` chooses adapter or IdP connection target.
-- If selector commits response, flow pauses and resumes on `resumePath`.
-- `callback()` runs after selected source authentication.
-- Official warning: writing response content in `callback()` is not supported; cookie writes are supported.
+- `selectContext` chooses authentication source (adapter, IdP connection, or context mapping).
+- Committed response in `selectContext` pauses flow; browser must return to `resumePath`.
+- `callback` runs after selected auth source completes.
 
-### 10.3 Result types
+Official callback restriction:
 
-Selector context can choose by:
+- Do not write response body in `callback`.
+- Cookie writes are supported.
 
-- context value (`ResultType.CONTEXT`)
-- concrete adapter ID
-- concrete IdP connection ID
+`authentication-selector-example` behavior:
 
----
+- Selector prompts for email/domain, extracts domain, and sets persistent cookie.
+- Supports API and non-API execution paths.
+- If no input exists, returns `null` after rendering response (selector still in progress).
+- Defaults cookie name to `pf-authn-selector-<configuration-id>` when not configured.
+- Uses `AuthenticationSelectorDescriptor.setSupportsExtendedResults(true)`.
 
-## 11. Custom Data Source Connector SPI
+Result type usage:
 
-### 11.1 Primary interface
+- Example sets `ResultType.CONTEXT` and returns domain string for context mapping.
+- Other legal result types: `ADAPTER_ID`, `IDP_CONN_ID`.
 
-Implement:
+## 9. Custom Data Source SPI
+
+Primary SPI:
 
 - `com.pingidentity.sources.CustomDataSourceDriver`
 
@@ -444,29 +437,32 @@ Core methods:
 ```java
 boolean testConnection();
 List<String> getAvailableFields();
-Map<String,Object> retrieveValues(Collection<String> attributeNamesToFill, SimpleFieldList filterConfiguration);
+Map<String, Object> retrieveValues(Collection<String> attributeNamesToFill, SimpleFieldList filterConfiguration);
 SourceDescriptor getSourceDescriptor();
 void configure(Configuration configuration);
 ```
 
-### 11.2 Runtime contract
+Runtime semantics:
 
-- `testConnection()` must return `true` only when connectivity is valid; false blocks admin progression.
+- `testConnection()` gates admin progress; false blocks continuation.
 - `getAvailableFields()` must return at least one field.
-- `retrieveValues()` returns map keyed by requested attribute names.
-- Use `CustomDataSourceDriverDescriptor` + `FilterFieldDataDescriptor` for runtime filter fields in admin UI.
+- `retrieveValues()` must return map keyed by requested attribute names; return empty map when no match.
 
-Official filter note:
+`custom-data-store-example` behavior:
 
-- Runtime attribute references in admin filters must use `${attributeName}` syntax.
+- Uses properties-file directory as storage.
+- Filter key: `SamplePropertiesDataStore Username`.
+- Descriptor includes both configuration fields and filter fields.
+- Reads `<username>.properties` and maps requested fields.
+- Missing properties return empty string values in sample implementation.
 
----
+Official filter substitution rule:
 
-## 12. Password Credential Validator SPI
+- Runtime attributes in admin-defined filters use `${attributeName}` syntax.
 
-### 12.1 Primary interface
+## 10. Password Credential Validator SPI
 
-Implement:
+Primary SPI:
 
 - `com.pingidentity.sdk.password.PasswordCredentialValidator`
 
@@ -479,31 +475,38 @@ throws PasswordValidationException;
 
 Semantics:
 
-- valid credentials -> non-empty `AttributeMap` (must include principal)
-- invalid credentials -> `null` or empty map
-- system/validation service failure -> throw `PasswordValidationException`
+- Valid credential -> non-empty `AttributeMap` with principal attributes.
+- Invalid credential -> null or empty map.
+- System or backend failures -> `PasswordValidationException`.
 
-### 12.2 Optional capability interfaces
-
-Common optional interfaces in samples:
+Optional interfaces demonstrated by sample:
 
 - `ChangeablePasswordCredential`
 - `ResettablePasswordCredential`
 - `RecoverableUsername`
 
-Sample behaviors include:
+`password-credential-validator-example` behavior:
 
-- change password policy checks returning recoverable auth exceptions
-- user lookup for reset with required attributes (`mail`, `givenName`, etc.)
-- username recovery by email
+- Stores a single credential pair in configuration for demonstration.
+- Supports password policy check on reset/change (min length, recoverable errors).
+- Implements:
+  - `changePassword(...)`
+  - `isPasswordChangeable()`
+  - `isChangePasswordEmailNotifiable()`
+  - `isPendingPasswordExpiryNotifiable()`
+  - `findUser(...)`
+  - `findUsersByMail(...)`
+  - attribute-name getters for reset/recovery metadata
+  - `isPasswordResettable()`
+  - `resetPassword(...)`
 
----
+Sample caveat explicitly documented in code:
 
-## 13. Notification Publisher SPI
+- Non-admin password updates are not persisted/replicated for cluster usage.
 
-### 13.1 Primary interface
+## 11. Notification Publisher SPI
 
-Implement:
+Primary SPI:
 
 - `com.pingidentity.sdk.notification.NotificationPublisherPlugin`
 
@@ -516,316 +519,423 @@ PublishResult publishNotification(
     Map<String, String> configuration)
 ```
 
-Runtime behavior:
+Runtime semantics:
 
-- PingFederate invokes this method when configured events occur.
-- Return `PublishResult` status (`SUCCESS`/`FAILURE`).
+- Called when configured events trigger notifications.
+- Plugin returns `PublishResult` with notification status.
 
-Sample implementation pattern:
+`notification-publisher-example` behavior:
 
-- Serialize event payload to JSON
-- POST to configured endpoint
-- map HTTP result to `PublishResult.NOTIFICATION_STATUS`
+- Descriptor type: `Sample HTTP Notification Publisher`.
+- Config field: `POST Endpoint`.
+- Builds JSON payload containing `eventType` and `data`.
+- Sends HTTP POST via Apache HTTP client.
+- Sets status `SUCCESS` on HTTP 200, otherwise `FAILURE`.
 
----
+## 12. Authentication API-Capable Plugins
 
-## 14. Authentication API-Capable Plugins
-
-### 14.1 Core concept
-
-API-capable adapters/selectors support JSON API interaction instead of browser template rendering when invoked through authentication API endpoints.
-
-### 14.2 Required interface
-
-Implement:
+Primary SPI:
 
 - `com.pingidentity.sdk.api.authn.AuthnApiPlugin`
 
 Methods:
 
-- `PluginApiSpec getApiSpec()`
-- `AuthnApiPluginDescriptor getApiPluginDescriptor()` (optional override)
+```java
+PluginApiSpec getApiSpec();
+AuthnApiPluginDescriptor getApiPluginDescriptor(); // optional override
+```
 
-### 14.3 API model vocabulary
+### 12.1 Concept model
 
-- **State**: current transaction step (`status`) plus model payload.
-- **Action**: allowed operation from current state.
-- **Model**: typed payload for states/actions.
-- **Errors**: top-level and detail error specs.
+Authentication API transaction model:
 
-Relevant spec classes:
+- PingFederate assigns flow ID to each API-based auth transaction.
+- Transaction always has a current state (`status`) with optional model fields.
+- State response also advertises available actions.
+- Action POST payload shape is determined by action model class.
 
-- `AuthnStateSpec`
-- `AuthnActionSpec`
+### 12.2 Spec objects
+
+Core spec types:
+
+- `AuthnStateSpec<TModel>`
+- `AuthnActionSpec<TModel>`
 - `AuthnErrorSpec`
 - `AuthnErrorDetailSpec`
 
-### 14.4 API Explorer integration
+Builder usage shown in official text and samples:
 
-The returned API spec powers API Explorer documentation and interactive testing (`/pf-ws/authn/explorer`, if enabled in admin settings).
+```java
+new AuthnStateSpec.Builder<...>().status(...).modelClass(...).action(...).build();
+new AuthnActionSpec.Builder<...>().id(...).modelClass(...).error(...).errorDetail(...).build();
+new AuthnErrorDetailSpec.Builder().code(...).message(...).parentCode(...).build();
+```
 
-### 14.5 Model annotation guidance
+### 12.3 Sample API specs
 
-Official recommendation:
+`template-render-adapter-example`:
 
-- Use `@Schema` on model getters with descriptions and required flags.
+- State ID: `USER_ATTRIBUTES_REQUIRED`
+- Action ID: `submitUserAttributes`
+- Error detail code: `INVALID_ATTRIBUTE_NAME`
+- Includes `CommonActionSpec.CANCEL_AUTHENTICATION`
+- Includes validation error mapping to `CommonErrorSpec.VALIDATION_ERROR`
 
-### 14.6 Runtime flow pattern (official)
+`authentication-selector-example`:
 
-In `lookupAuthN()` or `selectContext()`:
+- State ID: `EMAIL_OR_DOMAIN_REQUIRED`
+- Action ID: `submitEmailOrDomain`
+- Includes cancel action
 
-1. Check expected actions for current state.
-2. If action requested, deserialize model and process it.
-3. If unknown action ID requested, return `INVALID_ACTION_ID`.
-4. If no action requested, return/render current state.
+### 12.4 Runtime handling pattern
 
-### 14.7 AuthnApiSupport utility
+Official pattern for `lookupAuthN()` or `selectContext()`:
 
-Common helper class:
+1. Check whether request carries an expected action for current state.
+2. If action exists, deserialize action model and process.
+3. If action ID exists but does not match any valid action for state, return `INVALID_ACTION_ID`.
+4. If no action requested, render current state response.
+
+Common utility class:
 
 - `AuthnApiSupport apiSupport = AuthnApiSupport.getDefault();`
 
-Frequently used methods in samples/docs:
+Frequently used helper methods:
 
-- `isApiRequest(req)`
-- `getActionId(req)`
-- `deserializeAsModel(req, ModelClass.class)`
-- `makeAuthnState(req, stateSpec, model)`
-- `writeAuthnStateResponse(req, resp, state)`
-- `writeErrorResponse(req, resp, authnError)`
+- `apiSupport.isApiRequest(req)`
+- `apiSupport.getActionId(req)`
+- `apiSupport.deserializeAsModel(req, Model.class)`
+- `apiSupport.makeAuthnState(req, stateSpec, model)`
+- `apiSupport.writeAuthnStateResponse(req, resp, state)`
+- `apiSupport.writeErrorResponse(req, resp, authnError)`
 
-### 14.8 Validation and error handling
+Validation flow from official guidance:
 
-Official behavior:
-
-- `deserializeAsModel()` validates shape/required fields and can throw `AuthnErrorException`.
-- Plugin-specific validation should throw `AuthnErrorException` with `AuthnError` payload.
+- `deserializeAsModel()` enforces JSON shape and required fields (`@Schema(required=true)`).
+- Additional domain validation should throw `AuthnErrorException` with detail objects.
 - Catch `AuthnErrorException` and write API error response.
 
-### 14.9 Non-interactive plugin mode
+### 12.5 Non-interactive API-capable plugins
 
-For plugins that never prompt users:
+Official and sample pattern:
 
 - implement `AuthnApiPlugin`
 - return `null` from `getApiSpec()`
-- return descriptor with `interactive(false)` via `AuthnApiPluginDescriptor.Builder`
+- return `new AuthnApiPluginDescriptor.Builder().interactive(false).build()`
 
-This avoids forced RESUME redirects during API executions.
+Effect:
 
-### 14.10 Error localization
+- PingFederate can execute plugin directly in API and front-channel paths without forced redirect/RESUME.
 
-Official guidance and samples:
+## 13. Session State and Transaction State
 
-- Use `AuthnErrorDetail.userMessage` for end-user-facing error text.
-- Localize with `LocaleUtil` + `LanguagePackMessages`.
+Official mechanisms:
 
----
+- `SessionStateSupport`: user session-scoped attributes across transactions.
+- `TransactionalStateSupport`: attributes scoped to current auth transaction.
 
-## 15. Session State Management
+Guidance:
 
-Official guidance:
+- Use same state strategy for API and non-API requests.
+- Do not introduce extra state just for API mode if existing state is sufficient.
+- Remove transactional attributes when flow completes.
 
-- Use SDK state helpers instead of direct servlet session usage.
+Sample usage highlights:
 
-Primary helpers:
+- `ExternalConsentPageAdapter`: CSRF token and authorization-detail identifier map via `SessionStateSupport`.
+- `SampleEmailAuthPlugin`: OOB transaction data in `KeyValueStateSupport`, cleaned in `finished()`.
 
-- `SessionStateSupport` (global/session-scoped)
-- `TransactionalStateSupport` (current transaction-scoped)
+## 14. Error Localization
 
-Sample usage patterns:
+Official API error localization pattern:
 
-- `ExternalConsentPageAdapter` stores CSRF token and temporary authorization detail mappings via `SessionStateSupport`.
-- `ciba-auth-plugin-example` stores OOB transaction state with `KeyValueStateSupport` and removes it in `finished()`.
+- Use `AuthnErrorDetail.userMessage` for end-user-facing text.
+- Define reusable error detail specs (`code`, `message`, `parentCode`).
+- Build localized user message at runtime via language bundles.
 
-Cleanup rule:
+Localization utilities used by samples:
 
-- Remove transaction state once flow completes to avoid leaks and stale security state.
-
----
-
-## 16. Identity Store Provisioner SPI
-
-### 16.1 Preferred interfaces
-
-Implement one of:
-
-- `IdentityStoreProvisionerWithFiltering` (supports list/query/filter)
-- `IdentityStoreProvisioner` (no list/query/filter)
-
-Deprecated:
-
-- `IdentityStoreUserProvisioner` (users only)
-
-### 16.2 Core user methods
-
-```java
-UserResponseContext createUser(CreateUserRequestContext ctx)
-UserResponseContext readUser(ReadUserRequestContext ctx)
-UserResponseContext updateUser(UpdateUserRequestContext ctx)
-void deleteUser(DeleteUserRequestContext ctx)
-```
-
-With filtering interface additionally:
-
-```java
-UsersResponseContext readUsers(ReadUsersRequestContext ctx)
-```
-
-### 16.3 Core group methods
-
-```java
-boolean isGroupProvisioningSupported()
-GroupResponseContext createGroup(CreateGroupRequestContext ctx)
-GroupResponseContext readGroup(ReadGroupRequestContext ctx)
-GroupResponseContext updateGroup(UpdateGroupRequestContext ctx)
-void deleteGroup(DeleteGroupRequestContext ctx)
-```
-
-With filtering interface additionally:
-
-```java
-GroupsResponseContext readGroups(ReadGroupsRequestContext ctx)
-```
-
-### 16.4 Error semantics
-
-- Throw `IdentityStoreException` subclasses for runtime/provisioning errors.
-- If soft-delete model is used, deleted resources must behave as not found for read/update/delete.
-- Conflict checks should ignore previously deleted resources where applicable.
-
-### 16.5 Sample behavior highlights
-
-`identity-store-provisioner-example` demonstrates:
-
-- configurable delete-vs-disable user behavior
-- SCIM paging/sort hooks (`startIndex`, `count`, `sortBy`, `sortOrder`)
-- conflict handling on username uniqueness
-- optional group provisioning support path
-
----
-
-## 17. SDK Sample Inventory
-
-Path:
-`binaries/pingfederate/dist/pingfederate-13.0.1/pingfederate/sdk/plugin-src/`
-
-| Sample folder | Primary extension point | Key capability shown |
-|---------------|-------------------------|----------------------|
-| `idp-adapter-example` | IdP adapter | Non-interactive API-capable adapter (`interactive=false`) |
-| `template-render-adapter-example` | IdP adapter | Interactive form + Authn API states/actions/errors |
-| `external-consent-page-example` | IdP adapter | External OAuth consent, scope/authorization-details approval, CSRF |
-| `sp-adapter-example` | SP adapter | SP session creation/logout/account-link plus rich GUI descriptors |
-| `authentication-selector-example` | Selector | Cookie-based context selection + API-capable selector |
-| `token-processor-example` | STS processor | `BinarySecurityToken` decode -> subject context |
-| `token-generator-example` | STS generator | Subject context -> encoded `BinarySecurityToken` |
-| `custom-data-store-example` | Data source | Filter fields, properties-file lookup, connection test |
-| `password-credential-validator-example` | PCV | Validate + change/reset/recovery optional interfaces |
-| `identity-store-provisioner-example` | Provisioner | User/group CRUD with filtering/sorting/pagination hooks |
-| `notification-publisher-example` | Notification | HTTP POST publisher implementation |
-| `secret-manager-example` | Secret manager | Secret reference generation/verification admin actions |
-| `ciba-auth-plugin-example` | OOB/CIBA | OOB initiate/check/finished with review/approve/deny handlers |
-| `dynamic-client-registration-example` | Dynamic client registration | Software statement JWT validation and metadata mapping |
-| `client-storage-example` | OAuth client storage | CRUD/search/sort pagination for client data |
-| `access-grant-example` | Access grant manager | Access grant persistence/revocation and criteria lookup |
-
----
-
-## 18. Sample-Derived Patterns Not Explicit in Official Text
-
-These are practical patterns visible in shipped examples and useful for implementation quality.
-
-### 18.1 API-capable non-interactive plugins
-
-`idp-adapter-example` demonstrates the recommended non-interactive API pattern:
-
-- `getApiSpec()` returns `null`
-- `getApiPluginDescriptor()` returns `interactive(false)`
-
-This avoids unnecessary RESUME responses for API clients.
-
-### 18.2 Template rendering and i18n
-
-Interactive samples consistently pair:
-
-- `TemplateRendererUtil.render(...)`
 - `LocaleUtil.getUserLocale(req)`
 - `LanguagePackMessages("<bundle>", locale)`
 
-and provide language pack files under `conf/language-packs/`.
+Template samples load these bundles:
 
-### 18.3 Callback discipline for selectors
+- `attribute-form-template.properties`
+- `sample-authn-selector-email-template.properties`
+- `external-consent-page.properties`
+- `request-approval-page.properties`
 
-`authentication-selector-example` follows official guidance:
+## 15. Identity Store Provisioner SPI
 
-- `callback()` sets cookies only
-- no body writes in callback path
+Preferred interfaces:
 
-### 18.4 Session-safe consent handling
+- `IdentityStoreProvisionerWithFiltering`
+- `IdentityStoreProvisioner`
 
-`external-consent-page-example` adds concrete security pattern:
+Deprecated interface:
 
-- generate/store CSRF token in session state
-- verify token on approval POST
-- map authorization details to short random IDs before rendering page
+- `IdentityStoreUserProvisioner`
 
-### 18.5 OOB/CIBA transaction lifecycle
+### 15.1 User operations
 
-`ciba-auth-plugin-example` demonstrates full lifecycle contract:
+```java
+UserResponseContext createUser(CreateUserRequestContext createRequestCtx)
+UserResponseContext readUser(ReadUserRequestContext readRequestCtx)
+UsersResponseContext readUsers(ReadUsersRequestContext readRequestCtx) // WithFiltering only
+UserResponseContext updateUser(UpdateUserRequestContext updateRequestCtx)
+void deleteUser(DeleteUserRequestContext deleteRequestCtx)
+```
 
-- `initiate(...)` allocates transaction state, sends notification
-- `check(...)` returns `IN_PROGRESS`/`SUCCESS`/`FAILURE`
-- `finished(...)` removes transaction state
+### 15.2 Group operations
 
-### 18.6 Admin action patterns
+```java
+boolean isGroupProvisioningSupported()
+GroupResponseContext createGroup(CreateGroupRequestContext createRequestCtx)
+GroupResponseContext readGroup(ReadGroupRequestContext readRequestCtx)
+GroupsResponseContext readGroups(ReadGroupsRequestContext readRequestCtx) // WithFiltering only
+GroupResponseContext updateGroup(UpdateGroupRequestContext updateRequestCtx)
+void deleteGroup(DeleteGroupRequestContext deleteRequestCtx)
+```
 
-`secret-manager-example` and `ciba-auth-plugin-example` show using `ActionDescriptor` to:
+Error contract:
 
-- run connectivity checks
-- generate and validate secret references
-- accept action parameters via `SimpleFieldList`
+- Throw `IdentityStoreException` subclasses for operational errors.
+- If using soft-delete semantics, deleted IDs must behave as not found for read/update/delete.
+- Deleted resources must not incorrectly trigger conflict checks.
 
-### 18.7 Rich GUI validation
+`identity-store-provisioner-example` deep behavior:
 
-`sp-adapter-example` demonstrates three useful validation scopes:
+- In-memory user/group caches (`ConcurrentHashMap`).
+- Admin radio option controls delete behavior:
+  - disable user
+  - permanently delete user
+- Implements SCIM-style list/query hooks:
+  - filter string logging
+  - sort mapping via `getSCIMTargetToSourceAttributeMapping()`
+  - pagination (`startIndex`, `count`)
+- Demonstrates conflict logic on username uniqueness with soft-delete mode awareness.
+- Group contract includes member handling via `MemberAttribute`.
 
-- field-level (`FieldValidator`)
-- row-level (`RowValidator` for table rows)
-- whole-config (`ConfigurationValidator`)
+## 16. Additional SDK Extension SPIs in Samples
 
-### 18.8 HA caveat in in-memory samples
+These SPIs are present in shipped sample code and are highly relevant when extending PingFederate beyond the core SDK chapter list.
 
-`access-grant-example`, `client-storage-example`, and `identity-store-provisioner-example` are intentionally in-memory.
+### 16.1 OOB/CIBA Authentication Plugin (`OOBAuthPlugin`)
 
-Implication:
+Sample class:
 
-- do not reuse these storage approaches for HA/DR production deployments.
-- back persistent plugin state with external durable store.
+- `com.pingidentity.oob.SampleEmailAuthPlugin`
 
----
+Core methods used:
 
-## 19. Production Hardening Checklist
+```java
+OOBAuthTransactionContext initiate(OOBAuthRequestContext requestContext, Map<String, Object> inParameters)
+OOBAuthResultContext check(String transactionIdentifier, Map<String, Object> inParameters)
+void finished(String transactionIdentifier)
+```
 
-Before production use:
+Sample flow:
 
-1. Replace in-memory state stores with durable shared storage.
-2. Add structured logging (avoid `System.out` usage in samples).
-3. Add strict input validation for all request-derived fields.
-4. Ensure CSRF and replay protections for interactive handlers.
-5. Enforce bounded retries/timeouts for network dependencies.
-6. Validate compatibility across upgrades in dedicated regression suites.
-7. Document and test restart/redeploy behavior (state cleanup, idempotency).
-8. Validate plugin behavior in cluster mode (session replication, callback paths).
+- Registers custom handlers for review/approve/deny endpoints.
+- Sends email containing approval URL.
+- Tracks transaction in `KeyValueStateSupport`.
+- Supports approved scopes and approved authorization details.
+- Optional status-change callback flag in configuration.
 
----
+Handler paths used:
 
-## 20. Quick Start Recipe
+- `/oob-auth/review`
+- `/oob-auth/approve`
+- `/oob-auth/deny`
 
-For a new plugin in SDK workspace:
+### 16.2 Secret Manager (`SecretManager`)
 
-1. Create `sdk/plugin-src/<plugin-name>/java/...` package structure.
-2. Implement target SPI and descriptor method(s).
-3. Add GUI fields/validators/actions in descriptor.
-4. Implement `configure(Configuration)` and runtime methods.
+Sample class:
+
+- `com.pingidentity.secretmanager.SampleSecretManager`
+
+Core method:
+
+```java
+SecretInfo getSecretInfo(String secretId, Map<String, Object> inParameters)
+```
+
+Sample behavior:
+
+- Reads secret from environment variable named by `secretId`.
+- Returns `SecretInfo(secret, attributes)`.
+- Provides admin actions:
+  - generate secret reference
+  - verify secret reference
+- Uses reference format:
+  - `OBF:MGR:{secretManagerId}:{secretId}`
+
+### 16.3 Dynamic Client Registration Plugin
+
+Sample class:
+
+- `com.pingidentity.clientregistration.SoftwareStatementValidatorPlugin`
+
+Core methods:
+
+```java
+void processPlugin(HttpServletRequest request, HttpServletResponse response, DynamicClient dynamicClient, Map<String, Object> inParameters)
+void processPluginUpdate(HttpServletRequest request, HttpServletResponse response, DynamicClient dynamicClient, DynamicClient existingDynamicClient, Map<String, Object> inParameters)
+```
+
+Sample behavior:
+
+- Validates `software_statement` JWT.
+- Enforces configured issuer.
+- Supports verification from either:
+  - JWKS URI
+  - JWKS JSON text
+- Rejects invalid signatures, malformed JWTs, and software_statement on update.
+- Maps standard OAuth/OIDC/DCR claims into `DynamicClient`.
+- Processes supported extended metadata claims.
+
+Configuration validation logic is strict:
+
+- exactly one of `JWKS URL` or `JWKS` must be provided
+- both set or both blank are rejected
+
+### 16.4 Access Grant Manager
+
+Sample class:
+
+- `com.pingidentity.accessgrant.SampleAccessGrant`
+
+SPI:
+
+- `AccessGrantManager`
+
+Sample behavior:
+
+- In-memory grant storage keyed by GUID.
+- Implements full grant lookup/update/revoke API.
+- Supports criteria-based retrieval including authorization details equality.
+- Refresh-token lookup hashes incoming token before comparison.
+
+### 16.5 Client Storage Manager
+
+Sample class:
+
+- `com.pingidentity.clientstorage.SampleClientStorage`
+
+SPI base:
+
+- `ClientStorageManagerBase` (`ClientStorageManagerV2` semantics)
+
+Sample behavior:
+
+- In-memory client storage with CRUD.
+- Implements search with query filtering on ID/name.
+- Supports sort by ID/name/last-modified/creation-time.
+- Supports pagination via `SearchCriteria` start index and item count.
+
+## 17. Full Sample Inventory and Deep Notes
+
+Sample set under `sdk/plugin-src/` (Java files, templates, language packs):
+
+| Sample | Primary SPI(s) | Key implementation notes |
+|---|---|---|
+| `idp-adapter-example` | `IdpAuthenticationAdapterV2`, `AuthnApiPlugin` | IPv4 subnet auth, chained-attribute role elevation, non-interactive API descriptor (`interactive=false`) |
+| `template-render-adapter-example` | `IdpAuthenticationAdapterV2`, `AuthnApiPlugin` | Unified browser/API flow, explicit state/action/error specs, model deserialization + validation pipeline |
+| `external-consent-page-example` | `IdpAuthenticationAdapterV2` | OAuth external consent flow, CSRF token enforcement, authorization-details ID masking |
+| `sp-adapter-example` | `SpAuthenticationAdapter` | Full admin GUI control surface: field, row, config validators; action descriptor usage |
+| `authentication-selector-example` | `AuthenticationSelector`, `AuthnApiPlugin` | Domain-based source selection, persistent cookie optimization, API state for selector |
+| `custom-data-store-example` | `CustomDataSourceDriver` | Descriptor with filter fields, runtime property-file lookup, connection testing pattern |
+| `password-credential-validator-example` | `PasswordCredentialValidator` + optional interfaces | Auth + password change/reset + username recovery in one implementation |
+| `identity-store-provisioner-example` | `IdentityStoreProvisionerWithFiltering` | SCIM-style read/list/filter/sort/page, soft delete vs hard delete behavior |
+| `token-processor-example` | `TokenProcessor<BinarySecurityToken>` | Token decode to subject attribute context |
+| `token-generator-example` | `TokenGenerator` | Subject attribute context to token generation |
+| `notification-publisher-example` | `NotificationPublisherPlugin` | HTTP POST transport with JSON payload + status mapping |
+| `ciba-auth-plugin-example` | `OOBAuthPlugin` | Full out-of-band approval lifecycle with callback-capable status changes |
+| `secret-manager-example` | `SecretManager` | Secret lookup from env, plus actionable admin utilities |
+| `dynamic-client-registration-example` | `DynamicClientRegistrationPlugin` | Software statement verification and claim-to-client mapping |
+| `access-grant-example` | `AccessGrantManager` | End-to-end grant persistence interface sample |
+| `client-storage-example` | `ClientStorageManagerBase` | Client CRUD + search/sort/page administrative support |
+
+Notable non-code sample assets:
+
+- Template HTML files under each sample `conf/template/` directory.
+- Language bundles under `conf/language-packs/`.
+- These are first-class runtime dependencies for interactive templates and localized messages.
+
+## 18. Cross-Sample Reusable Patterns
+
+### 18.1 Dual-path handlers (API + browser)
+
+`TemplateRenderAdapter` and `SampleAuthenticationSelector` both use one runtime path that branches by request type:
+
+- API request: action ID + JSON model + `AuthnApiSupport` response
+- Browser request: form parameters + template rendering
+
+This keeps behavior parity between channels.
+
+### 18.2 Strict action matching
+
+Good pattern used by API-capable samples:
+
+- if an action ID is present but not valid for current state, return invalid-action error instead of silently ignoring it.
+
+### 18.3 Descriptor-centric admin UX
+
+`SpAuthnAdapterExample` shows full descriptor stack:
+
+- field-level validation
+- row-level cross-field validation in tables
+- global configuration validator
+- action links with dynamic results
+
+### 18.4 State cleanup discipline
+
+`SampleEmailAuthPlugin.finished()` and official adapter guidance align on one rule:
+
+- always remove transaction-scoped state once terminal status is reached.
+
+### 18.5 Security details demonstrated in examples
+
+- CSRF token round-trip validation on consent pages.
+- Escaping request parameters before rendering (`Utils.escapeForHtml`).
+- Authorization-detail value shielding by random identifier mapping.
+
+## 19. Hardening Checklist
+
+Concrete hardening deltas from sample code to production:
+
+1. Replace all in-memory state stores (`HashMap`, in-process caches) with durable shared storage.
+2. Remove `System.out` logging and normalize structured logger usage.
+3. Enforce timeout, retry, and circuit behavior for all network calls.
+4. Validate all user-supplied inputs beyond basic sample checks.
+5. Ensure cluster-safe replication behavior for password reset/change state.
+6. Ensure secret manager integrations rely on secure secret backends rather than plain env vars where possible.
+7. Validate all template parameters for XSS-safety before rendering.
+8. Test API and browser paths for identical policy outcomes.
+9. Add restart and failover tests for session and transaction state recovery semantics.
+10. Ensure plugin startup/lazy-init settings are tested with your extension set.
+
+## 20. SDK-Relevant Release Deltas
+
+SDK-facing deltas surfaced in the vendor text:
+
+- `IN_PARAMETER_NAME_SRI` added to SDK inputs (`pi.sri` exposure).
+- `SessionManager` added to SDK for adapter-driven session revocation use cases.
+- Startup toggle for plugin creation/initialization introduced (`ConfigurePluginsOnStartup`).
+- `AccessGrantManagerAccessor` exposed in SDK API surface.
+
+Operational implication:
+
+- Plugin lifecycle timing can differ when startup plugin initialization is disabled; plugin first-use latency should be tested in environments using this setting.
+
+## 21. Build-Deploy Quick Start
+
+Minimal plugin workflow:
+
+1. Create plugin project under `sdk/plugin-src/<plugin-name>/`.
+2. Add Java sources under `java/` with package structure.
+3. Add optional third-party dependencies under `<plugin>/lib/`.
+4. Add optional runtime config assets under `<plugin>/conf/`.
 5. Set `target-plugin.name=<plugin-name>` in `sdk/build.local.properties`.
 6. Run:
 
@@ -837,38 +947,44 @@ ant deploy-plugin
 ```
 
 7. Restart PingFederate.
-8. Configure plugin instance in admin console and validate flow end-to-end.
+8. Configure plugin instance in admin console.
+9. Validate both happy-path and failure-path behavior in runtime flows.
 
----
+## 22. Source Inventory
 
-## 21. References
+Primary official text:
 
-Primary official source text:
+- `docs/reference/vendor/pingfederate_server-13.0.txt`
 
-- `docs/reference/vendor/pingfederate_server-13.0.txt` (SDK Developer's Guide section; lines approx. `82582-84395`)
-
-SDK build/config and API docs:
+SDK build and layout files:
 
 - `binaries/pingfederate/dist/pingfederate-13.0.1/pingfederate/sdk/build.xml`
 - `binaries/pingfederate/dist/pingfederate-13.0.1/pingfederate/sdk/build.properties`
 - `binaries/pingfederate/dist/pingfederate-13.0.1/pingfederate/sdk/build.local.properties`
-- `binaries/pingfederate/dist/pingfederate-13.0.1/pingfederate/sdk/doc/index.html`
 
-Sample sources (all reviewed for this guide):
+Bundled sample sources reviewed:
 
 - `binaries/pingfederate/dist/pingfederate-13.0.1/pingfederate/sdk/plugin-src/idp-adapter-example/java/com/pingidentity/adapter/idp/SampleSubnetAdapter.java`
 - `binaries/pingfederate/dist/pingfederate-13.0.1/pingfederate/sdk/plugin-src/template-render-adapter-example/java/com/pingidentity/adapter/idp/TemplateRenderAdapter.java`
-- `binaries/pingfederate/dist/pingfederate-13.0.1/pingfederate/sdk/plugin-src/authentication-selector-example/java/com/pingidentity/authentication/selector/SampleAuthenticationSelector.java`
+- `binaries/pingfederate/dist/pingfederate-13.0.1/pingfederate/sdk/plugin-src/template-render-adapter-example/java/com/pingidentity/adapter/idp/api/StateSpec.java`
+- `binaries/pingfederate/dist/pingfederate-13.0.1/pingfederate/sdk/plugin-src/template-render-adapter-example/java/com/pingidentity/adapter/idp/api/ActionSpec.java`
+- `binaries/pingfederate/dist/pingfederate-13.0.1/pingfederate/sdk/plugin-src/template-render-adapter-example/java/com/pingidentity/adapter/idp/api/ErrorDetailSpec.java`
+- `binaries/pingfederate/dist/pingfederate-13.0.1/pingfederate/sdk/plugin-src/template-render-adapter-example/java/com/pingidentity/adapter/idp/api/SubmitUserAttributes.java`
+- `binaries/pingfederate/dist/pingfederate-13.0.1/pingfederate/sdk/plugin-src/template-render-adapter-example/java/com/pingidentity/adapter/idp/api/UserAttributesRequired.java`
+- `binaries/pingfederate/dist/pingfederate-13.0.1/pingfederate/sdk/plugin-src/external-consent-page-example/java/com/pingidentity/adapter/idp/ExternalConsentPageAdapter.java`
 - `binaries/pingfederate/dist/pingfederate-13.0.1/pingfederate/sdk/plugin-src/sp-adapter-example/java/com/pingidentity/adapter/sp/SpAuthnAdapterExample.java`
-- `binaries/pingfederate/dist/pingfederate-13.0.1/pingfederate/sdk/plugin-src/token-processor-example/java/com/pingidentity/processor/SampleTokenProcessor.java`
-- `binaries/pingfederate/dist/pingfederate-13.0.1/pingfederate/sdk/plugin-src/token-generator-example/java/com/pingidentity/generator/SampleTokenGenerator.java`
+- `binaries/pingfederate/dist/pingfederate-13.0.1/pingfederate/sdk/plugin-src/authentication-selector-example/java/com/pingidentity/authentication/selector/SampleAuthenticationSelector.java`
+- `binaries/pingfederate/dist/pingfederate-13.0.1/pingfederate/sdk/plugin-src/authentication-selector-example/java/com/pingidentity/authentication/selector/api/StateSpec.java`
+- `binaries/pingfederate/dist/pingfederate-13.0.1/pingfederate/sdk/plugin-src/authentication-selector-example/java/com/pingidentity/authentication/selector/api/ActionSpec.java`
+- `binaries/pingfederate/dist/pingfederate-13.0.1/pingfederate/sdk/plugin-src/authentication-selector-example/java/com/pingidentity/authentication/selector/api/SubmitEmailOrDomain.java`
 - `binaries/pingfederate/dist/pingfederate-13.0.1/pingfederate/sdk/plugin-src/custom-data-store-example/java/com/pingidentity/customdatastore/SamplePropertiesDataStore.java`
 - `binaries/pingfederate/dist/pingfederate-13.0.1/pingfederate/sdk/plugin-src/password-credential-validator-example/java/com/pingidentity/password/credential/validator/SamplePasswordCredentialValidator.java`
-- `binaries/pingfederate/dist/pingfederate-13.0.1/pingfederate/sdk/plugin-src/identity-store-provisioner-example/java/com/pingidentity/identitystoreprovisioners/sample/SampleIdentityStoreProvisioner.java`
 - `binaries/pingfederate/dist/pingfederate-13.0.1/pingfederate/sdk/plugin-src/notification-publisher-example/java/com/pingidentity/notification/publisher/HttpNotificationPublisher.java`
-- `binaries/pingfederate/dist/pingfederate-13.0.1/pingfederate/sdk/plugin-src/secret-manager-example/java/com/pingidentity/secretmanager/SampleSecretManager.java`
+- `binaries/pingfederate/dist/pingfederate-13.0.1/pingfederate/sdk/plugin-src/token-processor-example/java/com/pingidentity/processor/SampleTokenProcessor.java`
+- `binaries/pingfederate/dist/pingfederate-13.0.1/pingfederate/sdk/plugin-src/token-generator-example/java/com/pingidentity/generator/SampleTokenGenerator.java`
+- `binaries/pingfederate/dist/pingfederate-13.0.1/pingfederate/sdk/plugin-src/identity-store-provisioner-example/java/com/pingidentity/identitystoreprovisioners/sample/SampleIdentityStoreProvisioner.java`
 - `binaries/pingfederate/dist/pingfederate-13.0.1/pingfederate/sdk/plugin-src/ciba-auth-plugin-example/java/com/pingidentity/oob/SampleEmailAuthPlugin.java`
-- `binaries/pingfederate/dist/pingfederate-13.0.1/pingfederate/sdk/plugin-src/external-consent-page-example/java/com/pingidentity/adapter/idp/ExternalConsentPageAdapter.java`
+- `binaries/pingfederate/dist/pingfederate-13.0.1/pingfederate/sdk/plugin-src/secret-manager-example/java/com/pingidentity/secretmanager/SampleSecretManager.java`
 - `binaries/pingfederate/dist/pingfederate-13.0.1/pingfederate/sdk/plugin-src/dynamic-client-registration-example/java/com/pingidentity/clientregistration/SoftwareStatementValidatorPlugin.java`
-- `binaries/pingfederate/dist/pingfederate-13.0.1/pingfederate/sdk/plugin-src/client-storage-example/java/com/pingidentity/clientstorage/SampleClientStorage.java`
 - `binaries/pingfederate/dist/pingfederate-13.0.1/pingfederate/sdk/plugin-src/access-grant-example/java/com/pingidentity/accessgrant/SampleAccessGrant.java`
+- `binaries/pingfederate/dist/pingfederate-13.0.1/pingfederate/sdk/plugin-src/client-storage-example/java/com/pingidentity/clientstorage/SampleClientStorage.java`
