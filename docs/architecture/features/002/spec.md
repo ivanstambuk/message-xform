@@ -1044,7 +1044,7 @@ for structured results of each live PA E2E run. Traceability to the E2E test pla
 | Aspect | Detail |
 |--------|--------|
 | Success path | `./scripts/pa-e2e-bootstrap.sh` → builds + configures PA + runs Karate tests + exits 0 |
-| Status | ✅ Implemented — 26/26 Karate scenarios pass (validated 2026-02-15) |
+| Status | ✅ Implemented — 31/31 Karate scenarios pass (validated 2026-02-15) |
 | Source | G-002-05 |
 
 ### FR-002-13: TransformContext Construction
@@ -1143,12 +1143,20 @@ public interface MessageTransformMetricsMXBean {
 
 **Implementation pattern:**
 
+> **Critical:** PingAccess creates multiple rule objects per configuration
+> (one per engine/application binding). All instances sharing the same name
+> must use the **same** `MessageTransformMetrics` instance — otherwise the
+> JMX MBean reads stale counters. See `PITFALLS.md` §"PA Creates Multiple
+> Rule Instances" and `pingaccess-operations-guide.md` §"JMX Pitfalls".
+
 ```java
-// In configure() — register MBean if enabled
+// In configure() — obtain shared metrics and register MBean if enabled
+String instanceName = config.getName() != null ? config.getName() : "default";
+this.metrics = MessageTransformMetrics.forInstance(instanceName); // shared registry
 if (config.isEnableJmxMetrics()) {
     MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
     ObjectName name = new ObjectName(
-        "io.messagexform:type=TransformMetrics,instance=" + config.getName());
+        "io.messagexform:type=TransformMetrics,instance=" + instanceName);
     if (!mbs.isRegistered(name)) {
         mbs.registerMBean(this.metrics, name);
     }
