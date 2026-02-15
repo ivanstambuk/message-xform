@@ -6,6 +6,14 @@
 // build/check lifecycle — run via the bootstrap script or explicitly:
 //   ./gradlew :e2e-pingaccess:test
 //
+// Docker lifecycle is managed automatically:
+//   - dockerUp  (dependsOn :adapter-pingaccess:shadowJar)  → idempotent start
+//   - dockerDown (finalizedBy)                              → teardown on exit
+//
+// The Karate Runner extension (click "Run" on a scenario) triggers:
+//   ./gradlew clean test --tests e2e.PingAccessE2ETest -Dkarate.options="..."
+// which flows through dockerUp → test → dockerDown automatically.
+//
 // Spotless is intentionally excluded: .feature files are Gherkin, not Java.
 // ---------------------------------------------------------------------------
 
@@ -31,6 +39,35 @@ dependencies {
     testRuntimeOnly(catalog.findLibrary("junit-platform-launcher").get())
 }
 
+// ---------------------------------------------------------------------------
+// E2E guard — only enable Docker + test tasks for explicit E2E invocations.
+// Prevents `./gradlew check` from starting Docker infrastructure.
+// ---------------------------------------------------------------------------
+val isE2EExplicit = gradle.startParameter.taskNames.any {
+    it.contains("e2e-pingaccess") || it == "test"
+}
+
+// ---------------------------------------------------------------------------
+// Docker lifecycle tasks
+// ---------------------------------------------------------------------------
+val dockerUp by tasks.registering(Exec::class) {
+    group = "e2e"
+    description = "Start E2E Docker infrastructure (idempotent — skips if already running)"
+    enabled = isE2EExplicit
+    dependsOn(":adapter-pingaccess:shadowJar")
+    commandLine("bash", "${rootDir}/scripts/pa-e2e-infra-up.sh")
+}
+
+val dockerDown by tasks.registering(Exec::class) {
+    group = "e2e"
+    description = "Tear down E2E Docker infrastructure"
+    enabled = isE2EExplicit
+    commandLine("bash", "${rootDir}/scripts/pa-e2e-infra-down.sh")
+}
+
+// ---------------------------------------------------------------------------
+// Test task configuration
+// ---------------------------------------------------------------------------
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
     // Karate tests need more time (PA startup, OIDC flows)
@@ -46,7 +83,12 @@ tasks.withType<Test>().configureEach {
     }
     // E2E tests require Docker infrastructure — exclude from `check` lifecycle.
     // Run explicitly: ./gradlew :e2e-pingaccess:test
-    enabled = gradle.startParameter.taskNames.any { it.contains("e2e-pingaccess") }
+    // Also enabled when Karate Runner extension runs bare `test`.
+    enabled = isE2EExplicit
+
+    // Wire Docker lifecycle: start before tests, tear down after
+    dependsOn(dockerUp)
+    finalizedBy(dockerDown)
 }
 
 // Karate feature files live in src/test/java (Karate convention)

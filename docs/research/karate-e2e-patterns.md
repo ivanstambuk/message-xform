@@ -8,27 +8,28 @@ _Audience:_ Future sessions implementing E2E tests for other features/adapters.
 
 ---
 
-## 1. Architecture: Bootstrap Script + Karate Split
+## 1. Architecture: Gradle-Integrated Docker Lifecycle + Karate
 
-The E2E suite is split into two layers:
+The E2E suite is split into three layers:
 
 | Layer | Responsibility | Technology |
 |-------|---------------|------------|
-| **Infrastructure** (`scripts/pa-e2e-bootstrap.sh`) | Docker lifecycle, container startup, PA readiness, cleanup, Gradle build | Bash |
+| **IDE** (`Karate Runner` extension) | Click-to-run scenarios, CodeLens, debug | VS Code extension |
+| **Build** (`build.gradle.kts` + scripts) | Docker lifecycle, shadow JAR build, task graph | Gradle 9.x + Bash |
 | **Tests** (`e2e-pingaccess/`) | PA Admin API provisioning, HTTP assertions, payload verification | Karate DSL |
 
-**Why this split?** Karate has no built-in Docker control. The bootstrap script
-starts containers, waits for health, then delegates to `./gradlew :e2e-pingaccess:test`.
-Karate handles everything that involves HTTP requests and JSON assertions.
-
-**Bootstrap script pattern:**
-```bash
-# 1. Build (unless --skip-build)
-# 2. Start Docker containers (echo backend, mock-OIDC, PingAccess)
-# 3. Wait for PA readiness (poll /version endpoint)
-# 4. Delegate to Karate: ./gradlew :e2e-pingaccess:test
-# 5. Cleanup (trap EXIT)
+**Gradle task graph:**
 ```
+:adapter-pingaccess:shadowJar → dockerUp → test → dockerDown
+```
+
+Docker lifecycle is **automatic** — clicking "Run" in the Karate Runner extension
+or running `./gradlew :e2e-pingaccess:test` triggers the full flow.
+The `dockerUp` script is **idempotent** (skips if PA is already running).
+The `dockerDown` script is **marker-gated** (only tears down what Gradle started).
+
+> **Full reference:** See [E2E Karate Operations Guide](../operations/e2e-karate-operations-guide.md)
+> for complete setup instructions, extension patches, and porting template.
 
 ---
 
@@ -342,16 +343,21 @@ dependencies {
 ## 6. Running Tests
 
 ```bash
-# Full E2E (build + Docker + tests)
-./scripts/pa-e2e-bootstrap.sh
+# Via Gradle (Docker lifecycle managed automatically):
+./gradlew :e2e-pingaccess:test
 
-# Skip build
+# Single scenario (Docker auto-starts):
+./gradlew :e2e-pingaccess:test \
+    -Dkarate.options="classpath:e2e/phase4-context/context-variables.feature:12"
+
+# Full lifecycle for CI:
+./scripts/pa-e2e-bootstrap.sh
 ./scripts/pa-e2e-bootstrap.sh --skip-build
 
-# Run a single phase (requires Docker containers up)
-./gradlew :e2e-pingaccess:test --tests '*phase3*'
+# IDE: click "Karate: Run" on any Scenario line (requires Karate Runner extension)
+# → automatically triggers: shadowJar → dockerUp → test → dockerDown
 
-# Run with Karate HTML report
+# Karate HTML report:
 # → e2e-pingaccess/build/karate-reports/karate-summary.html
 ```
 
@@ -378,6 +384,8 @@ dependencies {
 
 ## See Also
 
+- [E2E Karate Operations Guide](../operations/e2e-karate-operations-guide.md) —
+  Full setup, extension patches, Gradle integration, and porting template
 - [E2E Test Framework Research](e2e-test-framework-research.md) — Tooling
   analysis that led to Karate selection
 - [PingAccess Operations Guide](../operations/pingaccess-operations-guide.md)

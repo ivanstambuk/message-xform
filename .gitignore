@@ -49,3 +49,6 @@ libs/**/*.jar
 
 # Audit reports — ephemeral session artifacts, not tracked
 audit-reports/
+
+# E2E Docker lifecycle marker
+.e2e-infra-started
