@@ -100,3 +100,12 @@ transforms:
     match:
       path: "/web/session/**"
       method: POST
+
+  # ── Hot-reload addition (Tests 25–27, Phase 9) ──
+  # At startup, e2e-reload-addition is a no-op identity transform.
+  # Phase 9 tests overwrite it with a marker version to prove hot-reload.
+  - spec: e2e-reload-addition@1.0.0
+    direction: request
+    match:
+      path: "/api/reload/**"
+      method: POST

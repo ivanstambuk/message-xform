@@ -42,6 +42,10 @@ function fn() {
         shadowJar: karate.properties['shadowJar'] ||
             '../adapter-pingaccess/build/libs/adapter-pingaccess-0.1.0-SNAPSHOT.jar',
 
+        // -- Host-side spec/staging paths (for Phase 9 hot-reload) ----------------
+        hostSpecsDir: '../e2e/pingaccess/specs',
+        hostStagingDir: '../e2e/pingaccess/staging',
+
         // -- Common headers -------------------------------------------------------
         paAdminHeaders: { 'X-XSRF-Header': 'PingAccess', 'Content-Type': 'application/json' }
     };

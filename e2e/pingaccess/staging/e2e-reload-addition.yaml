@@ -1,0 +1,27 @@
+# E2E test spec: hot-reload MODIFIED version
+#
+# This is the "after" version of the reload spec.  The Phase 9 tests
+# copy this file over the live e2e-reload-addition.yaml in specs/ to
+# prove the reload scheduler picks up changes.
+#
+# The JSLT adds a "__reloaded": true marker to the body, which is
+# absent in the startup (identity) version.
+id: e2e-reload-addition
+version: "1.0.0"
+description: "E2E test — hot-reload body marker (modified version)"
+
+input:
+  schema:
+    type: object
+
+output:
+  schema:
+    type: object
+
+transform:
+  lang: jslt
+  expr: |
+    {
+      "probe": .probe,
+      "__reloaded": true
+    }

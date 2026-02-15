@@ -62,7 +62,7 @@ Feature: PA Admin API provisioning (idempotent)
     # -----------------------------------------------------------------------
     * def ruleId = findId('/rules', 'E2E Transform Rule')
 
-    * def ptRuleBody = { className: 'io.messagexform.pingaccess.MessageTransformRule', name: 'E2E Transform Rule', supportedDestinations: ['Site'], configuration: { specsDir: '/specs', profilesDir: '/profiles', activeProfile: 'e2e-profile', errorMode: 'PASS_THROUGH', reloadIntervalSec: '0', schemaValidation: 'LENIENT', enableJmxMetrics: 'true' } }
+    * def ptRuleBody = { className: 'io.messagexform.pingaccess.MessageTransformRule', name: 'E2E Transform Rule', supportedDestinations: ['Site'], configuration: { specsDir: '/specs', profilesDir: '/profiles', activeProfile: 'e2e-profile', errorMode: 'PASS_THROUGH', reloadIntervalSec: '5', schemaValidation: 'LENIENT', enableJmxMetrics: 'true' } }
     * if (ruleId == null) karate.set('ruleId', karate.call('classpath:e2e/helpers/create-if-absent.feature', { path: '/rules', body: ptRuleBody }).resourceId)
 
     * karate.log('PASS_THROUGH rule id=' + ruleId)
@@ -72,7 +72,7 @@ Feature: PA Admin API provisioning (idempotent)
     # -----------------------------------------------------------------------
     * def denyRuleId = findId('/rules', 'E2E DENY Rule')
 
-    * def denyRuleBody = { className: 'io.messagexform.pingaccess.MessageTransformRule', name: 'E2E DENY Rule', supportedDestinations: ['Site'], configuration: { specsDir: '/specs', profilesDir: '/profiles', activeProfile: 'e2e-profile', errorMode: 'DENY', reloadIntervalSec: '0', schemaValidation: 'LENIENT', enableJmxMetrics: 'true' } }
+    * def denyRuleBody = { className: 'io.messagexform.pingaccess.MessageTransformRule', name: 'E2E DENY Rule', supportedDestinations: ['Site'], configuration: { specsDir: '/specs', profilesDir: '/profiles', activeProfile: 'e2e-profile', errorMode: 'DENY', reloadIntervalSec: '5', schemaValidation: 'LENIENT', enableJmxMetrics: 'true' } }
     * if (denyRuleId == null) karate.set('denyRuleId', karate.call('classpath:e2e/helpers/create-if-absent.feature', { path: '/rules', body: denyRuleBody }).resourceId)
 
     * karate.log('DENY rule id=' + denyRuleId)
