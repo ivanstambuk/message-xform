@@ -77,6 +77,13 @@ docs/research/gateway-candidates.md
 docs/research/pingam-authentication-api.md
 docs/research/t-001-12-jslt-context-variables.md
 docs/research/standalone-proxy-http-server.md
+docs/research/e2e-test-framework-research.md
+
+# E2E test infrastructure (Karate DSL)
+scripts/pa-e2e-bootstrap.sh
+e2e-pingaccess/src/test/java/karate-config.js
+e2e-pingaccess/build.gradle.kts
+docs/research/karate-e2e-patterns.md
 
 # Implementation tracking
 docs/architecture/features/001/tasks.md
