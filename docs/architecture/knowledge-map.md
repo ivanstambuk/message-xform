@@ -113,6 +113,7 @@ ADR-0032 (Core ACL)          governs ── FR-001-14, NFR-001-02, references AD
 ADR-0033 (Port Value Objects) governs ── FR-001-14, references ADR-0032
 ADR-0034 (SLF4J Binding)     governs ── NFR-001-02, references ADR-0032, ADR-0033
 ADR-0035 (Version Parity)    governs ── FR-002-09, supersedes ADR-0031 §7-§8, references ADR-0031
+ADR-0036 (Conditional Routing) governs ── FR-001-15, FR-001-16, updates ADR-0003, ADR-0006, ADR-0012
 ```
 
 ## Feature → ADR → NFR Traceability
@@ -135,6 +136,8 @@ ADR-0035 (Version Parity)    governs ── FR-002-09, supersedes ADR-0031 §7-�
 | FR-001-12 (URL Rewriting) | ADR-0027 | — |
 | FR-001-13 (Session Context) | ADR-0030 | — |
 | FR-001-14 (Byte Boundary) | ADR-0032, ADR-0033, ADR-0034 | NFR-001-02 |
+| FR-001-15 (Status Routing) | ADR-0036, ADR-0006 | — |
+| FR-001-16 (Body Predicate Routing) | ADR-0036, ADR-0006, ADR-0012 | — |
 | NFR-001-03 (Latency) | ADR-0028 | NFR-001-03 |
 | Hot Reload | — | NFR-001-05 |
 | FR-002-01 (GatewayAdapter) | ADR-0013, ADR-0025 | — |

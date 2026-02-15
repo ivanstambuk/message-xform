@@ -61,6 +61,7 @@ docs/decisions/ADR-0032-core-anti-corruption-layer.md
 docs/decisions/ADR-0033-core-port-value-objects.md
 docs/decisions/ADR-0034-slf4j-compile-time-binding.md
 docs/decisions/ADR-0035-adapter-version-parity.md
+docs/decisions/ADR-0036-conditional-response-routing.md
 docs/decisions/ADR-0022-error-response-on-transform-failure.md
 docs/decisions/ADR-0006-profile-match-resolution.md
 docs/decisions/ADR-0005-profile-spec-version-pinning.md
@@ -78,6 +79,7 @@ docs/research/pingaccess-plugin-api.md
 docs/research/gateway-candidates.md
 docs/research/pingam-authentication-api.md
 docs/research/t-001-12-jslt-context-variables.md
+docs/research/conditional-response-routing.md
 docs/research/standalone-proxy-http-server.md
 docs/research/e2e-test-framework-research.md
 
