@@ -20,6 +20,9 @@ e2e-pingaccess/docs/e2e-results.md
 # PingAccess SDK Implementation Guide (LLM-optimized reference)
 docs/reference/pingaccess-sdk-guide.md
 
+# PingFederate SDK Implementation Guide (LLM-optimized reference)
+docs/reference/pingfederate-sdk-guide.md
+
 # PingAccess Operations & Deployment (Docker, Admin API, deployment patterns, gotchas)
 docs/operations/pingaccess-operations-guide.md
 
