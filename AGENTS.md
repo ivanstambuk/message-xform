@@ -38,7 +38,7 @@ constitution in `docs/decisions/project-constitution.md` before acting.
 | # | Feature | Status |
 |---|---------|--------|
 | 001 | Message Transformation Engine (core) | ✅ Complete |
-| 002 | PingAccess Adapter | 🔨 In Progress |
+| 002 | PingAccess Adapter | ✅ Complete |
 | 003 | PingGateway Adapter | 🔲 Not Started |
 | 004 | Standalone HTTP Proxy Mode | ✅ Complete |
 | 005 | WSO2 API Manager Adapter | 🔲 Not Started |

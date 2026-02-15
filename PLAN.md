@@ -38,7 +38,7 @@ A **standalone transformation engine** with gateway-specific adapter plugins. Tr
 - **`core`** — Pure transformation logic. No gateway dependencies. Anti-corruption layer
   hides Jackson behind byte[] boundary (ADR-0032, ADR-0033).
 - **`adapter-standalone`** — HTTP proxy mode for testing and non-gateway use (Feature 004).
-- **`adapter-pingaccess`** — PingAccess plugin adapter (Feature 002, not yet created).
+- **`adapter-pingaccess`** — PingAccess plugin adapter (Feature 002).
 
 ---
 
@@ -48,6 +48,8 @@ A **standalone transformation engine** with gateway-specific adapter plugins. Tr
 > Listed here for historical reference only.
 
 - **Feature 001 — Core Transformation Engine** — spec, scenarios, tasks, implementation
+- **Feature 002 — PingAccess Adapter** — spec, SDK guide, 237 unit tests, 39/39 E2E,
+  shadow JAR 4.65 MB, all 14 FRs and 5 NFRs verified
 - **Feature 004 — Standalone HTTP Proxy** — spec, plan, tasks, implementation
 - **Feature 009 — Toolchain & Quality Platform** — spec, implementation
 - **Core byte-boundary refactor** — ADR-0032, ADR-0033. Core hides Jackson behind
@@ -60,11 +62,6 @@ A **standalone transformation engine** with gateway-specific adapter plugins. Tr
 ---
 
 ## Next Up
-
-### Feature 002 — PingAccess Adapter
-
-Primary production target. Spec complete (`docs/architecture/features/002/spec.md`),
-SDK guide complete (`docs/reference/pingaccess-sdk-guide.md`).
 
 ### Artifact Publishing (FR-009-16, FR-009-17)
 

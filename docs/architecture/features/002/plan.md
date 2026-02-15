@@ -3,7 +3,7 @@
 _Linked specification:_ `docs/architecture/features/002/spec.md`
 _Linked tasks:_ `docs/architecture/features/002/tasks.md`
 _Status:_ Complete (all tasks implemented, FR-002-12 Docker E2E validated)
-_Last updated:_ 2026-02-14
+_Last updated:_ 2026-02-15
 
 > Guardrail: Keep this plan traceable back to the governing spec. Reference
 > FR/NFR/Scenario IDs from `spec.md` where relevant, log any new high- or
@@ -109,30 +109,30 @@ _To be completed after implementation._
 
 | FR | Description | Implementation | Test Evidence |
 |----|-------------|----------------|---------------|
-| FR-002-01 | GatewayAdapter implementation | | |
-| FR-002-02 | AsyncRuleInterceptor plugin | | |
-| FR-002-03 | @Rule annotation | | |
-| FR-002-04 | Plugin configuration (admin UI) | | |
-| FR-002-05 | Plugin lifecycle | | |
-| FR-002-06 | Session context binding | | |
-| FR-002-07 | ExchangeProperty state | | |
-| FR-002-08 | SPI registration | | |
-| FR-002-09 | Deployment packaging | | |
-| FR-002-10 | Gradle module setup | | |
-| FR-002-11 | Error handling | | |
-| FR-002-12 | Docker E2E test suite | `scripts/pa-e2e-bootstrap.sh` + `e2e-pingaccess/` | `e2e-pingaccess/docs/e2e-results.md` — 31/31 Karate scenarios pass (2026-02-15) |
-| FR-002-13 | TransformContext construction | | |
-| FR-002-14 | JMX observability (opt-in) | | |
+| FR-002-01 | GatewayAdapter implementation | `PingAccessAdapter` (wrapRequest, wrapResponse, applyRequestChanges, applyResponseChanges) | `PingAccessAdapterRequestTest` (19), `PingAccessAdapterResponseTest` (11), `ApplyChangesTest` (23) |
+| FR-002-02 | AsyncRuleInterceptor plugin | `MessageTransformRule extends AsyncRuleInterceptorBase<MessageTransformConfig>` | `RuleLifecycleTest` (6), `TransformFlowTest` (16) |
+| FR-002-03 | @Rule annotation | `@Rule(destination = Site, category = Processing)` on `MessageTransformRule` | `RuleLifecycleTest.annotationAndCallback()` |
+| FR-002-04 | Plugin configuration (admin UI) | `MessageTransformConfig` with `@UIElement`, `@Help`, Bean Validation | `MessageTransformConfigTest` (21), `EnumTest` (4) |
+| FR-002-05 | Plugin lifecycle | `configure()`, `@PreDestroy shutdown()`, daemon thread | `RuleLifecycleTest` (6), `HotReloadTest` (9) |
+| FR-002-06 | Session context binding | `buildSessionContext()` — 4-layer flat merge (Identity → OAuth → Attributes → SessionState) | `IdentityMappingTest` (14), `ContextMappingTest` (14) |
+| FR-002-07 | ExchangeProperty state | `TransformResultSummary` record, `TRANSFORM_RESULT` + `TRANSFORM_DENIED` properties | `ExchangePropertyTest` (12), `TransformFlowTest` (DENY guard) |
+| FR-002-08 | SPI registration | `META-INF/services/com.pingidentity.pa.sdk.policy.AsyncRuleInterceptor` | `SpiRegistrationTest` (4) |
+| FR-002-09 | Deployment packaging | Shadow JAR with core + JSLT + SnakeYAML; excludes PA SDK, Jackson, SLF4J, Jakarta | `ShadowJarTest` (12) |
+| FR-002-10 | Gradle module setup | `adapter-pingaccess/build.gradle.kts` with compileOnly deps, shadow config | `ShadowJarTest`, CI green |
+| FR-002-11 | Error handling | `PASS_THROUGH` (warn + continue) / `DENY` (RFC 9457 + Outcome.RETURN / in-place rewrite) | `TransformFlowTest` (16 — error paths + DENY guard) |
+| FR-002-12 | Docker E2E test suite | `scripts/pa-e2e-bootstrap.sh` + `e2e-pingaccess/` (Karate DSL) | `e2e-pingaccess/docs/e2e-results.md` — 39/39 Karate scenarios pass (2026-02-15) |
+| FR-002-13 | TransformContext construction | `buildTransformContext()` — headers, query, cookies, status, session | `ContextMappingTest` (14) |
+| FR-002-14 | JMX observability (opt-in) | `MessageTransformMetricsMXBean` + `MessageTransformMetrics` (LongAdder counters) | `MessageTransformMetricsTest` (20), `JmxIntegrationTest` (8) |
 
 #### NFR Verification
 
 | NFR | Target | Evidence | Status |
 |-----|--------|----------|--------|
-| NFR-002-01 | Adapter overhead < 10 ms for < 64 KB body | | ⬜ |
-| NFR-002-02 | Shadow JAR < 5 MB | | ⬜ |
-| NFR-002-03 | Thread-safe — no mutable per-request state | | ⬜ |
-| NFR-002-04 | No reflection | | ⬜ |
-| NFR-002-05 | Java 21 `-Xlint:all -Werror` | | ⬜ |
+| NFR-002-01 | Adapter overhead < 10 ms for < 64 KB body | `PingAccessAdapterPerformanceTest` — 500 warmup + 1000 measured, avg < 10 ms | ✅ |
+| NFR-002-02 | Shadow JAR < 5 MB | `ShadowJarTest` — JAR size 4.65 MB; verified via `stat` | ✅ |
+| NFR-002-03 | Thread-safe — no mutable per-request state | `ConcurrentTest` — 12 threads × 100 iterations, no corruption | ✅ |
+| NFR-002-04 | No reflection | `PingAccessArchitectureTest` — ArchUnit no-reflection rule | ✅ |
+| NFR-002-05 | Java 21 `-Xlint:all -Werror` | CI green, `compileJava` with `-Xlint:all -Werror` | ✅ |
 
 ---
 
@@ -705,51 +705,47 @@ Run `docs/operations/analysis-gate-checklist.md` at two milestones:
 
 ## Exit Criteria
 
-- [ ] All increments (I1–I14) completed and checked off
-- [ ] Quality gate passes (`./gradlew --no-daemon spotlessApply check`)
-- [ ] All scenarios defined in `scenarios.md` have corresponding test methods
-- [ ] Scenario coverage matrix in `scenarios.md` has no uncovered FRs/NFRs
-- [ ] Shadow JAR < 5 MB, no PA SDK classes
-- [ ] Thread safety test passes with 10 concurrent threads
-- [ ] Implementation Drift Gate report attached
-- [ ] Open questions resolved and removed from `open-questions.md`
-- [ ] Documentation synced (roadmap, knowledge-map, AGENTS.md, llms.txt)
+- [x] All increments (I1–I14) completed and checked off
+- [x] Quality gate passes (`./gradlew --no-daemon spotlessApply check`)
+- [x] All scenarios defined in `scenarios.md` have corresponding test methods
+- [x] Scenario coverage matrix in `scenarios.md` has no uncovered FRs/NFRs
+- [x] Shadow JAR < 5 MB, no PA SDK classes
+- [x] Thread safety test passes with 12 concurrent threads
+- [x] Implementation Drift Gate report attached
+- [x] Open questions resolved and removed from `open-questions.md`
+- [x] Documentation synced (roadmap, knowledge-map, AGENTS.md, llms.txt)
 
 ## Intent Log
 
-_To be filled during implementation._
-
-- **I1:** …
-- **I2:** …
-- **I3:** …
-- **I4a:** …
-- **I4b:** …
-- **I5:** …
-- **I6:** …
-- **I7:** …
-- **I8:** …
-- **I9:** …
-- **I10:** …
-- **I11:** …
-- **I12:** …
-- **I13:** …
-- **I14:** …
+- **I1:** Config model with Bean Validation + enum auto-discovery via `ConfigurationBuilder.from()`. 21 tests.
+- **I2:** `wrapRequest()` with body pre-read, JSON fallback, `bodyParseFailed` flag. URI split to path + query. 19 tests.
+- **I3:** `wrapResponse()` + diff-based header strategy + protected header exclusion + direction-specific apply helpers. Compressed body explicit v1 no-decompression. 23 tests.
+- **I4a:** Rule skeleton with `@Rule(Site)`, `configure()` boot, `getErrorHandlingCallback()`. 6 lifecycle tests.
+- **I4b:** `TransformResultSummary` record, exchange properties, SPI service file. 16 tests.
+- **I5:** `buildTransformContext()` — headers, query, cookies, status, `URISyntaxException` fallback. 14 tests.
+- **I6:** 4-layer flat session merge (Identity → OAuth → Attributes → SessionState). `jsonNodeToJavaObject()` for ADR-0032 boundary. 14 tests.
+- **I7:** PASS_THROUGH + DENY error dispatch. ResponseBuilder for request DENY. In-place rewrite for response DENY. DENY guard in `handleResponse()`. 16 tests.
+- **I8:** Daemon single-thread scheduler. Explicit `engine.reload(paths, profile)`. Failure retains previous registry. 9 tests.
+- **I9:** `MessageTransformMetricsMXBean` + `LongAdder` counters. Opt-in lifecycle. MBean register/unregister. 28 tests (20 unit + 8 integration).
+- **I10:** Shadow JAR verification (12 tests). `PaVersionGuard.check()` with WARN-only semantics (8 tests).
+- **I11:** 12 threads × 100 iterations concurrent stress test. Performance budget < 10 ms for 64 KB body (500 warmup + 1000 measured). 5 tests.
+- **I12:** Path normalization + traversal rejection. 8 security tests.
+- **I13:** Coverage matrix created — 35/35 scenarios mapped. Quality gate green.
+- **I14:** Documentation sync — roadmap, AGENTS.md, knowledge-map, `_current-session.md` updated. FR/NFR traceability complete.
 
 ## Follow-ups / Backlog
 
 - [x] **FR-002-12: Docker E2E test script** — ✅ Complete.
-      50/50 tests pass against PA 9.0.1.0. See `e2e-pingaccess/docs/e2e-results.md`.
-      22 scenarios validated E2E, 6 specs, profile routing, 19 test groups.
-- [ ] **E2E: OAuth/identity scenarios** — S-002-13, S-002-25, S-002-26.
-      Requires authenticated PA session. Options: (a) PingFederate/PingAM as
-      IdP in Docker Compose, (b) lightweight Python OIDC stub (mock token
-      introspection + session attributes). Consider [mock-oauth2-server](https://github.com/navikt/mock-oauth2-server).
-- [ ] **E2E: Hot-reload scenarios** — S-002-29, S-002-30, S-002-31.
-      Requires file-system mutation during live E2E run (modify spec YAML
-      while PA is running, verify reload behavior).
-- [ ] **E2E: JMX metrics scenarios** — S-002-33, S-002-34.
-      Requires JMX client connection to PA JVM (expose JMX port in Docker,
-      use `jmxterm` or `jmx_exporter` for assertion).
+      39/39 tests pass against PA 9.0.1.0. See `e2e-pingaccess/docs/e2e-results.md`.
+      30/35 scenarios validated E2E, 12 specs, profile routing, 39 test groups.
+- [x] **E2E: OAuth/identity scenarios** — S-002-13, S-002-25, S-002-26. ✅ Complete.
+      Phase 8a (Bearer token L1-L3) + Phase 8b (Web Session OIDC L4).
+      Tests 20-24 in `e2e-results.md`. mock-oauth2-server used for JWKS/introspection.
+- [x] **E2E: Hot-reload scenarios** — S-002-29, S-002-30, S-002-31. ✅ Complete.
+      Phase 9: spec file mutation during live PA run. Tests 25-27 in `e2e-results.md`.
+- [x] **E2E: JMX metrics scenarios** — S-002-33, S-002-34. ✅ Complete.
+      Phase 10: JMX remote access enabled in Docker, MBean assertions. Tests 28-29
+      in `e2e-results.md`. JMX metric bug (shared registry pattern) fixed.
 - [ ] **Compressed body support** (Constraint 10) — Decompress `gzip`/`deflate`/`br`
       response bodies before JSON parsing. Requires adding `java.util.zip` handling.
 - [ ] **SessionContextFilter** — Selective `$session` field whitelisting for
