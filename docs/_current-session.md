@@ -1,29 +1,29 @@
 # Current Session
 
-**Focus**: Session retro and multi-agent coordination hardening
+**Focus**: Shared ignored-artifact workflow hardening across worktrees
 **Date**: 2026-02-15
 **Status**: Complete for this session scope
 
 ## Accomplished
 
-1. Added and validated lock-based coordination workflow for concurrent agents:
-   - `scripts/agent-lock.sh` (`acquire`, `check`, `heartbeat`, `release`, `list`)
-   - Active-work board and ownership maps:
-     - `.agent/session/active-work.yaml`
-     - `.agent/session/path-owners.yaml`
-   - AGENTS conventions updated for active-only entries, lease reclaim, and routing hints.
+1. Added and validated shared ignored-artifact utilities:
+   - `scripts/shared-ignored-init.sh`
+   - `scripts/shared-ignored-mount.sh`
+   - `scripts/shared-ignored-umount.sh`
+   - `scripts/shared-ignored-status.sh`
+   - `scripts/shared-ignored-persist.sh` (managed `/etc/fstab` block)
 
-2. Persisted same-branch multi-agent research:
-   - `docs/research/multi-agent-same-branch-coordination.md`.
+2. Updated worktree bootstrap flow:
+   - `scripts/worktree-bootstrap.sh` now runs init + bind mount + verify.
 
 3. Recorded latest PingAccess E2E result update:
    - `docs/architecture/features/002/e2e-results.md` now reflects the 2026-02-15 run entry.
 
 ## Key Decisions
 
-- Active-lock board is machine-oriented and contains only active work items (no completed history).
-- Mutating work should acquire locks; research-only work does not register.
-- `workflow:retro` is exclusive and blocks overlapping mutating work while running.
+- Shared ignored vendor artifacts are exposed to worktrees via bind mounts from `/home/ivan/dev/message-xform-shared`.
+- Persistent remount after reboot is handled by managed `/etc/fstab` entries via `scripts/shared-ignored-persist.sh`.
+- Agent lock-board coordination was removed; merge/conflict handling is done through standard git branch/worktree workflow.
 
 ## Next Session Focus
 
