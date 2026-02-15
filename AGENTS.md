@@ -268,6 +268,11 @@ See `docs/operations/quality-gate.md` for full pipeline documentation.
     - Create/rename/update custom skills only in `.agents/skills/<skill-name>/`.
     - Keep `.agents/` local-only via `.git/info/exclude` unless the owner explicitly asks to commit those files.
     - If asked to install globally, implement the equivalent project-scoped skill and note the policy.
+21. **No Backlogs in Feature Plans** ⚡ **(NON-NEGOTIABLE)**: Feature specs, plans, and task files MUST NOT contain "Follow-ups", "Backlog", "Future Work", "TODO", or similar sections that propose new requirements outside the feature's approved scope. These bypass the SDD pipeline and accumulate unchecked.
+    - **If implementation reveals new work**: record it in the master `PLAN.md` (Next Up / Backlog) or amend the owning feature's spec via the normal pipeline (spec → plan → tasks).
+    - **Design constraints** (e.g., "v1 does not support X"): document as a Constraint in the spec — not as a follow-up to "add later".
+    - **Violation signal**: Any section named "Follow-ups", "Backlog", "Future Work", or "TODO" in a feature plan or spec. Move the items to `PLAN.md` or delete them.
+    - **Constitutional reference**: Principle 9 — No Backlogs in Feature Plans.
 ### Known Pitfalls
 
 - **File edit tool + Spotless concurrency** (2026-02-08): When `./gradlew spotlessApply` runs concurrently with `replace_file_content` or `multi_replace_file_content`, Spotless may overwrite edits silently — the tool reports success but the file on disk is unchanged. **Workaround**: run `spotlessApply` first, *then* edit, *then* `check`. Or use `sed` / Python for edits that must survive.

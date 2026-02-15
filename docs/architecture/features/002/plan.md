@@ -746,8 +746,6 @@ Run `docs/operations/analysis-gate-checklist.md` at two milestones:
 - [x] **E2E: JMX metrics scenarios** — S-002-33, S-002-34. ✅ Complete.
       Phase 10: JMX remote access enabled in Docker, MBean assertions. Tests 28-29
       in `e2e-results.md`. JMX metric bug (shared registry pattern) fixed.
-- [ ] **Compressed body support** (Constraint 10) — Decompress `gzip`/`deflate`/`br`
-      response bodies before JSON parsing. Requires adding `java.util.zip` handling.
 - [ ] **SessionContextFilter** — Selective `$session` field whitelisting for
       multi-tenant spec authoring. Follow-up if needed.
 - [ ] **PA-native error handler integration** — Add `ErrorHandlerUtil`

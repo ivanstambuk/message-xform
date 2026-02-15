@@ -1,9 +1,9 @@
 # message-xform Project Constitution
 
 ## Metadata
-- Constitution Version: 1.1.0
+- Constitution Version: 1.2.0
 - Ratified On: 2026-02-07
-- Last Amended On: 2026-02-13
+- Last Amended On: 2026-02-15
 - Maintainer: Ivan (project owner)
 
 ## Preamble
@@ -114,6 +114,28 @@ the agent playbook in `AGENTS.md` before acting.
 - **Violation signal:** Any plan step that says "modify core type X" or
   "extend Feature A's class Y" inside a different feature's plan is a
   constitutional violation. Refactor the change into the owning feature.
+
+### Principle 9 – No Backlogs in Feature Plans
+
+- Feature specifications, plans, and task files MUST NOT contain "Follow-ups",
+  "Backlog", or "Future Work" sections that propose new requirements, features,
+  or enhancements outside the feature's approved scope.
+- Speculative items disguised as follow-ups bypass the SDD pipeline
+  (specification → plan → tasks) and the Clarification Gate (Principle 2).
+  They accumulate unchecked, become stale, and create ambiguity about what is
+  actually in scope.
+- When implementation reveals a potential enhancement or new requirement:
+  1. If it is a **new feature or cross-cutting concern**: record it in the
+     master `PLAN.md` under the appropriate section (Next Up / Backlog).
+  2. If it affects an **existing feature's scope**: update that feature's
+     specification through the normal SDD pipeline (spec amendment → plan
+     update → task creation).
+  3. If it is a **design constraint** (e.g., "v1 does not support X"):
+     document it as a Constraint in the feature's specification — not as a
+     follow-up to "add later".
+- **Violation signal:** Any section named "Follow-ups", "Backlog",
+  "Future Work", "TODO", or similar in a feature plan or spec is a
+  constitutional violation. Move the items to `PLAN.md` or delete them.
 
 ## ADR Lifecycle
 
