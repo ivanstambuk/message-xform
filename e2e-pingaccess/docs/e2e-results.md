@@ -3,7 +3,7 @@
 | Field | Value |
 |-------|-------|
 | Script | `scripts/pa-e2e-bootstrap.sh` + `e2e-pingaccess/` (Karate DSL) |
-| Spec files | `e2e-rename.yaml`, `e2e-header-inject.yaml`, `e2e-context.yaml`, `e2e-error.yaml`, `e2e-status-override.yaml`, `e2e-url-rewrite.yaml`, `e2e-session.yaml`, `e2e-reload-addition.yaml` |
+| Spec files | `e2e-rename.yaml`, `e2e-header-inject.yaml`, `e2e-context.yaml`, `e2e-error.yaml`, `e2e-status-override.yaml`, `e2e-url-rewrite.yaml`, `e2e-session.yaml`, `e2e-reload-addition.yaml`, `e2e-status-route-success.yaml`, `e2e-status-route-error.yaml`, `e2e-polymorphic-admin.yaml`, `e2e-polymorphic-user.yaml` |
 | Profile | `e2e-profile.yaml` |
 | Linked requirement | FR-002-12 |
 
@@ -17,14 +17,14 @@
 | Field | Value |
 |-------|-------|
 | Date | 2026-02-15 |
-| Result | **31/31 PASSED** ✅ |
+| Result | **39/39 PASSED** ✅ |
 | PA version | 9.0.1.0 |
 | PA Docker image | `pingidentity/pingaccess:latest` |
 | Shadow JAR size | 4.6 MB (< 5 MB NFR-002-02) |
 | Class file version | 61 (Java 17) |
 | Build time | 4s |
 | PA startup time | 24s |
-| Test groups | 31 |
+| Test groups | 39 |
 
 ### Test Breakdown
 
@@ -60,7 +60,15 @@
 | 27 | Concurrent requests during reload | S-002-31 | 5 sequential requests all return 200 | 1/1 ✅ |
 | 28 | JMX MBean registered | S-002-33 | MBean exists, ActiveSpecCount ≥ 1, TransformTotalCount increments, registration log | 4/4 ✅ |
 | 29 | JMX MBean not registered (negative) | S-002-34 | Non-existent instance MBean does NOT exist | 1/1 ✅ |
-| | **Total** | | | **31/31** |
+| 33 | Status routing: 200 → success spec | S-001-87 | POST 200, result=success, original_status=200, data preserved | 4/4 ✅ |
+| 34 | Status routing: 404 → error spec + 502 | S-001-88 | POST 502, result=error, original_status=404, error fields | 5/5 ✅ |
+| 35 | Status routing: 301 → passthrough | S-001-89 | POST 301, original body unchanged | 2/2 ✅ |
+| 36 | Status routing: default 200 | S-001-90 | POST 200 (no X-Echo-Status), success reshaping | 3/3 ✅ |
+| 37 | Polymorphic: admin → admin transform | S-001-93 | POST 200, role=admin, display_name, permissions | 4/4 ✅ |
+| 38 | Polymorphic: user → user transform | S-001-94 | POST 200, role=standard, display_name, no permissions | 4/4 ✅ |
+| 39 | Polymorphic: 400 → error transform | S-001-95 | POST 502, error format regardless of body | 5/5 ✅ |
+| 40 | Polymorphic: non-JSON → passthrough | S-001-97 | POST 200, text/plain body preserved, when-predicate gracefully skipped | 2/2 ✅ |
+| | **Total** | | | **39/39** |
 
 ---
 
@@ -98,6 +106,14 @@
 | S-002-33 | JMX metrics opt-in (MBean registered, counters work) |
 | S-002-34 | JMX metrics disabled (non-existent instance → MBean absent) |
 | S-002-35 | PA-specific non-standard status code (277 passthrough) |
+| S-001-87 | Status routing: 2xx responses routed to success spec |
+| S-001-88 | Status routing: 4xx responses routed to error spec + status override |
+| S-001-89 | Status routing: unmatched status (3xx) → passthrough |
+| S-001-90 | Status routing: default echo (no X-Echo-Status) → 2xx → success |
+| S-001-93 | Polymorphic body routing: admin role → admin transform (match.when) |
+| S-001-94 | Polymorphic body routing: user role → user transform (match.when) |
+| S-001-95 | Polymorphic body routing: 4xx error → error transform (no when needed) |
+| S-001-97 | Polymorphic body routing: non-JSON body → graceful skip → passthrough |
 
 ---
 
@@ -127,3 +143,4 @@ Each has comprehensive unit test coverage documented in `coverage-matrix.md`.
 | 2026-02-14 16:15 | 50/50 ✅ | 9.0.1.0 | — | Full E2E expansion: 19 test groups, 6 specs, profile routing, context variables, error modes, status/URL transforms, non-JSON pass-through. |
 | 2026-02-14 18:04 | 62/62 ✅ | 9.0.1.0 | `97db1c1` | Phase 8a OAuth/Identity: Bearer token auth, session context, mock-oauth2-server. |
 | 2026-02-15 | 31/31 ✅ | 9.0.1.0 | — | All phases complete: Phase 8b (Web Session OIDC L4), Phase 9 (hot-reload), Phase 10 (JMX metrics). JMX metric bug fixed (shared registry pattern). |
+| 2026-02-15 | 39/39 ✅ | 9.0.1.0 | `72dded2` | Feature 001 Phase 2: status routing (Tests 33-36) + polymorphic body routing via match.when (Tests 37-40). Echo backend extended with X-Echo-Status/X-Echo-Body headers. |

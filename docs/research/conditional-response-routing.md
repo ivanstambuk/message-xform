@@ -1279,7 +1279,7 @@ New E2E scenarios:
 - [x] Pass `preParsedBody` to `transformWithSpec` (reuse across all 4 `bodyToJson` sites)
 - [x] Extract `isTruthy()` to `JsonNodeUtils`
 - [x] Unit tests: `ProfileMatcherTest` (when predicate), `ProfileParserTest` (when parsing)
-- [ ] E2E tests: body predicate routing, status+when combined, non-JSON body graceful skip
+- [x] E2E tests: body predicate routing, status+when combined, non-JSON body graceful skip
 
 #### SDD Documentation (cross-cutting)
 
