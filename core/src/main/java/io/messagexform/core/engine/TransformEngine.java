@@ -437,7 +437,12 @@ public final class TransformEngine {
         TransformProfile profile = snapshot.activeProfile();
         if (profile != null) {
             List<ProfileEntry> matches = ProfileMatcher.findMatches(
-                    profile, message.requestPath(), message.requestMethod(), message.contentType(), direction);
+                    profile,
+                    message.requestPath(),
+                    message.requestMethod(),
+                    message.contentType(),
+                    direction,
+                    message.statusCode());
             if (matches.isEmpty()) {
                 return TransformResult.passthrough();
             }

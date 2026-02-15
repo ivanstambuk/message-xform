@@ -21,23 +21,32 @@ public final class ProfileMatcher {
     private ProfileMatcher() {}
 
     /**
-     * Finds all matching profile entries for the given request parameters and
-     * direction, sorted by specificity (highest first).
+     * Finds all matching profile entries for the given request parameters,
+     * direction, and optional status code, sorted by specificity (highest
+     * first).
      *
      * @param profile     the profile to search
      * @param requestPath the request path (e.g. "/json/alpha/authenticate")
      * @param method      the HTTP method (e.g. "POST"), or null
      * @param contentType the Content-Type header value, or null
      * @param direction   the transform direction (REQUEST or RESPONSE)
+     * @param statusCode  the HTTP status code for response-direction matching
+     *                    (FR-001-15, ADR-0036), or null for request-direction
+     *                    or when status is unknown
      * @return list of matching entries sorted by specificity (highest first),
      *         empty if no entries match
      */
     public static List<ProfileEntry> findMatches(
-            TransformProfile profile, String requestPath, String method, String contentType, Direction direction) {
+            TransformProfile profile,
+            String requestPath,
+            String method,
+            String contentType,
+            Direction direction,
+            Integer statusCode) {
 
         List<ProfileEntry> matches = new ArrayList<>();
         for (ProfileEntry entry : profile.entries()) {
-            if (matches(entry, requestPath, method, contentType, direction)) {
+            if (matches(entry, requestPath, method, contentType, direction, statusCode)) {
                 matches.add(entry);
             }
         }
@@ -51,6 +60,15 @@ public final class ProfileMatcher {
     }
 
     /**
+     * Backward-compatible overload — delegates to the 6-arg version with
+     * {@code null} status code.
+     */
+    public static List<ProfileEntry> findMatches(
+            TransformProfile profile, String requestPath, String method, String contentType, Direction direction) {
+        return findMatches(profile, requestPath, method, contentType, direction, null);
+    }
+
+    /**
      * Finds the single best-matching entry (most-specific-wins), or null
      * if no entries match.
      *
@@ -59,19 +77,39 @@ public final class ProfileMatcher {
      * @param method      the HTTP method, or null
      * @param contentType the Content-Type header value, or null
      * @param direction   the transform direction
+     * @param statusCode  the HTTP status code, or null
      * @return the best matching entry, or null if no entries match
      */
     public static ProfileEntry findBestMatch(
-            TransformProfile profile, String requestPath, String method, String contentType, Direction direction) {
-        List<ProfileEntry> matches = findMatches(profile, requestPath, method, contentType, direction);
+            TransformProfile profile,
+            String requestPath,
+            String method,
+            String contentType,
+            Direction direction,
+            Integer statusCode) {
+        List<ProfileEntry> matches = findMatches(profile, requestPath, method, contentType, direction, statusCode);
         return matches.isEmpty() ? null : matches.get(0);
     }
 
     /**
-     * Tests whether a single entry matches the given request parameters.
+     * Backward-compatible overload — delegates with {@code null} status code.
+     */
+    public static ProfileEntry findBestMatch(
+            TransformProfile profile, String requestPath, String method, String contentType, Direction direction) {
+        return findBestMatch(profile, requestPath, method, contentType, direction, null);
+    }
+
+    /**
+     * Tests whether a single entry matches the given request parameters
+     * and optional status code.
      */
     static boolean matches(
-            ProfileEntry entry, String requestPath, String method, String contentType, Direction direction) {
+            ProfileEntry entry,
+            String requestPath,
+            String method,
+            String contentType,
+            Direction direction,
+            Integer statusCode) {
 
         // Direction must match
         if (entry.direction() != direction) {
@@ -95,7 +133,29 @@ public final class ProfileMatcher {
             return false;
         }
 
+        // Status code must match (if specified in the entry) — FR-001-15, ADR-0036
+        // Evaluation order: direction → path → method → content-type → status
+        if (entry.statusPattern() != null) {
+            if (statusCode == null) {
+                // Response direction but no status code on message — defensive:
+                // treat as non-matching. This should not happen in practice
+                // (adapters always populate statusCode on response Messages).
+                return false;
+            }
+            if (!entry.statusPattern().matches(statusCode)) {
+                return false;
+            }
+        }
+
         return true;
+    }
+
+    /**
+     * Backward-compatible overload — delegates with {@code null} status code.
+     */
+    static boolean matches(
+            ProfileEntry entry, String requestPath, String method, String contentType, Direction direction) {
+        return matches(entry, requestPath, method, contentType, direction, null);
     }
 
     /**

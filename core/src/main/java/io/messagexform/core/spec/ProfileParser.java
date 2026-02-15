@@ -6,6 +6,7 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import io.messagexform.core.error.ProfileResolveException;
 import io.messagexform.core.model.Direction;
 import io.messagexform.core.model.ProfileEntry;
+import io.messagexform.core.model.StatusPattern;
 import io.messagexform.core.model.TransformProfile;
 import io.messagexform.core.model.TransformSpec;
 import java.io.IOException;
@@ -97,12 +98,18 @@ public final class ProfileParser {
         String method = optionalString(matchNode, "method");
         String contentType = optionalString(matchNode, "content-type");
 
+        // ⚠️ v4 fix: DO NOT use optionalString() for status — YAML parses
+        // unquoted 404 as IntNode, which optionalString() silently ignores.
+        // Use StatusPatternParser.parseStatusField() instead (ADR-0036, FR-001-15).
+        StatusPattern statusPattern =
+                StatusPatternParser.parseStatusField(matchNode, direction, profileId, index, source);
+
         // Normalize method to uppercase for consistent matching
         if (method != null) {
             method = method.toUpperCase();
         }
 
-        return new ProfileEntry(resolvedSpec, direction, pathPattern, method, contentType);
+        return new ProfileEntry(resolvedSpec, direction, pathPattern, method, contentType, statusPattern);
     }
 
     /**
