@@ -19,7 +19,7 @@ Options:
 
 Environment:
   MESSAGE_XFORM_SHARED_ROOT  Override shared_root from manifest
-  SUDO_PASS                  Non-interactive sudo for automation
+  Uses standard sudo (cached credentials or interactive prompt)
 USAGE
 }
 
@@ -104,9 +104,7 @@ yaml_list() {
 
 sudo_run() {
   if sudo -n true >/dev/null 2>&1; then
-    sudo "$@"
-  elif [[ -n "${SUDO_PASS:-}" ]]; then
-    printf '%s\n' "$SUDO_PASS" | sudo -S -p '' "$@"
+    sudo -n "$@"
   else
     sudo "$@"
   fi

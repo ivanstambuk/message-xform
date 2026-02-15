@@ -9,7 +9,7 @@ Unmount bind-mounted shared ignored-artifact paths from this worktree
 or from all worktrees of the current repository.
 
 Environment:
-  SUDO_PASS (non-interactive sudo for automation)
+  Uses standard sudo (cached credentials or interactive prompt)
 USAGE
 }
 
@@ -60,9 +60,7 @@ yaml_list() {
 
 sudo_run() {
   if sudo -n true >/dev/null 2>&1; then
-    sudo "$@"
-  elif [[ -n "${SUDO_PASS:-}" ]]; then
-    printf '%s\n' "$SUDO_PASS" | sudo -S -p '' "$@"
+    sudo -n "$@"
   else
     sudo "$@"
   fi
