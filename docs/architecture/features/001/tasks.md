@@ -1364,18 +1364,21 @@ Track long-running or shared commands with timestamps to avoid duplicate work.
 
 #### I18 — Phase 1b: Unknown-Key Detection in ProfileParser
 
-- [ ] **T-001-70** — Add unknown-key detection to `ProfileParser` (FR-001-01 parity)
+- [x] **T-001-70** — Add unknown-key detection to `ProfileParser` (FR-001-01 parity) ✅ 2026-02-15
   _Intent:_ Add known-key validation to `ProfileParser.parseEntry()` for
   parity with `SpecParser`. Typos like `statis: 404` would be silently
   ignored without this check.
   _Implement:_
-  - Define known-key set for `match` block (path, method, content-type, status).
-  - Warn or reject unknown keys in the `match` block.
-  - Unit tests for unknown-key detection.
-  _Verify:_ New tests pass. No regressions.
+  - Define known-key sets for root (profile/version/description/transforms),
+    entry (spec/direction/match), and match block (path/method/content-type/status).
+  - Add `rejectUnknownKeys()` method mirroring `SpecParser` pattern.
+  - Validate at all three levels: root, entry, and match block.
+  - 5 new unit tests in `ProfileParserTest.UnknownKeyDetection`.
+  _Verify:_ All 529 tests pass. No regressions.
   _Verification commands:_
   - `./gradlew :core:test --tests "*ProfileParserTest*"`
   - `./gradlew spotlessApply check`
+  _Status:_ ✅ Complete (2026-02-15). 5 new tests. All 529 tests pass.
 
 #### I19 — Phase 2: `match.when` (Body-Predicate Matching)
 

@@ -1263,9 +1263,9 @@ New E2E scenarios:
 
 #### Phase 1b: Unknown-key detection in `ProfileParser`
 
-- [ ] Add known-key set to `parseEntry()` (parity with `SpecParser`)
-- [ ] Warn or reject unknown keys in `match` block
-- [ ] Unit tests for unknown-key detection
+- [x] Add known-key sets for root, entry, and match block (parity with `SpecParser`)
+- [x] Reject unknown keys at all 3 levels: root, entry, match block
+- [x] 5 unit tests in `ProfileParserTest.UnknownKeyDetection` — all 529 tests pass
 
 #### Phase 2: `match.when` — Body-Predicate Matching
 

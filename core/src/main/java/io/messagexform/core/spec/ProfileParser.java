@@ -15,6 +15,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 /**
  * Parses YAML profile files into {@link TransformProfile} instances
@@ -28,6 +31,20 @@ import java.util.Objects;
 public final class ProfileParser {
 
     private static final ObjectMapper YAML_MAPPER = new ObjectMapper(new YAMLFactory());
+
+    // ── Strict unknown-key detection (T-001-70, FR-001-01 parity) ──
+    // Each YAML block has a set of recognized keys. Any key not in the set
+    // triggers a ProfileResolveException so that typos (e.g. "statis: 404")
+    // are caught at load time instead of silently ignored.
+
+    /** Recognized top-level profile keys. */
+    private static final Set<String> KNOWN_ROOT_KEYS = Set.of("profile", "version", "description", "transforms");
+
+    /** Recognized keys in each transforms entry. */
+    private static final Set<String> KNOWN_ENTRY_KEYS = Set.of("spec", "direction", "match");
+
+    /** Recognized keys inside the {@code match} block. */
+    private static final Set<String> KNOWN_MATCH_KEYS = Set.of("path", "method", "content-type", "status");
 
     private final Map<String, TransformSpec> specRegistry;
 
@@ -62,6 +79,9 @@ public final class ProfileParser {
         String version = requireString(root, "version", source);
         String description = optionalString(root, "description");
 
+        // Strict key check: reject unknown root-level keys (T-001-70)
+        rejectUnknownKeys(root, KNOWN_ROOT_KEYS, "profile root", profileId, source);
+
         JsonNode transformsNode = root.get("transforms");
         if (transformsNode == null || !transformsNode.isArray() || transformsNode.isEmpty()) {
             throw new ProfileResolveException(
@@ -79,6 +99,9 @@ public final class ProfileParser {
     // --- Private helpers ---
 
     private ProfileEntry parseEntry(JsonNode entryNode, String profileId, String source, int index) {
+        // Strict key check: reject unknown entry-level keys (T-001-70)
+        rejectUnknownKeys(entryNode, KNOWN_ENTRY_KEYS, String.format("entry[%d]", index), profileId, source);
+
         // Parse spec reference (required)
         String specRef = requireEntryString(entryNode, "spec", profileId, source, index);
         TransformSpec resolvedSpec = resolveSpec(specRef, profileId, source, index);
@@ -93,6 +116,9 @@ public final class ProfileParser {
             throw new ProfileResolveException(
                     String.format("Profile '%s' entry[%d]: 'match' block is required", profileId, index), null, source);
         }
+
+        // Strict key check: reject unknown match-block keys (T-001-70)
+        rejectUnknownKeys(matchNode, KNOWN_MATCH_KEYS, String.format("entry[%d].match", index), profileId, source);
 
         String pathPattern = requireMatchString(matchNode, "path", profileId, source, index);
         String method = optionalString(matchNode, "method");
@@ -240,5 +266,41 @@ public final class ProfileParser {
     private String optionalString(JsonNode node, String field) {
         JsonNode child = node.get(field);
         return (child != null && child.isTextual()) ? child.asText() : null;
+    }
+
+    /**
+     * Rejects unknown keys in a YAML block by throwing
+     * {@link ProfileResolveException}
+     * if any key is not in the allowed set.
+     *
+     * <p>
+     * This is the shift-left guard against profile misconfiguration, mirroring
+     * the pattern in {@link SpecParser#rejectUnknownKeys} (T-001-70, FR-001-01
+     * parity).
+     * Without this check, typos like {@code statis: 404} instead of
+     * {@code status: "4xx"} are silently ignored.
+     *
+     * @param node      the YAML object node to check
+     * @param knownKeys the set of recognized key names for this block
+     * @param blockName human-readable block name for error messages
+     * @param profileId profile identifier for error context
+     * @param source    source file path for error context
+     */
+    private void rejectUnknownKeys(
+            JsonNode node, Set<String> knownKeys, String blockName, String profileId, String source) {
+        if (node == null || !node.isObject()) {
+            return;
+        }
+        List<String> unknown = StreamSupport.stream(((Iterable<String>) node::fieldNames).spliterator(), false)
+                .filter(key -> !knownKeys.contains(key))
+                .collect(Collectors.toList());
+        if (!unknown.isEmpty()) {
+            throw new ProfileResolveException(
+                    "Unknown key" + (unknown.size() > 1 ? "s" : "") + " in '"
+                            + blockName + "': " + unknown
+                            + " — recognized keys are: " + knownKeys,
+                    profileId,
+                    source);
+        }
     }
 }

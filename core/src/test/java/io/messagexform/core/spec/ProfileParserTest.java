@@ -360,4 +360,142 @@ class ProfileParserTest {
             assertThat(ProfileParser.compareVersions("1.0.1", "1.0.0")).isGreaterThan(0);
         }
     }
+
+    @Nested
+    @DisplayName("Unknown key detection (T-001-70)")
+    class UnknownKeyDetection {
+
+        @Test
+        @DisplayName("unknown root-level key → ProfileResolveException")
+        void unknownRootKey() throws IOException {
+            specRegistry.put("my-spec@1.0.0", dummySpec("my-spec", "1.0.0"));
+
+            Path profileYaml = tempDir.resolve("unknown-root.yaml");
+            Files.writeString(profileYaml, """
+          profile: test-unknown-root
+          version: "1.0.0"
+          routing:
+            fallback: passthrough
+          transforms:
+            - spec: my-spec@1.0.0
+              direction: response
+              match:
+                path: "/test"
+          """);
+
+            ProfileParser parser = new ProfileParser(specRegistry);
+
+            assertThatThrownBy(() -> parser.parse(profileYaml))
+                    .isInstanceOf(ProfileResolveException.class)
+                    .hasMessageContaining("Unknown key")
+                    .hasMessageContaining("routing")
+                    .hasMessageContaining("profile root");
+        }
+
+        @Test
+        @DisplayName("unknown entry-level key → ProfileResolveException")
+        void unknownEntryKey() throws IOException {
+            specRegistry.put("my-spec@1.0.0", dummySpec("my-spec", "1.0.0"));
+
+            Path profileYaml = tempDir.resolve("unknown-entry.yaml");
+            Files.writeString(profileYaml, """
+          profile: test-unknown-entry
+          version: "1.0.0"
+          transforms:
+            - spec: my-spec@1.0.0
+              direction: response
+              priority: 10
+              match:
+                path: "/test"
+          """);
+
+            ProfileParser parser = new ProfileParser(specRegistry);
+
+            assertThatThrownBy(() -> parser.parse(profileYaml))
+                    .isInstanceOf(ProfileResolveException.class)
+                    .hasMessageContaining("Unknown key")
+                    .hasMessageContaining("priority")
+                    .hasMessageContaining("entry");
+        }
+
+        @Test
+        @DisplayName("unknown match-block key → ProfileResolveException")
+        void unknownMatchKey() throws IOException {
+            specRegistry.put("my-spec@1.0.0", dummySpec("my-spec", "1.0.0"));
+
+            Path profileYaml = tempDir.resolve("unknown-match.yaml");
+            Files.writeString(profileYaml, """
+          profile: test-unknown-match
+          version: "1.0.0"
+          transforms:
+            - spec: my-spec@1.0.0
+              direction: response
+              match:
+                path: "/test"
+                statis: "4xx"
+          """);
+
+            ProfileParser parser = new ProfileParser(specRegistry);
+
+            assertThatThrownBy(() -> parser.parse(profileYaml))
+                    .isInstanceOf(ProfileResolveException.class)
+                    .hasMessageContaining("Unknown key")
+                    .hasMessageContaining("statis")
+                    .hasMessageContaining("match");
+        }
+
+        @Test
+        @DisplayName("multiple unknown keys listed in error message")
+        void multipleUnknownKeys() throws IOException {
+            specRegistry.put("my-spec@1.0.0", dummySpec("my-spec", "1.0.0"));
+
+            Path profileYaml = tempDir.resolve("multi-unknown.yaml");
+            Files.writeString(profileYaml, """
+          profile: test-multi-unknown
+          version: "1.0.0"
+          transforms:
+            - spec: my-spec@1.0.0
+              direction: response
+              match:
+                path: "/test"
+                statis: "4xx"
+                header: "application/json"
+          """);
+
+            ProfileParser parser = new ProfileParser(specRegistry);
+
+            assertThatThrownBy(() -> parser.parse(profileYaml))
+                    .isInstanceOf(ProfileResolveException.class)
+                    .hasMessageContaining("Unknown keys")
+                    .hasMessageContaining("statis")
+                    .hasMessageContaining("header");
+        }
+
+        @Test
+        @DisplayName("valid profile with all known keys passes without error")
+        void validProfileAllKnownKeys() throws IOException {
+            specRegistry.put("my-spec@1.0.0", dummySpec("my-spec", "1.0.0"));
+
+            Path profileYaml = tempDir.resolve("all-known.yaml");
+            Files.writeString(profileYaml, """
+          profile: test-all-known
+          version: "1.0.0"
+          description: "A valid profile with all known keys"
+          transforms:
+            - spec: my-spec@1.0.0
+              direction: response
+              match:
+                path: "/api/**"
+                method: GET
+                content-type: "application/json"
+                status: "2xx"
+          """);
+
+            ProfileParser parser = new ProfileParser(specRegistry);
+            TransformProfile profile = parser.parse(profileYaml);
+
+            assertThat(profile.id()).isEqualTo("test-all-known");
+            assertThat(profile.entries()).hasSize(1);
+        }
+    }
 }
