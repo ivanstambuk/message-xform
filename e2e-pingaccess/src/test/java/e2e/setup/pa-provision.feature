@@ -167,12 +167,13 @@ Feature: PA Admin API provisioning (idempotent)
     # -----------------------------------------------------------------------
     * def phase8Skip = false
 
+    # Third-Party Service now points to OIDC proxy (HTTPS :8443, Trust Any certs)
     * def oidcSvcId = findId('/thirdPartyServices', 'Mock OIDC Server')
-    * if (oidcSvcId == null) karate.set('oidcSvcId', karate.call('classpath:e2e/helpers/create-if-absent.feature', { path: '/thirdPartyServices', body: { name: 'Mock OIDC Server', targets: [oidcContainer + ':8080'], secure: false, maxConnections: 5, availabilityProfileId: 1, trustedCertificateGroupId: 0 } }).resourceId)
+    * if (oidcSvcId == null) karate.set('oidcSvcId', karate.call('classpath:e2e/helpers/create-if-absent.feature', { path: '/thirdPartyServices', body: { name: 'Mock OIDC Server', targets: [oidcContainer + ':8443'], secure: true, maxConnections: 5, availabilityProfileId: 1, trustedCertificateGroupId: 2 } }).resourceId)
     * if (oidcSvcId == null) phase8Skip = true
     * if (phase8Skip) karate.log('WARN: Third-Party Service unavailable — skipping Phase 8')
 
-    # ATV
+    # ATV (issuer now uses HTTPS via proxy)
     * def atvId = null
     * if (!phase8Skip) atvId = findId('/accessTokenValidators', 'Mock OIDC Validator')
     * if (!phase8Skip && atvId == null) karate.call('classpath:e2e/setup/create-atv.feature', { oidcSvcId: oidcSvcId, oidcContainer: oidcContainer })
@@ -184,8 +185,16 @@ Feature: PA Admin API provisioning (idempotent)
 
     # -----------------------------------------------------------------------
     # Phase 8b: Web Session / OIDC
+    # Common Token Provider + OIDC Provider + Web Session + Web App
+    # See operations guide §25 for full architecture details.
     # -----------------------------------------------------------------------
     * def phase8bSkip = phase8Skip
+
+    # Configure Common Token Provider + OIDC Provider (idempotent PUTs)
+    * if (!phase8bSkip) karate.call('classpath:e2e/setup/create-oidc-provider.feature', { oidcContainer: oidcContainer })
+
+    # Web Session + Web Application
     * def webSessionId = null
     * def webAppId = null
     * if (!phase8bSkip) karate.call('classpath:e2e/setup/create-web-session.feature', { siteId: siteId, vhId: vhId, ruleId: ruleId, oidcContainer: oidcContainer })
+

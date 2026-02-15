@@ -1,11 +1,8 @@
-# E2E test spec: hot-reload target (Phase 9)
+# E2E test spec: hot-reload target — IDENTITY version
 #
-# This spec ships as a no-op identity transform in specs/.  The Phase 9
-# hot-reload tests overwrite this file with a version that adds a
-# "__reloaded": true marker, proving that the reload scheduler picked
-# up the change.
-#
-# Profile routing: /api/reload/** → e2e-reload-addition@1.0.0 (request)
+# This is the original no-op identity version of the reload spec.
+# Phase 9 tests use this to restore the spec after overwriting it
+# with the marker version or invalid YAML.
 id: e2e-reload-addition
 version: "1.0.0"
 description: "E2E test — hot-reload target (identity at startup)"

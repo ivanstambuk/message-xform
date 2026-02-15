@@ -29,9 +29,14 @@ PA_ENGINE_PORT=13000
 ECHO_PORT=18080
 OIDC_PORT=18443
 JMX_PORT=19999
-JMX_CONTAINER_PORT=9999
+# IMPORTANT: container port must equal host port for JMX/RMI.
+# RMI returns the server-side port in its stub; if container port (9999) ≠
+# host port (19999), the client gets told to connect to localhost:9999
+# which doesn't exist on the host.  Using the same port on both sides
+# ensures the RMI stub matches what the Docker-mapped host port exposes.
+JMX_CONTAINER_PORT=19999
 PA_PASSWORD="2Access"
-LICENSE_FILE="$PROJECT_ROOT/binaries/PingAccess-9.0-Development.lic"
+LICENSE_FILE="$PROJECT_ROOT/binaries/pingaccess/license/PingAccess-9.0-Development.lic"
 SHADOW_JAR="$PROJECT_ROOT/adapter-pingaccess/build/libs/adapter-pingaccess-0.1.0-SNAPSHOT.jar"
 SPECS_DIR="$PROJECT_ROOT/e2e/pingaccess/specs"
 PROFILES_DIR="$PROJECT_ROOT/e2e/pingaccess/profiles"

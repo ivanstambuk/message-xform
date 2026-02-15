@@ -26,16 +26,19 @@ Feature: JMX Metrics E2E (Phase 10)
     @phase10
   Scenario: Test 28 — JMX MBean registered and counters work (S-002-33)
     # ── (a) Verify MBean exists ──
-    * def existsResult = call read('classpath:e2e/helpers/jmx-query.feature') { jmxUrl: '#(jmxUrl)', objectName: 'io.messagexform:type=TransformMetrics,instance=*', attributeName: '__exists__' }
+    # Use exact instance name (not wildcard) — there are 2 rules with JMX enabled
+    # (main + DENY), and wildcard uses iterator().next() which is non-deterministic.
+    * def mbeanName = 'io.messagexform:type=TransformMetrics,instance=E2E Transform Rule'
+    * def existsResult = call read('classpath:e2e/helpers/jmx-query.feature') { jmxUrl: '#(jmxUrl)', objectName: '#(mbeanName)', attributeName: '__exists__' }
     * match existsResult.jmxResult.exists == true
 
     # ── (b) Verify ActiveSpecCount ≥ 1 ──
-    * def specCountResult = call read('classpath:e2e/helpers/jmx-query.feature') { jmxUrl: '#(jmxUrl)', objectName: 'io.messagexform:type=TransformMetrics,instance=*', attributeName: 'ActiveSpecCount' }
+    * def specCountResult = call read('classpath:e2e/helpers/jmx-query.feature') { jmxUrl: '#(jmxUrl)', objectName: '#(mbeanName)', attributeName: 'ActiveSpecCount' }
     * match specCountResult.jmxResult.exists == true
     * assert specCountResult.jmxResult.value >= 1
 
     # ── (c) Record baseline TotalRequestCount ──
-    * def baselineResult = call read('classpath:e2e/helpers/jmx-query.feature') { jmxUrl: '#(jmxUrl)', objectName: 'io.messagexform:type=TransformMetrics,instance=*', attributeName: 'TransformTotalCount' }
+    * def baselineResult = call read('classpath:e2e/helpers/jmx-query.feature') { jmxUrl: '#(jmxUrl)', objectName: '#(mbeanName)', attributeName: 'TransformTotalCount' }
     * def baselineCount = baselineResult.jmxResult.value
 
     # ── (d) Send a request to PA to increment the counter ──
@@ -50,7 +53,7 @@ Feature: JMX Metrics E2E (Phase 10)
     # The request goes through wrapRequest (request transform) + handleResponse
     # (response transform), so the counter may increment by 1 or 2 depending
     # on whether both directions match a profile entry.
-    * def afterResult = call read('classpath:e2e/helpers/jmx-query.feature') { jmxUrl: '#(jmxUrl)', objectName: 'io.messagexform:type=TransformMetrics,instance=*', attributeName: 'TransformTotalCount' }
+    * def afterResult = call read('classpath:e2e/helpers/jmx-query.feature') { jmxUrl: '#(jmxUrl)', objectName: '#(mbeanName)', attributeName: 'TransformTotalCount' }
     * assert afterResult.jmxResult.value > baselineCount
 
     # ── (f) Verify PA log shows JMX registration ──

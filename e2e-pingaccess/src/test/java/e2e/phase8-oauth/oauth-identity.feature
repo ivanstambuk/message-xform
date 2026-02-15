@@ -14,9 +14,9 @@ Feature: OAuth/Identity Tests
     * if (typeof phase8Skip !== 'undefined' && phase8Skip) karate.abort()
 
     # Obtain access token from mock-oauth2-server
-    Given url 'http://localhost:' + oidcPort + '/default/token'
-    And configure ssl = false
-    And header Host = oidcContainer + ':8080'
+    Given url 'https://localhost:' + oidcPort + '/default/token'
+    And configure ssl = true
+    And header Host = oidcContainer + ':8443'
     And form field grant_type = 'client_credentials'
     And form field client_id = 'e2e-client'
     And form field client_secret = 'e2e-secret'
@@ -59,9 +59,9 @@ Feature: OAuth/Identity Tests
     * if (typeof phase8Skip !== 'undefined' && phase8Skip) karate.abort()
 
     # Obtain fresh token
-    Given url 'http://localhost:' + oidcPort + '/default/token'
-    And configure ssl = false
-    And header Host = oidcContainer + ':8080'
+    Given url 'https://localhost:' + oidcPort + '/default/token'
+    And configure ssl = true
+    And header Host = oidcContainer + ':8443'
     And form field grant_type = 'client_credentials'
     And form field client_id = 'e2e-client'
     And form field client_secret = 'e2e-secret'
@@ -95,9 +95,9 @@ Feature: OAuth/Identity Tests
     * if (typeof phase8Skip !== 'undefined' && phase8Skip) karate.abort()
 
     # Obtain fresh token
-    Given url 'http://localhost:' + oidcPort + '/default/token'
-    And configure ssl = false
-    And header Host = oidcContainer + ':8080'
+    Given url 'https://localhost:' + oidcPort + '/default/token'
+    And configure ssl = true
+    And header Host = oidcContainer + ':8443'
     And form field grant_type = 'client_credentials'
     And form field client_id = 'e2e-client'
     And form field client_secret = 'e2e-secret'

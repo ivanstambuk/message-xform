@@ -19,7 +19,7 @@ Feature: Create Access Token Validator
         "configuration": {
           "path": "/default/jwks",
           "subjectAttributeName": "sub",
-          "issuer": "#('http://' + oidcContainer + ':8080/default')",
+          "issuer": "#('https://' + oidcContainer + ':8443/default')",
           "audience": null,
           "thirdPartyService": "#('' + oidcSvcId)"
         }

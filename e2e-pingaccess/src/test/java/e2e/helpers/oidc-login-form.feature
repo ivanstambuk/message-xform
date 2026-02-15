@@ -1,6 +1,7 @@
 @ignore
 Feature: POST OIDC login form
   # Helper for interactive OIDC mode — posts username to extract callback URL.
+  # Returns: callbackUrl
 
   Scenario:
     Given url formUrl
