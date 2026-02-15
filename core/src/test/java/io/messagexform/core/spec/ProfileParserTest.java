@@ -3,6 +3,8 @@ package io.messagexform.core.spec;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.messagexform.core.engine.EngineRegistry;
+import io.messagexform.core.engine.jslt.JsltExpressionEngine;
 import io.messagexform.core.error.ProfileResolveException;
 import io.messagexform.core.model.Direction;
 import io.messagexform.core.model.TransformProfile;
@@ -496,6 +498,232 @@ class ProfileParserTest {
 
             assertThat(profile.id()).isEqualTo("test-all-known");
             assertThat(profile.entries()).hasSize(1);
+        }
+    }
+
+    // ── match.when Parsing (FR-001-16, ADR-0036, T-001-71) ──
+
+    @Nested
+    @DisplayName("match.when Parsing")
+    class WhenParsing {
+
+        private EngineRegistry engineRegistry;
+
+        @BeforeEach
+        void setUpEngineRegistry() {
+            engineRegistry = new EngineRegistry();
+            engineRegistry.register(new JsltExpressionEngine());
+        }
+
+        @Test
+        @DisplayName("valid when block → compiles and sets whenPredicate")
+        void validWhenBlock() throws IOException {
+            specRegistry.put("my-spec@1.0.0", dummySpec("my-spec", "1.0.0"));
+
+            Path profileYaml = tempDir.resolve("when-valid.yaml");
+            Files.writeString(profileYaml, """
+          profile: test-when
+          version: "1.0.0"
+          transforms:
+            - spec: my-spec@1.0.0
+              direction: response
+              match:
+                path: "/api/**"
+                when:
+                  lang: jslt
+                  expr: '.type == "admin"'
+          """);
+
+            ProfileParser parser = new ProfileParser(specRegistry, engineRegistry);
+            TransformProfile profile = parser.parse(profileYaml);
+
+            assertThat(profile.entries()).hasSize(1);
+            assertThat(profile.entries().get(0).whenPredicate()).isNotNull();
+            assertThat(profile.hasWhenPredicates()).isTrue();
+        }
+
+        @Test
+        @DisplayName("when block missing lang → ProfileResolveException")
+        void whenMissingLang() throws IOException {
+            specRegistry.put("my-spec@1.0.0", dummySpec("my-spec", "1.0.0"));
+
+            Path profileYaml = tempDir.resolve("when-no-lang.yaml");
+            Files.writeString(profileYaml, """
+          profile: test-when-no-lang
+          version: "1.0.0"
+          transforms:
+            - spec: my-spec@1.0.0
+              direction: response
+              match:
+                path: "/api/**"
+                when:
+                  expr: '.type == "admin"'
+          """);
+
+            ProfileParser parser = new ProfileParser(specRegistry, engineRegistry);
+
+            assertThatThrownBy(() -> parser.parse(profileYaml))
+                    .isInstanceOf(ProfileResolveException.class)
+                    .hasMessageContaining("'match.when' requires 'lang'");
+        }
+
+        @Test
+        @DisplayName("when block missing expr → ProfileResolveException")
+        void whenMissingExpr() throws IOException {
+            specRegistry.put("my-spec@1.0.0", dummySpec("my-spec", "1.0.0"));
+
+            Path profileYaml = tempDir.resolve("when-no-expr.yaml");
+            Files.writeString(profileYaml, """
+          profile: test-when-no-expr
+          version: "1.0.0"
+          transforms:
+            - spec: my-spec@1.0.0
+              direction: response
+              match:
+                path: "/api/**"
+                when:
+                  lang: jslt
+          """);
+
+            ProfileParser parser = new ProfileParser(specRegistry, engineRegistry);
+
+            assertThatThrownBy(() -> parser.parse(profileYaml))
+                    .isInstanceOf(ProfileResolveException.class)
+                    .hasMessageContaining("'match.when' requires 'expr'");
+        }
+
+        @Test
+        @DisplayName("when block with lang=jolt → ProfileResolveException")
+        void whenJoltRejected() throws IOException {
+            specRegistry.put("my-spec@1.0.0", dummySpec("my-spec", "1.0.0"));
+
+            Path profileYaml = tempDir.resolve("when-jolt.yaml");
+            Files.writeString(profileYaml, """
+          profile: test-when-jolt
+          version: "1.0.0"
+          transforms:
+            - spec: my-spec@1.0.0
+              direction: response
+              match:
+                path: "/api/**"
+                when:
+                  lang: jolt
+                  expr: '[{"operation":"shift"}]'
+          """);
+
+            ProfileParser parser = new ProfileParser(specRegistry, engineRegistry);
+
+            assertThatThrownBy(() -> parser.parse(profileYaml))
+                    .isInstanceOf(ProfileResolveException.class)
+                    .hasMessageContaining("does not support lang 'jolt'")
+                    .hasMessageContaining("Use 'jslt' instead");
+        }
+
+        @Test
+        @DisplayName("when block with unknown keys → ProfileResolveException")
+        void whenUnknownKeys() throws IOException {
+            specRegistry.put("my-spec@1.0.0", dummySpec("my-spec", "1.0.0"));
+
+            Path profileYaml = tempDir.resolve("when-unknown.yaml");
+            Files.writeString(profileYaml, """
+          profile: test-when-unknown
+          version: "1.0.0"
+          transforms:
+            - spec: my-spec@1.0.0
+              direction: response
+              match:
+                path: "/api/**"
+                when:
+                  lang: jslt
+                  expr: '.type == "admin"'
+                  timeout: 1000
+          """);
+
+            ProfileParser parser = new ProfileParser(specRegistry, engineRegistry);
+
+            assertThatThrownBy(() -> parser.parse(profileYaml))
+                    .isInstanceOf(ProfileResolveException.class)
+                    .hasMessageContaining("Unknown key")
+                    .hasMessageContaining("timeout");
+        }
+
+        @Test
+        @DisplayName("when block without EngineRegistry → ProfileResolveException")
+        void whenWithoutEngineRegistry() throws IOException {
+            specRegistry.put("my-spec@1.0.0", dummySpec("my-spec", "1.0.0"));
+
+            Path profileYaml = tempDir.resolve("when-no-registry.yaml");
+            Files.writeString(profileYaml, """
+          profile: test-when-no-registry
+          version: "1.0.0"
+          transforms:
+            - spec: my-spec@1.0.0
+              direction: response
+              match:
+                path: "/api/**"
+                when:
+                  lang: jslt
+                  expr: '.type == "admin"'
+          """);
+
+            // No engine registry → should fail
+            ProfileParser parser = new ProfileParser(specRegistry);
+
+            assertThatThrownBy(() -> parser.parse(profileYaml))
+                    .isInstanceOf(ProfileResolveException.class)
+                    .hasMessageContaining("engine registry");
+        }
+
+        @Test
+        @DisplayName("when block with unregistered engine → ProfileResolveException")
+        void whenUnregisteredEngine() throws IOException {
+            specRegistry.put("my-spec@1.0.0", dummySpec("my-spec", "1.0.0"));
+
+            // Create engine registry WITHOUT jslt
+            EngineRegistry emptyRegistry = new EngineRegistry();
+
+            Path profileYaml = tempDir.resolve("when-unregistered.yaml");
+            Files.writeString(profileYaml, """
+          profile: test-when-unregistered
+          version: "1.0.0"
+          transforms:
+            - spec: my-spec@1.0.0
+              direction: response
+              match:
+                path: "/api/**"
+                when:
+                  lang: jslt
+                  expr: '.type == "admin"'
+          """);
+
+            ProfileParser parser = new ProfileParser(specRegistry, emptyRegistry);
+
+            assertThatThrownBy(() -> parser.parse(profileYaml))
+                    .isInstanceOf(ProfileResolveException.class)
+                    .hasMessageContaining("engine 'jslt' not registered");
+        }
+
+        @Test
+        @DisplayName("profile without when → hasWhenPredicates() is false")
+        void noWhenPredicatesReturnsFalse() throws IOException {
+            specRegistry.put("my-spec@1.0.0", dummySpec("my-spec", "1.0.0"));
+
+            Path profileYaml = tempDir.resolve("no-when.yaml");
+            Files.writeString(profileYaml, """
+          profile: test-no-when
+          version: "1.0.0"
+          transforms:
+            - spec: my-spec@1.0.0
+              direction: response
+              match:
+                path: "/api/**"
+          """);
+
+            ProfileParser parser = new ProfileParser(specRegistry);
+            TransformProfile profile = parser.parse(profileYaml);
+
+            assertThat(profile.entries().get(0).whenPredicate()).isNull();
+            assertThat(profile.hasWhenPredicates()).isFalse();
         }
     }
 }

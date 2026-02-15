@@ -109,6 +109,18 @@ public final class SpecParser {
     }
 
     /**
+     * Returns the engine registry used by this parser.
+     * Exposed so that {@code TransformEngine} can pass it to
+     * {@code ProfileParser} for compiling {@code match.when} expressions
+     * (FR-001-16, ADR-0036).
+     *
+     * @return the engine registry, never null
+     */
+    public EngineRegistry engineRegistry() {
+        return engineRegistry;
+    }
+
+    /**
      * Parses the YAML file at the given path into a {@link TransformSpec}.
      *
      * @param path path to the spec YAML file

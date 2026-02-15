@@ -3,12 +3,15 @@ package io.messagexform.core.spec;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import io.messagexform.core.engine.EngineRegistry;
 import io.messagexform.core.error.ProfileResolveException;
 import io.messagexform.core.model.Direction;
 import io.messagexform.core.model.ProfileEntry;
 import io.messagexform.core.model.StatusPattern;
 import io.messagexform.core.model.TransformProfile;
 import io.messagexform.core.model.TransformSpec;
+import io.messagexform.core.spi.CompiledExpression;
+import io.messagexform.core.spi.ExpressionEngine;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -44,22 +47,40 @@ public final class ProfileParser {
     private static final Set<String> KNOWN_ENTRY_KEYS = Set.of("spec", "direction", "match");
 
     /** Recognized keys inside the {@code match} block. */
-    private static final Set<String> KNOWN_MATCH_KEYS = Set.of("path", "method", "content-type", "status");
+    private static final Set<String> KNOWN_MATCH_KEYS = Set.of("path", "method", "content-type", "status", "when");
+
+    /** Recognized keys inside the {@code match.when} block. */
+    private static final Set<String> KNOWN_WHEN_KEYS = Set.of("lang", "expr");
 
     private final Map<String, TransformSpec> specRegistry;
+    private final EngineRegistry engineRegistry; // nullable — null means no when support
 
     /**
      * Creates a profile parser that resolves spec references from the given
-     * registry.
+     * registry, without expression engine support (no {@code match.when}).
      *
-     * @param specRegistry map of "id@version" → loaded TransformSpec. The key
-     *                     format
-     *                     MUST be "specId@version" for versioned references, or
-     *                     just
-     *                     "specId" for unversioned (latest) resolution.
+     * @param specRegistry map of "id@version" → loaded TransformSpec
      */
     public ProfileParser(Map<String, TransformSpec> specRegistry) {
+        this(specRegistry, null);
+    }
+
+    /**
+     * Creates a profile parser that resolves spec references from the given
+     * registry and compiles {@code match.when} expressions using the engine
+     * registry (FR-001-16, ADR-0036).
+     *
+     * @param specRegistry   map of "id@version" → loaded TransformSpec. The key
+     *                       format MUST be "specId@version" for versioned
+     *                       references, or just "specId" for unversioned (latest)
+     *                       resolution.
+     * @param engineRegistry registry for resolving expression engine identifiers
+     *                       for {@code match.when} compilation. May be null if
+     *                       {@code when} predicates are not used.
+     */
+    public ProfileParser(Map<String, TransformSpec> specRegistry, EngineRegistry engineRegistry) {
         this.specRegistry = Objects.requireNonNull(specRegistry, "specRegistry must not be null");
+        this.engineRegistry = engineRegistry; // nullable
     }
 
     /**
@@ -130,12 +151,120 @@ public final class ProfileParser {
         StatusPattern statusPattern =
                 StatusPatternParser.parseStatusField(matchNode, direction, profileId, index, source);
 
+        // Parse match.when body-predicate (FR-001-16, ADR-0036, T-001-71)
+        CompiledExpression whenPredicate = parseWhenBlock(matchNode, profileId, source, index);
+
         // Normalize method to uppercase for consistent matching
         if (method != null) {
             method = method.toUpperCase();
         }
 
-        return new ProfileEntry(resolvedSpec, direction, pathPattern, method, contentType, statusPattern);
+        return new ProfileEntry(
+                resolvedSpec, direction, pathPattern, method, contentType, statusPattern, whenPredicate);
+    }
+
+    /**
+     * Parses the optional {@code match.when} block and compiles the predicate
+     * expression at load time (FR-001-16, ADR-0036, T-001-71).
+     *
+     * <p>
+     * The {@code when} block uses the same {@code lang}/{@code expr} structure
+     * as transform and status predicates:
+     *
+     * <pre>{@code
+     * match:
+     *   path: "/api/users/**"
+     *   when:
+     *     lang: jslt
+     *     expr: '.type == "admin"'
+     * }</pre>
+     *
+     * @return compiled predicate expression, or null if no {@code when} block
+     * @throws ProfileResolveException if the when block is invalid, the engine
+     *                                 is not registered, or the engine doesn't
+     *                                 support boolean predicates
+     */
+    private CompiledExpression parseWhenBlock(JsonNode matchNode, String profileId, String source, int index) {
+        JsonNode whenNode = matchNode.get("when");
+        if (whenNode == null) {
+            return null;
+        }
+
+        if (!whenNode.isObject()) {
+            throw new ProfileResolveException(
+                    String.format(
+                            "Profile '%s' entry[%d]: 'match.when' must be an object with 'lang' and 'expr' fields",
+                            profileId, index),
+                    profileId,
+                    source);
+        }
+
+        // Strict key check: reject unknown when-block keys
+        rejectUnknownKeys(whenNode, KNOWN_WHEN_KEYS, String.format("entry[%d].match.when", index), profileId, source);
+
+        // Require lang
+        JsonNode langNode = whenNode.get("lang");
+        if (langNode == null || !langNode.isTextual() || langNode.asText().isBlank()) {
+            throw new ProfileResolveException(
+                    String.format("Profile '%s' entry[%d]: 'match.when' requires 'lang' field", profileId, index),
+                    profileId,
+                    source);
+        }
+        String lang = langNode.asText();
+
+        // JOLT cannot produce boolean predicate results — reject with clear diagnostic
+        if ("jolt".equalsIgnoreCase(lang)) {
+            throw new ProfileResolveException(
+                    String.format(
+                            "Profile '%s' entry[%d]: 'match.when' does not support lang 'jolt' — "
+                                    + "JOLT cannot produce boolean predicate results. Use 'jslt' instead.",
+                            profileId, index),
+                    profileId,
+                    source);
+        }
+
+        // Require expr
+        JsonNode exprNode = whenNode.get("expr");
+        if (exprNode == null || !exprNode.isTextual() || exprNode.asText().isBlank()) {
+            throw new ProfileResolveException(
+                    String.format("Profile '%s' entry[%d]: 'match.when' requires 'expr' field", profileId, index),
+                    profileId,
+                    source);
+        }
+        String expr = exprNode.asText();
+
+        // Require engine registry for when compilation
+        if (engineRegistry == null) {
+            throw new ProfileResolveException(
+                    String.format(
+                            "Profile '%s' entry[%d]: 'match.when' requires an engine registry "
+                                    + "(ProfileParser constructed without EngineRegistry)",
+                            profileId, index),
+                    profileId,
+                    source);
+        }
+
+        // Resolve engine and compile expression at load time
+        ExpressionEngine engine = engineRegistry.getEngine(lang).orElse(null);
+        if (engine == null) {
+            throw new ProfileResolveException(
+                    String.format(
+                            "Profile '%s' entry[%d]: expression engine '%s' not registered", profileId, index, lang),
+                    profileId,
+                    source);
+        }
+
+        try {
+            return engine.compile(expr);
+        } catch (Exception e) {
+            throw new ProfileResolveException(
+                    String.format(
+                            "Profile '%s' entry[%d]: failed to compile 'match.when' expression: %s",
+                            profileId, index, e.getMessage()),
+                    e,
+                    profileId,
+                    source);
+        }
     }
 
     /**

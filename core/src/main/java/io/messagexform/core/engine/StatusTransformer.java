@@ -61,7 +61,7 @@ public final class StatusTransformer {
         try {
             JsonNode predicateResult = statusSpec.when().evaluate(transformedBody, TransformContext.empty());
 
-            if (isTruthy(predicateResult)) {
+            if (JsonNodeUtils.isTruthy(predicateResult)) {
                 LOG.debug("Status when predicate matched: {} → {}", originalStatus, statusSpec.set());
                 return statusSpec.set();
             } else {
@@ -76,20 +76,5 @@ public final class StatusTransformer {
                     e.getMessage());
             return originalStatus;
         }
-    }
-
-    /**
-     * Determines if a JsonNode represents a truthy value.
-     * In JSLT: true is truthy, false/null/missing are falsy.
-     */
-    private static boolean isTruthy(JsonNode node) {
-        if (node == null || node.isNull() || node.isMissingNode()) {
-            return false;
-        }
-        if (node.isBoolean()) {
-            return node.asBoolean();
-        }
-        // For non-boolean results, treat non-null as truthy (following JSLT semantics)
-        return true;
     }
 }

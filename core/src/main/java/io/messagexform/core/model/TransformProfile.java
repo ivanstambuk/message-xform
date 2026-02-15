@@ -26,4 +26,20 @@ public record TransformProfile(String id, String description, String version, Li
         Objects.requireNonNull(version, "profile version must not be null");
         entries = entries != null ? Collections.unmodifiableList(entries) : List.of();
     }
+
+    /**
+     * Returns {@code true} if any entry in this profile has a {@code when}
+     * predicate (FR-001-16, ADR-0036). Used by {@code TransformEngine} to
+     * decide whether to pre-parse the message body before profile matching.
+     *
+     * <p>
+     * This is a computed method (NOT a record component) because Java records
+     * cannot have non-component fields. The iteration is O(n) over a small
+     * list (typically 2–10 entries) and is called once per request.
+     *
+     * @return true if any entry has a non-null whenPredicate
+     */
+    public boolean hasWhenPredicates() {
+        return entries.stream().anyMatch(e -> e.whenPredicate() != null);
+    }
 }

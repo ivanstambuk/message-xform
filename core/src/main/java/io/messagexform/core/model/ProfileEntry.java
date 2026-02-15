@@ -1,11 +1,12 @@
 package io.messagexform.core.model;
 
+import io.messagexform.core.spi.CompiledExpression;
 import java.util.Objects;
 
 /**
  * A single transform binding within a {@link TransformProfile} (DO-001-08).
  * Binds a {@link TransformSpec} to a request match pattern (path, method,
- * content-type, status) and direction.
+ * content-type, status, when predicate) and direction.
  *
  * <p>
  * Immutable, thread-safe — created at profile load time.
@@ -20,6 +21,10 @@ import java.util.Objects;
  * @param statusPattern status code pattern (e.g. exact 404, class 4xx, range
  *                      400-499), or null for any status. Only valid for
  *                      response-direction entries (FR-001-15, ADR-0036).
+ * @param whenPredicate compiled body-predicate expression for content-based
+ *                      routing (FR-001-16, ADR-0036), or null for "always
+ *                      match".
+ *                      Evaluated against the parsed JSON body at match time.
  */
 public record ProfileEntry(
         TransformSpec spec,
@@ -27,7 +32,8 @@ public record ProfileEntry(
         String pathPattern,
         String method,
         String contentType,
-        StatusPattern statusPattern) {
+        StatusPattern statusPattern,
+        CompiledExpression whenPredicate) {
 
     /** Canonical constructor — validates required fields. */
     public ProfileEntry {
@@ -37,12 +43,26 @@ public record ProfileEntry(
     }
 
     /**
-     * Backward-compatible constructor without statusPattern.
-     * Equivalent to passing {@code null} for statusPattern (match any status).
+     * Backward-compatible constructor without whenPredicate.
+     * Equivalent to passing {@code null} for whenPredicate (always match).
+     */
+    public ProfileEntry(
+            TransformSpec spec,
+            Direction direction,
+            String pathPattern,
+            String method,
+            String contentType,
+            StatusPattern statusPattern) {
+        this(spec, direction, pathPattern, method, contentType, statusPattern, null);
+    }
+
+    /**
+     * Backward-compatible constructor without statusPattern or whenPredicate.
+     * Equivalent to passing {@code null} for both (match any status, always match).
      */
     public ProfileEntry(
             TransformSpec spec, Direction direction, String pathPattern, String method, String contentType) {
-        this(spec, direction, pathPattern, method, contentType, null);
+        this(spec, direction, pathPattern, method, contentType, null, null);
     }
 
     /**
@@ -75,14 +95,15 @@ public record ProfileEntry(
 
     /**
      * Returns the number of match constraints for tie-breaking (ADR-0006).
-     * Includes method, content-type, and status pattern (weighted by
-     * specificity).
+     * Includes method, content-type, status pattern (weighted by
+     * specificity), and when predicate.
      */
     public int constraintCount() {
         int count = 0;
         if (method != null) count++;
         if (contentType != null) count++;
         if (statusPattern != null) count += statusPattern.specificityWeight();
+        if (whenPredicate != null) count++;
         return count;
     }
 }

@@ -195,7 +195,7 @@ public final class UrlTransformer {
         if (urlSpec.methodWhen() != null) {
             try {
                 JsonNode result = urlSpec.methodWhen().evaluate(originalBody, context);
-                if (!isTruthy(result)) {
+                if (!JsonNodeUtils.isTruthy(result)) {
                     LOG.debug("url.method.when predicate is false — method unchanged: {}", currentMethod);
                     return currentMethod;
                 }
@@ -209,24 +209,6 @@ public final class UrlTransformer {
         String newMethod = urlSpec.methodSet();
         LOG.debug("URL method override: {} → {}", currentMethod, newMethod);
         return newMethod;
-    }
-
-    /**
-     * Checks if a JSLT result is "truthy".
-     * Follows JSLT/JSON semantics: null, false, empty string, missing → falsy.
-     */
-    private static boolean isTruthy(JsonNode result) {
-        if (result == null || result.isNull() || result.isMissingNode()) {
-            return false;
-        }
-        if (result.isBoolean()) {
-            return result.booleanValue();
-        }
-        if (result.isTextual()) {
-            return !result.asText().isEmpty();
-        }
-        // Any other non-null value is truthy
-        return true;
     }
 
     /**

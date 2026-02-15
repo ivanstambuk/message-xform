@@ -282,7 +282,7 @@ public final class TransformEngine {
      */
     public TransformProfile loadProfile(Path path) {
         TransformRegistry current = registryRef.get();
-        ProfileParser profileParser = new ProfileParser(current.allSpecs());
+        ProfileParser profileParser = new ProfileParser(current.allSpecs(), specParser.engineRegistry());
         TransformProfile profile = profileParser.parse(path);
         registryRef.updateAndGet(old -> new TransformRegistry(old.allSpecs(), profile));
         return profile;
@@ -331,7 +331,7 @@ public final class TransformEngine {
         TransformProfile profile = null;
         if (profilePath != null) {
             TransformRegistry tempRegistry = builder.build();
-            ProfileParser profileParser = new ProfileParser(tempRegistry.allSpecs());
+            ProfileParser profileParser = new ProfileParser(tempRegistry.allSpecs(), specParser.engineRegistry());
             profile = profileParser.parse(profilePath);
             builder.activeProfile(profile);
         }
@@ -436,13 +436,32 @@ public final class TransformEngine {
         // Phase 5: Profile-based routing via ProfileMatcher
         TransformProfile profile = snapshot.activeProfile();
         if (profile != null) {
+            // Phase 2 (FR-001-16, ADR-0036, T-001-71): Conditional body pre-parse
+            // If any profile entry has a when predicate, we must parse the body
+            // BEFORE matching so that ProfileMatcher can evaluate predicates.
+            // If no entries have when predicates, we skip this (zero overhead).
+            JsonNode preParsedBody = null;
+            if (profile.hasWhenPredicates()) {
+                try {
+                    preParsedBody = bodyToJson(message.body());
+                } catch (IllegalArgumentException e) {
+                    // bodyToJson() throws on non-JSON content (NOT returns null).
+                    // Non-JSON body — when predicates cannot evaluate.
+                    // Entries without when predicates can still match.
+                    LOG.debug("Body is not JSON — when predicates will not match: {}", e.getMessage());
+                    preParsedBody = null;
+                }
+            }
+
             List<ProfileEntry> matches = ProfileMatcher.findMatches(
                     profile,
                     message.requestPath(),
                     message.requestMethod(),
                     message.contentType(),
                     direction,
-                    message.statusCode());
+                    message.statusCode(),
+                    preParsedBody,
+                    context);
             if (matches.isEmpty()) {
                 return TransformResult.passthrough();
             }
@@ -451,7 +470,7 @@ public final class TransformEngine {
                 ProfileEntry entry = matches.get(0);
                 LogContext logCtx =
                         new LogContext(profile.id(), entry.specificityScore(), message.requestPath(), direction, null);
-                return transformWithSpec(entry.spec(), message, direction, logCtx, context);
+                return transformWithSpec(entry.spec(), message, direction, logCtx, context, preParsedBody);
             }
             // Multiple matches → pipeline chain (T-001-31, ADR-0012, S-001-49)
             return transformChain(matches, message, direction, context);
@@ -465,7 +484,7 @@ public final class TransformEngine {
 
         // Use the first loaded spec (for backward compatibility with Phase 4 tests)
         TransformSpec spec = allSpecs.values().iterator().next();
-        return transformWithSpec(spec, message, direction, null, context);
+        return transformWithSpec(spec, message, direction, null, context, null);
     }
 
     /**
@@ -498,7 +517,7 @@ public final class TransformEngine {
 
             LogContext logCtx =
                     new LogContext(profileId, entry.specificityScore(), message.requestPath(), direction, stepLabel);
-            TransformResult stepResult = transformWithSpec(entry.spec(), current, direction, logCtx, context);
+            TransformResult stepResult = transformWithSpec(entry.spec(), current, direction, logCtx, context, null);
 
             if (stepResult.isError()) {
                 LOG.warn(
@@ -531,19 +550,27 @@ public final class TransformEngine {
      * Applies a single spec to the message. Shared between profile-routed and
      * single-spec (Phase 4 fallback) paths.
      *
-     * @param logCtx  optional logging context for structured log emission
-     *                (T-001-41,
-     *                NFR-001-08);
-     *                null when no profile is loaded (Phase 4 fallback)
-     * @param context the transform context (adapter-injected or engine-built)
+     * @param logCtx        optional logging context for structured log emission
+     *                      (T-001-41, NFR-001-08);
+     *                      null when no profile is loaded (Phase 4 fallback)
+     * @param context       the transform context (adapter-injected or engine-built)
+     * @param preParsedBody the body already parsed during profile matching
+     *                      (FR-001-16, T-001-71), or null if not pre-parsed.
+     *                      When non-null, avoids redundant re-parsing.
      */
     private TransformResult transformWithSpec(
-            TransformSpec spec, Message message, Direction direction, LogContext logCtx, TransformContext context) {
+            TransformSpec spec,
+            Message message,
+            Direction direction,
+            LogContext logCtx,
+            TransformContext context,
+            JsonNode preParsedBody) {
         // Resolve the expression based on directionality
         CompiledExpression expr = resolveExpression(spec, direction);
 
-        // Save the original body for URL rewriting (ADR-0027: "route the input")
-        JsonNode originalBody = bodyToJson(message.body());
+        // Reuse pre-parsed body when available (Phase 2, T-001-71)
+        // Falls back to bodyToJson() for Phase 4 fallback and chaining
+        JsonNode originalBody = preParsedBody != null ? preParsedBody : bodyToJson(message.body());
 
         // T-001-42: Notify telemetry listener of transform start
         notifyTransformStarted(spec, direction);
@@ -553,7 +580,7 @@ public final class TransformEngine {
         try {
             // T-001-26: Strict-mode input schema validation
             if (schemaValidationMode == SchemaValidationMode.STRICT && spec.inputSchema() != null) {
-                validateInputSchema(bodyToJson(message.body()), spec);
+                validateInputSchema(originalBody, spec);
             }
 
             // T-001-39: Apply pipeline or single expression evaluation (FR-001-08,
@@ -561,7 +588,7 @@ public final class TransformEngine {
             JsonNode transformedBody;
             if (spec.hasApplyPipeline()) {
                 // Execute apply steps in declaration order — each step's output feeds the next
-                JsonNode pipelineInput = bodyToJson(message.body());
+                JsonNode pipelineInput = originalBody;
                 for (ApplyStep step : spec.applySteps()) {
                     if (step.isExpr()) {
                         // Main transform expression
@@ -574,7 +601,7 @@ public final class TransformEngine {
                 transformedBody = pipelineInput;
             } else {
                 // No apply directive — backwards-compatible single expression evaluation
-                transformedBody = expr.evaluate(bodyToJson(message.body()), context);
+                transformedBody = expr.evaluate(originalBody, context);
             }
 
             long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;

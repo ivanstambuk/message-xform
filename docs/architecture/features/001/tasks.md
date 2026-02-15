@@ -1382,7 +1382,7 @@ Track long-running or shared commands with timestamps to avoid duplicate work.
 
 #### I19 — Phase 2: `match.when` (Body-Predicate Matching)
 
-- [ ] **T-001-71** — Implement `match.when` (FR-001-16, ADR-0036)
+- [x] **T-001-71** — Implement `match.when` (FR-001-16, ADR-0036) ✅ 2026-02-15
   _Intent:_ Add body-predicate matching to profile entries, enabling
   polymorphic routing based on body content.
   _Implement:_ See research document §Phase 2 for detailed design.
@@ -1395,8 +1395,10 @@ Track long-running or shared commands with timestamps to avoid duplicate work.
   - Update `TransformEngine.transformInternal()` — conditional body pre-parse.
   - Pass `preParsedBody` to `transformWithSpec` (reuse across all 4 `bodyToJson` sites).
   - Extract `isTruthy()` to `JsonNodeUtils`.
-  _Test:_ `ProfileMatcherTest` (when predicate), `TransformEngineTest` (e2e integration).
+  _Test:_ `ProfileMatcherTest` (when predicate), `ProfileParserTest` (when parsing).
   _Scenarios:_ S-001-93, S-001-94, S-001-95, S-001-96, S-001-97, S-001-98, S-001-99.
+  _Status:_ ✅ Complete (2026-02-15). 15 new tests (7 matcher + 8 parser). All tests pass.
   _Verification commands:_
   - `./gradlew :core:test`
   - `./gradlew spotlessApply check`
+

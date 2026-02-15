@@ -1269,16 +1269,16 @@ New E2E scenarios:
 
 #### Phase 2: `match.when` — Body-Predicate Matching
 
-- [ ] Add `EngineRegistry` field to `TransformEngine` (constructor change)
-- [ ] Update `ProfileParser` constructor to accept `EngineRegistry`
-- [ ] Update `ProfileParser.parseEntry()` — parse `when` block, compile expression at load time
-- [ ] Update `ProfileEntry` — add `whenPredicate` field
-- [ ] Add `hasWhenPredicates()` computed method to `TransformProfile` (NOT record component)
-- [ ] Update `ProfileMatcher` — two-phase matching (envelope, then body predicate)
-- [ ] Update `TransformEngine.transformInternal()` — conditional body pre-parse
-- [ ] Pass `preParsedBody` to `transformWithSpec` (reuse across all 4 `bodyToJson` sites)
-- [ ] Extract `isTruthy()` to `JsonNodeUtils`
-- [ ] Unit tests: `ProfileMatcherTest` (when predicate), `TransformEngineTest` (e2e integration)
+- [x] Add `EngineRegistry` field to `TransformEngine` (constructor change)
+- [x] Update `ProfileParser` constructor to accept `EngineRegistry`
+- [x] Update `ProfileParser.parseEntry()` — parse `when` block, compile expression at load time
+- [x] Update `ProfileEntry` — add `whenPredicate` field
+- [x] Add `hasWhenPredicates()` computed method to `TransformProfile` (NOT record component)
+- [x] Update `ProfileMatcher` — two-phase matching (envelope, then body predicate)
+- [x] Update `TransformEngine.transformInternal()` — conditional body pre-parse
+- [x] Pass `preParsedBody` to `transformWithSpec` (reuse across all 4 `bodyToJson` sites)
+- [x] Extract `isTruthy()` to `JsonNodeUtils`
+- [x] Unit tests: `ProfileMatcherTest` (when predicate), `ProfileParserTest` (when parsing)
 - [ ] E2E tests: body predicate routing, status+when combined, non-JSON body graceful skip
 
 #### SDD Documentation (cross-cutting)

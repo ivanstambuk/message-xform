@@ -2,11 +2,14 @@ package io.messagexform.core.engine;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.BooleanNode;
 import io.messagexform.core.model.Direction;
 import io.messagexform.core.model.ProfileEntry;
 import io.messagexform.core.model.StatusPattern;
 import io.messagexform.core.model.TransformProfile;
 import io.messagexform.core.model.TransformSpec;
+import io.messagexform.core.spi.CompiledExpression;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -343,6 +346,131 @@ class ProfileMatcherTest {
             // 301 → neither 2xx nor 4xx → no match → passthrough
             assertThat(ProfileMatcher.findBestMatch(profile, "/api/test", null, null, Direction.RESPONSE, 301))
                     .isNull();
+        }
+    }
+
+    // ── When Predicate Matching (FR-001-16, ADR-0036, T-001-71) ──
+
+    @Nested
+    @DisplayName("When Predicate Matching")
+    class WhenPredicateMatching {
+
+        private static ProfileEntry entryWithWhen(
+                String specId, String path, Direction dir, CompiledExpression whenPredicate) {
+            return new ProfileEntry(dummySpec(specId), dir, path, null, null, null, whenPredicate);
+        }
+
+        @Test
+        @DisplayName("truthy when-predicate → entry matches")
+        void truthyPredicateMatches() {
+            // Predicate returns true for any input
+            CompiledExpression alwaysTrue = (input, ctx) -> BooleanNode.getTrue();
+            var entry = entryWithWhen("spec-a", "/api/**", Direction.RESPONSE, alwaysTrue);
+            var profile = new TransformProfile("p1", null, "1.0.0", List.of(entry));
+
+            var body = new ObjectMapper().createObjectNode().put("type", "admin");
+            var matches =
+                    ProfileMatcher.findMatches(profile, "/api/users", null, null, Direction.RESPONSE, 200, body, null);
+            assertThat(matches).hasSize(1);
+            assertThat(matches.get(0).spec().id()).isEqualTo("spec-a");
+        }
+
+        @Test
+        @DisplayName("falsy when-predicate → entry does not match")
+        void falsyPredicateDoesNotMatch() {
+            CompiledExpression alwaysFalse = (input, ctx) -> BooleanNode.getFalse();
+            var entry = entryWithWhen("spec-a", "/api/**", Direction.RESPONSE, alwaysFalse);
+            var profile = new TransformProfile("p1", null, "1.0.0", List.of(entry));
+
+            var body = new ObjectMapper().createObjectNode().put("type", "admin");
+            var matches =
+                    ProfileMatcher.findMatches(profile, "/api/users", null, null, Direction.RESPONSE, 200, body, null);
+            assertThat(matches).isEmpty();
+        }
+
+        @Test
+        @DisplayName("null body with when-predicate → entry does not match")
+        void nullBodyWithPredicateSkips() {
+            CompiledExpression alwaysTrue = (input, ctx) -> BooleanNode.getTrue();
+            var entry = entryWithWhen("spec-a", "/api/**", Direction.RESPONSE, alwaysTrue);
+            var profile = new TransformProfile("p1", null, "1.0.0", List.of(entry));
+
+            // null body → when predicate cannot evaluate → no match
+            var matches =
+                    ProfileMatcher.findMatches(profile, "/api/users", null, null, Direction.RESPONSE, 200, null, null);
+            assertThat(matches).isEmpty();
+        }
+
+        @Test
+        @DisplayName("predicate evaluation error → fail-safe (non-matching)")
+        void predicateErrorFailsSafe() {
+            CompiledExpression throwsError = (input, ctx) -> {
+                throw new RuntimeException("JSLT boom");
+            };
+            var entry = entryWithWhen("spec-a", "/api/**", Direction.RESPONSE, throwsError);
+            var profile = new TransformProfile("p1", null, "1.0.0", List.of(entry));
+
+            var body = new ObjectMapper().createObjectNode().put("x", 1);
+            var matches =
+                    ProfileMatcher.findMatches(profile, "/api/users", null, null, Direction.RESPONSE, 200, body, null);
+            assertThat(matches).isEmpty();
+        }
+
+        @Test
+        @DisplayName("entry without when-predicate matches regardless of body")
+        void noPredicateAlwaysMatches() {
+            // Standard entry — no when predicate
+            var entry = entry("spec-a", "/api/**", null, null, Direction.RESPONSE);
+            var profile = new TransformProfile("p1", null, "1.0.0", List.of(entry));
+
+            // With body
+            var body = new ObjectMapper().createObjectNode().put("type", "admin");
+            var matches =
+                    ProfileMatcher.findMatches(profile, "/api/users", null, null, Direction.RESPONSE, 200, body, null);
+            assertThat(matches).hasSize(1);
+
+            // Without body
+            matches =
+                    ProfileMatcher.findMatches(profile, "/api/users", null, null, Direction.RESPONSE, 200, null, null);
+            assertThat(matches).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("mixed entries: only the one with true predicate matches")
+        void mixedEntriesFilterByPredicate() {
+            // Entry A: when predicate returns true for type=="admin"
+            CompiledExpression adminPredicate = (input, ctx) -> BooleanNode.valueOf(
+                    input.has("type") && "admin".equals(input.get("type").asText()));
+            // Entry B: when predicate returns true for type=="user"
+            CompiledExpression userPredicate = (input, ctx) -> BooleanNode.valueOf(
+                    input.has("type") && "user".equals(input.get("type").asText()));
+
+            var adminEntry = entryWithWhen("admin-spec", "/api/**", Direction.RESPONSE, adminPredicate);
+            var userEntry = entryWithWhen("user-spec", "/api/**", Direction.RESPONSE, userPredicate);
+            var profile = new TransformProfile("p1", null, "1.0.0", List.of(adminEntry, userEntry));
+
+            var adminBody = new ObjectMapper().createObjectNode().put("type", "admin");
+            var matches = ProfileMatcher.findMatches(
+                    profile, "/api/users", null, null, Direction.RESPONSE, 200, adminBody, null);
+            assertThat(matches).hasSize(1);
+            assertThat(matches.get(0).spec().id()).isEqualTo("admin-spec");
+
+            var userBody = new ObjectMapper().createObjectNode().put("type", "user");
+            matches = ProfileMatcher.findMatches(
+                    profile, "/api/users", null, null, Direction.RESPONSE, 200, userBody, null);
+            assertThat(matches).hasSize(1);
+            assertThat(matches.get(0).spec().id()).isEqualTo("user-spec");
+        }
+
+        @Test
+        @DisplayName("when-predicate counts toward constraintCount for specificity tie-breaking")
+        void whenPredicateCountsAsConstraint() {
+            // Entry with when predicate has higher constraint count
+            CompiledExpression pred = (input, ctx) -> BooleanNode.getTrue();
+            var withWhen = entryWithWhen("with-when", "/api/**", Direction.RESPONSE, pred);
+            var withoutWhen = entry("without-when", "/api/**", null, null, Direction.RESPONSE);
+
+            assertThat(withWhen.constraintCount()).isGreaterThan(withoutWhen.constraintCount());
         }
     }
 }
