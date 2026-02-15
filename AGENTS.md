@@ -93,6 +93,8 @@ Update both `docs/architecture/roadmap.md` and the Roadmap table above when stat
   - `docs/_current-session.md` — Session state for agent handoffs.
   - `.agent/workflows/` — Session lifecycle workflows.
   - `.agent/session/` — Ephemeral session state (pending tasks).
+  - `.agent/session/active-work.yaml` — Machine-readable active lock board for concurrent agent coordination.
+  - `.agent/session/path-owners.yaml` — Advisory path routing hints for multi-agent task partitioning.
   - `llms.txt` — High-signal specs manifest for LLM context.
 
 ## Build & Test Commands
@@ -263,10 +265,25 @@ See `docs/operations/quality-gate.md` for full pipeline documentation.
     - **YAML only**: this file is machine-oriented for LLM agents, not human prose.
     - **Active entries only**: no history, no completed section, no `done` status. Remove entries immediately when work finishes or is aborted.
     - **Register only mutating work**: edits, generated files, config/script changes, workflow operations that modify workspace state. Read-only research MUST NOT register.
-    - **Required entry fields**: `agent`, `task_id`, `kind` (`edit` or `workflow`), `locks.paths`, `locks.resources`, `started_at`, `updated_at`, and optional `note`.
+    - **Agent tool required**: agents MUST use `scripts/agent-lock.sh` for lock operations (`acquire`, `check`, `heartbeat`, `release`, `list`) instead of manual YAML editing.
+    - **Required entry fields**: `agent`, `task_id`, `kind` (`edit` or `workflow`), `locks.paths`, `locks.resources`, `started_at`, `updated_at`, `lease_until`, and optional `note`.
+    - **Lock taxonomy**:
+      - `locks.paths`: exact file paths first; use directory/glob locks only when necessary.
+      - `locks.resources`: normalized resource ids. Recommended values:
+        - `workflow:init`
+        - `workflow:retro`
+        - `infra:docker:pa-e2e`
+        - `infra:gradle:quality-gate`
+        - `artifact:binaries`
     - **Conflict rule**: if another active entry overlaps the same file/directory lock or resource lock, wait on that scope.
-    - **Special lock**: if `workflow:retro` is active, no other mutating workflow may start until it is removed.
+    - **Special lock**:
+      - if `workflow:retro` is active, no other mutating workflow may start;
+      - acquiring `workflow:retro` requires no other active mutating lock entries.
+    - **Automatic lease reclaim**: lock entries are lease-based. Expired entries (`lease_until` in the past) may be reclaimed automatically by agents via `scripts/agent-lock.sh` (no manual intervention required).
     - **No busy waiting**: do not spin/poll in a loop waiting for lock release. Continue with non-conflicting work; if none exists, report blocked state and stop.
+22. **Path Routing Hints (Advisory)**: `.agent/session/path-owners.yaml` provides optional routing hints for concurrent agents.
+    - Use it to pick likely owners before lock acquisition to reduce contention.
+    - It is advisory only — lock rules in Rule 21 are authoritative.
 
 ### Known Pitfalls
 

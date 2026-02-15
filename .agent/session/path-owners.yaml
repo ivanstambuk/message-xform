@@ -1,0 +1,13 @@
+# Advisory routing hints for concurrent agents.
+# This file does not grant exclusive ownership.
+# Rule 21 lock checks in active-work.yaml remain authoritative.
+#
+# Shape:
+# version: 1
+# routing_hints:
+#   - pattern: "docs/research/**"
+#     preferred_agent: "opus"
+#     note: "research-heavy paths"
+
+version: 1
+routing_hints: []

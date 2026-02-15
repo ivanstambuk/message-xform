@@ -1,6 +1,10 @@
 # Active work only.
 # Remove an entry immediately when the work completes or is aborted.
+# No completed history or done status in this file.
+# This file is updated by scripts/agent-lock.sh.
 # This file is machine-oriented for LLM agent coordination, not a history log.
 
 version: 1
+defaults:
+  lease_seconds: 900
 active_work: []
