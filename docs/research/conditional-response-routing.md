@@ -1243,6 +1243,51 @@ New E2E scenarios:
 | **Body predicate pipeline** | Two non-exclusive `when` predicates both match → pipeline fires. | Two entries with overlapping conditions, both match, verifying ADR-0012 pipeline. |
 | **Non-JSON body with when** | Backend returns HTML body with `when` predicate configured → graceful skip. | Validates non-JSON handling. |
 
+### Implementation Tracker
+
+> Visual progress tracker. Updated as each step is committed.
+
+#### Phase 1: `match.status` — ✅ Complete (2026-02-15, commit `7fd5ddb`)
+
+- [x] Create `StatusPattern` sealed interface + implementations (Exact, Class, Range, Not, AnyOf)
+- [x] Create `StatusPatternParser` — type-aware YAML parsing (handles IntNode gotcha)
+- [x] Update `ProfileEntry` — add `statusPattern` field (backward-compatible 5-arg ctor)
+- [x] Update `ProfileEntry.constraintCount()` — weighted specificity (Exact=2, Class/Not=1)
+- [x] Update `ProfileParser.parseEntry()` — integrate `parseStatusField()` (NOT `optionalString`)
+- [x] Update `ProfileMatcher.findMatches()` — new 6-arg overload accepting `statusCode`
+- [x] Update `TransformEngine.transformInternal()` — pass `message.statusCode()`
+- [x] Add `StatusPatternTest` — all pattern types, validation, boundaries, defensive copy
+- [x] Add `StatusPatternParserTest` — string/int/array parsing, YAML gotcha, validation errors
+- [x] Add `ProfileMatcherTest` status tests — class routing, exact match, specificity, null-safety, passthrough
+- [x] All 524 tests pass, 0 failures
+
+#### Phase 1b: Unknown-key detection in `ProfileParser`
+
+- [ ] Add known-key set to `parseEntry()` (parity with `SpecParser`)
+- [ ] Warn or reject unknown keys in `match` block
+- [ ] Unit tests for unknown-key detection
+
+#### Phase 2: `match.when` — Body-Predicate Matching
+
+- [ ] Add `EngineRegistry` field to `TransformEngine` (constructor change)
+- [ ] Update `ProfileParser` constructor to accept `EngineRegistry`
+- [ ] Update `ProfileParser.parseEntry()` — parse `when` block, compile expression at load time
+- [ ] Update `ProfileEntry` — add `whenPredicate` field
+- [ ] Add `hasWhenPredicates()` computed method to `TransformProfile` (NOT record component)
+- [ ] Update `ProfileMatcher` — two-phase matching (envelope, then body predicate)
+- [ ] Update `TransformEngine.transformInternal()` — conditional body pre-parse
+- [ ] Pass `preParsedBody` to `transformWithSpec` (reuse across all 4 `bodyToJson` sites)
+- [ ] Extract `isTruthy()` to `JsonNodeUtils`
+- [ ] Unit tests: `ProfileMatcherTest` (when predicate), `TransformEngineTest` (e2e integration)
+- [ ] E2E tests: body predicate routing, status+when combined, non-JSON body graceful skip
+
+#### SDD Documentation (cross-cutting)
+
+- [ ] Add FR-001-15 / FR-001-16 to `spec.md`
+- [ ] Add S-001-87 – S-001-100 to `scenarios.md`
+- [ ] Update coverage matrix
+- [ ] Add implementation tasks to `tasks.md`
+
 ### Phase Summary
 
 | Phase | Scope | Affected Code | Backward Compatible? |
