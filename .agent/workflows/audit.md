@@ -478,6 +478,39 @@ the spec claims. Cross-reference against SDK documentation or decompiled sources
 
 ---
 
+### Phase 9 — Governance & Completion Compliance
+
+This phase catches constitutional and rule violations that are easy to miss
+during incremental implementation.
+
+// turbo
+**Automated checks:**
+
+```bash
+# GOV-01: Principle 9 — no Follow-ups/Backlog sections in feature plans
+grep -inE '^## (Follow-up|Backlog|Future Work|TODO)' \
+  docs/architecture/features/<id>/plan.md \
+  docs/architecture/features/<id>/spec.md \
+  docs/architecture/features/<id>/tasks.md
+# Must produce no output
+
+# GOV-02: No speculative language in spec
+grep -inE '(future consideration|could be added later|follow-up if needed|follow-up if requested)' \
+  docs/architecture/features/<id>/spec.md
+# Must produce no output
+```
+
+**Manual checks:**
+
+| Check | What to look for | Severity |
+|-------|-----------------|----------|
+| **GOV-01** | Sections named "Follow-ups", "Backlog", "Future Work", or "TODO" in plan, spec, or tasks (Principle 9 violation) | 🔴 Critical |
+| **GOV-02** | Speculative language in spec proposing unscoped work ("Future consideration", "could be added later", "follow-up if needed/requested") | 🟡 Medium |
+| **GOV-03** | Feature completion status mismatch: all tasks `[x]` but spec/plan/tasks/roadmap/AGENTS.md statuses disagree (Rule 22 violation) | 🔴 Critical |
+| **GOV-04** | Completion checklist not run: feature declared complete but FR traceability, NFR verification, exit criteria, or intent log are empty in `plan.md` | 🔴 Critical |
+
+---
+
 ## Output — Two-Tier Report
 
 The audit produces **two outputs**: a detailed file (for reference) and a chat

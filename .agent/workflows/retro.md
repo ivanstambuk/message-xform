@@ -28,8 +28,8 @@ Review the session's activity:
 Verify that all work from the session is fully captured per the SDD methodology.
 Run through each check and collect findings. This is the core of the retrospective.
 
-**CRITICAL**: Every gap found in steps 3a–3e MUST be recorded in the findings
-ledger (step 3f). Do NOT just mention gaps in chat — write them down.
+**CRITICAL**: Every gap found in steps 3a–3f MUST be recorded in the findings
+ledger (step 3g). Do NOT just mention gaps in chat — write them down.
 
 #### 3a. Scenario Coverage Check
 // turbo
@@ -75,9 +75,26 @@ ledger (step 3f). Do NOT just mention gaps in chat — write them down.
   - All requirements have: ID, requirement text, driver, measurement, dependencies, source.
   - Cross-references to ADRs are correct.
 
-#### 3f. Findings Ledger (MANDATORY)
+#### 3f. Feature Completion Gate (Rule 22)
+// turbo
+- Check if any feature had its **last task** marked `[x]` this session.
+  - Quick check: `git log --oneline` this session for commits mentioning the last
+    task ID of a feature, or `tasks.md` with all boxes checked.
+- If yes, run the **Feature Completion Checklist** (AGENTS.md Rule 22):
+  - [ ] `spec.md` → Status: `Implementation Complete`, date updated
+  - [ ] `plan.md` → Status: `Complete`; FR traceability, NFR verification, exit criteria, intent log all filled
+  - [ ] `tasks.md` → Status: `Complete`, date updated
+  - [ ] `roadmap.md` → Feature row: `✅ Complete`
+  - [ ] `AGENTS.md` → Roadmap mirror synced
+  - [ ] `PLAN.md` → Feature moved to completed section
+  - [ ] No Follow-ups/Backlog sections (Principle 9)
+  - [ ] No speculative language in spec
+  - [ ] `_current-session.md` → Updated with completion summary
+- Any unchecked items are **findings** for step 3g.
+
+#### 3g. Findings Ledger (MANDATORY)
 Before proceeding to step 4, you MUST write a numbered checklist of **every gap**
-found in steps 3a–3e. Use this exact format:
+found in steps 3a–3f. Use this exact format:
 
 ```
 Findings Ledger:
@@ -181,6 +198,7 @@ Present a concise retrospective to the user:
   - ADRs: ✅/⚠️
   - Open Questions: ✅/⚠️
   - Spec Consistency: ✅/⚠️
+  - Feature Completion (Rule 22): ✅/⚠️/N/A
 - **Changed**: What docs were updated and why.
 - **Open**: Anything left unresolved or worth revisiting.
 - **Handover**: What's saved for the next session (pending-task summary).

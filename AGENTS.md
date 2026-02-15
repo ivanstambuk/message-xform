@@ -273,6 +273,18 @@ See `docs/operations/quality-gate.md` for full pipeline documentation.
     - **Design constraints** (e.g., "v1 does not support X"): document as a Constraint in the spec — not as a follow-up to "add later".
     - **Violation signal**: Any section named "Follow-ups", "Backlog", "Future Work", or "TODO" in a feature plan or spec. Move the items to `PLAN.md` or delete them.
     - **Constitutional reference**: Principle 9 — No Backlogs in Feature Plans.
+22. **Feature Completion Checklist** ⚡ **(NON-NEGOTIABLE)**: When all tasks for a feature are done, you MUST complete this checklist before declaring the feature complete. Skipping any step causes documentation sync drift.
+    - [ ] `spec.md` → Status updated to `Implementation Complete`, date set
+    - [ ] `plan.md` → Status updated to `Complete`; FR traceability matrix filled; NFR verification filled; exit criteria all checked; intent log filled
+    - [ ] `tasks.md` → Status updated to `Complete`, date set
+    - [ ] `roadmap.md` → Feature row marked `✅ Complete`
+    - [ ] `AGENTS.md` → Roadmap mirror synced with `roadmap.md`
+    - [ ] `PLAN.md` → Feature moved from active to completed section
+    - [ ] No Follow-ups/Backlog sections remain in plan (Principle 9)
+    - [ ] No speculative language in spec ("Future consideration", "could be added later", "follow-up if needed")
+    - [ ] `_current-session.md` → Updated with completion summary
+    - **When to run**: After the last task commit, before the session retro.
+    - **Violation signal**: A feature with all tasks `[x]` but mismatched status across spec/plan/tasks/roadmap/AGENTS.md.
 ### Known Pitfalls
 
 - **File edit tool + Spotless concurrency** (2026-02-08): When `./gradlew spotlessApply` runs concurrently with `replace_file_content` or `multi_replace_file_content`, Spotless may overwrite edits silently — the tool reports success but the file on disk is unchanged. **Workaround**: run `spotlessApply` first, *then* edit, *then* `check`. Or use `sed` / Python for edits that must survive.
