@@ -23,6 +23,15 @@ silently evaluates to `false` because it checks whether the string `"admin"`
 contains the array `$session.roles` (which is nonsensical). The correct form
 is `contains("admin", $session.roles)`.
 
+## JSLT Context Variables and Null-Safety
+- Context variables are injected as external variables on each evaluation call.
+  Referencing an undeclared variable (for example, `$querParams` typo) throws
+  `JsltException` at evaluation time.
+- `contains()` throws `JsltException` when its sequence argument is null or
+  missing. Guard before calling it (for example, check field existence first).
+- Excluding object fields requires JSLT matcher syntax:
+  `{ * - secret : . }`. Pattern like `{ * : . } - "secret"` is invalid in JSLT.
+
 ## TransformRegistry.specCount() Returns 2× Unique Specs
 `TransformRegistry.specCount()` returns the internal map size, which stores each
 spec under **both** its `id` key and its `id@version` key. This means 1 unique

@@ -94,6 +94,19 @@ language-specific concerns (consistent with ADR-0020 cross-language principle).
 This is consistent with the existing `$headers`/`$status` engine support matrix
 (ADR-0004): JOLT does not support context variables.
 
+### JSLT binding semantics (v1)
+
+For JSLT, context variables are bound as top-level external variables via
+`Expression.apply(Map<String, JsonNode>, JsonNode)`.
+
+- Variables are passed per evaluation call while compiled expressions are reused.
+- Accessing an undeclared variable (for example, typo in `$queryParams`) fails
+  evaluation with `JsltException`.
+- Calling `contains()` on a null or missing field fails evaluation with
+  `JsltException`; expressions should guard nullability before calling it.
+- Object field exclusion uses JSLT matcher syntax (for example,
+  `{ * - secret : . }`), not post-expression subtraction.
+
 ## Consequences
 
 1. `TransformContext` gains two new methods: `getQueryParams()` and `getCookies()`.
@@ -108,6 +121,9 @@ This is consistent with the existing `$headers`/`$status` engine support matrix
    in the transform output.
 5. `$cookies` is request-side only. Response `Set-Cookie` manipulation remains a
    header transform concern (FR-001-10).
+6. JSLT variable-binding failure modes are explicit and deterministic. Invalid
+   variable references and null-unsafe `contains()` usage fail evaluation instead
+   of silently returning fallback values.
 
 ## Alternatives Considered
 

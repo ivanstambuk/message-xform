@@ -194,9 +194,9 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
   variables via its API, or we may need to inject them into the input JSON.
   _Test first:_ Write spike test: create a JSLT expression using a variable
   `$headers`, compile and evaluate with context. Document what works.
-  _Implement:_ Document findings in
-  `docs/research/jslt-context-variables.md`. If JSLT supports context
-  variables, note the API. If not, document the input-wrapping approach.
+  _Implement:_ Capture findings in ADR and module pitfalls:
+  `docs/decisions/ADR-0021-query-params-and-cookies-in-context.md` and
+  `core/PITFALLS.md`.
   _Verify:_ Research document committed. Decision captured.
   _Verification commands:_
   - N/A — research task, no production test.
@@ -340,15 +340,15 @@ implements and **sequences tests before code** (Rule 12 — TDD cadence).
 
 - [x] **T-001-21** — Context variable binding: $headers, $status (FR-001-10, FR-001-11)
   _Intent:_ Wire `TransformContext` into JSLT evaluation so expressions can
-  reference `$headers`, `$headers_all`, `$status`. Depends on T-001-12
-  research findings.
+  reference `$headers`, `$headers_all`, `$status`. Depends on the
+  ADR-0021 binding decision and JSLT pitfalls captured in `core/PITFALLS.md`.
   _Test first:_ Write `ContextBindingTest`:
   - JSLT expression uses `$headers."X-Request-ID"` → correct value from
     message headers.
   - JSLT expression uses `$status` → correct status code.
   - Request transform: `$status` is null (ADR-0017).
-  _Implement:_ Based on T-001-12 findings — either use JSLT external
-  variables API or wrap input JSON with context fields.
+  _Implement:_ Use JSLT external variables API with per-evaluation variable
+  maps and null-safe predicates.
   _Verify:_ `ContextBindingTest` passes.
   _Verification commands:_
   - `./gradlew :core:test --tests "*ContextBindingTest*"`
@@ -1299,8 +1299,8 @@ Track long-running or shared commands with timestamps to avoid duplicate work.
 
 - **Package naming:** `io.messagexform.core` is a placeholder. Decide final
   package name during T-001-01 (Feature 009 decision).
-- **JSLT context variables:** T-001-12 research will determine the binding
-  approach. T-001-21 depends on this finding.
+- **JSLT context variables:** Binding approach is settled and captured in
+  ADR-0021 and `core/PITFALLS.md`.
 - **Evaluation timeout:** T-001-25 notes that JSLT evaluation may not be
   interruptible. If so, document the limitation and rely on output size budget.
 - **Scenario YAML extraction:** T-001-50 needs a strategy for loading scenario

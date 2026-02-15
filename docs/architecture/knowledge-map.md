@@ -173,7 +173,6 @@ ADR-0036 (Conditional Routing) governs ── FR-001-15, FR-001-16, updates ADR-
 |----------|-------|------------|
 | `docs/research/pingam-authentication-api.md` | PingAM authentication API analysis | Feature 001 scenarios |
 | `docs/research/gateway-candidates.md` | Gateway adapter comparison | Features 002–008 |
-| `docs/research/t-001-12-jslt-context-variables.md` | JSLT context variable binding approach | T-001-10 (JsltExpressionEngine), ADR-0021 |
 | `docs/research/standalone-proxy-http-server.md` | HTTP server evaluation for standalone proxy | Feature 004, ADR-0029 |
 | `docs/research/pingaccess-plugin-api.md` | PingAccess Add-on SDK, RuleInterceptor SPI, Exchange model | Feature 002 spec |
 | `docs/research/pingam-authentication-api.md` | PingAM /json/authenticate endpoint, callback format | Feature 002 scenarios |
