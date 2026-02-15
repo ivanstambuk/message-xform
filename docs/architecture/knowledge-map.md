@@ -1,6 +1,6 @@
 # Knowledge Map
 
-Status: Draft | Last updated: 2026-02-12
+Status: Draft | Last updated: 2026-02-15
 
 This document maps the architectural relationships between modules, specs, ADRs,
 and key concepts in message-xform. It serves as a navigational aid for agents and
