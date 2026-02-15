@@ -113,7 +113,10 @@ transforms:
   - spec: e2e-combined@1.0.0
     direction: response
     match:
-      path: "/api/combined/**"
+      # Must match the REWRITTEN path — the request-side URL rewrite already
+      # changed /api/combined/... to /api/combined-rewritten before the response
+      # transform runs. PA's exchange.getRequest().getUri() returns the rewritten URI.
+      path: "/api/combined-rewritten"
       method: POST
 
   # ── Hot-reload addition (Tests 25–27) ──

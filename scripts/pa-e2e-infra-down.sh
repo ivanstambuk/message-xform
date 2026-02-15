@@ -19,6 +19,7 @@ MARKER="$PROJECT_ROOT/.e2e-infra-started"
 PA_CONTAINER="pa-e2e-test"
 ECHO_CONTAINER="pa-e2e-echo"
 OIDC_CONTAINER="pa-e2e-oidc"
+OIDC_BACKEND_CONTAINER="pa-e2e-oidc-backend"
 
 CYAN='\033[0;36m'
 GREEN='\033[0;32m'
@@ -47,7 +48,8 @@ fi
 # Tear down
 # ---------------------------------------------------------------------------
 info "Tearing down E2E Docker infrastructure..."
-docker rm -f "$PA_CONTAINER" "$ECHO_CONTAINER" "$OIDC_CONTAINER" 2>/dev/null || true
+docker rm -f "$PA_CONTAINER" "$ECHO_CONTAINER" "$OIDC_CONTAINER" "$OIDC_BACKEND_CONTAINER" 2>/dev/null || true
 docker network rm pa-e2e-net 2>/dev/null || true
+rm -rf "$PROJECT_ROOT/.e2e-oidc-certs" 2>/dev/null || true
 rm -f "$MARKER"
 ok "E2E infrastructure stopped"
