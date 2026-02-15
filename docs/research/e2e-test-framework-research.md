@@ -10,8 +10,7 @@
   capability.
 - **Outcome**: Karate DSL was selected (§4.4 / §6 tertiary recommendation) for its
   native cookie/session handling (RQ-15), multi-scope variables (RQ-14), and complex
-  JSON processing (RQ-18). See `docs/research/karate-migration-plan.md` for the
-  migration plan and results.
+  JSON processing (RQ-18). Implementation lives in `e2e-pingaccess/` (26/26 tests pass).
 
 ---
 
