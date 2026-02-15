@@ -1018,10 +1018,10 @@ exceptions are caught by `getErrorHandlingCallback()` (FR-002-02).
 >    with `type: urn:messagexform:error:adapter:wrap-failure` and status 502.
 >    This error body is built by the adapter, not the core engine.
 
-### FR-002-12: Docker E2E Test Script
+### FR-002-12: Docker E2E Test Suite
 
-**Requirement:** The project MUST include a script (`scripts/pa-e2e-test.sh`)
-that:
+**Requirement:** The project MUST include an E2E test suite
+(`scripts/pa-e2e-bootstrap.sh` + `e2e-pingaccess/`) that:
 
 1. Builds the adapter shadow JAR via Gradle.
 2. Starts a PingAccess 9.0 Docker container
@@ -1033,17 +1033,18 @@ that:
 3. Waits for PingAccess to start and be healthy.
 4. Configures a rule + application + resource via the PA Admin REST API
    (port 9000).
-5. Sends test requests through the PA engine (port 3000) and verifies
+5. Executes the Karate DSL test suite (`e2e-pingaccess/`) which sends
+   test requests through the PA engine (port 3000) and verifies
    transformed responses.
 6. Tears down the Docker containers.
 
 **Validation record:** See `docs/architecture/features/002/e2e-results.md`
-for structured results of each live PA E2E run.
+for structured results of each live PA E2E run. Traceability to the E2E test plan is in `docs/architecture/features/002/e2e-plan.md`.
 
 | Aspect | Detail |
 |--------|--------|
-| Success path | `./scripts/pa-e2e-test.sh` → builds + configures PA + runs assertions + exits 0 |
-| Status | ✅ Implemented — 18/18 tests pass (validated 2026-02-14) |
+| Success path | `./scripts/pa-e2e-bootstrap.sh` → builds + configures PA + runs Karate tests + exits 0 |
+| Status | ✅ Implemented — 26/26 Karate scenarios pass (validated 2026-02-15) |
 | Source | G-002-05 |
 
 ### FR-002-13: TransformContext Construction

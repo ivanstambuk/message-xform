@@ -148,7 +148,7 @@ ADR-0035 (Version Parity)    governs ── FR-002-09, supersedes ADR-0031 §7-�
 | FR-002-09 (Deployment Packaging) | ADR-0031, ADR-0032, ADR-0035 | NFR-002-02 |
 | FR-002-10 (Gradle Module) | — | NFR-002-05 |
 | FR-002-11 (Error Handling) | ADR-0022, ADR-0024 | — |
-| FR-002-12 (Docker E2E Test) | `scripts/pa-e2e-test.sh`, `e2e/pingaccess/specs/` | `docs/architecture/features/002/e2e-results.md` |
+| FR-002-12 (Docker E2E Test) | `scripts/pa-e2e-bootstrap.sh`, `e2e-pingaccess/`, `e2e/pingaccess/specs/` | `docs/architecture/features/002/e2e-results.md` |
 | FR-004-01 (Standalone Proxy) | ADR-0029 | NFR-004-01 through NFR-004-07 |
 | FR-004-02..13 (Transform) | ADR-0029, ADR-0025, ADR-0013 | — |
 | FR-004-14..17 (TLS/mTLS) | — | NFR-004-05 |

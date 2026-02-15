@@ -2,7 +2,7 @@
 
 _Created:_ 2026-02-14
 _Status:_ In Progress
-_Linked:_ `e2e-results.md`, FR-002-12, `scripts/pa-e2e-test.sh`
+_Linked:_ `e2e-results.md`, FR-002-12, `scripts/pa-e2e-bootstrap.sh`, `e2e-pingaccess/`
 
 ## Objective
 

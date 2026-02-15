@@ -2,7 +2,7 @@
 
 | Field | Value |
 |-------|-------|
-| Script | `scripts/pa-e2e-test.sh` |
+| Script | `scripts/pa-e2e-bootstrap.sh` + `e2e-pingaccess/` (Karate DSL) |
 | Spec files | `e2e-rename.yaml`, `e2e-header-inject.yaml`, `e2e-context.yaml`, `e2e-error.yaml`, `e2e-status-override.yaml`, `e2e-url-rewrite.yaml` |
 | Profile | `e2e-profile.yaml` |
 | Linked requirement | FR-002-12 |

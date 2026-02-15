@@ -868,7 +868,7 @@ This is what tells PA to discover and register our plugin.
 
 ## 14. E2E Test Infrastructure
 
-### Script: `scripts/pa-e2e-test.sh`
+### Script: `scripts/pa-e2e-bootstrap.sh` + `e2e-pingaccess/` (Karate DSL)
 
 The E2E test script validates the full plugin lifecycle against a real PA instance.
 
@@ -958,8 +958,8 @@ Located in `e2e/pingaccess/specs/`:
 ### Usage
 
 ```bash
-./scripts/pa-e2e-test.sh              # full (build + test)
-./scripts/pa-e2e-test.sh --skip-build # skip Gradle build
+./scripts/pa-e2e-bootstrap.sh              # full (build + test)
+./scripts/pa-e2e-bootstrap.sh --skip-build # skip Gradle build
 ```
 
 ---

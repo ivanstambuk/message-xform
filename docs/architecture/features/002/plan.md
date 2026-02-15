@@ -120,7 +120,7 @@ _To be completed after implementation._
 | FR-002-09 | Deployment packaging | | |
 | FR-002-10 | Gradle module setup | | |
 | FR-002-11 | Error handling | | |
-| FR-002-12 | Docker E2E test script | `scripts/pa-e2e-test.sh` | `e2e-results.md` — 50/50 pass, 22 scenarios validated E2E (2026-02-14) |
+| FR-002-12 | Docker E2E test suite | `scripts/pa-e2e-bootstrap.sh` + `e2e-pingaccess/` | `e2e-results.md` — 26/26 Karate scenarios pass (2026-02-15) |
 | FR-002-13 | TransformContext construction | | |
 | FR-002-14 | JMX observability (opt-in) | | |
 
