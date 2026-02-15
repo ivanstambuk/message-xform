@@ -1,0 +1,22 @@
+# Regular user response transform for polymorphic routing (Phase 2, FR-001-16).
+# Applied when match.when evaluates .role != "admin" on the response body.
+# Produces a simpler response without permissions.
+id: e2e-polymorphic-user
+version: "1.0.0"
+description: "Regular user response transform for polymorphic routing"
+
+input:
+  schema:
+    type: object
+
+output:
+  schema:
+    type: object
+
+transform:
+  lang: jslt
+  expr: |
+    {
+      "role": "standard",
+      "display_name": .name
+    }

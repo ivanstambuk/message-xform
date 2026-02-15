@@ -1,0 +1,27 @@
+# Error response rewrite for status routing tests (Phase 2, FR-001-15).
+# Applied in RESPONSE direction when status matches 4xx.
+# Reshapes the body to include an "error" result and overrides status to 502.
+id: e2e-status-route-error
+version: "1.0.0"
+description: "Error response rewrite for status routing tests"
+
+input:
+  schema:
+    type: object
+
+output:
+  schema:
+    type: object
+
+transform:
+  lang: jslt
+  expr: |
+    {
+      "result": "error",
+      "original_status": $status,
+      "error_code": .errorCode,
+      "error_message": .message
+    }
+
+status:
+  set: 502

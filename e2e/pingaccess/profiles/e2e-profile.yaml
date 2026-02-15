@@ -127,3 +127,47 @@ transforms:
     match:
       path: "/api/reload/**"
       method: POST
+
+  # ── Status routing (Tests 33–35, FR-001-15) ──
+  # Routes responses based on HTTP status class.
+  # 2xx → success spec (reshapes body), 4xx → error spec (reshapes + sets 502).
+  - spec: e2e-status-route-success@1.0.0
+    direction: response
+    match:
+      path: "/api/status-route/**"
+      status: "2xx"
+
+  - spec: e2e-status-route-error@1.0.0
+    direction: response
+    match:
+      path: "/api/status-route/**"
+      status: "4xx"
+
+  # ── Polymorphic body routing (Tests 37–40, FR-001-16, ADR-0036) ──
+  # Routes responses based on body content using match.when predicates.
+  # Admin users (.role == "admin") get a richer response with permissions.
+  # Non-admin users get a simpler response.
+  # 4xx errors get the error spec regardless of body.
+  - spec: e2e-polymorphic-admin@1.0.0
+    direction: response
+    match:
+      path: "/api/polymorphic/**"
+      status: "2xx"
+      when:
+        lang: jslt
+        expr: '.role == "admin"'
+
+  - spec: e2e-polymorphic-user@1.0.0
+    direction: response
+    match:
+      path: "/api/polymorphic/**"
+      status: "2xx"
+      when:
+        lang: jslt
+        expr: '.role != "admin"'
+
+  - spec: e2e-status-route-error@1.0.0
+    direction: response
+    match:
+      path: "/api/polymorphic/**"
+      status: "4xx"

@@ -1,0 +1,23 @@
+# Success response rewrite for status routing tests (Phase 2, FR-001-15).
+# Applied in RESPONSE direction when status matches 2xx.
+# Reshapes the body to include a "result" field and preserves the original data.
+id: e2e-status-route-success
+version: "1.0.0"
+description: "Success response rewrite for status routing tests"
+
+input:
+  schema:
+    type: object
+
+output:
+  schema:
+    type: object
+
+transform:
+  lang: jslt
+  expr: |
+    {
+      "result": "success",
+      "original_status": $status,
+      "data": .data
+    }

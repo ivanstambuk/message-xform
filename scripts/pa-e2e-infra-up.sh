@@ -106,7 +106,7 @@ docker run -d --name "$ECHO_CONTAINER" --network pa-e2e-net \
     -p "$ECHO_PORT:8080" \
     python:3.12-alpine \
     python3 -c '
-import http.server, json, sys, re
+import http.server, json, sys, re, base64
 
 class EchoHandler(http.server.BaseHTTPRequestHandler):
     def handle_request(self):
@@ -123,6 +123,13 @@ class EchoHandler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(html_body)
             return
 
+        # X-Echo-Status header: override response status code
+        # X-Echo-Body header: override response body (raw JSON string)
+        # These give tests full control over the echo response without
+        # path conflicts.  Used by status-routing and polymorphic E2E tests.
+        echo_status = self.headers.get("X-Echo-Status")
+        echo_body = self.headers.get("X-Echo-Body")
+
         status_match = re.search(r"/status/(\d+)", self.path)
         if status_match:
             code = int(status_match.group(1))
@@ -135,13 +142,17 @@ class EchoHandler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(body)
             return
 
+        # Determine status code and body
+        code = int(echo_status) if echo_status else 200
+        out = echo_body.encode() if echo_body else body
+
         ct = self.headers.get("Content-Type", "application/json")
-        self.send_response(200)
+        self.send_response(code)
         self.send_header("Content-Type", ct)
-        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Content-Length", str(len(out)))
         self._send_echo_headers()
         self.end_headers()
-        self.wfile.write(body)
+        self.wfile.write(out)
 
     def _send_echo_headers(self):
         self.send_header("X-Echo-Method", self.command)

@@ -1,0 +1,23 @@
+# Admin user response transform for polymorphic routing (Phase 2, FR-001-16).
+# Applied when match.when evaluates .role == "admin" on the response body.
+# Reshapes admin responses to include permissions.
+id: e2e-polymorphic-admin
+version: "1.0.0"
+description: "Admin user response transform for polymorphic routing"
+
+input:
+  schema:
+    type: object
+
+output:
+  schema:
+    type: object
+
+transform:
+  lang: jslt
+  expr: |
+    {
+      "role": "admin",
+      "display_name": .name,
+      "permissions": .permissions
+    }
