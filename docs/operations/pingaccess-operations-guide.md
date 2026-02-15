@@ -37,6 +37,7 @@
 21. [Deployment Patterns](#21-deployment-patterns)
 22. [Spec Hot-Reload](#22-spec-hot-reload)
 23. [Deployment FAQ](#23-deployment-faq)
+24. [Rule Execution Order](#24-rule-execution-order)
 
 ---
 
@@ -1187,7 +1188,7 @@ PingAccess owns request routing. The admin binds rule instances to Applications.
 Key points:
 - Each Application can have **zero or more** MessageTransform rule instances.
 - Each rule instance is an **independent plugin instance** with its own configuration.
-- PA fires rules in order for every request matching the Application's context root.
+- PA fires rules **sequentially in policy-manager order** for every request matching the Application's context root. See [§24](#24-rule-execution-order).
 - Our plugin has **no visibility** into which Application it belongs to.
 
 ### Level 2 — Engine Profile Matching (message-xform)
@@ -1306,7 +1307,8 @@ JAR itself. Updating the JAR requires a PA restart.
 
 **Q: Can two rule instances process the same request?**
 Yes, if the PA admin binds two MessageTransform rules to the same Application.
-They execute independently in rule-chain order (ADR-0023).
+They execute **sequentially** in policy-manager order — each rule's `CompletionStage`
+completes before the next rule starts. See [§24](#24-rule-execution-order).
 
 **Q: What if no profile entry matches the request?**
 The engine returns `PASSTHROUGH` — the request/response goes through **completely
@@ -1328,6 +1330,167 @@ The reload fails gracefully — the previous valid registry stays active.
 
 ---
 
+## 24. Rule Execution Order
+
+> **TL;DR:** PingAccess executes rules **sequentially (async-serial)**, not in parallel.
+> Each rule's `CompletionStage` completes before the next rule starts. The order
+> is the policy-manager order (top-to-bottom in the UI).
+
+### Four-Tier Execution Order
+
+PingAccess 9.0 documentation (page 369, "Processing order") states:
+
+> "Access control rules are applied before processing rules. For each type of
+> rule, **the rules are applied in the order configured in the policy manager.**"
+
+The full order is:
+1. **Application access control rules**
+2. **Resource access control rules**
+3. **Resource processing rules**
+4. **Application processing rules**
+
+Within each tier, rules execute top-to-bottom as configured. The Rule Sets
+UI documentation (page 412) confirms: *"Processing occurs from top to bottom."*
+
+### Rule Categories
+
+PingAccess rules belong to one of two categories. The `@Rule` annotation's
+`category` field determines which tier a rule belongs to.
+
+**Access control rules** are **gatekeepers** — they decide whether a request
+should be allowed or denied. Their outcome is binary: allow or reject.
+Examples from the PA documentation (page 369):
+
+- Test user attributes (OAuth attribute rules)
+- Check the time of day the request was made (time range rules)
+- Verify source IP addresses (network range rules)
+- Test OAuth access token scopes (OAuth scope rules)
+
+If an access control rule denies a request, processing stops immediately —
+no backend request is made, and no processing rules run.
+
+**Processing rules** are **transformers** — they modify the request or response
+in transit. Examples:
+
+- Modify headers (rewrite response header rules)
+- Rewrite URLs (rewrite URL rules)
+- **Transform JSON bodies (our adapter)**
+
+Our adapter is registered as a processing rule:
+
+```java
+@Rule(
+    category = RuleInterceptorCategory.Processing,
+    destination = {RuleInterceptorSupportedDestination.Site},
+    ...
+)
+public class MessageTransformRule extends AsyncRuleInterceptorBase<MessageTransformConfig> { ... }
+```
+
+This means our rule always runs in **tiers 3 or 4** — after all access control
+has already passed.
+
+| Tier | Category | Purpose | Example |
+|------|----------|---------|---------|
+| 1 | Access control (app) | Reject unauthorized users early | "Only allow users with `admin` scope" |
+| 2 | Access control (resource) | Fine-grained per-path access | "Only allow IPs in 10.0.0.0/8 for `/api/internal`" |
+| 3 | **Processing (resource)** | Transform requests for specific paths | **Our adapter** — rename fields, inject headers |
+| 4 | Processing (app) | Transform requests across all paths | Global header injection |
+
+**Why access control runs first:** The PA documentation explains the performance
+rationale — *"If an access control rule is more likely to reject access, it
+should appear near the top of the list to reduce the amount of processing that
+occurs before that rule is applied."* There is no point spending CPU on JSON
+body transformation if the request is going to be rejected.
+
+### The "Unprotected" Resource Nuance
+
+The PA documentation (page 338) describes two modes for resources without
+authentication requirements:
+
+| Mode | Access control rules | Processing rules |
+|------|---------------------|-----------------|
+| **Anonymous** | ✅ Applied | ✅ Applied |
+| **Unprotected** | ❌ Skipped entirely | ✅ Applied |
+
+This is why our E2E tests work with `unprotected: true` — our processing
+rule still fires even though there is no access control. Identity mappings
+are only applied in Anonymous mode if the user is already authenticated.
+
+### Flow Strategy Classes
+
+The PA engine (`pingaccess-engine-9.0.1.0.jar`) implements two flow strategies
+for rule evaluation in the `com.pingidentity.pa.interceptor.flow` package:
+
+| Class | Success Criteria | Behaviour |
+|-------|-----------------|-----------|
+| `FailOnFirstFailRuleInterceptorFlowStrategy` | **All** | Every rule must succeed; first failure stops the chain |
+| `AtleastOneMustPassRuleInterceptorFlowStrategy` | **Any** | First success stops the chain; all failures = denied |
+
+A `RulesetEvaluationSuccessCriteria` enum maps the admin-configured success
+criteria to these strategies. Individual rules (not in a RuleSet) always use
+the **All** strategy.
+
+### Sequential Execution Model
+
+Both strategies iterate rules using a `java.util.Iterator` and follow an
+**async-serial continuation** pattern:
+
+1. The engine calls the first rule's `handleRequestAsync()` method
+2. It **returns** immediately — no further rules are invoked yet
+3. When the rule's `CompletionStage` completes, a callback evaluates the outcome
+4. If `CONTINUE` → the engine **recursively** calls the iterator for the **next** rule
+5. If denied (All strategy) or succeeded (Any strategy) → the chain stops
+
+**Execution flow for rules A → B → C (All strategy):**
+1. Iterator yields rule A → call `handleRequestAsync()` → return
+2. A completes with `CONTINUE` → push A's response interceptor → recurse
+3. Iterator yields rule B → call `handleRequestAsync()` → return
+4. B completes with `CONTINUE` → push B's response interceptor → recurse
+5. Iterator yields rule C → call `handleRequestAsync()` → return
+6. C completes with `CONTINUE` → no more rules → return `CONTINUE`
+7. If any rule returns non-`CONTINUE` → `handleDenial()` → pipeline stops
+
+**This is an async-serial chain.** The next rule never starts until the previous
+rule's `CompletionStage` has completed.
+
+### The "Any" Strategy — Short-Circuit Behaviour
+
+The `AtleastOneMustPassRuleInterceptorFlowStrategy` also iterates sequentially
+but uses inverted termination semantics:
+
+- **On success:** Stops immediately — remaining rules are **not** evaluated
+- **On failure:** Continues to the next rule (opposite of "All")
+- After all rules are evaluated, calls `evaluatePolicyDecision()` to determine
+  the aggregate outcome
+
+> ⚠️ **Implication for processing rules:** The PA documentation explicitly warns:
+> *"When Success Criteria is set to Any, the first processing rule that succeeds
+> causes PingAccess not to evaluate all other rules in the set."*
+> This means multiple processing rules in an "Any" RuleSet will **not** all execute.
+
+### Implications for Multi-Rule Chains
+
+Because execution is sequential:
+
+1. **URI rewrites from Rule A are visible to Rule B.** `Request.getUri()` reflects
+   modifications from earlier rules — confirmed by scenario S-002-27.
+2. **Body modifications from Rule A are visible to Rule B.** `Request.getBodyContent()`
+   returns the modified body.
+3. **Order is deterministic.** It follows the policy-manager order (UI drag position).
+4. **Single-rule-per-RuleSet is safest** for processing rules to avoid
+   short-circuit surprises with "Any" criteria.
+
+### Why the SDK API Looks Non-Deterministic
+
+The `AsyncRuleInterceptor` SPI returns `CompletionStage<Outcome>`, which
+*suggests* parallel evaluation. However, the engine's flow strategies
+**serialize** these stages — the async contract is for the rule's **internal**
+async work (e.g., HTTP calls to external services), not for parallel rule
+evaluation.
+
+---
+
 ## See Also
 
 - [Feature 002 Spec](../architecture/features/002/spec.md) — Full functional requirements
@@ -1344,3 +1507,4 @@ The reload fails gracefully — the previous valid registry stays active.
 |------------|--------------------------------------------------|
 | 2026-02-14 | Initial version — consolidated from E2E debugging sessions |
 | 2026-02-14 | Merged `pingaccess-deployment.md` and `pingaccess-docker-and-sdk.md` into this single file |
+| 2026-02-15 | Added §24 — Rule Execution Order analysis |

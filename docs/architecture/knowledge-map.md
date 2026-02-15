@@ -175,5 +175,5 @@ ADR-0035 (Version Parity)    governs ── FR-002-09, supersedes ADR-0031 §7-�
 | `docs/research/pingaccess-plugin-api.md` | PingAccess Add-on SDK, RuleInterceptor SPI, Exchange model | Feature 002 spec |
 | `docs/research/pingam-authentication-api.md` | PingAM /json/authenticate endpoint, callback format | Feature 002 scenarios |
 | `docs/reference/pingaccess-sdk-guide.md` | Standalone PingAccess 9.0 SDK reference (19 sections, 112 classes) | Feature 002 spec, all adapter implementation |
-| `docs/operations/pingaccess-operations-guide.md` | PA operations, deployment architecture, Docker/K8s layout, Admin API gotchas | Feature 002 spec, ADR-0023, ADR-0006 |
+| `docs/operations/pingaccess-operations-guide.md` | PA operations, deployment architecture, Docker/K8s layout, Admin API gotchas, rule execution order | Feature 002 spec, ADR-0023, ADR-0006 |
 | `docs/operations/e2e-karate-operations-guide.md` | Gateway-neutral E2E test architecture, Docker lifecycle, Gradle integration, Karate patterns, IDE extension patches | All E2E modules, Feature 002, future gateway features |

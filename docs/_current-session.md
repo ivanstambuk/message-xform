@@ -1,49 +1,39 @@
 # Current Session
 
-**Focus**: E2E Gradle Docker lifecycle + operations guide
+**Focus**: PingAccess rule execution order analysis
 **Date**: 2026-02-15
-**Status**: Complete
+**Status**: Complete — pending commit
 
 ## Accomplished
 
-1. **Gradle Docker lifecycle integration**:
-   - Created `pa-e2e-infra-up.sh`: idempotent startup with preflight checks,
-     container orchestration, readiness polling, marker-file mechanism
-   - Created `pa-e2e-infra-down.sh`: marker-gated teardown with `--force` option
-   - Added `dockerUp`/`dockerDown` Gradle tasks wired to test lifecycle
-   - Used `enabled = isE2EExplicit` for config-cache-compatible guards
-   - Added gradlew symlink for Karate Runner extension
+1. **Rule execution order analysis** (§24 in operations guide):
+   - Investigated PingAccess engine rule execution behaviour
+   - Confirmed sequential (async-serial) execution — each rule's
+     `CompletionStage` completes before the next rule starts
+   - Documented the four-tier execution order from vendor docs
+   - Explained rule categories (access control vs processing) with examples
+   - Documented the "Unprotected" resource nuance (processing rules
+     still fire when access control is skipped)
+   - Documented flow strategy classes and short-circuit behaviour
+   - Clarified why the `CompletionStage<Outcome>` API looks non-deterministic
+     but is actually serialized by the engine
 
-2. **E2E operations guide** (3 iterative passes):
-   - Pass 1: Initial 741-line guide covering all 13 sections
-   - Pass 2: Fixed stale scenario count, consolidated extension patch sections,
-     added troubleshooting table, iterative development workflow, @setup tag
-     explanation, corrected `--tests` vs `-Dkarate.options` filtering
-   - Pass 3: Restructured as gateway-neutral framework — PingAccess as reference
-     implementation, generic pattern section, gateway comparison table, echo
-     backend API docs, multi-gateway IDE workflow notes
-
-3. **Cross-reference updates**:
-   - `karate-e2e-patterns.md` updated with Gradle lifecycle references
-   - Knowledge-map updated with new ops guide and infra scripts
-   - `llms.txt` updated with new high-signal documents
-
-## Commits (this session)
-
-- `6310a83` — feat(e2e): add Gradle Docker lifecycle and ops guide
+2. **Cross-reference updates**:
+   - Updated §18 (Deployment Architecture) to link to §24
+   - Updated §23 (FAQ) multi-rule question to reference §24
+   - Updated knowledge-map description for the operations guide
 
 ## Key Decisions
 
-- **`enabled` over `onlyIf`** — Gradle 9.x config cache requires configuration-time
-  booleans, not execution-time closures
-- **Marker-file mechanism** — Prevents Gradle from tearing down manually-started
-  infra during iterative development
-- **Gateway-neutral guide** — Ops guide structured as a blueprint for all gateways,
-  with PingAccess as the concrete reference implementation
+- **No decompiled evidence committed** — decompiled Java source files were
+  used for analysis but removed from the repository per license restrictions.
+  §24 references class names and behaviour without disclosing the analysis method.
+- **Phase 11 dropped** — multi-rule chain E2E was already flagged for removal
+  in the expansion plan. Sequential execution is confirmed but multi-rule
+  chaining remains fragile due to short-circuit behaviour with "Any" criteria.
 
 ## Next Session Focus
 
-- **Phase 11** (Multi-Rule Chain E2E) — Final E2E phase. Validates URI rewrite
-  by prior rule propagates to adapter. 1 scenario, 2 assertions.
-- **Phase 8b** (Web Session OIDC) — Requires PingFederate or improved mock.
-  Currently deferred.
+- **Commit §24** — operations guide changes are staged but not yet committed
+- **E2E expansion plan** — update to remove Phase 11, mark S-002-27 as unit-only
+- **Phase 8b** (Web Session OIDC) — deferred, requires PingFederate or improved mock
