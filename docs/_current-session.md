@@ -1,39 +1,38 @@
 # Current Session
 
-**Focus**: PingAccess rule execution order analysis
+**Focus**: Fix JMX metric test (Test 28) and documentation
 **Date**: 2026-02-15
-**Status**: Complete — pending commit
+**Status**: Complete — all work committed
 
 ## Accomplished
 
-1. **Rule execution order analysis** (§24 in operations guide):
-   - Investigated PingAccess engine rule execution behaviour
-   - Confirmed sequential (async-serial) execution — each rule's
-     `CompletionStage` completes before the next rule starts
-   - Documented the four-tier execution order from vendor docs
-   - Explained rule categories (access control vs processing) with examples
-   - Documented the "Unprotected" resource nuance (processing rules
-     still fire when access control is skipped)
-   - Documented flow strategy classes and short-circuit behaviour
-   - Clarified why the `CompletionStage<Outcome>` API looks non-deterministic
-     but is actually serialized by the engine
+1. **Fixed JMX metrics bug (Test 28)**:
+   - Root cause: PingAccess creates multiple rule instances per configuration
+     (one per engine/app binding). Each `configure()` created a new
+     `MessageTransformMetrics` but JMX MBean pointed to a stale instance.
+   - Fix: static `ConcurrentHashMap` registry in `MessageTransformMetrics`
+     keyed by instance name → all rule objects share canonical metrics.
+   - Unit test fix: `resetMetrics()` in `@BeforeEach` for test isolation.
+   - E2E test fix: exact MBean ObjectName instead of wildcard query.
+   - Result: **31/31 E2E tests pass**, all unit tests pass.
 
-2. **Cross-reference updates**:
-   - Updated §18 (Deployment Architecture) to link to §24
-   - Updated §23 (FAQ) multi-rule question to reference §24
-   - Updated knowledge-map description for the operations guide
+2. **Documented JMX pitfalls** (4 pitfalls + debugging checklist):
+   - PA operations guide: new "JMX Pitfalls" section
+   - E2E Karate operations guide: troubleshooting table entries
+   - adapter-pingaccess/PITFALLS.md: multi-instance and build cache entries
+
+3. **SDD retro fixes**:
+   - Updated spec.md FR-002-12 E2E count from 26/26 to 31/31
+   - Updated spec.md FR-002-14 implementation pattern with shared registry
 
 ## Key Decisions
 
-- **No decompiled evidence committed** — decompiled Java source files were
-  used for analysis but removed from the repository per license restrictions.
-  §24 references class names and behaviour without disclosing the analysis method.
-- **Phase 11 dropped** — multi-rule chain E2E was already flagged for removal
-  in the expansion plan. Sequential execution is confirmed but multi-rule
-  chaining remains fragile due to short-circuit behaviour with "Any" criteria.
+- **Shared metrics registry pattern** — chosen over per-test unique names
+  because the fundamental issue is PA's multi-instance lifecycle, not test
+  isolation. The registry ensures correctness in production.
 
 ## Next Session Focus
 
-- **Commit §24** — operations guide changes are staged but not yet committed
-- **E2E expansion plan** — update to remove Phase 11, mark S-002-27 as unit-only
-- **Phase 8b** (Web Session OIDC) — deferred, requires PingFederate or improved mock
+- **Push to origin** — 9 local commits ahead of origin/main
+- **E2E expansion** — Phase 8b (Web Session OIDC) refinement if needed
+- **Feature 002 completion** — final review pass on all documentation
