@@ -7,8 +7,8 @@
 | Total scenarios | 36 |
 | Unit-covered | 36/36 (100%) |
 | E2E-covered | 22/36 (61%) |
-| E2E backlogged | 9 (with rationale) |
-| E2E not feasible | 5 (with rationale) |
+| E2E backlogged | 8 (with rationale) |
+| E2E not feasible | 6 (with rationale) |
 
 ---
 
@@ -42,7 +42,7 @@
 | S-002-24 | Shadow JAR Correctness | `ShadowJarTest.*` (12 tests: includes adapter/core/SPI, excludes Jackson/SLF4J/Jakarta/SDK, size < 5 MB) | ✅ |
 | S-002-25 | OAuth Context in JSLT | `IdentityMappingTest.oauthToken*`, `IdentityMappingTest.clientId*` | 🔶 |
 | S-002-26 | Session State in JSLT | `IdentityMappingTest.sessionState*`, `ContextMappingTest.sessionContext*` | 🔶 |
-| S-002-27 | Prior Rule URI Rewrite | `PingAccessAdapterRequestTest.uriWithQueryString` (reads exchange URI after prior rules) | 🔶 |
+| S-002-27 | Prior Rule URI Rewrite | `PingAccessAdapterRequestTest.uriWithQueryString` (reads exchange URI after prior rules) | ❌² |
 | S-002-28 | DENY + handleResponse Interaction | `TransformFlowTest.denyGuardSkipsResponseProcessing`, `TransformFlowTest.noDenyAllowsNormalResponseProcessing`, `TransformFlowTest.wrapResponseBodyParseFailedDenySkipsBody` | ✅³ |
 | S-002-29 | Spec Hot-Reload (Success) | `HotReloadTest.reloadPicksUpNewSpec`, `HotReloadTest.schedulerStartsOnPositiveInterval` | 🔶 |
 | S-002-30 | Spec Hot-Reload (Failure) | `HotReloadTest.reloadFailureRetainsPreviousRegistry`, `HotReloadTest.reloadWithMissingProfileLogsWarning` | 🔶 |

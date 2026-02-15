@@ -404,29 +404,16 @@ Karate JVM → JMXConnectorFactory.connect() → RMI → PA JVM:9999 → MBeanSe
 | P10-03 | Test 28: **JMX MBean registered** — Query `io.messagexform:type=TransformMetrics,instance=*` via JMX RMI. Assert: (a) MBean exists, (b) `ActiveSpecCount` ≥ 1, (c) after POST, `TransformTotalCount` incremented, (d) PA log contains `JMX MBean registered`. | S-002-33 | 4 | ✅ |
 | P10-04 | Test 29: **JMX disabled by default** — Query for non-existent instance `DOES_NOT_EXIST`. Assert: MBean does NOT exist. | S-002-34 | 1 | ✅ |
 
-### Phase 11 — Multi-Rule Chain E2E (S-002-27)
+### ~~Phase 11 — Multi-Rule Chain E2E (S-002-27)~~ REMOVED
 
-Validates that when a prior PA rule rewrites the request URI, the adapter
-sees the rewritten URI (not the original).
+**Removed 2026-02-15.** S-002-27 is now **unit-only**.
 
-**Prerequisites:**
-
-- Two PA rules applied to the same app in sequence
-- Rule 1: a URL rewrite rule (can be our own `e2e-url-rewrite` spec
-  applied as a first rule)
-- Rule 2: our main transform rule that reads the request path
-
-**Architecture:**
-
-```
-curl /api/chain/test → Rule 1 (rewrites to /api/chained) → Rule 2 (reads path) → echo
-```
-
-| ID | Task | Scenario(s) | Est. assertions | Status |
-|----|------|-------------|:---------------:|:------:|
-| P11-01 | PA configuration: create a second MessageTransformRule instance (Rule A) with its own spec directory containing only `e2e-url-rewrite.yaml`. Create an app + resource with Rule A applied first, Rule B (existing main rule) applied second. Both read specs from the same profile. | — | — | ⬜ |
-| P11-02 | Create `e2e/pingaccess/specs-chain/e2e-chain-rewrite.yaml` — rewrites path from `/api/chain/test` to `/api/chained`. This spec lives in Rule A's separate spec directory. | — | — | ⬜ |
-| P11-03 | Test 28: **Prior rule URI rewrite** — POST to `/api/chain/test` with JSON body. Rule A rewrites URI to `/api/chained`. Rule B's `wrapRequest()` reads `exchange.getRequest().getUri()` which should reflect `/api/chained` (after Rule A). Assert: (a) `X-Echo-Path` header shows `/api/chained`, (b) response body is valid JSON (transform succeeded on both rules). | S-002-27 | 2 | ⬜ |
+**Rationale:** The §24 rule execution order analysis confirmed that PA executes
+rules sequentially via async-serial continuation, and `Request.getUri()` reflects
+prior rule rewrites by design. However, multi-rule chaining in an "Any" RuleSet
+short-circuits on first success, making deterministic multi-rule E2E fragile.
+The adapter's URI reading behavior is a trivial `request.getUri()` call — there
+is no adapter-side logic to validate beyond what the unit test already covers.
 
 ---
 
@@ -438,13 +425,12 @@ curl /api/chain/test → Rule 1 (rewrites to /api/chained) → Rule 2 (reads pat
 | ⬜ Phase 8 (OAuth/Identity) | S-002-13/25/26 | 3 |
 | ✅ Phase 9 (Hot-Reload) | S-002-29/30/31 | 3 |
 | ✅ Phase 10 (JMX) | S-002-33/34 | 2 |
-| ⬜ Phase 11 (Multi-Rule) | S-002-27 | 1 |
-| ❌ Unit-only (see rationale below) | S-002-16/18/20/21/36 | 5 |
+| ❌ Unit-only (see rationale below) | S-002-16/18/20/21/27/36 | 6 |
 | **Total** | | **36** |
 
 ### Unit-Only Scenarios (E2E not feasible)
 
-These 5 scenarios cannot be meaningfully validated through HTTP round-trips.
+These 6 scenarios cannot be meaningfully validated through HTTP round-trips.
 Each has comprehensive unit test coverage documented in `coverage-matrix.md`.
 
 | Scenario | Reason E2E is not feasible |
@@ -453,6 +439,7 @@ Each has comprehensive unit test coverage documented in `coverage-matrix.md`.
 | S-002-18 | Config validation fires during `configure()` before engine starts — invalid config prevents PA rule creation |
 | S-002-20 | Thread safety requires deterministic per-thread assertion on 10 concurrent threads — HTTP can't isolate |
 | S-002-21 | ExchangeProperty is PA-internal API — values not visible in HTTP response |
+| S-002-27 | Prior-rule URI rewrite — `Request.getUri()` reflects prior rewrites by PA engine design. Multi-rule E2E is fragile due to "Any" RuleSet short-circuit behaviour (§24). Unit test covers the adapter's trivial `getUri()` call directly. |
 | S-002-36 | Version mismatch warning requires a PA version different from compile-time — single Docker image |
 
 ### Assertion Count Projection
@@ -470,8 +457,7 @@ Each has comprehensive unit test coverage documented in `coverage-matrix.md`.
 | Phase 8b (Web Session) | — | — (SKIPPED — requires PingFederate runtime) |
 | Phase 9 (Hot-Reload) | 6 | 68 |
 | Phase 10 (JMX) | 5 | 73 |
-| Phase 11 (Multi-Rule) | 2 | 75 |
-| **Total** | **63** | **75** |
+| **Total** | **61** | **73** |
 
 
 ---
@@ -488,4 +474,4 @@ Each has comprehensive unit test coverage documented in `coverage-matrix.md`.
 | JSLT `$cookies`/`$queryParams` binding fails in PA runtime | **Low** | Same engine code path as unit tests; PA's cookie parsing is the only new variable |
 | Mock OIDC server token format rejected by PA Token Provider | **High** — blocks Phase 8 | ✅ **Resolved:** Keep `PingFederate` type, use JWKS ATV with Third-Party Service pointing to mock-oauth2-server's JWKS endpoint. |
 | PA JVM doesn't expose JMX with custom args | **Medium** — blocks Phase 10 | PA Docker image may override JVM args. Check `JAVA_OPTS` or `PA_JVM_ARGS` env var. Fall back to JMX agent JAR injection. |
-| Multi-rule ordering non-deterministic | **Medium** — blocks Phase 11 | PA applies rules in resource-order. Verify via Admin API that Rule A precedes Rule B. |
+| Multi-rule ordering non-deterministic | ~~**Medium** — blocks Phase 11~~ **Removed** | PA applies rules in resource-order but "Any" RuleSet short-circuits. Phase 11 dropped; S-002-27 is unit-only. |

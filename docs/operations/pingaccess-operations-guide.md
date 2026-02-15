@@ -31,7 +31,7 @@
 15. [Common Pitfalls & Solutions](#15-common-pitfalls--solutions)
 16. [Admin API Endpoint Reference](#16-admin-api-endpoint-reference)
 17. [Vendor Documentation](#17-vendor-documentation)
-18. [Deployment Architecture](#18-deployment-architecture)
+18. [Deployment Architecture (Two-Level Matching, Request/Response Lifecycle, PA Object Model)](#18-deployment-architecture)
 19. [Per-Instance Configuration](#19-per-instance-configuration)
 20. [File System Layout](#20-file-system-layout)
 21. [Deployment Patterns](#21-deployment-patterns)
@@ -1198,6 +1198,78 @@ Once PA fires our rule, the engine performs its own matching within the active
 The engine uses **most-specific-wins** resolution (ADR-0006). If no profile entry
 matches, the request **passes through** untouched.
 
+### Request/Response Lifecycle
+
+The same rule instance handles **both directions**. PA calls `handleRequest()` on
+the way in and `handleResponse()` on the way back. The full lifecycle:
+
+```
+Client                 PA Engine               Our Rule (Processing)          Site (Backend)
+  │                       │                        │                              │
+  │── POST /api/foo ─────►│                        │                              │
+  │                       │  access control rules  │                              │
+  │                       │  (tier 1/2) run first  │                              │
+  │                       │                        │                              │
+  │                       │── handleRequest() ────►│                              │
+  │                       │   (processing rule,    │                              │
+  │                       │    tier 3/4)           │                              │
+  │                       │                        │── wrapRequest(exchange)      │
+  │                       │                        │   → reads URI, headers, body │
+  │                       │                        │── engine.transform(REQUEST)  │
+  │                       │                        │   → body JSLT (reverse expr) │
+  │                       │                        │   → headers.add / remove     │
+  │                       │                        │   → url.path.expr            │
+  │                       │                        │── applyChanges(exchange)     │
+  │                       │                        │   → mutates Exchange in-place │
+  │                       │                        │                              │
+  │                       │◄── return CONTINUE ────│                              │
+  │                       │                        │                              │
+  │                       │── forwards modified request to Site ─────────────────►│
+  │                       │                        │                              │
+  │                       │◄── backend responds ──────────────────────────────────│
+  │                       │                        │                              │
+  │                       │── handleResponse() ───►│                              │
+  │                       │                        │── wrapResponse(exchange)     │
+  │                       │                        │   → reads status, headers,   │
+  │                       │                        │     response body            │
+  │                       │                        │── engine.transform(RESPONSE) │
+  │                       │                        │   → body JSLT (forward expr) │
+  │                       │                        │   → headers.add / remove     │
+  │                       │                        │   → status.set               │
+  │                       │                        │── applyChanges(exchange)     │
+  │                       │                        │   → mutates Exchange in-place │
+  │                       │                        │                              │
+  │                       │◄── return CONTINUE ────│                              │
+  │                       │                        │                              │
+  │◄── transformed resp ──│                        │                              │
+```
+
+### PA Object Model
+
+| PA Object | What it is | Role in the flow |
+|-----------|-----------|------------------|
+| **Virtual Host** | Hostname + port binding (e.g., `api.example.com:443`) | Entry point — PA selects the VH based on the `Host` header |
+| **Application** | Context root (e.g., `/api/customers`) bound to a VH | Routes requests by path prefix to a set of Resources |
+| **Site** | Backend target (e.g., `backend-service:8080`) | Where PA forwards the request *after* all processing rules run |
+| **Resource** | Path pattern within an Application (e.g., `/*`, `/orders/*`) | Attaches policy (rules) at sub-path granularity |
+| **Rule** (ours) | `MessageTransformRule` — a processing rule | Transforms request before backend, response after backend |
+
+**Destination constraint:** Our rule is annotated with `@RuleInterceptorDestinations(Site)`,
+meaning it only works on Applications whose destination is a **Site** (backend proxy mode).
+It will not activate for PA Agent destinations.
+
+**Key observations:**
+
+- The **same rule instance** handles both request and response. There is no
+  separate "request rule" and "response rule" — PA calls both lifecycle methods
+  on the same object.
+- Spec direction is controlled by `forward`/`reverse` expressions (bidirectional)
+  or a single `transform.expr` (unidirectional, applied in both directions).
+  See [§9](#9-transform-direction-behaviour) for details.
+- The rule returns `Outcome.CONTINUE` — it never blocks the request. Blocking is
+  the job of access control rules (tier 1/2). If the transform fails, `errorMode`
+  controls whether to pass through or deny (HTTP 500).
+
 ---
 
 ## 19. Per-Instance Configuration
@@ -1263,29 +1335,115 @@ state, specs, or profiles.
 
 ## 21. Deployment Patterns
 
-### Pattern 1: Single Rule, One Profile (Simplest)
+### Key Principle: Profile = Per-Operation Router
 
-One MessageTransform rule instance, bound globally or to a single Application.
-The profile handles all path matching internally.
+A profile entry matches on **path + method + content-type** — the same tuple
+that defines an OpenAPI operation. This means profiles already provide
+per-operation routing within a single rule instance. There is no need to
+create separate PA Resources or separate MessageTransformRule instances to
+handle different API operations.
 
-**Pros:** Simple to manage. One place for all transforms.
-**Cons:** All specs reload together. One misconfigured spec can block all others.
+Example: a single profile covering an entire Customer API:
 
-### Pattern 2: Per-Application Rules (Recommended)
+```yaml
+profile: customer-api
+version: "1.0.0"
+description: "Routes all customer API operations"
 
-Separate MessageTransform rule instances per Application. Each instance has its
-own spec directory and profile.
+transforms:
+  # POST /api/customers → create-customer spec (request transform)
+  - spec: create-customer@1.0.0
+    direction: request
+    match:
+      path: "/api/customers"
+      method: POST
 
-**Pros:** Team isolation. Independent error modes. Targeted reload.
-**Cons:** More rule instances to manage.
+  # GET /api/customers/* → get-customer spec (response transform)
+  - spec: get-customer@1.0.0
+    direction: response
+    match:
+      path: "/api/customers/*"
+      method: GET
 
-### Pattern 3: Shared Specs, Separate Profiles
+  # PUT /api/customers/*/orders → update-order spec (request transform)
+  - spec: update-order@1.0.0
+    direction: request
+    match:
+      path: "/api/customers/*/orders"
+      method: PUT
+```
+
+Each spec can independently transform the body, inject/remove headers, rewrite
+the URL, and override the status code — all in a single YAML file. There is no
+need for multiple rules to achieve multi-dimension transforms per operation.
+
+### When to Use Which Pattern
+
+| Pattern | When | Why |
+|---------|------|-----|
+| **One rule + one profile** | Same `errorMode` and `reloadIntervalSec` across operations | Simplest config. One engine instance. Atomic hot-reload. |
+| **One rule per Application** | Different teams or different `errorMode` per API | Team isolation. Per-API error handling. Independent reload. |
+| **Per-Resource rules** | Different `errorMode` per operation within the same app | Rare. Only when you need DENY for mutations but PASS_THROUGH for reads *within* the same context root. |
+| **Multiple MessageTransformRules on one Resource** | ❌ **Never do this** | See anti-pattern below. |
+
+### Pattern 1: One Rule per Application + Profile Routing (Recommended)
+
+One MessageTransform rule instance per Application. The profile handles
+per-operation routing internally.
+
+```
+Application: /api/customers  →  Rule: customer-transforms
+  profile: customer-api (routes POST/GET/PUT/DELETE to individual specs)
+
+Application: /api/payments   →  Rule: payment-transforms
+  profile: payment-api (routes POST/GET to individual specs)
+```
+
+**Pros:** Simple PA config. One engine instance per API. All routing controlled
+by the profile. Atomic hot-reload. Team isolation at the Application level.
+**Cons:** All operations within one app share the same `errorMode`.
+
+### Pattern 2: Shared Specs, Separate Profiles
 
 All instances point to the same `specsDir` but use different `activeProfile` values
 to select which specs apply.
 
 **Pros:** Single source of truth for specs. Profile controls routing.
 **Cons:** Both instances load all specs (wasted memory for unused specs).
+
+### Pattern 3: Per-Resource Rules (Advanced)
+
+Split rules across PA Resources when you need **different `errorMode`** per
+operation. For example, DENY for payment mutations and PASS_THROUGH for catalog
+reads, both under the same context root.
+
+```
+Application: /api
+  Resource: /payments/* → Rule: payment-transforms (errorMode=DENY)
+  Resource: /catalog/*  → Rule: catalog-transforms (errorMode=PASS_THROUGH)
+```
+
+This is the only legitimate reason to attach multiple MessageTransformRule
+instances under one Application. The cost is multiple engine instances and
+independent reload cycles.
+
+### Anti-Pattern: Multiple MessageTransformRules on One Resource
+
+> ⚠️ **Do not chain multiple MessageTransformRule instances on the same
+> Resource.** This is never necessary.
+
+A single transform spec already supports body transformation, header injection,
+URL rewriting, and status code overrides — all in one YAML file. Attaching
+two MessageTransformRules to the same Resource would:
+
+- Create **two independent engine instances**, each loading its own specs
+- Run **both transforms sequentially** (§24), with Rule B seeing Rule A's
+  modified request — making the interaction order-dependent and fragile
+- Waste memory and CPU on duplicate engines
+- Create confusion about which spec handles which aspect of the transform
+
+If you need different transforms for different operations under the same
+application, use **profile routing** (path + method matching) instead.
 
 ---
 
@@ -1309,6 +1467,17 @@ JAR itself. Updating the JAR requires a PA restart.
 Yes, if the PA admin binds two MessageTransform rules to the same Application.
 They execute **sequentially** in policy-manager order — each rule's `CompletionStage`
 completes before the next rule starts. See [§24](#24-rule-execution-order).
+However, **this is not recommended** for MessageTransformRules — use profile
+routing instead (§21).
+
+**Q: Do I need a separate rule for each API operation?**
+No. A single profile handles per-operation routing using path + method matching.
+One rule per Application with a profile is the recommended pattern. See §21.
+
+**Q: Can a single spec handle body, headers, URL, and status transforms?**
+Yes. A transform spec supports `transform.expr` (body), `headers.add/remove`,
+`url.path.expr`, and `status.set` — all in one YAML file. There is no need for
+multiple rules or specs to cover different transform dimensions.
 
 **Q: What if no profile entry matches the request?**
 The engine returns `PASSTHROUGH` — the request/response goes through **completely
@@ -1508,3 +1677,5 @@ evaluation.
 | 2026-02-14 | Initial version — consolidated from E2E debugging sessions |
 | 2026-02-14 | Merged `pingaccess-deployment.md` and `pingaccess-docker-and-sdk.md` into this single file |
 | 2026-02-15 | Added §24 — Rule Execution Order analysis |
+| 2026-02-15 | Expanded §21 — Profile-as-operation-router guidance, anti-pattern for multi-rule chaining, per-Resource pattern, new FAQ entries in §23 |
+| 2026-02-15 | Expanded §18 — Request/Response Lifecycle diagram, PA Object Model table, destination constraint |
