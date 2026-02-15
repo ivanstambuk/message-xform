@@ -1,45 +1,44 @@
 # Current Session
 
-**Focus**: Conditional Response Routing — Research, Design, and ADR
+**Focus**: Conditional Response Routing — Implementation Complete
 **Date**: 2026-02-15
-**Status**: Complete — ready for implementation
+**Status**: Complete — all phases implemented, tested, documented, and committed.
 
 ## Accomplished
 
-1. Authored comprehensive research proposal for conditional response routing
-   (`docs/research/conditional-response-routing.md`, Revision 4, Accepted).
-   - 4 deep-pass revisions identifying 26+ gaps across 4 angles:
-     type system, parser correctness, API contracts, and cross-feature interactions.
-   - Defined `match.status` (Phase 1) and `match.when` (Phase 2).
+1. Implemented Phase 1: `match.status` (T-001-69) — status-code pattern matching
+   with exact, class, range, negation, and list patterns. 44 new unit tests.
 
-2. Created ADR-0036 — Conditional Response Routing:
-   - Full options analysis with comparison matrix.
-   - Phase 1: status pattern matching (exact, class, range, negation, list).
-   - Phase 2: body predicate matching via compiled JSLT expressions.
-   - Specificity weighting, evaluation order, pipeline interaction.
-   - `status.when` vs `match.status` disambiguation.
+2. Implemented Phase 1b: Unknown-key detection in ProfileParser (T-001-70) —
+   parity with SpecParser. 5 new unit tests.
 
-3. Updated 3 existing ADRs with cross-references:
-   - ADR-0003: disambiguation section for status.when vs match.status.
-   - ADR-0006: weighted specificity, when-predicate ambiguity exemption.
-   - ADR-0012: body predicate timing (original body, not pipeline intermediate).
+3. Implemented Phase 2: `match.when` (T-001-71) — body-predicate matching via
+   compiled JSLT expressions. 15 new unit tests.
 
-4. Added FR-001-15 (Status Routing) and FR-001-16 (Body Predicate Routing)
-   to knowledge map and llms.txt.
+4. Completed SDD documentation gate (T-001-72) — FR-001-15/16 in spec.md,
+   S-001-87–S-001-100 in scenarios.md, tasks in tasks.md.
 
-## Key Decisions
+5. Created E2E tests: 8 new scenarios in 2 feature files (status-routing.feature,
+   polymorphic-routing.feature). Full suite: 39/39 pass.
 
-- Proposal accepted after 4 revision passes — design is stable.
-- `match.status` is response-direction only; `match.when` is both directions.
-- Weighted specificity: exact/range = +2, class/negation = +1, when = +1.
-- `when` entries exempt from load-time ambiguity rejection.
-- Pre-parsed body reuse across all 4 `bodyToJson()` call sites.
-- `TransformProfile.hasWhenPredicates()` is a computed method, not record component.
-- `parseStatusField()` handles YAML IntNode, TextNode, ArrayNode (not `optionalString()`).
+6. Extended echo backend with X-Echo-Status and X-Echo-Body headers for
+   fine-grained response control in E2E tests.
+
+7. Retired research document (`docs/research/conditional-response-routing.md`) —
+   all content captured in ADR-0036, spec, scenarios, and tasks.
+
+## Commits
+
+| Hash | Description |
+|------|-------------|
+| `f9f21c4` | feat: unknown-key detection in ProfileParser (T-001-70) |
+| `76db4b5` | feat: match.when body-predicate routing (T-001-71) |
+| `72dded2` | test(e2e): status routing + polymorphic routing tests |
+| `f3153cf` | docs: E2E results (39/39), Phase 2 checklist |
+| `a3d6eeb` | docs: scenario verification table + ops guide |
+| (pending) | docs: retire research doc, update references |
 
 ## Next Session Focus
 
-- Begin implementation of conditional response routing (Phase 1 first).
-- First task: add FR-001-15/16 to spec.md and S-001-87–S-001-100 to scenarios.md.
-- Then implement StatusPattern type hierarchy, ProfileParser changes, ProfileMatcher updates.
-- ProfileParser needs EngineRegistry dependency (Phase 2 blocker — plan constructor change).
+- Pull remote changes and push local commits.
+- Begin next feature or backlog item.

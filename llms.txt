@@ -79,7 +79,6 @@ docs/research/pingaccess-plugin-api.md
 docs/research/gateway-candidates.md
 docs/research/pingam-authentication-api.md
 docs/research/t-001-12-jslt-context-variables.md
-docs/research/conditional-response-routing.md
 docs/research/standalone-proxy-http-server.md
 docs/research/e2e-test-framework-research.md
 

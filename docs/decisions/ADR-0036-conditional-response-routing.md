@@ -258,7 +258,7 @@ Negative / trade-offs:
 
 ## References
 
-- Research: `docs/research/conditional-response-routing.md` (Revision 4)
+- Research: `docs/research/conditional-response-routing.md` (Revision 4, retired — content captured in this ADR, spec FR-001-15/16, and scenarios S-001-87–100)
 - Feature 001 spec: `docs/architecture/features/001/spec.md` (FR-001-15, FR-001-16)
 - Related ADRs: ADR-0003 (disambiguation), ADR-0006 (specificity update), ADR-0012
   (pipeline timing), ADR-0015 (spec vs profile routing), ADR-0027 (original body)

@@ -1315,9 +1315,8 @@ Track long-running or shared commands with timestamps to avoid duplicate work.
 > routing — different transforms for success vs. error responses on the same
 > path, and polymorphic routing based on body content.
 >
-> **Research:** `docs/research/conditional-response-routing.md` (Rev 4, Accepted)
 > **ADR:** `docs/decisions/ADR-0036-conditional-response-routing.md`
-> **Tracker:** §Implementation Tracker in the research document
+> **Research:** Retired — content captured in ADR-0036, spec FR-001-15/16, scenarios S-001-87–100.
 
 #### I17 — Phase 1: `match.status` (Status-Code Pattern Matching)
 
