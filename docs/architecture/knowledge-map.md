@@ -148,7 +148,7 @@ ADR-0035 (Version Parity)    governs ── FR-002-09, supersedes ADR-0031 §7-�
 | FR-002-09 (Deployment Packaging) | ADR-0031, ADR-0032, ADR-0035 | NFR-002-02 |
 | FR-002-10 (Gradle Module) | — | NFR-002-05 |
 | FR-002-11 (Error Handling) | ADR-0022, ADR-0024 | — |
-| FR-002-12 (Docker E2E Test) | `scripts/pa-e2e-bootstrap.sh`, `e2e-pingaccess/`, `e2e/pingaccess/specs/` | `docs/architecture/features/002/e2e-results.md` |
+| FR-002-12 (Docker E2E Test) | `scripts/pa-e2e-bootstrap.sh`, `scripts/pa-e2e-infra-up.sh`, `scripts/pa-e2e-infra-down.sh`, `e2e-pingaccess/`, `e2e/pingaccess/specs/` | `docs/architecture/features/002/e2e-results.md` |
 | FR-004-01 (Standalone Proxy) | ADR-0029 | NFR-004-01 through NFR-004-07 |
 | FR-004-02..13 (Transform) | ADR-0029, ADR-0025, ADR-0013 | — |
 | FR-004-14..17 (TLS/mTLS) | — | NFR-004-05 |
@@ -176,3 +176,4 @@ ADR-0035 (Version Parity)    governs ── FR-002-09, supersedes ADR-0031 §7-�
 | `docs/research/pingam-authentication-api.md` | PingAM /json/authenticate endpoint, callback format | Feature 002 scenarios |
 | `docs/reference/pingaccess-sdk-guide.md` | Standalone PingAccess 9.0 SDK reference (19 sections, 112 classes) | Feature 002 spec, all adapter implementation |
 | `docs/operations/pingaccess-operations-guide.md` | PA operations, deployment architecture, Docker/K8s layout, Admin API gotchas | Feature 002 spec, ADR-0023, ADR-0006 |
+| `docs/operations/e2e-karate-operations-guide.md` | Gateway-neutral E2E test architecture, Docker lifecycle, Gradle integration, Karate patterns, IDE extension patches | All E2E modules, Feature 002, future gateway features |
