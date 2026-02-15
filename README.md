@@ -5,10 +5,6 @@
 Transform HTTP message payloads and headers declaratively — no code changes per API.
 Deploy as a **standalone reverse proxy** or embed as a **plugin** in your existing API gateway.
 
-<p align="center">
-  <img src="docs/images/architecture-overview.png" alt="message-xform architecture — standalone proxy and gateway plugin deployment modes" width="100%">
-</p>
-
 ---
 
 ## What is message-xform?
@@ -19,9 +15,11 @@ message-xform is a **gateway-agnostic transformation engine** that rewrites HTTP
 
 ---
 
-## Two Deployment Modes
-
 ### 🔀 Standalone Reverse Proxy
+
+<p align="center">
+  <img src="docs/images/standalone-proxy.png" alt="message-xform standalone reverse proxy — API client to proxy to backend API" width="100%">
+</p>
 
 Run message-xform as an **independent HTTP proxy** with zero external dependencies. Ideal for:
 
@@ -48,6 +46,10 @@ java -jar message-xform-proxy.jar
 ```
 
 ### 🔌 Gateway Plugin
+
+<p align="center">
+  <img src="docs/images/gateway-plugin.png" alt="message-xform gateway plugin — API client to gateway with embedded engine to backend API" width="100%">
+</p>
 
 Embed message-xform **directly into your existing API gateway** as a native plugin, rule, or filter. The core engine runs inside the gateway's JVM — no network hop, no sidecar overhead.
 
