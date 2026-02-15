@@ -31,6 +31,7 @@ Run message-xform as an **independent HTTP proxy** with zero external dependenci
 
 **Key features:**
 - Docker image (~100 MB) with multi-stage build
+- Java 21 virtual threads for high-concurrency request handling
 - TLS termination (inbound + outbound) with mTLS support
 - Environment variable overrides for all configuration
 - Health (`/health`) and readiness (`/ready`) endpoints
@@ -55,7 +56,7 @@ Embed message-xform **directly into your existing API gateway** as a native plug
 | Gateway | Integration Model | Status |
 |---------|-------------------|--------|
 | **Standalone Proxy** | Embedded HTTP proxy (Javalin/Jetty) | ✅ Complete |
-| **PingAccess** | Java plugin via RuleInterceptor SPI | 🔲 Planned (Tier 2) |
+| **PingAccess** | Java plugin via `AsyncRuleInterceptor` SPI | ✅ Complete |
 | **PingGateway** | Java/Groovy filter chain | 🔲 Planned (Tier 2) |
 | **WSO2 API Manager** | Java extension API | 🔲 Planned (Tier 3) |
 | **Apache APISIX** | Java Plugin Runner | 🔲 Planned (Tier 3) |
@@ -149,6 +150,21 @@ reverse:
   expr: '{ "legacy_name": .name }'    # Response: modern → legacy
 ```
 
+### 🔐 Session Context Access
+
+Access identity and session data inside JSLT expressions via the `$session` variable — populated from gateway-provided identity attributes (OAuth claims, OIDC session state, SAML assertions):
+
+```yaml
+transform:
+  lang: jslt
+  expr: |
+    {
+      "user":    $session.sub,
+      "email":   $session.email,
+      "payload": .
+    }
+```
+
 ---
 
 ## Configuration
@@ -211,6 +227,9 @@ cd message-xform
 # Build the standalone proxy shadow JAR
 ./gradlew --no-daemon :adapter-standalone:shadowJar
 
+# Build the PingAccess adapter shadow JAR
+./gradlew --no-daemon :adapter-pingaccess:shadowJar
+
 # Build the Docker image (~100 MB)
 docker build -t message-xform-proxy adapter-standalone/
 ```
@@ -232,6 +251,19 @@ docker run \
 java -jar adapter-standalone/build/libs/adapter-standalone-*-all.jar
 ```
 
+### Deploy the PingAccess Plugin
+
+```bash
+# Build the shadow JAR
+./gradlew :adapter-pingaccess:shadowJar
+
+# Copy to PingAccess deploy directory
+cp adapter-pingaccess/build/libs/adapter-pingaccess-*-all.jar \
+   /opt/pingaccess/deploy/
+
+# Restart PingAccess — the plugin auto-registers via ServiceLoader
+```
+
 ---
 
 ## Project Structure
@@ -248,26 +280,49 @@ message-xform/
 │   ├── proxy/               # ProxyHandler, UpstreamClient, FileWatcher
 │   ├── config/              # YAML config loader with env var overlay
 │   └── tls/                 # TLS/mTLS configuration
+├── adapter-pingaccess/      # PingAccess 9.0 gateway plugin
+│   ├── adapter/             # GatewayAdapter + RuleInterceptor SPI
+│   ├── config/              # Plugin descriptor + SnakeYAML config
+│   └── metrics/             # JMX MBean metrics (optional)
+├── e2e-pingaccess/          # End-to-end Karate tests against live PA
+│   ├── docker-compose.yml   # PA + echo backend + mock OAuth2
+│   └── src/test/            # Karate feature files (31 scenarios)
 ├── docs/                    # Specifications, ADRs, research
 │   ├── architecture/        # Feature specs, roadmap, terminology
-│   ├── decisions/           # Architecture Decision Records (ADRs)
-│   └── research/            # Gateway evaluations, API analysis
+│   ├── decisions/           # Architecture Decision Records (36 ADRs)
+│   └── operations/          # Deployment and operations guides
 └── Dockerfile               # Multi-stage build (~100 MB image)
 ```
 
 ## Tech Stack
 
 | Component | Technology |
-|-----------|-----------|
+|-----------|------------|
 | Language | Java 21 (virtual threads) |
-| Build | Gradle 8.12 (Kotlin DSL) |
+| Build | Gradle 9.2 (Kotlin DSL) |
 | HTTP Server | Javalin 6 / Jetty 12 |
-| JSON Processing | Jackson |
+| JSON Processing | Jackson 2.17 |
 | Transform Language | [JSLT](https://github.com/schibsted/jslt) (pluggable SPI) |
 | Schema Validation | networknt json-schema-validator |
-| Testing | JUnit 5, AssertJ |
+| Testing | JUnit 5, AssertJ, Karate |
+| E2E Testing | [Karate](https://karatelabs.github.io/karate/) + Docker Compose |
 | Formatting | Palantir Java Format (via Spotless) |
 | CI | GitHub Actions |
+
+---
+
+## PingAccess Adapter
+
+The PingAccess adapter embeds the transformation engine as a native **RuleInterceptor** plugin:
+
+- **AsyncRuleInterceptor** SPI — non-blocking request + response interception (Site rules only)
+- **Bidirectional transforms** — request and response in a single spec
+- **Session context** — OAuth claims, OIDC attributes, and SAML assertions available as `$session` in JSLT
+- **Profile routing** — multiple specs bound to URL patterns per PA Application/Resource
+- **Hot reload** — file-based spec reloading without PA restart
+- **JMX metrics** — active spec count, transform counts, error rates (opt-in via plugin config)
+- **Shadow JAR** — single deployable JAR with relocated dependencies; uses PA-provided Jackson/SLF4J
+- **Tested against PA 9.0.1** — 31 E2E scenarios validated via Karate + Docker Compose
 
 ---
 
