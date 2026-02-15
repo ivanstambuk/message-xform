@@ -3,10 +3,9 @@
 | Field | Value |
 |-------|-------|
 | Script | `scripts/pa-e2e-bootstrap.sh` + `e2e-pingaccess/` (Karate DSL) |
-| Spec files | `e2e-rename.yaml`, `e2e-header-inject.yaml`, `e2e-context.yaml`, `e2e-error.yaml`, `e2e-status-override.yaml`, `e2e-url-rewrite.yaml` |
+| Spec files | `e2e-rename.yaml`, `e2e-header-inject.yaml`, `e2e-context.yaml`, `e2e-error.yaml`, `e2e-status-override.yaml`, `e2e-url-rewrite.yaml`, `e2e-session.yaml`, `e2e-reload-addition.yaml` |
 | Profile | `e2e-profile.yaml` |
 | Linked requirement | FR-002-12 |
-| Expansion plan | `e2e-expansion-plan.md` |
 
 > This is a living document. Update it each time the E2E suite is run against
 > a live PingAccess instance. Append new entries to the Run History table.
@@ -17,16 +16,15 @@
 
 | Field | Value |
 |-------|-------|
-| Date | 2026-02-14T18:04 CET |
-| Result | **62/62 PASSED** ✅ |
+| Date | 2026-02-15 |
+| Result | **31/31 PASSED** ✅ |
 | PA version | 9.0.1.0 |
 | PA Docker image | `pingidentity/pingaccess:latest` |
 | Shadow JAR size | 4.6 MB (< 5 MB NFR-002-02) |
 | Class file version | 61 (Java 17) |
 | Build time | 4s |
 | PA startup time | 24s |
-| Test groups | 24 |
-| Assertions | 62 |
+| Test groups | 31 |
 
 ### Test Breakdown
 
@@ -54,10 +52,15 @@
 | 19 | DENY guard verification (best-effort) | S-002-28 | Guard log check (either outcome valid) | 1/1 ✅ |
 | 20 | Session context in JSLT (Bearer) | S-002-13 | POST 200, subject populated, clientId best-effort, scopes best-effort | 4/4 ✅ |
 | 21 | OAuth context in JSLT | S-002-25 | tokenType populated, scopes best-effort | 2/2 ✅ |
-| 22 | Session state merge (L1-L4) | S-002-26 | $session object populated | 1/1 ✅ |
-| 23 | Web Session OIDC (L4) | S-002-26 | SKIPPED — PA requires PingFederate runtime | 1/1 ✅ |
-| 24 | L4 overrides L3 | S-002-26 | SKIPPED — PA requires PingFederate runtime | 1/1 ✅ |
-| | **Total** | | | **62/62** |
+| 22 | Session state merge (L1-L3) | S-002-26 | $session object populated | 1/1 ✅ |
+| 23 | Web Session OIDC (L4) | S-002-26 | OIDC auth code flow → PA session cookie → authenticated access | 4/4 ✅ |
+| 24 | L4 overrides L3 | S-002-26 | Repeat OIDC login → session-based auth works | 1/1 ✅ |
+| 25 | Spec hot-reload success | S-002-29 | Identity→marker overwrite, wait 9s, marker version active, scheduler log | 3/3 ✅ |
+| 26 | Spec hot-reload failure | S-002-30 | Invalid YAML overwrite, existing transform still works, reload failure log | 2/2 ✅ |
+| 27 | Concurrent requests during reload | S-002-31 | 5 sequential requests all return 200 | 1/1 ✅ |
+| 28 | JMX MBean registered | S-002-33 | MBean exists, ActiveSpecCount ≥ 1, TransformTotalCount increments, registration log | 4/4 ✅ |
+| 29 | JMX MBean not registered (negative) | S-002-34 | Non-existent instance MBean does NOT exist | 1/1 ✅ |
+| | **Total** | | | **31/31** |
 
 ---
 
@@ -86,19 +89,24 @@
 | S-002-23 | Query param access in JSLT ($queryParams.page → body field) |
 | S-002-24 | Shadow JAR correctness (size, class version, contents) |
 | S-002-25 | OAuth context in JSLT ($session.tokenType via Bearer token, L2 metadata) |
-| S-002-26 | Session state in JSLT (L1-L3 merge verified; L4 SKIPPED — requires PingFederate runtime) |
+| S-002-26 | Session state in JSLT (L1-L4: Bearer L1-L3 merge + Web Session OIDC L4) |
 | S-002-28 | DENY + handleResponse interaction (best-effort guard check) |
+| S-002-29 | Spec hot-reload success (modified spec picked up after 5s interval) |
+| S-002-30 | Spec hot-reload failure (malformed YAML → previous registry retained) |
+| S-002-31 | Concurrent requests during reload (5 requests, no corruption) |
 | S-002-32 | Non-JSON response body (HTML echo → body preserved) |
+| S-002-33 | JMX metrics opt-in (MBean registered, counters work) |
+| S-002-34 | JMX metrics disabled (non-existent instance → MBean absent) |
 | S-002-35 | PA-specific non-standard status code (277 passthrough) |
 
 ---
 
 ## E2E Coverage Gap Analysis
 
-Some scenarios are validated exclusively by unit tests. This section documents
-the rationale for each.
-
 ### Unit-Only Scenarios (E2E not feasible)
+
+These 6 scenarios cannot be meaningfully validated through HTTP round-trips.
+Each has comprehensive unit test coverage documented in `coverage-matrix.md`.
 
 | Scenario | Name | Rationale |
 |----------|------|-----------|
@@ -109,30 +117,6 @@ the rationale for each.
 | S-002-27 | Prior rule URI rewrite | `Request.getUri()` reflects prior-rule rewrites by PA engine design. Multi-rule E2E is fragile due to "Any" RuleSet short-circuit behaviour (§24). The adapter's `getUri()` call is trivially validated by unit test. |
 | S-002-36 | Runtime version mismatch | Requires running against a PA version different from compile-time version. Docker E2E uses the same PA version. Unit test mocks the version check. |
 
-### Backlogged E2E Scenarios (partially covered by Phase 8a)
-
-These scenarios were previously backlogged; Phase 8a now provides partial E2E
-coverage. Full coverage (L2 introspection, L4 session state) requires a real
-PingFederate/PingOne or an introspection-capable mock. The JWKS ATV approach
-populates L1 (subject) and L2 (tokenType) but not clientId/scopes (requires
-introspection) or L4 (requires Web Session with PingFederate runtime).
-
-| Scenario | Name | E2E Status |
-|----------|------|-------------|
-| S-002-13 | Session context in JSLT | ✅ Partial — subject populated, clientId/scopes best-effort (JWKS ATV) |
-| S-002-25 | OAuth context in JSLT | ✅ Partial — tokenType populated, scopes best-effort (JWKS ATV) |
-| S-002-26 | Session state in JSLT | ✅ Partial — L1-L3 merge verified, L4 SKIPPED (requires PingFederate) |
-
-### Backlogged E2E Scenarios (complex infrastructure)
-
-| Scenario | Name | Prerequisite |
-|----------|------|-------------|
-| S-002-29 | Spec hot-reload (success) | Modify spec file while PA is running, verify new spec takes effect. Requires file-system mutation during E2E. |
-| S-002-30 | Spec hot-reload (failure) | Introduce malformed spec during reload, verify previous registry retained. |
-| S-002-31 | Concurrent reload during active transform | File change during active HTTP traffic. |
-| S-002-33 | JMX metrics opt-in | Requires JMX client connection to PA JVM (JMX port exposure + `jmxterm` or similar). |
-| S-002-34 | JMX metrics disabled | Same JMX infrastructure requirement (verify absence of MBean). |
-
 ---
 
 ## Run History
@@ -142,4 +126,5 @@ introspection) or L4 (requires Web Session with PingFederate runtime).
 | 2026-02-14 ~12:24 | 13/13 ✅ | 9.0.1.0 | `0947e4b` | Initial script creation. Captured in commit message. |
 | 2026-02-14 14:58 | 18/18 ✅ | 9.0.1.0 | `093c688` | Strengthened assertions (bidirectional spec, field-level payload verification, direct echo probe). |
 | 2026-02-14 16:15 | 50/50 ✅ | 9.0.1.0 | — | Full E2E expansion: 19 test groups, 6 specs, profile routing, context variables, error modes, status/URL transforms, non-JSON pass-through. |
-| 2026-02-14 18:04 | 62/62 ✅ | 9.0.1.0 | `97db1c1` | Phase 8a OAuth/Identity: Bearer token auth, session context, mock-oauth2-server. Fixed: Token Provider type (keep PingFederate), ATV field name (thirdPartyService), container-side log grep, internal log file source. |
+| 2026-02-14 18:04 | 62/62 ✅ | 9.0.1.0 | `97db1c1` | Phase 8a OAuth/Identity: Bearer token auth, session context, mock-oauth2-server. |
+| 2026-02-15 | 31/31 ✅ | 9.0.1.0 | — | All phases complete: Phase 8b (Web Session OIDC L4), Phase 9 (hot-reload), Phase 10 (JMX metrics). JMX metric bug fixed (shared registry pattern). |
