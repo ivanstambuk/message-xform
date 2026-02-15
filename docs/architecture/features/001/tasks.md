@@ -1,7 +1,7 @@
 # Feature 001 — Message Transformation Engine — Tasks
 
-_Status:_ Complete (Phases 1–10); Phase 11 (port value objects) in progress
-_Last updated:_ 2026-02-11
+_Status:_ Complete (Phases 1–12); Phase 13 (conditional response routing) in progress
+_Last updated:_ 2026-02-15
 
 **Governing spec:** `docs/architecture/features/001/spec.md`
 **Implementation plan:** `docs/architecture/features/001/plan.md`
@@ -1305,3 +1305,95 @@ Track long-running or shared commands with timestamps to avoid duplicate work.
   interruptible. If so, document the limitation and rely on output size budget.
 - **Scenario YAML extraction:** T-001-50 needs a strategy for loading scenario
   YAML blocks from the markdown file or converting them to standalone files.
+
+---
+
+### Phase 13 — Conditional Response Routing (FR-001-15, FR-001-16, ADR-0036)
+
+> **Scope:** Status-code pattern matching (`match.status`) and body-predicate
+> matching (`match.when`) for profile entries. Enables conditional response
+> routing — different transforms for success vs. error responses on the same
+> path, and polymorphic routing based on body content.
+>
+> **Research:** `docs/research/conditional-response-routing.md` (Rev 4, Accepted)
+> **ADR:** `docs/decisions/ADR-0036-conditional-response-routing.md`
+> **Tracker:** §Implementation Tracker in the research document
+
+#### I17 — Phase 1: `match.status` (Status-Code Pattern Matching)
+
+- [x] **T-001-69** — Implement `match.status` (FR-001-15, ADR-0036) ✅ 2026-02-15
+  _Intent:_ Add status-code pattern matching to profile entries, enabling
+  conditional response routing by HTTP status.
+  _Implement:_
+  - Create `StatusPattern` sealed interface + 5 implementations (Exact, Class,
+    Range, Not, AnyOf) in `core/model/`.
+  - Create `StatusPatternParser` — type-aware YAML parsing (handles IntNode gotcha
+    where unquoted `status: 404` produces IntNode, not TextNode).
+  - Update `ProfileEntry` — add `statusPattern` field (backward-compatible 5-arg ctor).
+  - Update `ProfileEntry.constraintCount()` — weighted specificity (Exact=2, Class/Not=1).
+  - Update `ProfileParser.parseEntry()` — integrate `parseStatusField()` (NOT `optionalString`).
+  - Update `ProfileMatcher.findMatches()` — new 6-arg overload accepting `statusCode`.
+  - Update `TransformEngine.transformInternal()` — pass `message.statusCode()`.
+  _Test:_
+  - `StatusPatternTest` — all pattern types, validation, boundaries, defensive copy.
+  - `StatusPatternParserTest` — string/int/array parsing, YAML gotcha, validation errors.
+  - `ProfileMatcherTest` — status class routing (S-001-87), exact match (S-001-88),
+    specificity (S-001-92), null-safety, passthrough.
+  _Verify:_ All 524 tests pass. No regressions.
+  _Verification commands:_
+  - `./gradlew :core:test`
+  - `./gradlew spotlessApply check`
+  _Status:_ ✅ Complete (2026-02-15, commit `7fd5ddb`). 44 new tests across
+  3 test classes. All 524 tests pass, 0 failures.
+  _Scenarios covered:_ S-001-87, S-001-88, S-001-89, S-001-90, S-001-91,
+  S-001-92, S-001-100.
+
+- [x] **T-001-72** — SDD documentation gate (FR-001-15, FR-001-16) ✅ 2026-02-15
+  _Intent:_ Formalize the new requirements and scenarios in the SDD.
+  _Implement:_
+  - Add FR-001-15 / FR-001-16 to `spec.md`.
+  - Add S-001-87 through S-001-100 to `scenarios.md` (Category 25).
+  - Update coverage matrix.
+  - Update scenario index and test class verification table.
+  - Add DO-001-12 (StatusPattern) to domain objects.
+  - Update API-001-01 description.
+  - Add Phase 13 tasks to `tasks.md`.
+  _Verify:_ All SDD files are consistent and up to date.
+  _Verification commands:_
+  - Manual review of spec.md, scenarios.md, tasks.md.
+
+#### I18 — Phase 1b: Unknown-Key Detection in ProfileParser
+
+- [ ] **T-001-70** — Add unknown-key detection to `ProfileParser` (FR-001-01 parity)
+  _Intent:_ Add known-key validation to `ProfileParser.parseEntry()` for
+  parity with `SpecParser`. Typos like `statis: 404` would be silently
+  ignored without this check.
+  _Implement:_
+  - Define known-key set for `match` block (path, method, content-type, status).
+  - Warn or reject unknown keys in the `match` block.
+  - Unit tests for unknown-key detection.
+  _Verify:_ New tests pass. No regressions.
+  _Verification commands:_
+  - `./gradlew :core:test --tests "*ProfileParserTest*"`
+  - `./gradlew spotlessApply check`
+
+#### I19 — Phase 2: `match.when` (Body-Predicate Matching)
+
+- [ ] **T-001-71** — Implement `match.when` (FR-001-16, ADR-0036)
+  _Intent:_ Add body-predicate matching to profile entries, enabling
+  polymorphic routing based on body content.
+  _Implement:_ See research document §Phase 2 for detailed design.
+  - Add `EngineRegistry` field to `TransformEngine`.
+  - Update `ProfileParser` constructor to accept `EngineRegistry`.
+  - Update `ProfileParser.parseEntry()` — parse `when` block, compile at load time.
+  - Update `ProfileEntry` — add `whenPredicate` field.
+  - Add `hasWhenPredicates()` computed method to `TransformProfile`.
+  - Update `ProfileMatcher` — two-phase matching (envelope, then body predicate).
+  - Update `TransformEngine.transformInternal()` — conditional body pre-parse.
+  - Pass `preParsedBody` to `transformWithSpec` (reuse across all 4 `bodyToJson` sites).
+  - Extract `isTruthy()` to `JsonNodeUtils`.
+  _Test:_ `ProfileMatcherTest` (when predicate), `TransformEngineTest` (e2e integration).
+  _Scenarios:_ S-001-93, S-001-94, S-001-95, S-001-96, S-001-97, S-001-98, S-001-99.
+  _Verification commands:_
+  - `./gradlew :core:test`
+  - `./gradlew spotlessApply check`

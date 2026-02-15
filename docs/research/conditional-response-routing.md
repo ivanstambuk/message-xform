@@ -1283,10 +1283,10 @@ New E2E scenarios:
 
 #### SDD Documentation (cross-cutting)
 
-- [ ] Add FR-001-15 / FR-001-16 to `spec.md`
-- [ ] Add S-001-87 – S-001-100 to `scenarios.md`
-- [ ] Update coverage matrix
-- [ ] Add implementation tasks to `tasks.md`
+- [x] Add FR-001-15 / FR-001-16 to `spec.md`
+- [x] Add S-001-87 – S-001-100 to `scenarios.md`
+- [x] Update coverage matrix
+- [x] Add implementation tasks to `tasks.md` (T-001-69–72)
 
 ### Phase Summary
 

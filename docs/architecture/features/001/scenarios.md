@@ -3,7 +3,7 @@
 | Field | Value |
 |-------|-------|
 | Status | Draft |
-| Last updated | 2026-02-14 |
+| Last updated | 2026-02-15 |
 | Linked spec | `docs/architecture/features/001/spec.md` |
 | Format | Data Transform (see `docs/architecture/spec-guidelines/scenarios-format.md`) |
 
@@ -4558,6 +4558,420 @@ expected_error:
   message_contains: "does not support context variables"
 ```
 
+## Category 25: Conditional Response Routing (FR-001-15, FR-001-16, ADR-0036)
+
+Scenarios for status-code pattern matching (`match.status`) and body-predicate
+matching (`match.when`) in profile entries. Phase 1 covers status matching;
+Phase 2 covers body predicates.
+
+### S-001-87: Status Class Routing — 2xx Matches, 4xx Doesn't
+
+Response-direction profile entries with `match.status: "2xx"` match any 200-level
+status code. A 404 response does NOT match a `2xx` entry.
+
+
+---
+
+```yaml
+scenario: S-001-87
+name: status-class-routing
+description: >
+  Two response entries on the same path: one with status "2xx", one with "4xx".
+  A 200 response matches the 2xx entry. A 404 response matches the 4xx entry.
+  Neither matches the other's class.
+tags: [status, routing, profile, adr-0036]
+refs: [FR-001-15, ADR-0036]
+
+# This is a profile-level matching test, not a transform test.
+# The test configures two entries and asserts correct spec selection.
+
+profile_entries:
+  - spec: success-rewrite
+    direction: response
+    match:
+      path: "/api/**"
+      status: "2xx"
+  - spec: error-rewrite
+    direction: response
+    match:
+      path: "/api/**"
+      status: "4xx"
+
+assertions:
+  - status_code: 200
+    request_path: "/api/test"
+    expected_spec: success-rewrite
+  - status_code: 404
+    request_path: "/api/test"
+    expected_spec: error-rewrite
+  - status_code: 301
+    request_path: "/api/test"
+    expected_spec: null  # no match → passthrough
+```
+
+---
+
+### S-001-88: Status Exact Match — 404 Fires, 200 Doesn't
+
+Exact status match: only a 404 response triggers the spec.
+
+
+---
+
+```yaml
+scenario: S-001-88
+name: status-exact-match
+description: >
+  Response entry with status: 404 (exact). A 404 response matches.
+  A 200 response does NOT match.
+tags: [status, routing, exact, adr-0036]
+refs: [FR-001-15, ADR-0036]
+
+profile_entries:
+  - spec: not-found-handler
+    direction: response
+    match:
+      path: "/api/**"
+      status: 404
+
+assertions:
+  - status_code: 404
+    request_path: "/api/test"
+    expected_spec: not-found-handler
+  - status_code: 200
+    request_path: "/api/test"
+    expected_spec: null
+```
+
+---
+
+### S-001-89: Status Range — 400-499 Matches
+
+Range-based status matching: `status: "400-499"` matches any 4xx code.
+
+
+---
+
+```yaml
+scenario: S-001-89
+name: status-range-match
+description: >
+  Response entry with status: "400-499" (range). 404 matches. 500 doesn't.
+tags: [status, routing, range, adr-0036]
+refs: [FR-001-15, ADR-0036]
+
+profile_entries:
+  - spec: client-error-handler
+    direction: response
+    match:
+      path: "/api/**"
+      status: "400-499"
+
+assertions:
+  - status_code: 404
+    request_path: "/api/test"
+    expected_spec: client-error-handler
+  - status_code: 400
+    request_path: "/api/test"
+    expected_spec: client-error-handler
+  - status_code: 499
+    request_path: "/api/test"
+    expected_spec: client-error-handler
+  - status_code: 500
+    request_path: "/api/test"
+    expected_spec: null
+```
+
+---
+
+### S-001-90: Status on Request Direction → Load-Time Error
+
+`match.status` on a request-direction entry is invalid and MUST be rejected
+at load time.
+
+
+---
+
+```yaml
+scenario: S-001-90
+name: status-on-request-direction-rejected
+description: >
+  A profile entry with direction: request and match.status MUST be rejected
+  at load time with a diagnostic. Status matching is only valid for responses.
+tags: [status, validation, load-time, adr-0036]
+refs: [FR-001-15, ADR-0036]
+
+profile_entries:
+  - spec: some-spec
+    direction: request
+    match:
+      path: "/api/**"
+      status: "4xx"
+
+expected_error:
+  type: ProfileResolveException
+  message_contains:
+    - "status"
+    - "response"
+```
+
+---
+
+### S-001-91: Status Negation — !5xx Matches 200, Doesn't Match 502
+
+Negation prefix `!` inverts the pattern.
+
+
+---
+
+```yaml
+scenario: S-001-91
+name: status-negation
+description: >
+  Response entry with status: "!5xx" matches any code NOT in the 5xx class.
+  200 matches. 502 doesn't.
+tags: [status, routing, negation, adr-0036]
+refs: [FR-001-15, ADR-0036]
+
+profile_entries:
+  - spec: non-server-error
+    direction: response
+    match:
+      path: "/api/**"
+      status: "!5xx"
+
+assertions:
+  - status_code: 200
+    request_path: "/api/test"
+    expected_spec: non-server-error
+  - status_code: 404
+    request_path: "/api/test"
+    expected_spec: non-server-error
+  - status_code: 502
+    request_path: "/api/test"
+    expected_spec: null
+```
+
+---
+
+### S-001-92: Status Specificity — Exact Beats Class
+
+When two entries both match (e.g., `4xx` and `404` both match a 404 response),
+the more specific entry wins per ADR-0006 weighted constraint scoring.
+
+
+---
+
+```yaml
+scenario: S-001-92
+name: status-exact-beats-class-specificity
+description: >
+  Two response entries on the same path: one with status "4xx" (class, weight 1),
+  one with status 404 (exact, weight 2). A 404 response matches both, but the
+  exact entry wins because it has higher constraint count.
+tags: [status, specificity, adr-0006, adr-0036]
+refs: [FR-001-15, ADR-0006, ADR-0036]
+
+profile_entries:
+  - spec: generic-error
+    direction: response
+    match:
+      path: "/api/**"
+      status: "4xx"
+  - spec: not-found-specific
+    direction: response
+    match:
+      path: "/api/**"
+      status: 404
+
+assertions:
+  - status_code: 404
+    request_path: "/api/test"
+    expected_spec: not-found-specific  # exact (weight 2) beats class (weight 1)
+  - status_code: 403
+    request_path: "/api/test"
+    expected_spec: generic-error  # only class matches
+```
+
+---
+
+### S-001-93: Body When Predicate Matches → Spec Fires (Phase 2)
+
+Placeholder — Phase 2 (`match.when`). Body predicate evaluates to truthy → entry selected.
+
+
+---
+
+```yaml
+scenario: S-001-93
+name: when-predicate-matches
+description: >
+  Response entry with match.when predicate. Body field matches the predicate
+  expression → entry selected.
+tags: [when, predicate, routing, adr-0036, phase-2]
+refs: [FR-001-16, ADR-0036]
+status: planned
+```
+
+---
+
+### S-001-94: Body When Predicate Fails → No Match (Fail-Safe) (Phase 2)
+
+Placeholder — Phase 2. When predicate evaluation throws → treat as non-matching (fail-safe).
+
+
+---
+
+```yaml
+scenario: S-001-94
+name: when-predicate-error-fail-safe
+description: >
+  When predicate expression throws during evaluation. Entry is treated as
+  non-matching (fail-safe). Warning logged.
+tags: [when, error, fail-safe, adr-0036, phase-2]
+refs: [FR-001-16, ADR-0036]
+status: planned
+```
+
+---
+
+### S-001-95: Combined Status + When — 200 + Admin → Admin Spec (Phase 2)
+
+Placeholder — Phase 2. Combined status and body predicate matching.
+
+
+---
+
+```yaml
+scenario: S-001-95
+name: status-plus-when-combined
+description: >
+  Two response entries: both status "2xx" but different when predicates.
+  200 + role=admin → admin spec. 200 + role=user → user spec.
+tags: [status, when, combined, adr-0036, phase-2]
+refs: [FR-001-15, FR-001-16, ADR-0036]
+status: planned
+```
+
+---
+
+### S-001-96: No Match on Status + No Match on When → Passthrough (Phase 2)
+
+Placeholder — Phase 2. Neither status nor body predicate match → passthrough.
+
+
+---
+
+```yaml
+scenario: S-001-96
+name: status-when-no-match-passthrough
+description: >
+  Response status doesn't match any entry's status pattern, and body doesn't
+  match any entry's when predicate. Result is passthrough.
+tags: [status, when, passthrough, adr-0036, phase-2]
+refs: [FR-001-15, FR-001-16, ADR-0036]
+status: planned
+```
+
+---
+
+### S-001-97: Non-JSON Body with When Predicate → Graceful Skip (Phase 2)
+
+Placeholder — Phase 2. Non-JSON body with `match.when` → entry skipped (fail-safe).
+
+
+---
+
+```yaml
+scenario: S-001-97
+name: when-non-json-body-skip
+description: >
+  When predicate configured but body is not JSON (e.g., HTML). Entry is
+  skipped gracefully. Debug-level log.
+tags: [when, non-json, fail-safe, adr-0036, phase-2]
+refs: [FR-001-16, ADR-0036]
+status: planned
+```
+
+---
+
+### S-001-98: When Predicate on Request Direction → Works (Phase 2)
+
+Placeholder — Phase 2. Unlike `match.status`, `match.when` is valid on
+both request and response directions.
+
+
+---
+
+```yaml
+scenario: S-001-98
+name: when-predicate-request-direction
+description: >
+  When predicate on request-direction entry. Unlike status (response-only),
+  when predicates work on both directions.
+tags: [when, request, both-directions, adr-0036, phase-2]
+refs: [FR-001-16, ADR-0036]
+status: planned
+```
+
+---
+
+### S-001-99: When + Pipeline — Two Non-Exclusive Predicates → ADR-0012 Chain (Phase 2)
+
+Placeholder — Phase 2. Two entries with overlapping `when` predicates both
+match → pipeline fires per ADR-0012.
+
+
+---
+
+```yaml
+scenario: S-001-99
+name: when-pipeline-chaining
+description: >
+  Two entries with non-exclusive when predicates both match the same message.
+  Both specs fire in pipeline order per ADR-0012.
+tags: [when, pipeline, chaining, adr-0012, adr-0036, phase-2]
+refs: [FR-001-16, ADR-0012, ADR-0036]
+status: planned
+```
+
+---
+
+### S-001-100: Status Unquoted Integer YAML Parsing
+
+YAML `status: 404` (unquoted) produces an IntNode, not a string. The parser
+MUST handle this correctly — same behavior as `status: "404"`.
+
+
+---
+
+```yaml
+scenario: S-001-100
+name: status-unquoted-integer-yaml
+description: >
+  YAML unquoted integer (status: 404) produces IntNode in the parser.
+  The type-aware parseStatusField() handles this correctly, producing the
+  same StatusPattern.Exact(404) as the quoted string "404".
+tags: [status, parser, yaml, adr-0036]
+refs: [FR-001-15, ADR-0036]
+
+# This is a parser test, not a matching test.
+# Verified in StatusPatternParserTest.
+
+profile_entry_yaml: |
+  spec: some-spec
+  direction: response
+  match:
+    path: "/api/**"
+    status: 404
+
+assertions:
+  - parsed_status_pattern: Exact(404)
+  - equivalent_to: 'status: "404"'
+```
+
+---
+
 ## Scenario Index
 
 | ID | Name | Category | Tags |
@@ -4655,6 +5069,21 @@ expected_error:
 | S-001-83 | session-conditional-roles | Session Context | session, roles, conditional, response, fr-001-13, adr-0030 |
 | S-001-84 | session-null-safe-access | Session Context | session, null, null-safe, fr-001-13, adr-0030 |
 | S-001-85 | session-jolt-rejected-at-load-time | Session Context | session, jolt, validation, load-time, fr-001-13, adr-0030 |
+| S-001-86 | unknown-key-in-spec-rejected | Edge Cases | error, spec-parse, strict-validation, fail-fast |
+| S-001-87 | status-class-routing | CRR | status, routing, profile, adr-0036 |
+| S-001-88 | status-exact-match | CRR | status, routing, exact, adr-0036 |
+| S-001-89 | status-range-match | CRR | status, routing, range, adr-0036 |
+| S-001-90 | status-on-request-direction-rejected | CRR | status, validation, load-time, adr-0036 |
+| S-001-91 | status-negation | CRR | status, routing, negation, adr-0036 |
+| S-001-92 | status-exact-beats-class-specificity | CRR | status, specificity, adr-0006, adr-0036 |
+| S-001-93 | when-predicate-matches | CRR | when, predicate, routing, adr-0036, phase-2 |
+| S-001-94 | when-predicate-error-fail-safe | CRR | when, error, fail-safe, adr-0036, phase-2 |
+| S-001-95 | status-plus-when-combined | CRR | status, when, combined, adr-0036, phase-2 |
+| S-001-96 | status-when-no-match-passthrough | CRR | status, when, passthrough, adr-0036, phase-2 |
+| S-001-97 | when-non-json-body-skip | CRR | when, non-json, fail-safe, adr-0036, phase-2 |
+| S-001-98 | when-predicate-request-direction | CRR | when, request, both-directions, adr-0036, phase-2 |
+| S-001-99 | when-pipeline-chaining | CRR | when, pipeline, chaining, adr-0012, adr-0036, phase-2 |
+| S-001-100 | status-unquoted-integer-yaml | CRR | status, parser, yaml, adr-0036 |
 
 ## Coverage Matrix
 
@@ -4674,6 +5103,8 @@ expected_error:
 | FR-001-12 (URL Rewriting) | S-001-38a, S-001-38b, S-001-38c, S-001-38d, S-001-38e, S-001-38f, S-001-38g |
 | FR-001-13 (Session Context Binding) | S-001-82, S-001-83, S-001-84, S-001-85 |
 | FR-001-14 (Port Value Objects) | *Verified by dependency analysis and ArchUnit rules, not scenario-testable* |
+| FR-001-15 (Status-Code Pattern Matching) | S-001-87, S-001-88, S-001-89, S-001-90, S-001-91, S-001-92, S-001-100 |
+| FR-001-16 (Body Predicate Matching) | S-001-93, S-001-94, S-001-95, S-001-96, S-001-97, S-001-98, S-001-99 |
 | NFR-001-01 (Stateless) | All — implicit in test harness design |
 | NFR-001-03 (Latency <5ms) | S-001-23, S-001-79, S-001-80, S-001-81 |
 | NFR-001-04 (Open-world) | S-001-07, S-001-20 |
@@ -4784,5 +5215,19 @@ expected_error:
 | S-001-84 | `ScenarioSuiteTest`, `SessionContextBindingTest`, `SessionContextE2ETest` | `$session` null — null-safe access (FR-001-13, ADR-0030) |
 | S-001-85 | `SessionContextJoltRejectionTest` | JOLT + `$session` → rejected at load time (FR-001-13, ADR-0030) |
 | S-001-86 | `SpecParserTest` | Unknown key in spec → SpecParseException (FR-001-01 strict validation) |
+| S-001-87 | `ProfileMatcherTest` | Status class routing: 2xx matches, 4xx doesn't (FR-001-15, ADR-0036) |
+| S-001-88 | `ProfileMatcherTest` | Status exact match: 404 fires, 200 doesn't (FR-001-15, ADR-0036) |
+| S-001-89 | `StatusPatternTest` | Status range: 400-499 matches (FR-001-15, ADR-0036) |
+| S-001-90 | `StatusPatternParserTest` | Status on request direction → load-time error (FR-001-15, ADR-0036) |
+| S-001-91 | `StatusPatternTest` | Status negation: !5xx matches 200, doesn't match 502 (FR-001-15, ADR-0036) |
+| S-001-92 | `ProfileMatcherTest` | Status specificity: exact beats class for same code (FR-001-15, ADR-0006) |
+| S-001-93 | — | Phase 2: Body when predicate matches → spec fires (FR-001-16) |
+| S-001-94 | — | Phase 2: Body when predicate fails → fail-safe (FR-001-16) |
+| S-001-95 | — | Phase 2: Combined status + when routing (FR-001-15, FR-001-16) |
+| S-001-96 | — | Phase 2: No match on status + when → passthrough (FR-001-15, FR-001-16) |
+| S-001-97 | — | Phase 2: Non-JSON body with when → graceful skip (FR-001-16) |
+| S-001-98 | — | Phase 2: When on request direction (FR-001-16) |
+| S-001-99 | — | Phase 2: When + pipeline chaining (FR-001-16, ADR-0012) |
+| S-001-100 | `StatusPatternParserTest` | Status unquoted integer YAML parsing (FR-001-15, ADR-0036) |
 
 

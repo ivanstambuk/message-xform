@@ -3,7 +3,7 @@
 | Field | Value |
 |-------|-------|
 | Status | Ready |
-| Last updated | 2026-02-13 |
+| Last updated | 2026-02-15 |
 | Owners | Ivan |
 | Linked plan | `docs/architecture/features/001/plan.md` |
 | Linked tasks | `docs/architecture/features/001/tasks.md` |
@@ -1210,6 +1210,124 @@ namespace SessionContext {
 | Failure path | N/A — port types are simple value objects, no external I/O |
 | Source | ADR-0032, ADR-0033, Hexagonal Architecture |
 
+### FR-001-15: Status-Code Pattern Matching in Profiles
+
+**Requirement:** The profile matching engine MUST support an optional `match.status`
+field on response-direction profile entries. When present, the status code of the
+HTTP response is matched against the specified pattern before selecting the transform
+spec. This enables **conditional response routing** — different transforms for
+success vs. error responses on the same path.
+
+The `match.status` field supports the following pattern types:
+
+| Pattern | YAML Syntax | Example | Semantics |
+|---------|-------------|---------|----------|
+| Exact code | Integer or string | `status: 404` or `status: "404"` | Matches exactly one status code |
+| Class shorthand | String | `status: "4xx"` | Matches all codes in the class (e.g., 400–499) |
+| Range | String | `status: "400-499"` | Matches inclusive range |
+| Negation | String (prefix `!`) | `status: "!404"` or `status: "!5xx"` | Matches everything except the pattern |
+| List (OR) | Array | `status: [200, 201]` or `status: ["2xx", 404]` | Matches any of the listed patterns |
+
+**YAML parsing gotcha:** Unquoted integers in YAML (e.g., `status: 404`) produce
+an integer node, not a string. The parser MUST handle both integer and string
+nodes correctly. Using `optionalString()` for the `status` field would silently
+ignore integer values — a type-aware parser is required.
+
+**Specificity scoring (ADR-0006):** Status patterns participate in the
+most-specific-wins constraint scoring:
+
+| Pattern Type | Specificity Weight |
+|-------------|-------------------|
+| Exact / Range | +2 |
+| Class / Not | +1 |
+
+When two entries match the same request, the one with the higher total constraint
+count (method + content-type + weighted status) wins. This ensures exact status
+code matches beat class-level matches.
+
+**Direction constraint:** `match.status` is ONLY valid on response-direction
+entries. Using `match.status` on a request-direction entry MUST be rejected
+at load time with a diagnostic message.
+
+**Absent field behavior:** When `match.status` is absent from a profile entry,
+the entry matches **any** status code (backward-compatible behavior).
+
+```yaml
+# Example: different transforms for success vs. error responses
+entries:
+  - spec: success-rewrite
+    direction: response
+    match:
+      path: "/api/users/**"
+      status: "2xx"
+  - spec: error-rewrite
+    direction: response
+    match:
+      path: "/api/users/**"
+      status: "4xx"
+  - spec: not-found-handler
+    direction: response
+    match:
+      path: "/api/users/**"
+      status: 404
+```
+
+In the example above, a 404 response matches both the `4xx` entry and the `404`
+entry. The exact match wins because `Exact` (weight 2) > `Class` (weight 1) in
+the constraint count tie-break.
+
+| Aspect | Detail |
+|--------|--------|
+| Success path | Response 200 matches `status: "2xx"` entry → success-rewrite spec fires |
+| Success path | Response 404 matches `status: 404` (exact) over `status: "4xx"` (class) |
+| Validation path | `match.status` on request-direction → ProfileResolveException at load time |
+| Validation path | Invalid code (outside 100–599) → ProfileResolveException at load time |
+| Failure path | No matching status → no entry matches → passthrough |
+| Source | ADR-0036, ADR-0006+0036 interaction |
+
+### FR-001-16: Body Predicate Matching in Profiles (Planned)
+
+**Requirement:** The profile matching engine MUST support an optional `match.when`
+field on profile entries. When present, the parsed JSON body of the message is
+evaluated against the given expression. The entry matches only if the expression
+returns a truthy value.
+
+This enables **polymorphic routing** — different transforms based on the content
+of the message body, not just its envelope metadata (path, method, status).
+
+```yaml
+# Example: route by body content
+entries:
+  - spec: admin-transform
+    direction: response
+    match:
+      path: "/api/users/**"
+      status: "2xx"
+      when:
+        lang: jslt
+        expr: '.role == "admin"'
+  - spec: user-transform
+    direction: response
+    match:
+      path: "/api/users/**"
+      status: "2xx"
+      when:
+        lang: jslt
+        expr: '.role == "user"'
+```
+
+**Status:** Planned for Phase 2. Design is finalized in ADR-0036. The `when`
+expression is compiled at load time via the Expression Engine SPI. Evaluation
+order: direction → path → method → content-type → status → when (cheapest first).
+
+| Aspect | Detail |
+|--------|--------|
+| Success path | Body matches `when` predicate → entry selected |
+| Validation path | `when` with `lang: jolt` → rejected at load time (JOLT can't produce boolean) |
+| Failure path | Body doesn't match any `when` predicate → passthrough |
+| Failure path | Non-JSON body with `when` configured → entry skipped (fail-safe) |
+| Source | ADR-0036 |
+
 ## Non-Functional Requirements
 
 | ID | Requirement | Driver | Measurement | Dependencies | Source |
@@ -1275,7 +1393,7 @@ namespace SessionContext {
 | DO-001-01 | `Message` — generic HTTP message envelope (`MessageBody` body, `HttpHeaders` headers, status, session — ADR-0032, ADR-0033) | core |
 | DO-001-02 | `TransformSpec` — parsed spec (id, version, input/output JSON Schema, compiled JSLT expression, engine id) | core |
 | DO-001-03 | `CompiledExpression` — immutable, thread-safe compiled expression handle | core |
-| DO-001-04 | `TransformProfile` — user-supplied binding of specs to URL/method/content-type patterns | core |
+| DO-001-04 | `TransformProfile` — user-supplied binding of specs to URL/method/content-type/status patterns | core |
 | DO-001-05 | `TransformResult` — outcome of applying a spec (success/aborted + diagnostics); `errorResponse` uses `MessageBody` | core |
 | DO-001-06 | `ExpressionEngine` — pluggable engine SPI (compile + evaluate) | core |
 | DO-001-07 | `TransformContext` — read-only context passed to engines (`HttpHeaders` headers, status, queryParams, cookies, `SessionContext` session — ADR-0033) | core |
@@ -1283,12 +1401,13 @@ namespace SessionContext {
 | DO-001-09 | `MessageBody` — body value object (`byte[]` content + `MediaType`); zero third-party deps (FR-001-14b) | core |
 | DO-001-10 | `HttpHeaders` — case-insensitive header collection; single- and multi-value views (FR-001-14c) | core |
 | DO-001-11 | `SessionContext` — gateway session attributes as `Map<String, Object>`; safe `toString()` (FR-001-14d) | core |
+| DO-001-12 | `StatusPattern` — sealed interface for status-code matching patterns (Exact, Class, Range, Not, AnyOf); used by `ProfileEntry` (FR-001-15, ADR-0036) | core |
 
 ### Core Engine API
 
 | ID | Method | Description |
 |----|--------|-------------|
-| API-001-01 | `TransformEngine.transform(Message, Direction)` | Apply matching profile's spec to the message |
+| API-001-01 | `TransformEngine.transform(Message, Direction)` | Apply matching profile's spec to the message. Profile matching considers path, method, content-type, and status code (FR-001-15, ADR-0036). |
 | API-001-02 | `TransformEngine.loadProfile(Path)` | Load a transform profile from YAML |
 | API-001-03 | `TransformEngine.loadSpec(Path)` | Load and compile a transform spec from YAML |
 | API-001-04 | `TransformEngine.reload()` | Hot-reload: re-parse specs, recompile expressions, atomic swap |
