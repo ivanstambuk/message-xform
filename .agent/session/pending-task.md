@@ -1,30 +1,38 @@
 # Pending Task
 
-**Focus**: E2E test expansion — Phase 9 (Hot-Reload) or Standalone Proxy E2E
-**Status**: Karate migration complete. Ready for next feature work.
-**Next Step**: Choose between Phase 9 hot-reload E2E, Phase 8b Web Session,
-or creating `e2e-standalone/` for Feature 004.
+**Focus**: E2E Phase 11 — Multi-Rule Chain (Final Phase)
+**Status**: Not started
+**Next Step**: Design PA provisioning for a second rule instance with a
+  dedicated spec dir, then implement Test 30 (S-002-27).
 
 ## Context Notes
-- Karate DSL is the standard E2E framework. Patterns documented in
-  `docs/research/karate-e2e-patterns.md`.
-- PingAccess strips custom backend response headers — always assert via
-  body content or container log inspection (`karate.exec('docker exec ...')`).
-- Tests 23-24 (Web Session/OIDC) skipped — requires PingFederate runtime.
-- `callonce` caching is JVM-scoped — provisioning must be idempotent.
-- The `e2e-<gateway>/` naming convention is established for future adapters.
+- Phases 9 (hot-reload) and 10 (JMX) are fully committed and pushed.
+- All 27 existing E2E scenarios pass (last verified in prior session).
+- Phase 11 is the last remaining E2E phase before full coverage.
+- Phase 8b (Web Session OIDC) is deferred — requires PingFederate.
 
-## Open E2E Phases (from expansion plan)
-- **Phase 8b**: Web Session OIDC (requires PingFederate or improved mock)
-- **Phase 9**: Hot-Reload E2E (file-system mutation during live PA run)
-- **Phase 10**: JMX Metrics E2E (JMX client to PA JVM)
-- **Phase 11**: Multi-Rule Chain E2E (two PA rules in sequence)
+## Phase 11 Details
 
-## Standalone Proxy E2E (Feature 004)
-- Create `e2e-standalone/` module following `e2e-pingaccess/` patterns.
-- No Docker PA needed — standalone proxy runs as a JVM process.
-- Bootstrap script starts the proxy, Karate tests hit endpoints.
-- See `docs/research/karate-e2e-patterns.md` §5b for module naming.
+S-002-27: Prior Rule URI Rewrite — validates that when a PA rule rewrites
+the request URI before our adapter, the adapter sees the rewritten URI.
+
+Tasks:
+- P11-01: PA config — create a second rule instance + app/resource config
+- P11-02: Create `e2e-chain-rewrite.yaml` spec for the rewritten path
+- P11-03: Test 30 — POST to chain endpoint, verify rewritten URI in transform
+
+Estimated: 1 scenario, 2 assertions
+
+## E2E Assertion Totals
+- Current: 73 assertions (Phases 1-7, 9, 10)
+- After Phase 11: 75 assertions (projected)
+- Phase 8 (OAuth): adds 12+ assertions if/when implemented
+
+## Key Patterns Established
+- `JVM_OPTS` for JMX in PA Docker (not `JAVA_OPTS`)
+- Identity→marker overwrite for hot-reload testing
+- Karate Java interop for JMX (no external tools)
+- Wildcard ObjectName queries for portability
 
 ## SDD Gaps
-- None. All checks passed in retro.
+- None — all checks passed in retro.

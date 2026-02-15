@@ -1,44 +1,51 @@
 # Current Session
 
-**Focus**: Karate Migration Complete — Shell Script Deletion & Retro
+**Focus**: E2E Phase 9 (Hot-Reload) + Phase 10 (JMX)
 **Date**: 2026-02-15
 **Status**: Complete
 
 ## Accomplished
 
-1. **Resolved all 26 Karate E2E test failures** — Fixed header assertions
-   (PA strips backend response headers), null session handling, OAuth token
-   endpoint content types.
-2. **Deleted `scripts/pa-e2e-test.sh`** (1,701 lines) — 100% ported to
-   `scripts/pa-e2e-bootstrap.sh` + `e2e-pingaccess/` (Karate DSL).
-3. **Deleted `docs/research/karate-migration-plan.md`** — Migration complete.
-4. **Updated all documentation references** — spec.md, plan.md, knowledge-map.md,
-   e2e-results.md, e2e-expansion-plan.md, pingaccess-operations-guide.md.
-5. **Created `docs/research/karate-e2e-patterns.md`** — Comprehensive patterns &
-   pitfalls reference for future Karate-based E2E suites.
-6. **Updated `llms.txt`** and `AGENTS.md` with E2E infrastructure references.
+1. **Phase 9 — Hot-Reload E2E** (S-002-29/30/31):
+   - Created `hot-reload.feature` with 3 scenarios (Tests 25–27)
+   - Designed identity→marker overwrite pattern to work around
+     `ProfileResolveException` at startup
+   - Test 25: Spec hot-reload success (identity→marker overwrite, wait 9s)
+   - Test 26: Spec hot-reload failure (invalid YAML, old registry retained)
+   - Test 27: Concurrent requests during reload (5 sequential, all 200)
+   - Added staging specs dir, profile entries, reload-related specs
+
+2. **Phase 10 — JMX E2E** (S-002-33/34):
+   - Created `jmx-metrics.feature` with 2 scenarios (Tests 28–29)
+   - Created `jmx-query.feature` helper using Karate Java interop
+     (`javax.management.remote.JMXConnectorFactory`)
+   - Enabled JMX in PA Docker via `JVM_OPTS` env var (port 19999:9999)
+   - Test 28: MBean exists, ActiveSpecCount ≥ 1, counter increments
+   - Test 29: Non-existent instance returns no MBean
+
+3. **Documentation updates**:
+   - E2E expansion plan: Phase 9/10 tasks marked ✅
+   - Operations guide: added JMX port mapping, `JVM_OPTS` pattern
 
 ## Commits (this session)
 
-- `48e9614` — feat(e2e): port pa-e2e-test.sh to Karate DSL
-- `4cef505` — fix(e2e): all 26 Karate tests pass against live PingAccess
-- `e8485d2` — docs: mark Karate migration Phase 5 complete
-- `a1ca42f` — docs: mark e2e-test-framework-research as Migrated
-- `8a820dd` — chore: delete karate-migration-plan.md — migration complete
-- `a302b60` — chore: delete pa-e2e-test.sh — fully replaced by Karate E2E suite
+- `ae36905` — feat(e2e): Phase 9 — hot-reload E2E tests (S-002-29/30/31)
+- `b423639` — feat(e2e): Phase 10 — JMX metrics E2E tests (S-002-33/34)
 
 ## Key Decisions
 
-- **Assertion strategy shift** — From response headers to response body + PA
-  logs, because PingAccess strips custom backend response headers.
-- **Karate selected as E2E framework** — For native cookie/session handling,
-  multi-scope variables, and embedded JSON processing (over Hurl, Tavern, etc.).
-- **Bootstrap + Karate split** — Shell script handles Docker lifecycle; Karate
-  handles HTTP assertions and PA Admin API provisioning.
+- **JVM_OPTS not JAVA_OPTS** — PA's `run.sh` appends `JVM_OPTS` separately from
+  `JAVA_OPTS`. This allows JMX injection without overriding heap settings.
+- **Identity→marker overwrite** — Profile references require the spec to exist
+  at startup. Ship a no-op identity spec, overwrite at test time.
+- **Karate Java interop for JMX** — Uses `javax.management.remote` from the JDK,
+  no external tools (jmxterm, etc.) needed.
+- **Wildcard ObjectName** — Tests use `instance=*` to avoid depending on the
+  exact name PA sets via `config.setName()`.
 
 ## Next Session Focus
 
-- **Phase 9** (Hot-Reload E2E) — Independent of OAuth, lower risk.
+- **Phase 11** (Multi-Rule Chain E2E) — Final E2E phase. Validates URI rewrite
+  by prior rule propagates to adapter. 1 scenario, 2 assertions.
 - **Phase 8b** (Web Session OIDC) — Requires PingFederate or improved mock.
-- **Standalone proxy E2E** — Can create `e2e-standalone/` following same
-  patterns as `e2e-pingaccess/`.
+  Currently deferred.

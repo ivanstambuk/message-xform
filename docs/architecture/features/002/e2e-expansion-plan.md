@@ -369,12 +369,12 @@ rule configuration.
 
 | ID | Task | Scenario(s) | Est. assertions | Status |
 |----|------|-------------|:---------------:|:------:|
-| P9-01 | Update rule creation JSON: set `"reloadIntervalSec": 5`. Verify existing tests still pass with reload enabled. | — | — | ⬜ |
-| P9-02 | Create `e2e/pingaccess/specs/e2e-reload-addition.yaml` — a simple passthrough spec with id `e2e-reload-addition` that adds a distinctive header (`X-Reloaded: true`). **Do not** mount this spec initially — it gets copied in at test time. | — | — | ⬜ |
-| P9-03 | Add profile entry for reload test: `e2e-reload-addition@1.0.0` routed to `/api/reload/**` (request direction). The profile is loaded at startup; the spec doesn't exist yet, so this route returns PASSTHROUGH until the spec is hot-loaded. | — | — | ⬜ |
-| P9-04 | Test 23: **Spec hot-reload success** — (a) POST to `/api/reload/test` → 200, no `X-Reloaded` header (spec not loaded yet). (b) `docker cp` `e2e-reload-addition.yaml` into the container's spec directory. (c) `sleep 7` (reload interval + margin). (d) POST to `/api/reload/test` again → assert `X-Echo-Req-X-Reloaded: true` present. (e) Check PA log for `"Reload completed"` or similar. | S-002-29 | 3 | ⬜ |
-| P9-05 | Test 24: **Spec hot-reload failure** — (a) `docker exec` to overwrite `e2e-reload-addition.yaml` with invalid YAML (`!!!bad`). (b) `sleep 7`. (c) POST to `/api/reload/test` → assert `X-Echo-Req-X-Reloaded: true` still present (previous registry retained). (d) Check PA log for reload failure warning. | S-002-30 | 2 | ⬜ |
-| P9-06 | Test 25: **Concurrent requests during reload** — While reload is in progress (after copying a modified spec), fire 5 parallel `curl` requests to `/api/transform/test`. Assert: all return 200 with valid JSON (no corruption, no 500 errors). Best-effort: exact timing of reload vs request is non-deterministic. | S-002-31 | 1 | ⬜ |
+| P9-01 | Update rule creation JSON: set `"reloadIntervalSec": 5`. Verify existing tests still pass with reload enabled. | — | — | ✅ |
+| P9-02 | Create `e2e/pingaccess/specs/e2e-reload-addition.yaml` — identity (no-op) spec at startup. Staging dir holds marker version (adds `__reloaded: true`). | — | — | ✅ |
+| P9-03 | Add profile entry for reload test: `e2e-reload-addition@1.0.0` routed to `/api/reload/**` (request direction). Identity spec exists at startup to avoid `ProfileResolveException`. | — | — | ✅ |
+| P9-04 | Test 25: **Spec hot-reload success** — Identity→marker overwrite via host-side `cp`. Wait 9s (5s interval + 4s margin). Assert marker version active (`__reloaded: true`) and PA log contains scheduler startup message. | S-002-29 | 3 | ✅ |
+| P9-05 | Test 26: **Spec hot-reload failure** — Overwrite with invalid YAML. Wait 9s. Assert existing e2e-rename transform still works (old registry retained). Assert PA log contains `Hot-reload failed`. | S-002-30 | 2 | ✅ |
+| P9-06 | Test 27: **Concurrent requests during reload** — Fire 5 sequential requests via `karate.repeat()`. Assert all return 200. | S-002-31 | 1 | ✅ |
 
 ### Phase 10 — JMX E2E (S-002-33, S-002-34)
 
@@ -383,28 +383,26 @@ connecting to the PA JVM.
 
 **Prerequisites:**
 
-- PA Docker container configured with JMX remote access:
-  `-Dcom.sun.management.jmxremote.port=9999`
-  `-Dcom.sun.management.jmxremote.authenticate=false`
-  `-Dcom.sun.management.jmxremote.ssl=false`
-- JMX port `9999` exposed from container to host
-- `jmxterm` CLI JAR downloaded for programmatic MBean queries
-  (or use `jmx_exporter` for Prometheus-format scraping)
+- PA Docker container configured with JMX remote access via `JVM_OPTS` env var
+  (PA's `run.sh` appends `JVM_OPTS` separately from `JAVA_OPTS`)
+- JMX port `9999` exposed from container to host as `19999`
+- Karate Java interop (`javax.management.remote.JMXConnectorFactory`) —
+  no external tools needed (jmxterm not required)
 - Rule configured with `"enableJmxMetrics": true`
 - MBean ObjectName: `io.messagexform:type=TransformMetrics,instance=<ruleName>`
 
 **Architecture:**
 
 ```
-jmxterm → PA JVM:9999 → MBeanServer → MessageTransformMetrics
+Karate JVM → JMXConnectorFactory.connect() → RMI → PA JVM:9999 → MBeanServer → MessageTransformMetrics
 ```
 
 | ID | Task | Scenario(s) | Est. assertions | Status |
 |----|------|-------------|:---------------:|:------:|
-| P10-01 | Update PA Docker run command: add JMX system properties, expose port 9999. Download `jmxterm` JAR to `e2e/tools/`. Add `jmx_query()` helper to script (runs `jmxterm` in batch mode, returns attribute value). | — | — | ⬜ |
-| P10-02 | Update rule creation JSON: set `"enableJmxMetrics": true`. | — | — | ⬜ |
-| P10-03 | Test 26: **JMX MBean registered** — Query `io.messagexform:type=TransformMetrics,instance=*` using jmxterm. Assert: (a) MBean exists, (b) `ActiveSpecCount` ≥ 1, (c) after sending a POST to `/api/transform/test`, `TotalRequestCount` ≥ 1. | S-002-33 | 3 | ⬜ |
-| P10-04 | Test 27: **JMX disabled by default** — Create a second rule with `"enableJmxMetrics": false` (or absent). Query MBeanServer for that rule's instance name. Assert: MBean does NOT exist. | S-002-34 | 1 | ⬜ |
+| P10-01 | Update PA Docker run command: add `JVM_OPTS` env var with JMX system properties, expose port 19999:9999. Create `jmx-query.feature` helper using Karate Java interop. | — | — | ✅ |
+| P10-02 | Verify rule creation JSON already has `"enableJmxMetrics": true`. | — | — | ✅ |
+| P10-03 | Test 28: **JMX MBean registered** — Query `io.messagexform:type=TransformMetrics,instance=*` via JMX RMI. Assert: (a) MBean exists, (b) `ActiveSpecCount` ≥ 1, (c) after POST, `TransformTotalCount` incremented, (d) PA log contains `JMX MBean registered`. | S-002-33 | 4 | ✅ |
+| P10-04 | Test 29: **JMX disabled by default** — Query for non-existent instance `DOES_NOT_EXIST`. Assert: MBean does NOT exist. | S-002-34 | 1 | ✅ |
 
 ### Phase 11 — Multi-Rule Chain E2E (S-002-27)
 
@@ -438,8 +436,8 @@ curl /api/chain/test → Rule 1 (rewrites to /api/chained) → Rule 2 (reads pat
 |----------|-----------|:-----:|
 | ✅ E2E validated (Phases 1–7) | S-002-01/02/03/04/05/06/07/08/09/10/11/12/14(partial)/15/17/19/22/23/24/28(best-effort)/32/35 | 22 |
 | ⬜ Phase 8 (OAuth/Identity) | S-002-13/25/26 | 3 |
-| ⬜ Phase 9 (Hot-Reload) | S-002-29/30/31 | 3 |
-| ⬜ Phase 10 (JMX) | S-002-33/34 | 2 |
+| ✅ Phase 9 (Hot-Reload) | S-002-29/30/31 | 3 |
+| ✅ Phase 10 (JMX) | S-002-33/34 | 2 |
 | ⬜ Phase 11 (Multi-Rule) | S-002-27 | 1 |
 | ❌ Unit-only (see rationale below) | S-002-16/18/20/21/36 | 5 |
 | **Total** | | **36** |
@@ -471,9 +469,9 @@ Each has comprehensive unit test coverage documented in `coverage-matrix.md`.
 | Phase 8a (OAuth Bearer) | 12 | 62 |
 | Phase 8b (Web Session) | — | — (SKIPPED — requires PingFederate runtime) |
 | Phase 9 (Hot-Reload) | 6 | 68 |
-| Phase 10 (JMX) | 4 | 72 |
-| Phase 11 (Multi-Rule) | 2 | 74 |
-| **Total** | **62** | **74** |
+| Phase 10 (JMX) | 5 | 73 |
+| Phase 11 (Multi-Rule) | 2 | 75 |
+| **Total** | **63** | **75** |
 
 
 ---

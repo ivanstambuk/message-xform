@@ -945,6 +945,27 @@ docker run --network pa-e2e-net --name pa-e2e-test ...
 | `19000`   | `9000`         | PA Admin API         |
 | `13000`   | `3000`         | PA Engine            |
 | `18080`   | `8080`         | Echo backend (direct)|
+| `18443`   | `8080`         | Mock OIDC server     |
+| `19999`   | `9999`         | JMX RMI (Phase 10)   |
+
+### Enabling JMX in Docker
+
+PA's `run.sh` appends `$JVM_OPTS` to the Java command separately from
+`$JAVA_OPTS` (which controls heap/GC from `jvm-memory.options`). Set
+`JVM_OPTS` to inject JMX flags without overriding memory settings:
+
+```bash
+docker run -e JVM_OPTS="-Dcom.sun.management.jmxremote \
+  -Dcom.sun.management.jmxremote.port=9999 \
+  -Dcom.sun.management.jmxremote.rmi.port=9999 \
+  -Dcom.sun.management.jmxremote.authenticate=false \
+  -Dcom.sun.management.jmxremote.ssl=false \
+  -Djava.rmi.server.hostname=localhost" \
+  -p 19999:9999 ...
+```
+
+> **Key:** Both `jmxremote.port` and `jmxremote.rmi.port` must be the same
+> to avoid RMI using a random ephemeral port, which can't be Docker-mapped.
 
 ### Test Specs
 
