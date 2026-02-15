@@ -32,6 +32,8 @@ PA_ADMIN_PORT=19000
 PA_ENGINE_PORT=13000
 ECHO_PORT=18080
 OIDC_PORT=18443
+JMX_PORT=19999
+JMX_CONTAINER_PORT=9999
 PA_PASSWORD="2Access"
 LICENSE_FILE="$PROJECT_ROOT/binaries/PingAccess-9.0-Development.lic"
 SHADOW_JAR="$PROJECT_ROOT/adapter-pingaccess/build/libs/adapter-pingaccess-0.1.0-SNAPSHOT.jar"
@@ -210,17 +212,29 @@ else
 fi
 
 # 2c. PingAccess
+# JVM_OPTS is appended to the java command in PA's run.sh (separate from
+# JAVA_OPTS which controls heap/GC).  We use it to enable JMX remote access
+# for Phase 10 E2E tests (S-002-33, S-002-34).
+JMX_JVM_OPTS="-Dcom.sun.management.jmxremote"
+JMX_JVM_OPTS="$JMX_JVM_OPTS -Dcom.sun.management.jmxremote.port=$JMX_CONTAINER_PORT"
+JMX_JVM_OPTS="$JMX_JVM_OPTS -Dcom.sun.management.jmxremote.rmi.port=$JMX_CONTAINER_PORT"
+JMX_JVM_OPTS="$JMX_JVM_OPTS -Dcom.sun.management.jmxremote.authenticate=false"
+JMX_JVM_OPTS="$JMX_JVM_OPTS -Dcom.sun.management.jmxremote.ssl=false"
+JMX_JVM_OPTS="$JMX_JVM_OPTS -Djava.rmi.server.hostname=localhost"
+
 info "Starting PingAccess..."
 docker run -d --name "$PA_CONTAINER" --network pa-e2e-net \
     -e PING_IDENTITY_ACCEPT_EULA=YES \
     -e PA_ADMIN_PASSWORD_INITIAL="$PA_PASSWORD" \
     -e PING_IDENTITY_PASSWORD="$PA_PASSWORD" \
+    -e JVM_OPTS="$JMX_JVM_OPTS" \
     -v "$LICENSE_FILE:/opt/out/instance/conf/pingaccess.lic:ro" \
     -v "$SHADOW_JAR:/opt/server/deploy/message-xform-adapter.jar:ro" \
     -v "$SPECS_DIR:/specs:ro" \
     -v "$PROFILES_DIR:/profiles:ro" \
     -p "$PA_ADMIN_PORT:9000" \
     -p "$PA_ENGINE_PORT:3000" \
+    -p "$JMX_PORT:$JMX_CONTAINER_PORT" \
     "$PA_IMAGE" >/dev/null
 
 # Wait for PA readiness

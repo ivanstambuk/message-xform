@@ -46,6 +46,9 @@ function fn() {
         hostSpecsDir: '../e2e/pingaccess/specs',
         hostStagingDir: '../e2e/pingaccess/staging',
 
+        // -- JMX (Phase 10) -------------------------------------------------------
+        jmxPort: 19999,
+
         // -- Common headers -------------------------------------------------------
         paAdminHeaders: { 'X-XSRF-Header': 'PingAccess', 'Content-Type': 'application/json' }
     };
