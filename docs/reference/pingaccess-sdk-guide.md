@@ -12,7 +12,7 @@
 |-------|-------|
 | SDK Version | `com.pingidentity.pingaccess:pingaccess-sdk:9.0.1.0` |
 | Java | 17 or 21 (Amazon Corretto, OpenJDK, Oracle JDK — 64-bit) |
-| Source | Official SDK Javadoc (`binaries/pingaccess-9.0.1/sdk/apidocs/`) + sample rules + official docs chapter |
+| Source | Official SDK Javadoc (`binaries/pingaccess/dist/pingaccess-9.0.1/sdk/apidocs/`) + sample rules + official docs chapter |
 | Related spec | [`docs/architecture/features/002/spec.md`](../architecture/features/002/spec.md) |
 
 ---
@@ -3076,8 +3076,8 @@ this guide. The 5 previously undocumented classes were added in this revision:
 
 | Artefact | Path |
 |----------|------|
-| SDK JAR (binary) | `binaries/pingaccess-9.0.1/sdk/` |
-| SDK Javadoc (HTML) | `binaries/pingaccess-9.0.1/sdk/apidocs/` |
-| SDK sample rules | `binaries/pingaccess-9.0.1/sdk/samples/` |
+| SDK JAR (binary) | `binaries/pingaccess/dist/pingaccess-9.0.1/sdk/` |
+| SDK Javadoc (HTML) | `binaries/pingaccess/dist/pingaccess-9.0.1/sdk/apidocs/` |
+| SDK sample rules | `binaries/pingaccess/dist/pingaccess-9.0.1/sdk/samples/` |
 | Local SDK JAR copy | `docs/reference/vendor/pingaccess-sdk/pingaccess-sdk-9.0.1.0.jar` |
-| Engine JAR (vendor plugins) | `binaries/pingaccess-9.0.1.zip → lib/pingaccess-engine-9.0.1.0.jar` |
+| Engine JAR (vendor plugins) | `binaries/pingaccess/dist/pingaccess-9.0.1/lib/pingaccess-engine-9.0.1.0.jar` |

@@ -1479,8 +1479,8 @@ Client                    PingAccess                        Backend
 | `docs/research/pingam-authentication-api.md` | PingAM callback format (transform target) |
 | `docs/reference/pingaccess-sdk-guide.md` | SDK guide (authored from PA 9.0 docs + decompilation) |
 | `docs/reference/vendor/pingaccess-sdk/pingaccess-sdk-9.0.1.0.jar` | SDK JAR |
-| `binaries/pingaccess-9.0.1/sdk/apidocs/` | Official SDK Javadoc |
-| `binaries/pingaccess-9.0.1/sdk/samples/` | SDK sample rules |
+| `binaries/pingaccess/dist/pingaccess-9.0.1/sdk/apidocs/` | Official SDK Javadoc |
+| `binaries/pingaccess/dist/pingaccess-9.0.1/sdk/samples/` | SDK sample rules |
 | `adapter-standalone/src/main/java/.../StandaloneAdapter.java` | Reference adapter implementation |
 | ADR-0013 | Copy-on-wrap message adapter pattern |
 | ADR-0020 | Nullable status code (requests) |

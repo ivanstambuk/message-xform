@@ -87,9 +87,8 @@ Update both `docs/architecture/roadmap.md` and the Roadmap table above when stat
     specific to a single feature belong here, not in feature task lists.
   - `docs/research/` — Research notes (API analysis, gateway evaluations, etc.).
   - `docs/reference/pingaccess-sdk/pingaccess-sdk-9.0.1.0.jar` — SDK JAR (166 classes).
-  - `binaries/pingaccess-9.0.1.zip` — PingAccess 9.0.1 distribution ZIP (not committed).
-  - `.sdk-decompile/pingaccess-9.0.1/sdk/` — Extracted SDK distribution (samples, apidocs).
-    Source: `binaries/pingaccess-9.0.1.zip`. Re-extract with `unzip -q binaries/pingaccess-9.0.1.zip -d .sdk-decompile/`.
+  - `binaries/pingaccess/dist/pingaccess-9.0.1/` — Extracted PingAccess 9.0.1 distribution (not committed).
+  - `binaries/pingaccess/dist/pingaccess-9.0.1/sdk/` — SDK subtree (samples, apidocs).
   - `docs/templates/` — Spec, plan, tasks, and ADR templates.
   - `docs/_current-session.md` — Session state for agent handoffs.
   - `.agent/workflows/` — Session lifecycle workflows.
