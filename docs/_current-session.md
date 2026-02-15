@@ -1,38 +1,31 @@
 # Current Session
 
-**Focus**: Fix JMX metric test (Test 28) and documentation
+**Focus**: Session retro and multi-agent coordination hardening
 **Date**: 2026-02-15
-**Status**: Complete — all work committed
+**Status**: Complete for this session scope
 
 ## Accomplished
 
-1. **Fixed JMX metrics bug (Test 28)**:
-   - Root cause: PingAccess creates multiple rule instances per configuration
-     (one per engine/app binding). Each `configure()` created a new
-     `MessageTransformMetrics` but JMX MBean pointed to a stale instance.
-   - Fix: static `ConcurrentHashMap` registry in `MessageTransformMetrics`
-     keyed by instance name → all rule objects share canonical metrics.
-   - Unit test fix: `resetMetrics()` in `@BeforeEach` for test isolation.
-   - E2E test fix: exact MBean ObjectName instead of wildcard query.
-   - Result: **31/31 E2E tests pass**, all unit tests pass.
+1. Added and validated lock-based coordination workflow for concurrent agents:
+   - `scripts/agent-lock.sh` (`acquire`, `check`, `heartbeat`, `release`, `list`)
+   - Active-work board and ownership maps:
+     - `.agent/session/active-work.yaml`
+     - `.agent/session/path-owners.yaml`
+   - AGENTS conventions updated for active-only entries, lease reclaim, and routing hints.
 
-2. **Documented JMX pitfalls** (4 pitfalls + debugging checklist):
-   - PA operations guide: new "JMX Pitfalls" section
-   - E2E Karate operations guide: troubleshooting table entries
-   - adapter-pingaccess/PITFALLS.md: multi-instance and build cache entries
+2. Persisted same-branch multi-agent research:
+   - `docs/research/multi-agent-same-branch-coordination.md`.
 
-3. **SDD retro fixes**:
-   - Updated spec.md FR-002-12 E2E count from 26/26 to 31/31
-   - Updated spec.md FR-002-14 implementation pattern with shared registry
+3. Recorded latest PingAccess E2E result update:
+   - `docs/architecture/features/002/e2e-results.md` now reflects the 2026-02-15 run entry.
 
 ## Key Decisions
 
-- **Shared metrics registry pattern** — chosen over per-test unique names
-  because the fundamental issue is PA's multi-instance lifecycle, not test
-  isolation. The registry ensures correctness in production.
+- Active-lock board is machine-oriented and contains only active work items (no completed history).
+- Mutating work should acquire locks; research-only work does not register.
+- `workflow:retro` is exclusive and blocks overlapping mutating work while running.
 
 ## Next Session Focus
 
-- **Push to origin** — 9 local commits ahead of origin/main
-- **E2E expansion** — Phase 8b (Web Session OIDC) refinement if needed
-- **Feature 002 completion** — final review pass on all documentation
+- Continue from `/init` and pick the next feature/documentation task.
+- Keep commit scope isolated when concurrent agents have local changes in progress.

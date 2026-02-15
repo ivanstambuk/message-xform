@@ -1043,5 +1043,5 @@ e2e-common/
 ### See Also
 
 - [E2E Test Framework Research](../research/e2e-test-framework-research.md) — Framework selection rationale
-- [E2E Expansion Plan](../architecture/features/002/e2e-expansion-plan.md) — Phase-by-phase plan
+- [E2E Validation Record](../architecture/features/002/e2e-results.md) — Test results and coverage
 - [PingAccess Operations Guide](pingaccess-operations-guide.md) — PA deployment reference

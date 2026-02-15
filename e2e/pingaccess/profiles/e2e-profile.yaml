@@ -6,7 +6,7 @@
 #   - Main app (contextRoot=/api, errorMode=PASS_THROUGH)
 #   - Deny app (contextRoot=/deny-api, errorMode=DENY)
 #
-# See: docs/architecture/features/002/e2e-expansion-plan.md
+# See: docs/architecture/features/002/e2e-results.md
 
 profile: e2e-profile
 version: "1.0.0"
