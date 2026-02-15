@@ -14,4 +14,10 @@ dependencyResolutionManagement {
 include("core")
 include("adapter-standalone")
 include("adapter-pingaccess")
-include("e2e-pingaccess")
+
+// E2E modules: only include when the directory exists.
+// The standalone proxy Dockerfile copies settings.gradle.kts but not
+// e2e-pingaccess/, causing Gradle 9.x to fail at configuration time.
+if (file("e2e-pingaccess").isDirectory) {
+    include("e2e-pingaccess")
+}
