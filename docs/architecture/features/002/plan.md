@@ -120,7 +120,7 @@ _To be completed after implementation._
 | FR-002-09 | Deployment packaging | | |
 | FR-002-10 | Gradle module setup | | |
 | FR-002-11 | Error handling | | |
-| FR-002-12 | Docker E2E test suite | `scripts/pa-e2e-bootstrap.sh` + `e2e-pingaccess/` | `e2e-results.md` — 26/26 Karate scenarios pass (2026-02-15) |
+| FR-002-12 | Docker E2E test suite | `scripts/pa-e2e-bootstrap.sh` + `e2e-pingaccess/` | `e2e-pingaccess/docs/e2e-results.md` — 31/31 Karate scenarios pass (2026-02-15) |
 | FR-002-13 | TransformContext construction | | |
 | FR-002-14 | JMX observability (opt-in) | | |
 
@@ -638,7 +638,7 @@ _To be completed after implementation._
     - _Preconditions:_ I13 complete.
     - _Steps:_
       1. Update `roadmap.md`: F002 → `✅ Complete` (FR-002-12 Docker E2E
-         validated — see `e2e-results.md`).
+         validated — see `e2e-pingaccess/docs/e2e-results.md`).
       2. Sync `AGENTS.md` roadmap mirror.
       3. Update `knowledge-map.md` with new source files.
       4. Update `llms.txt` with adapter source files.
@@ -739,7 +739,7 @@ _To be filled during implementation._
 ## Follow-ups / Backlog
 
 - [x] **FR-002-12: Docker E2E test script** — ✅ Complete.
-      50/50 tests pass against PA 9.0.1.0. See `e2e-results.md`.
+      50/50 tests pass against PA 9.0.1.0. See `e2e-pingaccess/docs/e2e-results.md`.
       22 scenarios validated E2E, 6 specs, profile routing, 19 test groups.
 - [ ] **E2E: OAuth/identity scenarios** — S-002-13, S-002-25, S-002-26.
       Requires authenticated PA session. Options: (a) PingFederate/PingAM as

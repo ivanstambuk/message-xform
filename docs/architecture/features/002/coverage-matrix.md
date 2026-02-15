@@ -60,4 +60,4 @@
 | ✅¹ | Partial E2E (Bearer token L1-L3; clientId/scopes best-effort via JWKS ATV) |
 | ✅² | Partial E2E (unauth path only; full auth path covered by Tests 20-24) |
 | ✅⁴ | Best-effort E2E (guard check; either outcome valid) |
-| ❌³ | E2E not feasible — measurement/API not accessible via HTTP (unit-only with rationale, see `e2e-results.md`) |
+| ❌³ | E2E not feasible — measurement/API not accessible via HTTP (unit-only with rationale, see `e2e-pingaccess/docs/e2e-results.md`) |

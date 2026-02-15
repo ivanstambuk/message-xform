@@ -1038,7 +1038,7 @@ exceptions are caught by `getErrorHandlingCallback()` (FR-002-02).
    transformed responses.
 6. Tears down the Docker containers.
 
-**Validation record:** See `docs/architecture/features/002/e2e-results.md`
+**Validation record:** See `e2e-pingaccess/docs/e2e-results.md`
 for structured results of each live PA E2E run. Traceability to the E2E test plan is in `docs/architecture/features/002/e2e-plan.md`.
 
 | Aspect | Detail |
@@ -1336,7 +1336,7 @@ zero configuration.
 ### Integration Tests
 
 - **Docker-based E2E** (FR-002-12) — ✅ Implemented. Script-based, runs
-  against real PingAccess container. See `e2e-results.md` for validation record.
+  against real PingAccess container. See `e2e-pingaccess/docs/e2e-results.md` for validation record.
 
 ---
 
