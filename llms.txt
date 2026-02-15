@@ -86,7 +86,6 @@ scripts/pa-e2e-infra-up.sh
 scripts/pa-e2e-infra-down.sh
 e2e-pingaccess/src/test/java/karate-config.js
 e2e-pingaccess/build.gradle.kts
-docs/research/karate-e2e-patterns.md
 
 # Implementation tracking
 docs/architecture/features/001/tasks.md

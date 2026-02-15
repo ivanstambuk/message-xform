@@ -684,6 +684,16 @@ headers persist in the calling feature's scope. Always reset:
 * configure headers = null
 ```
 
+#### P2a: `callonce` Caching Is JVM-Scoped
+
+`callonce` caches its result for the **entire JVM lifetime**. If a test modifies
+gateway state (creates/deletes resources), the cached provisioning data still
+holds the old IDs.
+
+**Solution:** Make provisioning idempotent. Use the lookup-or-create pattern.
+Never delete shared resources inside a test — use separate test-specific
+resources if destructive operations are needed.
+
 #### P3: Helper Features Must Be Tagged `@ignore`
 
 Karate auto-discovers all `.feature` files. Helper features that require
@@ -728,6 +738,19 @@ And header Content-Type = 'application/x-www-form-urlencoded'
 And form field grant_type = 'client_credentials'
 ```
 
+#### P6a: Conditional Test Skipping
+
+When optional infrastructure (e.g., OAuth/OIDC server) may not be available,
+use `karate.abort()` for clean no-op skipping:
+
+```gherkin
+* eval if (__arg.phase8Skip) karate.abort()
+```
+
+Provisioning detects availability and exports skip flags. Test features check
+these flags at scenario start. `karate.abort()` marks the scenario as skipped
+without failure.
+
 #### P7: Configuration Cache Compatibility (Gradle 9.x)
 
 Use `enabled = isE2EExplicit` (configuration-time boolean) NOT
@@ -767,6 +790,23 @@ Use flexible assertions:
 * def s = response.session
 * assert s == null || (typeof s == 'object' && Object.keys(s).length == 0)
 ```
+
+### Known Limitations
+
+1. **No parallel test execution:** Tests modify shared gateway state (rules, apps).
+   Parallel execution would cause race conditions. Karate's default serial
+   execution is correct for our use case.
+
+2. **Container startup time:** PingAccess takes 25-60 seconds to start. The infra
+   script polls readiness with a retry loop. Total E2E runtime is ~2-3 minutes.
+
+3. **Log inspection fragility:** `grep` against container logs is inherently
+   fragile — log format changes across gateway versions. Prefer body/status
+   assertions when possible.
+
+4. **Web Session/OIDC (Phase 8b):** Skipped — requires PingFederate for full L4
+   session state validation. Mock OIDC server handles JWKS/token but not the
+   complete WebSession→OIDC redirect flow PA expects.
 
 ---
 
@@ -930,7 +970,6 @@ e2e-common/
 
 ### See Also
 
-- [Karate E2E Patterns & Pitfalls](../research/karate-e2e-patterns.md) — Pattern catalog
 - [E2E Test Framework Research](../research/e2e-test-framework-research.md) — Framework selection rationale
 - [E2E Expansion Plan](../architecture/features/002/e2e-expansion-plan.md) — Phase-by-phase plan
 - [PingAccess Operations Guide](pingaccess-operations-guide.md) — PA deployment reference

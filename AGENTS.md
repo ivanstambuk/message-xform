@@ -436,7 +436,7 @@ PITFALLS.md before working on a module.**
 | `core` | `core/PITFALLS.md` — JSLT version quirks, registry internals |
 | `adapter-standalone` | `adapter-standalone/PITFALLS.md` — JDK HttpClient, Javalin, Docker |
 | `adapter-pingaccess` | `adapter-pingaccess/PITFALLS.md` — PA SDK API, config builder, test specs |
-| `e2e-pingaccess` | `docs/research/karate-e2e-patterns.md` §4 — Karate DSL, PA header stripping, assertion strategies |
+| `e2e-pingaccess` | `docs/operations/e2e-karate-operations-guide.md` §11 — Karate DSL, PA header stripping, assertion strategies |
 
 ---
 
