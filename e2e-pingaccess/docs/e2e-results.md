@@ -105,7 +105,7 @@
 
 ### Unit-Only Scenarios (E2E not feasible)
 
-These 6 scenarios cannot be meaningfully validated through HTTP round-trips.
+These 5 scenarios cannot be meaningfully validated through HTTP round-trips.
 Each has comprehensive unit test coverage documented in `coverage-matrix.md`.
 
 | Scenario | Name | Rationale |
@@ -114,7 +114,6 @@ Each has comprehensive unit test coverage documented in `coverage-matrix.md`.
 | S-002-18 | Invalid spec directory | Config validation happens during `configure()`, before the engine starts. E2E script can't trigger this without breaking the PA rule. Unit test exercises `ValidationException` directly. |
 | S-002-20 | Thread safety | Controlled concurrency (10 threads × 100 requests) requires deterministic assertions on per-thread results. E2E HTTP can't guarantee thread isolation. |
 | S-002-21 | ExchangeProperty metadata | PA-internal exchange property API. Values are set on the exchange object but not visible in HTTP response headers/body. Unit test accesses the exchange directly. |
-| S-002-27 | Prior rule URI rewrite | `Request.getUri()` reflects prior-rule rewrites by PA engine design. Multi-rule E2E is fragile due to "Any" RuleSet short-circuit behaviour (§24). The adapter's `getUri()` call is trivially validated by unit test. |
 | S-002-36 | Runtime version mismatch | Requires running against a PA version different from compile-time version. Docker E2E uses the same PA version. Unit test mocks the version check. |
 
 ---

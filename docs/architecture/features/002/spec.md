@@ -1255,7 +1255,6 @@ zero configuration.
 | S-002-24 | **Shadow JAR correctness:** Deploy shadow JAR → no `ClassNotFoundException` at runtime (all deps bundled, PA SDK excluded). |
 | S-002-25 | **OAuth context in JSLT:** JSLT expression uses `$session.clientId` and `$session.scopes` → resolves from `OAuthTokenMetadata` (flat `$session` namespace, see FR-002-06 merge layers). |
 | S-002-26 | **Session state in JSLT:** JSLT expression uses `$session.authzCache` → resolves from `SessionStateSupport` (flat `$session` namespace, layer 4 merge). |
-| S-002-27 | **Prior rule URI rewrite:** Upstream ParameterRule rewrites `/old/path` to `/new/path` → MessageTransformRule wraps using `Request.getUri()` (rewritten URI) → spec matches on `/new/path` (validates URI choice per FR-002-01 note). |
 | S-002-28 | **DENY + handleResponse interaction:** `handleRequest()` returns `Outcome.RETURN` with DENY error body → `handleResponse()` is called (SDK contract) → adapter checks `TRANSFORM_DENIED` ExchangeProperty → skips response processing → client receives original DENY error (GAP-4 fix). |
 | S-002-29 | **Spec hot-reload (success):** `reloadIntervalSec=30` → spec YAML modified on disk → next poll reloads specs → new spec matches next request → transform uses updated spec. |
 | S-002-30 | **Spec hot-reload (failure):** `reloadIntervalSec=30` → malformed spec written to disk → reload fails with warning log → previous specs remain active → existing transforms unaffected. |

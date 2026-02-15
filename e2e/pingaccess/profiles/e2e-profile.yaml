@@ -101,9 +101,24 @@ transforms:
       path: "/web/session/**"
       method: POST
 
-  # ── Hot-reload addition (Tests 25–27, Phase 9) ──
+  # ── Combined multi-dimension transform (Test 32) ──
+  # Exercises ALL transform capabilities in a single spec: body rename,
+  # URL rewrite, header injection, status override, session context.
+  - spec: e2e-combined@1.0.0
+    direction: request
+    match:
+      path: "/api/combined/**"
+      method: POST
+
+  - spec: e2e-combined@1.0.0
+    direction: response
+    match:
+      path: "/api/combined/**"
+      method: POST
+
+  # ── Hot-reload addition (Tests 25–27) ──
   # At startup, e2e-reload-addition is a no-op identity transform.
-  # Phase 9 tests overwrite it with a marker version to prove hot-reload.
+  # Tests overwrite it with a marker version to prove hot-reload.
   - spec: e2e-reload-addition@1.0.0
     direction: request
     match:

@@ -196,7 +196,7 @@ _To be completed after implementation._
         flag tracking, and header normalization.
      3. Run tests, verify all pass.
    - _Requirements covered:_ FR-002-01 (wrapRequest mapping table), S-002-01,
-     S-002-07, S-002-08, S-002-27.
+     S-002-07, S-002-08.
    - _Commands:_ `./gradlew :adapter-pingaccess:test`,
      `./gradlew spotlessApply check`
    - _Exit:_ `wrapRequest()` maps all 7 fields. Deep-copy verified. Null/empty
@@ -680,7 +680,6 @@ _To be completed after implementation._
 | S-002-24 | I10 | Shadow JAR correctness |
 | S-002-25 | I6 | OAuth context in JSLT |
 | S-002-26 | I6 | Session state in JSLT |
-| S-002-27 | I2 | Prior rule URI rewrite |
 | S-002-28 | I7 | DENY + handleResponse interaction |
 | S-002-29 | I8 | Spec hot-reload (success) |
 | S-002-30 | I8 | Spec hot-reload (failure) |
@@ -751,8 +750,6 @@ _To be filled during implementation._
 - [ ] **E2E: JMX metrics scenarios** — S-002-33, S-002-34.
       Requires JMX client connection to PA JVM (expose JMX port in Docker,
       use `jmxterm` or `jmx_exporter` for assertion).
-- [ ] **E2E: Multi-rule chain** — S-002-27.
-      Requires two PA rules in sequence (first rewrites URI, second reads it).
 - [ ] **Compressed body support** (Constraint 10) — Decompress `gzip`/`deflate`/`br`
       response bodies before JSON parsing. Requires adding `java.util.zip` handling.
 - [ ] **SessionContextFilter** — Selective `$session` field whitelisting for

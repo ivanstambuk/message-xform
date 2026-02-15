@@ -1,0 +1,62 @@
+# E2E test spec: combined multi-dimension transform
+#
+# Exercises ALL transform dimensions in a single spec:
+#   - Body transform (JSLT: rename fields + inject context)
+#   - Header injection (X-Combined-Test + X-Transform-Spec)
+#   - URL path rewrite (/api/combined/** → /api/combined-rewritten)
+#   - Status code override (200 → 202)
+#   - Session context access ($session.subject, $cookies, $queryParams)
+#
+# This proves that a single transform spec can fully replace chaining
+# multiple PA rules — the recommended deployment pattern (see ops guide §21).
+#
+# Applied bidirectionally:
+#   REQUEST:  body rename + URL rewrite + header inject
+#   RESPONSE: body rename + status override + header inject
+id: e2e-combined
+version: "1.0.0"
+description: "E2E test — combined multi-dimension transform (body + URL + headers + status + session)"
+
+input:
+  schema:
+    type: object
+
+output:
+  schema:
+    type: object
+
+# REQUEST direction (reverse): rename fields + inject session context
+reverse:
+  lang: jslt
+  expr: |
+    {
+      "userId": .user_id,
+      "firstName": .first_name,
+      "sessionSubject": $session.subject,
+      "cookieToken": $cookies.auth_token,
+      "queryPage": $queryParams.page
+    }
+
+# RESPONSE direction (forward): rename back + inject session context
+forward:
+  lang: jslt
+  expr: |
+    {
+      "user_id": .userId,
+      "first_name": .firstName,
+      "session_subject": $session.subject,
+      "cookie_token": $cookies.auth_token,
+      "query_page": $queryParams.page
+    }
+
+headers:
+  add:
+    X-Combined-Test: "true"
+    X-Transform-Spec: "e2e-combined"
+
+url:
+  path:
+    expr: '"/api/combined-rewritten"'
+
+status:
+  set: 202

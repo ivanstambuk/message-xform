@@ -1759,7 +1759,7 @@ but uses inverted termination semantics:
 Because execution is sequential:
 
 1. **URI rewrites from Rule A are visible to Rule B.** `Request.getUri()` reflects
-   modifications from earlier rules — confirmed by scenario S-002-27.
+   modifications from earlier rules.
 2. **Body modifications from Rule A are visible to Rule B.** `Request.getBodyContent()`
    returns the modified body.
 3. **Order is deterministic.** It follows the policy-manager order (UI drag position).

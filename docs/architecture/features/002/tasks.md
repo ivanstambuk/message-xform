@@ -65,7 +65,7 @@ _Last updated:_ 2026-02-14
 
 #### I2 — `wrapRequest()` mapping (FR-002-01)
 
-- [x] **T-002-03** — Request URI split: path + query string (FR-002-01, S-002-06, S-002-27)
+- [x] **T-002-03** — Request URI split: path + query string (FR-002-01, S-002-06)
   _Test first:_ `PingAccessAdapterRequestTest.pathAndQueryMapping()` with URI containing `?`, multi-params, and no params.
   _Implement:_ Parse `Request.getUri()` into `requestPath` and `queryString`.
   _Verify:_ Path/query mapping tests pass.

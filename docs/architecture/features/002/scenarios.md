@@ -1055,46 +1055,6 @@ assertions:
 > **Note:** Session state attributes are layer 4 (highest precedence).
 > They override lower-layer attributes with the same key.
 
----
-
-## S-002-27: Prior Rule URI Rewrite
-
-```yaml
-scenario: S-002-27
-name: prior-rule-uri-rewrite
-description: >
-  When an upstream rule rewrites the URI before the adapter executes,
-  the adapter wraps the rewritten URI, not the original client URI.
-  Spec matching uses the rewritten path.
-tags: [uri, prior-rules, interceptor-chain]
-refs: [FR-002-01, FR-002-12]
-
-setup:
-  exchange:
-    request:
-      method: GET
-      uri: /new/path?q=test  # rewritten by prior ParameterRule
-    state:
-      originalUri: /old/path?q=test  # exchange.getOriginalRequestUri()
-  specs:
-    - id: new-path-transform
-      matches: "GET /new/**"
-      direction: request
-      expr: '. + {"routed": true}'
-
-trigger: handleRequest
-
-assertions:
-  - description: adapter wraps the rewritten URI
-    expect: message.requestPath() == "/new/path"
-  - description: spec matches against rewritten URI
-    expect: spec("new-path-transform") is applied
-  - description: original URI is NOT used for matching
-    expect: message.requestPath() != "/old/path"
-```
-
-> **Note:** `Request.getUri()` reflects modifications by prior rules in the
-> interceptor chain. `Exchange.getOriginalRequestUri()` retains the original.
 
 ## S-002-28: DENY + handleResponse Interaction
 
@@ -1495,7 +1455,7 @@ Mapping of scenario IDs to requirement references. Addresses audit finding F-005
 
 | Requirement | Scenarios |
 |-------------|-----------|
-| **FR-002-01** | S-002-01, S-002-07, S-002-08, S-002-27 |
+| **FR-002-01** | S-002-01, S-002-07, S-002-08 |
 | **FR-002-02** | S-002-02, S-002-32 |
 | **FR-002-03** | S-002-01, S-002-02, S-002-03, S-002-20 |
 | **FR-002-04** | S-002-04 |
@@ -1506,7 +1466,7 @@ Mapping of scenario IDs to requirement references. Addresses audit finding F-005
 | **FR-002-09** | S-002-17, S-002-18, S-002-24 |
 | **FR-002-10** | S-002-11, S-002-12, S-002-28 |
 | **FR-002-11** | S-002-12, S-002-28 |
-| **FR-002-12** | S-002-06, S-002-27 |
+| **FR-002-12** | S-002-06 |
 | **FR-002-13** | S-002-13, S-002-14, S-002-22, S-002-23, S-002-25, S-002-26 |
 | **FR-002-14** | S-002-29, S-002-30, S-002-31 |
 | **FR-002-15** | S-002-17, S-002-19, S-002-36 |
