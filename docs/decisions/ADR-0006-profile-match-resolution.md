@@ -57,9 +57,15 @@ Resolution algorithm:
    - `/json/*/authenticate` → 2 literals → score 2
    - `/json/*` → 1 literal → score 1
 2. **Tie-breaking** (same specificity score):
-   a. More `match` constraints (method, content-type) wins.
+   a. More `match` constraints (method, content-type, status, when) wins.
+      Status patterns contribute weighted values: exact/range = +2, class/negation = +1.
+      `when` predicates contribute +1. (ADR-0036)
    b. If still tied → **load-time error** with diagnostic listing the conflicting
       profiles. Operator must resolve the ambiguity.
+   c. **Exception:** entries with `when` predicates are exempt from the load-time
+      error in step 2b, even if they tie. The engine cannot statically determine
+      whether two JSLT predicates are mutually exclusive. At runtime, if both match,
+      they pipeline per ADR-0012. (ADR-0036)
 3. **Structured logging** (NFR-001-08): every matched profile MUST be logged with
    profile id, spec id@version, request path, and specificity score, so operators
    can trace exactly which profile was selected.
@@ -71,13 +77,18 @@ Positive:
 - Self-diagnosing: ambiguous ties are caught at load time, not at runtime.
 - Structured match logging (NFR-001-08) ensures full traceability in production.
 - Consistent with HTTP router conventions developers already know.
+- Status patterns enable fine-grained response routing without abandoning the
+  most-specific-wins model (ADR-0036).
 
 Negative / trade-offs:
 - Specificity algorithm must be well-defined and documented — edge cases around
   path parameter styles (`:id` vs `*`) need consideration.
 - Equal-specificity ties with equal constraints → load-time error. This is strict
   but necessary; operators must resolve ambiguity explicitly.
+- `when`-predicate exemption from ambiguity rejection means operators must ensure their
+  predicates are mutually exclusive through convention, not enforcement.
 
 References:
 - Feature 001 spec: `docs/architecture/features/001/spec.md` (FR-001-05, NFR-001-08)
-- Validating scenarios: S-001-44, S-001-45, S-001-46
+- Validating scenarios: S-001-44, S-001-45, S-001-46, S-001-92
+- ADR-0036 – Conditional Response Routing (status weighted scoring, `when` exemption)

@@ -48,9 +48,23 @@ they form an **ordered pipeline** executed in declaration order:
 - The abort-on-failure model aligns with copy-on-wrap semantics (ADR-0013) —
   on failure, the copy is discarded and the native message is untouched.
 
+### Body Predicate Timing (ADR-0036)
+
+When pipeline entries include `match.when` predicates (ADR-0036), all `when` predicates
+are evaluated against the **original body** — the body as received before any pipeline
+step executes. This follows ADR-0027's "route the input" convention: the routing
+decision (which entries pipeline) is based on what *arrived*, not what was produced
+partway through the chain.
+
+Concretely: if entries A, B, C all match with `when` predicates, each predicate
+evaluated against body₀ (original). Then the pipeline executes A(body₀) → B(bodyₐ) →
+C(body_b), where bodyₐ and body_b are intermediate outputs.
+
 ## Related
 
 - ADR-0008 — Single expression per direction (establishes profile-level chaining)
+- ADR-0027 — Route the Input (original body convention)
+- ADR-0036 — Conditional Response Routing (`when` predicate timing)
 - FR-001-05 — Transform Profiles (normative pipeline semantics)
 - S-001-49 — Mixed-engine chain scenario (JOLT → JSLT)
 - S-001-56 — Pipeline chain abort-on-failure scenario

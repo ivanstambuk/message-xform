@@ -62,7 +62,26 @@ Negative / trade-offs:
 - Predicate evaluates against the **transformed** body, which may confuse authors who
   expect it to reference the original input.
 
+### Disambiguation: `status.when` vs `match.status` (ADR-0036)
+
+This ADR's `status.when` is a **spec-level conditional** — it conditionally applies a
+status code override within a single spec, evaluated against the **transformed** body,
+after the body transform has executed.
+
+ADR-0036 introduces `match.status`, which is a **profile-level routing predicate** — it
+routes incoming messages to the correct spec based on the **incoming HTTP status code**,
+evaluated before any body transform. Despite sharing the "status" concept, these operate
+at different layers and different times:
+
+| | `status.when` (this ADR) | `match.status` (ADR-0036) |
+|---|---|---|
+| Layer | Spec (transform definition) | Profile (routing) |
+| Purpose | Conditionally override status code | Route to the correct spec |
+| Evaluated against | Transformed body (JSON) | Incoming HTTP status code (integer) |
+| Timing | After body transform | Before body transform |
+
 References:
 - Feature 001 spec: `docs/architecture/features/001/spec.md` (FR-001-11)
 - Header pattern precedent: ADR-0002
 - Validating scenarios: S-001-36 (conditional), S-001-37 ($status in body), S-001-38 (unconditional)
+- ADR-0036 – Conditional Response Routing (profile-level status matching)
