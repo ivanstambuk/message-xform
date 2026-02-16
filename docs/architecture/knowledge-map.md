@@ -178,4 +178,5 @@ ADR-0036 (Conditional Routing) governs ── FR-001-15, FR-001-16, updates ADR-
 | `docs/research/pingam-authentication-api.md` | PingAM /json/authenticate endpoint, callback format | Feature 002 scenarios |
 | `docs/reference/pingaccess-sdk-guide.md` | Standalone PingAccess 9.0 SDK reference (19 sections, 112 classes) | Feature 002 spec, all adapter implementation |
 | `docs/operations/pingaccess-operations-guide.md` | PA operations, deployment architecture, Docker/K8s layout, Admin API gotchas, rule execution order | Feature 002 spec, ADR-0023, ADR-0006 |
+| `docs/operations/pinggateway-operations-guide.md` | PG operations, Docker image build/run, filesystem layout, configuration mounting, rebuild playbook | Feature 003 spec |
 | `docs/operations/e2e-karate-operations-guide.md` | Gateway-neutral E2E test architecture, Docker lifecycle, Gradle integration, Karate patterns, IDE extension patches | All E2E modules, Feature 002, future gateway features |

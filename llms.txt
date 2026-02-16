@@ -26,6 +26,9 @@ docs/reference/pingfederate-sdk-guide.md
 # PingAccess Operations & Deployment (Docker, Admin API, deployment patterns, gotchas)
 docs/operations/pingaccess-operations-guide.md
 
+# PingGateway Operations & Deployment (Docker image build, run, configuration, rebuild playbook)
+docs/operations/pinggateway-operations-guide.md
+
 # Feature 004 — Standalone HTTP Proxy Mode
 docs/architecture/features/004/spec.md
 docs/architecture/features/004/plan.md
