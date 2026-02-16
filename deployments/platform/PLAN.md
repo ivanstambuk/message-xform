@@ -8,7 +8,7 @@
 |--------------|--------------------------|
 | Created      | 2026-02-16               |
 | Status       | 🔄 In Progress           |
-| Current Step | Phase 2, Step 2.6        |
+| Current Step | Phase 6, Step 6.5        |
 
 ---
 
@@ -33,11 +33,11 @@
 | **2** | [Docker Compose skeleton + TLS](#phase-2--docker-compose-skeleton--tls) | ✅ Done |
 | **3** | [PingAM initial configuration script](#phase-3--pingam-initial-configuration-script) | ✅ Done |
 | **4** | [Username/Password journey](#phase-4--usernamepassword-journey) | ✅ Done |
-| **5** | [PingAccess reverse proxy integration](#phase-5--pingaccess-reverse-proxy-integration) | 🔲 Not Started |
-| **6** | [WebAuthn / Passkey journeys](#phase-6--webauthn--passkey-journeys) | 🔲 Not Started |
+| **5** | [PingAccess reverse proxy integration](#phase-5--pingaccess-reverse-proxy-integration) | ✅ Done |
+| **6** | [WebAuthn / Passkey journeys](#phase-6--webauthn--passkey-journeys) | � In Progress |
 | **7** | [Message-xform plugin wiring](#phase-7--message-xform-plugin-wiring) | 🔲 Not Started |
 | **8** | [E2E smoke tests (Karate)](#phase-8--e2e-smoke-tests-karate) | 🔲 Not Started |
-| **9** | [Documentation & deployment guide](#phase-9--documentation--deployment-guide) | 🔲 Not Started |
+| **9** | [Documentation & deployment guide](#phase-9--documentation--deployment-guide) | � In Progress |
 
 ---
 
@@ -213,11 +213,11 @@ and usernameless flows.
 
 | Step | Task | Status |
 |------|------|--------|
-| 6.1 | Adapt webinar's `WebinarJourneyWebAuthN.journey.json` | 🔲 Not Started |
+| 6.1 | Adapt webinar's `WebinarJourneyWebAuthN.journey.json` | ✅ Done (RP→localhost, origins→https://localhost:13000) |
 | 6.2 | Create identifier-first WebAuthn journey | 🔲 Not Started |
 | 6.3 | Create usernameless WebAuthn journey | 🔲 Not Started |
-| 6.4 | Import journeys via script | 🔲 Not Started |
-| 6.5 | Test: register and authenticate with passkey | 🔲 Not Started |
+| 6.4 | Import journeys via script | ✅ Done (`import-webauthn-journey.sh` — REST API, not frodo) |
+| 6.5 | Test: register and authenticate with passkey | 🔲 Next — requires browser or `openauth-sim` |
 
 ---
 
@@ -253,9 +253,10 @@ and usernameless flows.
 
 | Step | Task | Status |
 |------|------|--------|
-| 9.1 | Create `docs/operations/platform-deployment-guide.md` | 🔲 Not Started |
-| 9.2 | Update `llms.txt` and `knowledge-map.md` | 🔲 Not Started |
-| 9.3 | Final review and commit | 🔲 Not Started |
+| 9.1 | Create `docs/operations/platform-deployment-guide.md` | ✅ Done (1042 lines) |
+| 9.2 | Update PingAM ops guide with REST API gotchas + WebAuthn sections | ✅ Done (§8b + §10 + §10b) |
+| 9.3 | Update `llms.txt` and `knowledge-map.md` | 🔲 Not Started |
+| 9.4 | Final review and commit | 🔲 Not Started |
 
 ---
 
@@ -268,3 +269,5 @@ and usernameless flows.
 | D3 | Self-signed TLS with enterprise extension points | Dev-friendly default with clear hooks for custom CA certs, keystores, and trust chains in production. | 2026-02-16 |
 | ~~D4~~ | ~~4-container architecture~~ | **SUPERSEDED** — live testing proved 3 containers work. PingDS not needed. | 2026-02-16 |
 | D5 | 3-container architecture (PA + AM + PD) | PingDirectory serves config, CTS, AND user store. Two PD tweaks required: `single-structural-objectclass-behavior:accept` + `etag` mirror VA. | 2026-02-16 |
+| D6 | REST API import over frodo CLI | frodo v3 has argument parsing issues; custom bash script using AM REST API gives full control over Host header, error handling, and import order. | 2026-02-16 |
+| D7 | Callback auth everywhere (no ZeroPageLogin) | AM 8.0 defaults ZPL to disabled for Login CSRF protection. Callback pattern handles all journey types including WebAuthn. | 2026-02-16 |

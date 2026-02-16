@@ -25,8 +25,12 @@
 | 6 | [Using PingDirectory as AM Backend](#6-using-pingdirectory-as-am-backend) | Verified: PingAM 8.0.2 on PingDirectory 11.0 |
 | | **Part IV — Authentication & Identity** | |
 | 7 | [Built-in Authentication Trees](#7-built-in-authentication-trees) | ldapService, Agent, amsterService |
-| 8 | [ZeroPageLogin](#8-zeropagelogin) | Header-based auth for REST APIs |
+| 8 | [REST Authentication — Callback Pattern](#8-rest-authentication--callback-pattern) | 2-step callback auth flow |
+| 8b | [REST API Gotchas](#8b-rest-api-gotchas) | Host header, curl -sf, orgConfig trap |
 | 9 | [Identity Store & Test Users](#9-identity-store--test-users) | User creation under ou=People |
+| | **Part V — WebAuthn / FIDO2 Journeys** | |
+| 10 | [WebAuthn Journey](#10-webauthn-journey) | Passkey journey flow, config, callbacks |
+| 10b | [Importing Trees via REST API](#10b-importing-trees-via-rest-api) | Node-first import procedure |
 
 ---
 
@@ -565,6 +569,13 @@ The default tree for the root realm is controlled by the `orgConfig` field:
 }
 ```
 
+> ⚠️ **`orgConfig` safety trap.** Never set `orgConfig` to a service name that
+> AM cannot resolve. If set to a non-existent tree/chain, **all authentication
+> breaks** — including the default `/json/authenticate` endpoint. Recovery
+> requires authenticating via `authIndexType=service&authIndexValue=ldapService`
+> (which always works regardless of orgConfig) and then PUT-ing orgConfig back
+> to `ldapService`. See [§8b](#8b-rest-api-gotchas) for details.
+
 #### Specifying an authentication tree
 
 When calling `/json/authenticate`, you can select a specific tree:
@@ -584,9 +595,10 @@ curl -X POST "http://<am-host>:8080/am/json/authenticate?authIndexType=service&a
 #### Query all trees via REST
 
 ```bash
-curl -sf "http://<am-host>:8080/am/json/realms/root/realm-config/authentication/authenticationtrees/trees?_queryFilter=true" \
+curl -s -H "Host: am.platform.local:18080" \
+  "http://127.0.0.1:18080/am/json/realms/root/realm-config/authentication/authenticationtrees/trees?_queryFilter=true" \
   -H "iPlanetDirectoryPro: <admin-token>" \
-  -H "Accept-API-Version: resource=1.0,protocol=2.1"
+  -H "Accept-API-Version: protocol=2.0,resource=1.0"
 ```
 
 ### 8. REST Authentication — Callback Pattern
@@ -606,7 +618,8 @@ The callback pattern is a 2-step flow:
 
 ```bash
 # Step 1: Get authId and callbacks
-STEP1=$(curl -sf -X POST "http://<am-host>:8080/am/json/authenticate" \
+STEP1=$(curl -s -H "Host: am.platform.local:18080" \
+  -X POST "http://127.0.0.1:18080/am/json/authenticate" \
   -H "Content-Type: application/json" \
   -H "Accept-API-Version: resource=2.0,protocol=1.0")
 
@@ -622,7 +635,8 @@ STEP1=$(curl -sf -X POST "http://<am-host>:8080/am/json/authenticate" \
 AUTH_ID=$(echo "$STEP1" | python3 -c "import sys,json; print(json.load(sys.stdin)['authId'])")
 
 # Step 2: Return filled callbacks
-curl -sf -X POST "http://<am-host>:8080/am/json/authenticate" \
+curl -s -H "Host: am.platform.local:18080" \
+  -X POST "http://127.0.0.1:18080/am/json/authenticate" \
   -H "Content-Type: application/json" \
   -H "Accept-API-Version: resource=2.0,protocol=1.0" \
   -d "{
@@ -715,3 +729,289 @@ Minimum required attributes:
 > or displaced when PingAM's configurator creates its DIT structure
 > (`ou=People`, `ou=Groups`, `ou=services`, `ou=tokens`, etc.) under the base DN.
 > Always create test users **after** AM configuration completes.
+
+### 8b. REST API Gotchas
+
+These patterns were discovered through multi-hour debugging sessions and are
+critical for anyone writing scripts that call the PingAM REST API.
+
+#### Host header requirement (CRITICAL)
+
+PingAM 8.0 validates the `Host` header against its configured `SERVER_URL`.
+If the Host header doesn't match `am.platform.local:18080`, AM returns
+HTTP 400 with no useful error — the response body is empty or generic.
+
+```bash
+# ✅ CORRECT: Explicit Host header + localhost IP
+curl -s -H "Host: am.platform.local:18080" \
+  -X POST "http://127.0.0.1:18080/am/json/authenticate" ...
+
+# ❌ BROKEN: --resolve alone (may hang on DNS, Host header may mismatch)
+curl --resolve "am.platform.local:18080:127.0.0.1" \
+  "http://am.platform.local:18080/am/json/authenticate" ...
+
+# ❌ BROKEN: Direct IP without Host header
+curl "http://127.0.0.1:18080/am/json/authenticate" ...
+```
+
+The `--resolve` flag maps DNS resolution but **does not bypass DNS lookup
+entirely** — if `am.platform.local` isn't in `/etc/hosts`, curl may still
+hang. The `Host:` + `127.0.0.1` pattern avoids DNS completely.
+
+#### curl -sf antipattern (CRITICAL)
+
+**Never use `curl -sf` for AM API calls.** The `-f` flag ("fail silently")
+makes curl return an empty response on HTTP errors (4xx/5xx), swallowing
+AM's JSON error bodies which contain the actual diagnostic information.
+
+```bash
+# ✅ CORRECT: -s (silent) only
+RESPONSE=$(curl -s --max-time 10 ...) 
+# Then check $RESPONSE for errors
+
+# ❌ BROKEN: -sf (fail silently) → errors invisible
+RESPONSE=$(curl -sf --max-time 10 ...)
+# On AM error: RESPONSE="" → script thinks success
+```
+
+This was the **root cause** of a multi-hour debugging session: node imports
+were silently failing (401 from missing Host header), so the tree was
+created referencing non-existent nodes, causing `"No Configuration found"`
+when invoked via `authIndexType=service`.
+
+#### orgConfig safety trap
+
+The `orgConfig` field in `/json/realms/root/realm-config/authentication`
+controls the **default** authentication service. Setting it to a name that
+AM cannot resolve **breaks ALL authentication**, including the default
+`/json/authenticate` endpoint.
+
+**Recovery procedure:**
+```bash
+# Step 1: Auth via ldapService explicitly (always works regardless of orgConfig)
+curl -s -H "Host: am.platform.local:18080" \
+  -X POST "http://127.0.0.1:18080/am/json/authenticate?authIndexType=service&authIndexValue=ldapService" \
+  -H "Content-Type: application/json" \
+  -H "Accept-API-Version: resource=2.0,protocol=1.0"
+# (follow 2-step callback flow to get admin token)
+
+# Step 2: Revert orgConfig to ldapService
+curl -s -H "Host: am.platform.local:18080" \
+  -X PUT "http://127.0.0.1:18080/am/json/realms/root/realm-config/authentication" \
+  -H "Content-Type: application/json" \
+  -H "Accept-API-Version: protocol=1.0,resource=1.0" \
+  -H "iPlanetDirectoryPro: ${TOKEN}" \
+  -d '{"core":{"orgConfig":"ldapService","adminAuthModule":"ldapService"}}'
+```
+
+#### API version headers
+
+All AM REST calls require `Accept-API-Version`. Wrong versions produce
+unhelpful 400 errors.
+
+| Endpoint Type | Header Value |
+|--------------|-------------|
+| Authentication (`/json/authenticate`) | `resource=2.0,protocol=1.0` |
+| Realm config (`/realm-config/...`) | `protocol=1.0,resource=1.0` |
+| Tree management (`/authenticationtrees/...`) | `protocol=2.0,resource=1.0` |
+| User management (`/users/...`) | `protocol=2.0,resource=4.0` |
+
+---
+
+## Part V — WebAuthn / FIDO2 Journeys
+
+### 10. WebAuthn Journey
+
+The `WebAuthnJourney` tree enables passwordless authentication using
+FIDO2/WebAuthn passkeys. It is adapted from the webinar reference journey
+(`WebinarJourneyWebAuthN.journey.json`) with local-environment overrides.
+
+#### Journey flow
+
+```
+Start → Username Collector
+  → WebAuthn Authentication
+      ├─ Device registered → ✓ Success
+      └─ No device → Password Collector → DataStore Decision
+                       → Match? → WebAuthn Registration → Recovery Codes
+                           → loop back to WebAuthn Auth
+                       → No Match? → ✗ Failure
+```
+
+#### Node inventory
+
+| Node Type | UUID | Key Settings |
+|-----------|------|-------------|
+| UsernameCollectorNode | `2d90dc82-...` | — |
+| WebAuthnAuthenticationNode | `f1e03c7e-...` | RP=localhost, origins=[https://localhost:13000] |
+| PasswordCollectorNode | `3946ca73-...` | — |
+| DataStoreDecisionNode | `4d9af624-...` | — |
+| WebAuthnRegistrationNode | `7adf255e-...` | RP=localhost, name=Platform Local |
+| RecoveryCodeDisplayNode | `7e41a4ca-...` | — |
+| RecoveryCodeCollectorDecisionNode | `0efd4461-...` | — |
+
+#### WebAuthn node configuration
+
+| Setting | Value | Notes |
+|---------|-------|-------|
+| `relyingPartyDomain` | `localhost` | Must match browser origin domain |
+| `relyingPartyName` | `Platform Local` | Display name shown to user |
+| `origins` | `["https://localhost:13000"]` | PingAccess engine URL |
+| `userVerificationRequirement` | `DISCOURAGED` | Broader device compat for testing |
+| `authenticatorAttachment` | `UNSPECIFIED` | Platform or cross-platform |
+| `attestationPreference` | `NONE` | No attestation for testing |
+| `acceptedSigningAlgorithms` | `["ES256", "RS256"]` | Standard WebAuthn algorithms |
+| `timeout` | `60` seconds | WebAuthn ceremony timeout |
+| `requiresResidentKey` | `false` | Not requiring discoverable credential |
+| `generateRecoveryCodes` | `true` | After registration |
+
+#### Adaptations from webinar reference
+
+| Setting | Webinar | Platform | Reason |
+|---------|---------|----------|--------|
+| `relyingPartyDomain` | `webinar.local` | `localhost` | Local testing |
+| `relyingPartyName` | `webinar.local` | `Platform Local` | Descriptive |
+| `origins` | `["https://webinar.local"]` | `["https://localhost:13000"]` | PA proxy URL |
+| Tree `_id` | `WebinarJourneyWebAuthN` | `WebAuthnJourney` | Cleaner name |
+
+#### WebAuthn callback structure
+
+When the journey reaches a WebAuthn node (registration or authentication),
+AM returns 3 callbacks:
+
+| # | Callback Type | Purpose |
+|---|--------------|--------|
+| 0 | `TextOutputCallback` | JavaScript calling `navigator.credentials.create()` or `.get()` |
+| 1 | `TextOutputCallback` | UI helper JavaScript for rendering |
+| 2 | `HiddenValueCallback` | Client submits `webAuthnOutcome` (Base64URL attestation/assertion) |
+
+Special values for `webAuthnOutcome`:
+- `"unsupported"` — WebAuthn not available in the browser
+- `"ERROR::..."` — Error during ceremony
+- Base64URL-encoded response — Successful registration/authentication
+
+#### Import
+
+```bash
+# From deployments/platform/
+./scripts/import-webauthn-journey.sh
+```
+
+See [§10b](#10b-importing-trees-via-rest-api) for the REST API procedure.
+
+#### Verification
+
+```bash
+# Start the journey (returns NameCallback for username collection)
+curl -s -H "Host: am.platform.local:18080" \
+  -X POST "http://127.0.0.1:18080/am/json/authenticate?authIndexType=service&authIndexValue=WebAuthnJourney" \
+  -H "Content-Type: application/json" \
+  -H "Accept-API-Version: resource=2.0,protocol=1.0"
+```
+
+#### Test walkthrough (user.1)
+
+```bash
+# Step 1: Username → user.1
+# Step 2: WebAuthn Auth → No device → PasswordCallback
+# Step 3: Password → Password1 → DataStore OK
+# Step 4: WebAuthn Registration → 3 callbacks (JS + HiddenValue)
+# Step 5: (client submits webAuthnOutcome) → Recovery Codes
+# Step 6: → loop back to WebAuthn Auth → ✓ Success
+```
+
+### 10b. Importing Trees via REST API
+
+#### Endpoints
+
+```
+Base: /json/realms/root/realm-config/authentication/authenticationtrees
+
+GET    /trees?_queryFilter=true              List all trees
+PUT    /trees/{treeName}                     Create or update tree
+DELETE /trees/{treeName}                     Delete tree
+
+PUT    /nodes/{nodeType}/{nodeId}            Create or update node
+DELETE /nodes/{nodeType}/{nodeId}            Delete node
+```
+
+All require: `Accept-API-Version: protocol=2.0,resource=1.0`
+
+#### Import order (CRITICAL)
+
+**Nodes MUST be created before the tree.** The tree definition references
+nodes by UUID. If a referenced node doesn't exist, the tree is created
+but broken — invoking it returns `"No Configuration found"`.
+
+AM does **not** validate node references during tree creation. This is a
+silent failure trap.
+
+#### Node import
+
+For each node in the journey JSON's `nodes` object:
+
+```bash
+# Strip _type, _outcomes, _id, _rev from the body — AM manages these
+curl -s -H "Host: am.platform.local:18080" \
+  -X PUT "http://127.0.0.1:18080/am/json/realms/root/realm-config/authentication/authenticationtrees/nodes/${nodeType}/${nodeId}" \
+  -H "Content-Type: application/json" \
+  -H "Accept-API-Version: protocol=2.0,resource=1.0" \
+  -H "iPlanetDirectoryPro: ${TOKEN}" \
+  -d "${nodeBodyWithout_type_outcomes_id_rev}"
+```
+
+> **Important:** The PUT body must NOT include `_type`, `_outcomes`, `_id`,
+> or `_rev`. Adding them may cause validation errors or silent failures.
+
+#### Tree import
+
+```bash
+curl -s -H "Host: am.platform.local:18080" \
+  -X PUT "http://127.0.0.1:18080/am/json/realms/root/realm-config/authentication/authenticationtrees/trees/${treeName}" \
+  -H "Content-Type: application/json" \
+  -H "Accept-API-Version: protocol=2.0,resource=1.0" \
+  -H "iPlanetDirectoryPro: ${TOKEN}" \
+  -d "${treeBody}"
+```
+
+The tree body includes `entryNodeId`, node wiring (connections/outcomes),
+and UI layout coordinates.
+
+#### Journey JSON format (frodo-compatible)
+
+The journey JSON file is compatible with the `frodo` CLI tool and has
+this top-level structure:
+
+```json
+{
+  "meta":    { "origin": "...", "exportDate": "..." },
+  "nodes":   { "<uuid>": { "_type": {...}, ...config... } },
+  "tree":    { "_id": "TreeName", "entryNodeId": "<uuid>", "nodes": {...} },
+  "scripts": {}, "emailTemplates": {}, "themes": [],
+  "innerNodes": {}, "socialIdentityProviders": {},
+  "saml2Entities": {}, "circlesOfTrust": {}
+}
+```
+
+#### frodo CLI (alternative import method)
+
+The `frodo` CLI (`@rockcarver/frodo-cli`) can also import journeys:
+
+```bash
+frodo journey import -k -f <journey.json> <connection-profile> <realm>
+```
+
+> **Note:** frodo v3 has CLI argument parsing issues — it may print help
+> instead of executing. Use environment variables (`FRODO_HOST`,
+> `FRODO_USERNAME`, `FRODO_PASSWORD`, `FRODO_AUTHENTICATION_SERVICE`)
+> for more reliable operation. For our platform, the custom REST API
+> import script (`import-webauthn-journey.sh`) is preferred.
+
+#### Troubleshooting tree imports
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| `"No Configuration found"` on invocation | Nodes don't exist (curl -sf hid errors) | Re-import with `-s` not `-sf`; verify each response |
+| Empty curl response | Missing Host header | Add `-H "Host: am.platform.local:18080"` |
+| Node PUT returns 400 | Body includes `_type`/`_outcomes`/`_rev` | Strip those fields — AM manages them |
+| Tree PUT succeeds but invocation fails | Node UUIDs in tree don't match imported nodes | Verify UUIDs are identical |

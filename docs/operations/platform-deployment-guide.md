@@ -28,6 +28,8 @@
 | | **Part IV — PingAccess Setup** | |
 | 8 | [Start PingAccess](#8-start-pingaccess) | Container startup, license, and password hooks |
 | 9 | [Configure PingAccess](#9-configure-pingaccess-reverse-proxy-for-pingam) | Reverse proxy for PingAM via Admin API |
+| | **Part IV-B — WebAuthn / Passkey Journeys** | |
+| 9b | [WebAuthn Journey](#9b-webauthn-journey) | Import and configure passkey authentication |
 | | **Part V — Operations** | |
 | 10 | [Log Monitoring](#10-log-monitoring) | Real-time log tailing recipes |
 | 11 | [Troubleshooting](#11-troubleshooting) | Error→fix lookup table |
@@ -797,6 +799,77 @@ curl -sf -k -H 'Host: localhost:3000' \
 
 ---
 
+## Part IV-B — WebAuthn / Passkey Journeys
+
+### 9b. WebAuthn Journey
+
+The WebAuthn journey enables passwordless authentication using FIDO2 passkeys.
+It is adapted from the webinar reference journey (`WebinarJourneyWebAuthN`)
+with local-environment overrides.
+
+#### Journey flow
+
+```
+Start → Username Collector
+  → WebAuthn Authentication
+      ├─ Device registered → ✓ Success
+      └─ No device → Password Collector → DataStore Decision
+                       → WebAuthn Registration → Recovery Codes
+                           → loop back to WebAuthn Auth
+```
+
+#### Configuration
+
+| Setting | Value |
+|---------|-------|
+| RP Domain | `localhost` |
+| RP Name | `Platform Local` |
+| Origin | `https://localhost:13000` |
+| User Verification | `DISCOURAGED` |
+| Signing Algorithms | ES256, RS256 |
+| Attestation | `NONE` |
+
+#### Import
+
+```bash
+# From deployments/platform/
+./scripts/import-webauthn-journey.sh
+```
+
+The script uses PingAM's REST API to import individual nodes, then wires
+them into the `WebAuthnJourney` authentication tree.
+
+#### Manual verification
+
+```bash
+# Start the journey (returns NameCallback for username)
+curl -s -H 'Host: am.platform.local:18080' \
+  -X POST 'http://127.0.0.1:18080/am/json/authenticate?authIndexType=service&authIndexValue=WebAuthnJourney' \
+  -H 'Content-Type: application/json' \
+  -H 'Accept-API-Version: resource=2.0,protocol=1.0'
+```
+
+> **Host header is critical for AM API calls.** PingAM rejects requests
+> whose `Host` header doesn't match the configured FQDN. Always use
+> `-H 'Host: am.platform.local:18080'` with `http://127.0.0.1:18080`
+> instead of `--resolve`. The `--resolve` flag alone does not set the
+> Host header, leading to silent 400 errors.
+
+> **`authIndexType=service` and trees.** In PingAM 8.0, this endpoint
+> resolves authentication trees by name. The tree must be imported via
+> the `/authenticationtrees/trees/{name}` API. If the error
+> `"No Configuration found"` appears, the tree import likely failed
+> silently — check that `curl` is not using `-f` (silent failure mode)
+> and verify nodes were created before the tree.
+
+> **Detailed reference:** For full REST API gotchas (Host header, curl flags,
+> orgConfig trap), WebAuthn callback structure, and the tree import procedure,
+> see [PingAM Ops §8b](./pingam-operations-guide.md#8b-rest-api-gotchas),
+> [§10](./pingam-operations-guide.md#10-webauthn-journey), and
+> [§10b](./pingam-operations-guide.md#10b-importing-trees-via-rest-api).
+
+---
+
 ## Part V — Operations
 
 ### 10. Log Monitoring
@@ -874,6 +947,8 @@ SEARCH RESULT ... base="" scope=0 filter="(objectClass=*)" attrs="1.1" resultCod
 | PA engine returns 403 Forbidden | `Host:port` doesn't match any virtual host | Add `-H 'Host: localhost:3000'` to curl. See [PA Ops §6](./pingaccess-operations-guide.md#6-virtual-host-matching-critical) |
 | Port 3000 already in use (PA engine won't start) | Another service (e.g., Tailscale, code-server) binds port 3000 | Remap PA engine: `-p 13000:3000` and use `PA_ENGINE_PORT=13000` in `.env` |
 | docker-compose v1 can't start PA (`container name already in use`) | Existing containers created via `docker run` lack compose labels | Use `docker run` directly on same network, or `docker rm -f` the stale container first |
+| `No Configuration found` on `authIndexType=service&authIndexValue=WebAuthnJourney` | Tree nodes weren't created (curl `-sf` hid errors) | Re-run import with `-s` (not `-sf`). Verify nodes exist before importing the tree. Use `Host:` header, not `--resolve` |
+| Changing `orgConfig` to a tree name breaks **all** authentication | `orgConfig` must point to a chain or tree that AM can resolve at startup | Revert via `authIndexType=service&authIndexValue=ldapService` (which always works), then PUT orgConfig back to `ldapService` |
 
 #### Startup order
 
