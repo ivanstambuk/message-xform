@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Tomcat server.xml for PingAM platform deployment.
+  
+  Connectors:
+    - HTTP  on port 8080 (internal, health checks)
+    - HTTPS on port 8443 (TLS via PKCS#12 keystore)
+  
+  Template variables (replaced at container startup or mount-time):
+    - SSL keystore is mounted at /usr/local/tomcat/ssl/tlskey.p12
+    - SSL password is set via SSL_PWD environment variable
+-->
+<Server port="8005" shutdown="SHUTDOWN">
+
+  <Listener className="org.apache.catalina.startup.VersionLoggerListener" />
+  <Listener className="org.apache.catalina.core.AprLifecycleListener" SSLEngine="on" />
+  <Listener className="org.apache.catalina.core.JreMemoryLeakPreventionListener" />
+  <Listener className="org.apache.catalina.mbeans.GlobalResourcesLifecycleListener" />
+  <Listener className="org.apache.catalina.core.ThreadLocalLeakPreventionListener" />
+
+  <Service name="Catalina">
+
+    <!-- HTTP connector — used for internal health checks and non-TLS access -->
+    <Connector port="8080"
+               protocol="HTTP/1.1"
+               connectionTimeout="20000"
+               redirectPort="8443"
+               maxParameterCount="1000" />
+
+    <!-- HTTPS connector — TLS termination for PingAM -->
+    <Connector port="8443"
+               protocol="org.apache.coyote.http11.Http11NioProtocol"
+               maxThreads="200"
+               SSLEnabled="true"
+               scheme="https"
+               secure="true"
+               maxParameterCount="1000">
+      <SSLHostConfig>
+        <Certificate certificateKeystoreFile="/usr/local/tomcat/ssl/tlskey.p12"
+                     certificateKeystorePassword="${SSL_PWD}"
+                     certificateKeystoreType="PKCS12"
+                     certificateKeyAlias="tlskey"
+                     type="RSA" />
+      </SSLHostConfig>
+    </Connector>
+
+    <Engine name="Catalina" defaultHost="localhost">
+      <Host name="localhost"
+            appBase="webapps"
+            unpackWARs="true"
+            autoDeploy="true">
+        <Valve className="org.apache.catalina.valves.AccessLogValve"
+               directory="logs"
+               prefix="localhost_access_log"
+               suffix=".txt"
+               pattern="%h %l %u %t &quot;%r&quot; %s %b" />
+      </Host>
+    </Engine>
+
+  </Service>
+</Server>

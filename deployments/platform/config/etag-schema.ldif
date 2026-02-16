@@ -1,0 +1,11 @@
+dn: cn=schema
+changetype: modify
+add: attributeTypes
+attributeTypes: ( 1.3.6.1.4.1.36733.2.1.999.1
+  NAME 'etag'
+  DESC 'CTS entry tag for optimistic concurrency control — mirrors ds-entry-checksum'
+  EQUALITY caseIgnoreMatch
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.15
+  SINGLE-VALUE
+  USAGE userApplications
+  X-ORIGIN 'PingAM CTS compatibility' )

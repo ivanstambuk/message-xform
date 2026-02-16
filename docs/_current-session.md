@@ -1,34 +1,70 @@
 # Current Session State
 
 **Date:** 2026-02-16
-**Focus:** Documentation restructuring — SDK guides and operations guide
+**Focus:** Platform deployment — PingAM + PingDirectory compatibility testing
+
+## Key Discovery: PingAM 8.0.2 Runs on PingDirectory 11.0
+
+Live testing proved the 3-container architecture works (PingAccess + PingAM +
+PingDirectory). The initial hypothesis requiring PingDS was **wrong**. PingDirectory
+can serve as the unified backend for all PingAM stores (config, CTS, policy, users).
+
+### Required PingDirectory Tweaks
+
+1. **Schema relaxation**: `single-structural-objectclass-behavior: accept`
+   - PingAM writes entries without structural objectClasses
+   - PingDirectory default is `reject`, PingDS silently accepts
+   - Error: `"Object Class Violation: Entry ... does not include a structural object class"`
+
+2. **ETag virtual attribute**: Mirror `ds-entry-checksum → etag`
+   - PingAM CTS expects `etag` for optimistic concurrency control
+   - PingDS has it built-in; PingDirectory does NOT
+   - Error: `"CTS: Unable to retrieve the etag from the token"`
+   - Fix: define `etag` attribute in schema, create mirror VA from `ds-entry-checksum`
+
+### Gotchas Discovered
+
+- **SSL cert trust**: PingAM JVM must trust PD's cert. AM runs as uid 11111 (forgerock),
+  but `cacerts` is root-owned → must `docker exec -u 0` to import
+- **FQDN validation**: PingAM rejects requests where Host header doesn't match
+  configured `SERVER_URL`. Use correct hostname or `/etc/hosts` entry.
+- **First request is slow**: After fresh config, AM lazy-initializes on first HTTP
+  request. CTS/LDAP connections established on-demand, can take 30–60s.
+- **`DATA_STORE=embedded` doesn't work**: Causes `NullPointerException` — AM 8.0
+  requires an external directory.
+- **PD default password**: The `pingidentity/pingdirectory` Docker image uses
+  `2FederateM0re` as the default root password (not `Password1`).
+
+### Diagnostic Techniques
+
+- **PD access log**: `docker exec <pd> tail -f /opt/out/instance/logs/access`
+  Shows every LDAP operation from AM with result codes
+- **AM debug logs**: `docker exec <am> tail /home/forgerock/openam/var/debug/CoreSystem`
+  Shows CTS errors, LDAP connection failures
+- **AM install log**: `docker exec <am> cat /home/forgerock/openam/var/install.log`
+  Shows schema loading progress during initial configurator run
+- **AM stdout**: `docker logs --tail 20 <am>` — shows LDAP connection factory status
 
 ## Completed This Session
 
-1. **PingAccess SDK Guide** (`docs/reference/pingaccess-sdk-guide.md`)
-   - Restructured: 19 flat sections → 20 sections in 6 Parts (2794 lines)
-   - Quick Start moved to §1, HTTP model unified, OAuth merged into Identity
+1. **Phase 1 — Verification**: PingDirectory as AM backend (PASS)
+2. **Phase 2 — Docker Compose + TLS** (mostly done):
+   - `.env.template` → updated for 3-container arch
+   - `scripts/generate-keys.sh` → created
+   - `docker-compose.yml` → rewritten for 3 containers
+   - `config/server.xml` → Tomcat HTTPS
+   - `config/pd-post-setup.dsconfig` → schema + etag tweaks
+   - `config/etag-schema.ldif` → etag attribute definition
+   - `.gitignore` → secrets, .env, data volumes
 
-2. **PingFederate SDK Guide** (`docs/reference/pingfederate-sdk-guide.md`)
-   - Restructured into thematic Parts
+3. **Documentation**: 
+   - `README.md` → updated architecture diagram
+   - `PLAN.md` → revised D4→D5, added test evidence
+   - `pingam-operations-guide.md` → **new Part III** with full PingDirectory
+     compatibility guide (tweaks, parameters, SSL, monitoring, debugging)
 
-3. **PingGateway SDK Guide** (`docs/reference/pinggateway-sdk-guide.md`)
-   - Restructured into thematic Parts
+## Next Steps
 
-4. **PingAccess Operations Guide** (`docs/operations/pingaccess-operations-guide.md`)
-   - Restructured: 25 flat sections → 20 sections in 7 Parts + Appendices (2447 lines)
-   - Rule Execution Order moved near routing context (§24 → §10)
-   - Deployment consolidated (8 sections → 4), debugging unified (§10+§15 → §15)
-
-## Key Decisions
-
-- Documentation-only session — no code changes, no new features
-- All restructurings follow same pattern: thematic Parts, consolidation of thin sections,
-  re-ordering for narrative flow (Quick Start → Concepts → Reference)
-- PingGateway SDK guide confirmed linked in `llms.txt`, Feature 003 spec, no missing refs
-
-## Commits
-
-- `79fa021` — docs: restructure SDK guides and PA operations guide into thematic Parts
-- `6c0dce6` — docs: rename PingGateway research to SDK guide
-- `9243e12` — docs(feature-003): PingGateway adapter research & spec draft
+- Phase 2, Step 2.8: `docker compose up -d` smoke test
+- Phase 3: `scripts/configure-am.sh` automation
+- Phase 4: User creation + authentication journey

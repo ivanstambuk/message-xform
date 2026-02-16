@@ -21,6 +21,8 @@
 | 4 | [Important Notes](#4-important-notes) | Vendor Dockerfile limitations, production concerns |
 | | **Part II — Rebuild Playbook** | |
 | 5 | [Full Rebuild from Scratch](#5-full-rebuild-from-scratch) | Step-by-step for a clean machine |
+| | **Part III — PingDirectory Compatibility** | |
+| 6 | [Using PingDirectory as AM Backend](#6-using-pingdirectory-as-am-backend) | Verified: PingAM 8.0.2 on PingDirectory 11.0 |
 
 ---
 
@@ -101,9 +103,10 @@ redirecting to the setup/configuration wizard at:
 http://localhost:8080/am
 ```
 
-PingAM **requires an external directory server** (PingDS) for its configuration
-store, user store, CTS, and policy store. The setup wizard will prompt for DS
-connection details.
+PingAM **requires an external directory server** for its configuration
+store, user store, CTS, and policy store. This can be either PingDS (ForgeRock DS)
+or PingDirectory (Ping Identity) — see [Part III](#6-using-pingdirectory-as-am-backend)
+for the PingDirectory setup. The setup wizard will prompt for DS connection details.
 
 **Typical startup log** (abbreviated):
 ```
@@ -114,21 +117,22 @@ Starting ProtocolHandler ["http-nio-8080"]
 Server startup in [6276] milliseconds
 ```
 
-#### With a PingDS backend
+#### With a PingDirectory backend (recommended)
 
-For a functional AM instance, you need PingDS running first:
+For a functional AM instance, you need a directory server running first.
+PingDirectory 11.0 is the recommended backend (see [Part III](#6-using-pingdirectory-as-am-backend)):
 
 ```bash
-# Start PingDS first (demo mode)
-docker run -d --name pingds \
-  -e USE_DEMO_KEYSTORE_AND_PASSWORDS=true \
-  -p 1389:1389 -p 1636:1636 \
-  pingds:8.0.2 start-ds
+# Start PingDirectory first
+docker run -d --name pingdirectory \
+  -e PING_IDENTITY_ACCEPT_EULA=YES \
+  -p 1636:1636 -p 1443:1443 \
+  pingidentity/pingdirectory:11.0.0.1-latest
 
 # Then start PingAM
 docker run -d --name pingam \
   -p 8080:8080 \
-  --link pingds:ds.example.com \
+  --link pingdirectory:pd.example.com \
   pingam:8.0.2
 ```
 
@@ -252,7 +256,7 @@ docker tag pingam:8.0.2 pingam:latest
 | Process user | `forgerock` (uid `11111`) |
 | Config directory | `/home/forgerock/openam/` |
 | First-run response | HTTP 302 → setup wizard |
-| Backend dependency | PingDS required for configuration/user stores |
+| Backend dependency | PingDS or PingDirectory (see [Part III](#6-using-pingdirectory-as-am-backend)) |
 
 ### Key differences from PingGateway and PingDS
 
@@ -263,5 +267,213 @@ docker tag pingam:8.0.2 pingam:latest
 | Base image | `gcr.io/.../java-21` | `gcr.io/.../java-21` | `tomcat:10.1-jdk21` |
 | Image size | 327 MB | 243 MB | 1.31 GB |
 | First-run | Welcome page (200) | Server ready (logs) | Setup wizard (302) |
-| External deps | None | Keystore (or demo) | PingDS backend |
+| External deps | None | Keystore (or demo) | PingDirectory or PingDS |
 | Docker Hub image | None | None | None |
+
+---
+
+## Part III — PingDirectory Compatibility
+
+### 6. Using PingDirectory as AM Backend
+
+> **Verified:** PingAM 8.0.2 runs on PingDirectory 11.0 as its sole LDAP backend
+> (config store, CTS, policy store, AND user store). Tested Feb 16, 2026.
+
+The Ping Identity documentation ambiguously states that PingAM requires "PingDS"
+for its config and CTS stores. However, live testing proved that PingDirectory
+works as a drop-in replacement with two configuration tweaks.
+
+#### Why This Works
+
+PingDS (ForgeRock DS / OpenDJ) and PingDirectory (Ping Identity / UnboundID)
+are now both owned by Thoma Bravo and share an LDAP protocol foundation. PingAM's
+`/config/configurator` endpoint uses standard LDAP operations (add, search, modify)
+that both products support. The only differences are in schema strictness and
+virtual attribute availability.
+
+#### Required PingDirectory Tweaks
+
+Two configuration changes must be applied to PingDirectory **before** configuring
+PingAM.
+
+##### Tweak 1: Schema Relaxation
+
+**Problem:** PingAM writes LDAP entries (e.g., `ou=iPlanetAMAuthConfiguration,...`)
+that lack a structural objectClass. PingDS accepts these silently; PingDirectory
+rejects them with:
+
+```
+Object Class Violation: Entry 'ou=iPlanetAMAuthConfiguration,ou=services,dc=example,dc=com'
+violates the Directory Server schema configuration because it does not include a
+structural object class.
+```
+
+**Fix:**
+```bash
+dsconfig set-global-configuration-prop \
+  --set single-structural-objectclass-behavior:accept
+```
+
+This tells PingDirectory to accept entries without structural objectClasses
+instead of rejecting them.
+
+##### Tweak 2: ETag Virtual Attribute
+
+**Problem:** PingAM's Core Token Service (CTS) uses an `etag` attribute for
+optimistic concurrency control on session tokens. PingDS has this as a built-in
+feature. PingDirectory does NOT have an `etag` attribute, causing:
+
+```
+CTS: Unable to retrieve the etag from the token
+```
+
+This error occurs during authentication — the authentication tree evaluates
+successfully, but session creation fails when CTS tries to persist the session.
+
+**Fix (two steps):**
+
+1. **Add `etag` attribute to PingDirectory schema:**
+
+```ldif
+dn: cn=schema
+changetype: modify
+add: attributeTypes
+attributeTypes: ( 1.3.6.1.4.1.36733.2.1.999.1
+  NAME 'etag'
+  DESC 'CTS entry tag for optimistic concurrency control'
+  EQUALITY caseIgnoreMatch
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.15
+  SINGLE-VALUE
+  USAGE userApplications
+  X-ORIGIN 'PingAM CTS compatibility' )
+```
+
+2. **Create mirror virtual attribute mapping `ds-entry-checksum → etag`:**
+
+```bash
+dsconfig create-virtual-attribute \
+  --name "CTS ETag" \
+  --type mirror \
+  --set enabled:true \
+  --set attribute-type:etag \
+  --set source-attribute:ds-entry-checksum \
+  --set base-dn:dc=example,dc=com
+```
+
+PingDirectory's `ds-entry-checksum` provides the same per-entry hash functionality
+that PingDS's native `etag` does. The mirror virtual attribute makes it available
+under the name PingAM expects.
+
+#### PingAM Configuration Parameters
+
+When configuring PingAM via the `/config/configurator` REST endpoint to use
+PingDirectory, use these parameters:
+
+| Parameter | Value | Notes |
+|-----------|-------|-------|
+| `DATA_STORE` | `dirServer` | External directory (not embedded) |
+| `DIRECTORY_SSL` | `SSL` | Use LDAPS |
+| `DIRECTORY_SERVER` | `<pd-hostname>` | PingDirectory hostname |
+| `DIRECTORY_PORT` | `1636` | LDAPS port |
+| `DIRECTORY_ADMIN_PORT` | `1443` | PD HTTPS admin port |
+| `ROOT_SUFFIX` | `dc=example,dc=com` | PD's existing base DN |
+| `DS_DIRMGRDN` | `cn=administrator` | PD root user DN |
+| `DS_DIRMGRPASSWD` | `<password>` | PD root user password |
+| `USERSTORE_TYPE` | `LDAPv3ForOpenDS` | PD is OpenDS-compatible |
+| `USERSTORE_SSL` | `SSL` | Use LDAPS for user store too |
+| `USERSTORE_HOST` | `<pd-hostname>` | Same PD instance |
+| `USERSTORE_PORT` | `1636` | Same LDAPS port |
+| `USERSTORE_SUFFIX` | `dc=example,dc=com` | Same or different base DN |
+| `USERSTORE_MGRDN` | `cn=administrator` | PD root user DN |
+
+> **Key insight:** Both config store and user store point to the **same**
+> PingDirectory instance. PingAM creates its own subtrees
+> (`ou=services`, `ou=tokens`, etc.) under the base DN.
+
+#### SSL Certificate Trust
+
+PingAM's JVM must trust PingDirectory's TLS certificate. For self-signed certs:
+
+```bash
+# Extract PD's certificate
+openssl s_client -connect <pd-host>:1636 -showcerts </dev/null 2>/dev/null \
+  | openssl x509 -outform PEM > pd-cert.pem
+
+# Import into AM's JVM truststore (run as root in AM container)
+keytool -importcert \
+  -alias pingdirectory \
+  -file pd-cert.pem \
+  -cacerts \
+  -storepass changeit \
+  -trustcacerts \
+  -noprompt
+```
+
+> **Gotcha:** PingAM runs as user `forgerock` (uid 11111), but the JVM cacerts
+> file is owned by root. You must exec into the container as root (`docker exec -u 0`)
+> to import certificates.
+
+#### Monitoring and Debugging
+
+##### PingDirectory Access Log
+
+The most useful log for debugging AM↔PD connectivity is PingDirectory's access log:
+
+```bash
+# Live tail of PD access log
+docker exec <pd-container> tail -f /opt/out/instance/logs/access
+```
+
+Target patterns to look for:
+- `resultCode=0` — successful operations (normal)
+- `resultCode=32` — "No Such Object" (missing entry — check base DN)
+- `resultCode=65` — "Object Class Violation" (schema tweak not applied)
+- `base="ou=famrecords,ou=openam-session,ou=tokens,..."` — CTS token operations
+- `base="ou=services,..."` — AM config reads
+
+##### PingAM Debug Logs
+
+PingAM writes debug logs inside the container:
+
+```bash
+# Key debug files
+docker exec <am-container> ls /home/forgerock/openam/var/debug/
+
+# Most useful:
+docker exec <am-container> tail -f /home/forgerock/openam/var/debug/CoreSystem
+
+# Installation log (first-run only):
+docker exec <am-container> cat /home/forgerock/openam/var/install.log
+```
+
+| Debug file | Contains |
+|------------|----------|
+| `CoreSystem` | CTS errors, LDAP connection issues, session persistence |
+| `Authentication` | Auth tree execution, login failures |
+| `IdRepo` | User store lookups, identity operations |
+| `OAuth2Provider` | OAuth2/OIDC token operations |
+| `Configuration` | Config store reads/writes |
+
+##### PingAM Container Logs (stdout)
+
+Tomcat/AM stdout shows startup and initial LDAP connections:
+
+```bash
+docker logs --tail 20 <am-container>
+```
+
+Look for:
+- `Connection factory 'LdapClient(host=..., port=1636, protocol=LDAPS)' is now operational`
+  — confirms AM↔PD connectivity
+- `Server startup in [XXXX] milliseconds` — Tomcat ready
+
+#### Test Evidence (Feb 16, 2026)
+
+| Test | Result |
+|------|--------|
+| PingAM configurator → PingDirectory | ✅ 98 schema files loaded (all successful) |
+| CTS token persistence | ✅ 13 tokens in `ou=tokens,dc=example,dc=com` |
+| Admin authentication (`amAdmin`) | ✅ Valid `tokenId` + `iPlanetDirectoryPro` cookie |
+| PD access log evidence | ✅ 4000+ successful LDAP ops from AM |
+| PD `single-structural-objectclass-behavior` | Default: `reject` → set to: `accept` |
+| PD `etag` virtual attribute | Created: mirror `ds-entry-checksum → etag` |

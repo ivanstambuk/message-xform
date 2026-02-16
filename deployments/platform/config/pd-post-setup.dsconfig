@@ -1,0 +1,30 @@
+# ==============================================================================
+# PingDirectory post-setup configuration for PingAM compatibility
+# ==============================================================================
+# Two tweaks are required for PingAM 8.0.2 to run on PingDirectory 11.0:
+#
+# 1. Schema relaxation — PingAM writes LDAP entries without structural
+#    objectClasses that PingDirectory would normally reject. Setting
+#    single-structural-objectclass-behavior to 'accept' allows these entries.
+#
+# 2. ETag virtual attribute — PingAM's CTS (Core Token Service) expects
+#    an 'etag' attribute on token entries for optimistic concurrency control.
+#    PingDirectory doesn't have this natively, but does have ds-entry-checksum
+#    which serves the same purpose. A mirror virtual attribute maps
+#    ds-entry-checksum → etag.
+#
+# Verified working: Feb 16, 2026 — PingAM 8.0.2 + PingDirectory 11.0
+# ==============================================================================
+
+# 1. Relax structural objectClass enforcement
+dsconfig set-global-configuration-prop \
+  --set single-structural-objectclass-behavior:accept
+
+# 2. Create the 'etag' mirror virtual attribute
+dsconfig create-virtual-attribute \
+  --name "CTS ETag" \
+  --type mirror \
+  --set enabled:true \
+  --set attribute-type:etag \
+  --set source-attribute:ds-entry-checksum \
+  --set base-dn:dc=example,dc=com

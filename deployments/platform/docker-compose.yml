@@ -1,0 +1,127 @@
+# ==============================================================================
+# Platform Docker Compose — PingAccess + PingAM + PingDirectory
+# ==============================================================================
+# 3-container architecture: PingDirectory serves as the unified LDAP backend
+# for ALL PingAM needs (config, CTS, policy, AND user store).
+#
+# Prerequisites:
+#   1. Run ./scripts/generate-keys.sh (creates .env + secrets/)
+#   2. Build PingAM image:
+#        cd ../../binaries/pingam && docker build . -f docker/Dockerfile -t pingam:8.0.2
+#   3. PingDirectory license at ../../binaries/pingdirectory/license/
+#
+# Usage:
+#   docker compose up -d
+#   docker compose logs -f
+#   docker compose down
+# ==============================================================================
+
+networks:
+  platform:
+    driver: bridge
+
+volumes:
+  pd-data:
+    driver: local
+  am-data:
+    driver: local
+
+services:
+  # ── PingDirectory — Unified LDAP store ────────────────────────────────────
+  # Serves as config store, CTS token store, AND user/identity store for AM.
+  # Post-setup hook relaxes schema + creates etag virtual attribute.
+  pingdirectory:
+    image: pingidentity/pingdirectory:11.0.0.1-latest
+    hostname: ${HOSTNAME_PD}
+    container_name: platform-pingdirectory
+    networks:
+      - platform
+    ports:
+      - "${PD_LDAPS_PORT:-1636}:1636"
+      - "${PD_HTTPS_PORT:-1443}:1443"
+    volumes:
+      - pd-data:/opt/out
+      - ./config/pd-post-setup.dsconfig:/opt/staging/dsconfig/pd-post-setup.dsconfig:ro
+      - ${PD_LICENSE_PATH:-../../binaries/pingdirectory/license/PingDirectory-11.0.0.0-Development.lic}:/opt/staging/pd.profile/server-root/pre-setup/PingDirectory.lic:ro
+    environment:
+      - PING_IDENTITY_ACCEPT_EULA=YES
+      - PING_IDENTITY_DEVOPS_USER=${PING_IDENTITY_DEVOPS_USER:-}
+      - PING_IDENTITY_DEVOPS_KEY=${PING_IDENTITY_DEVOPS_KEY:-}
+      - ROOT_USER_DN=${PD_ROOT_USER_DN:-cn=administrator}
+      - ROOT_USER_PASSWORD_FILE=/run/secrets/pd-root-password
+      - USER_BASE_DN=${PD_BASE_DN:-dc=example,dc=com}
+      - MAKELDIF_USERS=${PD_MAKELDIF_USERS:-10}
+      - MAX_HEAP_SIZE=512m
+    secrets:
+      - pd-root-password
+    healthcheck:
+      test: ["CMD", "/opt/server/bin/ldapsearch",
+             "--hostname", "localhost",
+             "--port", "1636",
+             "--useSsl", "--trustAll",
+             "--bindDN", "cn=administrator",
+             "--bindPasswordFile", "/run/secrets/pd-root-password",
+             "--baseDN", "",
+             "--searchScope", "base",
+             "(objectClass=*)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+
+  # ── PingAM — Authentication server (ForgeRock AM) ─────────────────────────
+  # Deployed as WAR on Tomcat. Uses PingDirectory for config, CTS, AND users.
+  # First-run setup via scripts/configure-am.sh.
+  pingam:
+    image: pingam:8.0.2
+    hostname: ${HOSTNAME_AM}
+    container_name: platform-pingam
+    depends_on:
+      pingdirectory:
+        condition: service_healthy
+    networks:
+      - platform
+    ports:
+      - "${AM_HTTP_PORT:-8080}:8080"
+      - "${AM_HTTPS_PORT:-8443}:8443"
+    volumes:
+      - am-data:/home/forgerock/openam
+      - ./secrets/tlskey.p12:/usr/local/tomcat/ssl/tlskey.p12:ro
+      - ./config/server.xml:/usr/local/tomcat/conf/server.xml:ro
+    environment:
+      - SSL_PWD=${SSL_PWD}
+      - HOSTNAME_AM=${HOSTNAME_AM}
+      - HOSTNAME_PD=${HOSTNAME_PD}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/am/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+
+  # ── PingAccess — Reverse proxy + message-xform plugin ─────────────────────
+  # Fronts PingAM. Configured via Admin API after startup.
+  pingaccess:
+    image: pingidentity/pingaccess:latest
+    hostname: ${HOSTNAME_PA}
+    container_name: platform-pingaccess
+    depends_on:
+      pingam:
+        condition: service_healthy
+    networks:
+      - platform
+    ports:
+      - "${PA_ENGINE_PORT:-3000}:3000"
+      - "${PA_ADMIN_PORT:-9000}:9000"
+    volumes:
+      - ./secrets/tlskey.p12:/opt/in/instance/conf/tlskey.p12:ro
+      - ./secrets/pubCert.crt:/opt/in/instance/conf/pubCert.crt:ro
+    environment:
+      - PING_IDENTITY_ACCEPT_EULA=YES
+      - PING_IDENTITY_DEVOPS_USER=${PING_IDENTITY_DEVOPS_USER:-}
+      - PING_IDENTITY_DEVOPS_KEY=${PING_IDENTITY_DEVOPS_KEY:-}
+
+# ── Docker Secrets ──────────────────────────────────────────────────────────
+secrets:
+  pd-root-password:
+    environment: PD_ROOT_USER_PWD
