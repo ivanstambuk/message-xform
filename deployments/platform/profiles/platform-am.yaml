@@ -1,0 +1,28 @@
+# Platform transform profile — routes specs to AM API paths
+#
+# This profile is used by the MessageTransform rule that fronts PingAM
+# through PingAccess. It demonstrates the recommended deployment pattern:
+# one rule per application + profile routing (ops guide §21).
+#
+# AM paths arrive as /am/json/... through the PA reverse proxy.
+#
+profile: platform-am
+version: "1.0.0"
+description: "Routes transform specs to PingAM API paths"
+
+transforms:
+  # ── Response body cleanup for /json/authenticate ──
+  # Cleans up AM's verbose success response into a friendlier API surface.
+  # Only fires on responses (AM → PA → client).
+  - spec: am-auth-response@1.0.0
+    direction: response
+    match:
+      path: "/am/json/authenticate"
+      method: POST
+
+  # ── Header injection for all AM /json/** responses ──
+  # Adds X-Auth-Provider header to all AM API responses.
+  - spec: am-header-inject@1.0.0
+    direction: response
+    match:
+      path: "/am/json/**"

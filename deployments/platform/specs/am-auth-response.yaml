@@ -1,0 +1,57 @@
+# Transform spec: PingAM authentication response cleanup
+#
+# Applied to RESPONSE direction only on /am/json/authenticate.
+# Transforms AM's raw success response into a cleaner API surface.
+#
+# AM raw response:
+#   {
+#     "tokenId": "KhtTF2Ih...*AAJTSQACMDEAAlNLABxadGUz...",
+#     "successUrl": "/am/console",
+#     "realm": "/"
+#   }
+#
+# Transformed response:
+#   {
+#     "token": "KhtTF2Ih...",
+#     "authenticated": true,
+#     "redirectUrl": "/am/console",
+#     "realm": "/"
+#   }
+#
+# The transform:
+#   1. Renames tokenId → token (cleaner field name)
+#   2. Adds "authenticated: true" boolean (client convenience)
+#   3. Renames successUrl → redirectUrl (more descriptive)
+#   4. Preserves realm as-is
+#
+# Note: This spec only transforms the success response. Callback
+# responses (which contain authId + callbacks[]) pass through untouched
+# because they don't contain a "tokenId" field — JSLT outputs null for
+# missing fields, which means the profile matching can't distinguish them.
+# To handle this, we use a status-based match (200 only) and the JSLT
+# uses if-present guards.
+#
+id: am-auth-response
+version: "1.0.0"
+description: "Clean up PingAM authentication success response"
+
+input:
+  schema:
+    type: object
+
+output:
+  schema:
+    type: object
+
+transform:
+  lang: jslt
+  expr: |
+    if (.tokenId)
+      {
+        "token": .tokenId,
+        "authenticated": true,
+        "redirectUrl": .successUrl,
+        "realm": .realm
+      }
+    else
+      .

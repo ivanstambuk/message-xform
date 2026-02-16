@@ -30,6 +30,8 @@
 | 9 | [Configure PingAccess](#9-configure-pingaccess-reverse-proxy-for-pingam) | Reverse proxy for PingAM via Admin API |
 | | **Part IV-B — WebAuthn / Passkey Journeys** | |
 | 9b | [WebAuthn Journey](#9b-webauthn-journey) | Import and configure passkey authentication |
+| | **Part IV-C — Message-xform Plugin** | |
+| 9c | [Message-xform Plugin Wiring](#9c-message-xform-plugin-wiring) | Transform specs, profiles, and rule binding |
 | | **Part V — Operations** | |
 | 10 | [Log Monitoring](#10-log-monitoring) | Real-time log tailing recipes |
 | 11 | [Troubleshooting](#11-troubleshooting) | Error→fix lookup table |
@@ -350,8 +352,7 @@ docker compose logs -f pingam
 
 > **docker-compose v1 bug:** The `pingam:8.0.2` image (built with newer Docker)
 > causes a `KeyError: 'ContainerConfig'` crash in docker-compose v1 (1.29.x).
-> **Workaround:** Use `docker run` directly (see below) or upgrade to
-> docker-compose v2 (`docker compose` without the hyphen).
+> **Fix:** Install Docker Compose v2 — see [§9c](#docker-compose-v2-requirement).
 
 > **Port collision:** If port 8080 is already in use on the host, override in
 > `.env`:
@@ -693,7 +694,7 @@ curl -sf -X POST "http://<am-host>:8080/am/json/authenticate" \
 ### 8. Start PingAccess
 
 ```bash
-docker-compose up -d pingaccess
+docker compose up -d pingaccess
 # Or via docker run (if compose can't adopt existing containers):
 set -a && source .env && set +a
 docker run -d --name platform-pingaccess \
@@ -870,6 +871,216 @@ curl -s -H 'Host: am.platform.local:18080' \
 
 ---
 
+## Part IV-C — Message-xform Plugin
+
+### 9c. Message-xform Plugin Wiring
+
+The message-xform adapter transforms PingAM's raw authentication responses into
+a cleaner API surface. It runs as a PingAccess Processing Rule, modifying
+responses as they flow back from AM through PA to the client.
+
+#### Why response-only?
+
+PingAM's callback authentication protocol (see [PingAM §8](#8-rest-authentication--callback-pattern))
+requires the `authId` JWT and callback structure to be echoed back **verbatim**.
+Any request-side transformation would break this round-trip. The transform
+engine therefore only operates in the **response direction**, cleaning up
+existing fields rather than restructuring the protocol.
+
+#### Architecture
+
+```
+                              ┌────────────────────────┐
+  Client ────POST──▶ PA ──▶ AM ──▶ Auth Tree ────▶ PA ──▶ Transform ──▶ Client
+            /authenticate           (callback)          │
+                                                        ▼
+                                                   Body rename:
+                                                     tokenId → token
+                                                     successUrl → redirectUrl
+                                                   Field inject:
+                                                     authenticated: true
+                                                   Header inject:
+                                                     X-Auth-Provider: PingAM
+                                                     X-Transform-Engine: message-xform
+```
+
+#### File layout
+
+```
+deployments/platform/
+├── specs/
+│   ├── am-auth-response.yaml      # Body transform for auth success
+│   └── am-header-inject.yaml      # Header injection for all AM responses
+├── profiles/
+│   └── platform-am.yaml           # Routes specs to AM API paths
+└── scripts/
+    ├── configure-pa.sh            # Base PA config (site, app, resource)
+    └── configure-pa-plugin.sh     # Plugin rule creation + policy binding
+```
+
+Inside the PingAccess container:
+
+| Host path | Container path | Purpose |
+|-----------|----------------|--------|
+| `adapter-pingaccess/build/libs/adapter-pingaccess-0.1.0-SNAPSHOT.jar` | `/opt/server/deploy/message-xform-adapter.jar` | Shadow JAR (auto-discovered by PA classloader) |
+| `specs/` | `/specs` | Transform spec YAML files |
+| `profiles/` | `/profiles` | Profile files routing specs to paths |
+
+#### Transform specs
+
+##### `am-auth-response.yaml` — Body transform
+
+Transforms PingAM's authentication success response:
+
+| AM raw field | Transformed field | Notes |
+|-------------|-------------------|-------|
+| `tokenId` | `token` | Cleaner field name |
+| `successUrl` | `redirectUrl` | More descriptive |
+| (none) | `authenticated: true` | Client convenience boolean |
+| `realm` | `realm` | Preserved as-is |
+
+The spec uses a JSLT `if (.tokenId)` guard: callback responses (which don't
+contain `tokenId`) pass through unchanged. Only final success responses are
+transformed.
+
+**AM raw response:**
+```json
+{
+  "tokenId": "ZNHQ9iMy7F3dMBBy...",
+  "successUrl": "/am/console",
+  "realm": "/"
+}
+```
+
+**Transformed response:**
+```json
+{
+  "token": "ZNHQ9iMy7F3dMBBy...",
+  "authenticated": true,
+  "redirectUrl": "/am/console",
+  "realm": "/"
+}
+```
+
+##### `am-header-inject.yaml` — Header injection
+
+Adds custom headers to all PingAM API responses (`/am/json/**`):
+
+| Header | Value | Purpose |
+|--------|-------|--------|
+| `X-Auth-Provider` | `PingAM` | Identifies the authentication provider |
+| `X-Transform-Engine` | `message-xform` | Identifies the transform engine |
+
+> **Header case:** PA normalizes response headers to lowercase.
+> Clients should check for `x-auth-provider` (not `X-Auth-Provider`).
+
+#### Profile routing
+
+The `platform-am.yaml` profile routes specs to PingAM API paths:
+
+| Spec | Method | Path | Direction |
+|------|--------|------|-----------|
+| `am-auth-response` | `POST` | `/am/json/authenticate` | Response |
+| `am-header-inject` | `POST` | `/am/json/**` | Response |
+
+This follows the recommended **one rule per application** pattern: a single
+MessageTransform rule is attached to the PingAM Proxy application, and the
+profile handles all path-based routing internally.
+
+#### Setup procedure
+
+**Step 1: Build the shadow JAR** (if not already built):
+```bash
+cd /path/to/message-xform
+./gradlew :adapter-pingaccess:shadowJar
+# → adapter-pingaccess/build/libs/adapter-pingaccess-0.1.0-SNAPSHOT.jar (~4.7 MB)
+```
+
+**Step 2: Restart PingAccess** with the new volume mounts:
+```bash
+cd deployments/platform
+docker compose up -d pingaccess  # recreates container with JAR + specs + profiles
+```
+
+The `docker-compose.yml` already includes the volume mounts:
+```yaml
+# message-xform plugin (Phase 7)
+- ../../adapter-pingaccess/build/libs/adapter-pingaccess-0.1.0-SNAPSHOT.jar:/opt/server/deploy/message-xform-adapter.jar:ro
+- ./specs:/specs:ro
+- ./profiles:/profiles:ro
+```
+
+**Step 3: Configure the base PA proxy** (if not already done):
+```bash
+./scripts/configure-pa.sh
+```
+
+**Step 4: Wire the plugin:**
+```bash
+./scripts/configure-pa-plugin.sh
+```
+
+This script:
+1. Verifies the `MessageTransformRule` descriptor is available in PA (JAR auto-discovered)
+2. Creates a Processing Rule with the spec/profile configuration
+3. Finds the existing PingAM Proxy application and its root resource
+4. Attaches the rule to the root resource's **Web** policy bucket
+5. Verifies transform is active via PA engine logs
+
+> **Idempotent:** The script detects existing rules and resources. Re-running
+> it safely skips already-created objects.
+
+#### Verification
+
+```bash
+# Test 1: Callback response passes through unchanged
+curl -sk -H 'Host: localhost:3000' \
+  -X POST 'https://localhost:13000/am/json/authenticate' \
+  -H 'Content-Type: application/json' \
+  -H 'Accept-API-Version: resource=2.0,protocol=1.0'
+# → { "authId": "...", "callbacks": [...] }  (unchanged — JSLT guard)
+
+# Test 2: Auth success is transformed
+# (fill callbacks with user.1 / Password1 and submit)
+# → { "token": "...", "authenticated": true, "redirectUrl": "/am/console", "realm": "/" }
+
+# Test 3: Headers injected
+curl -sk -H 'Host: localhost:3000' \
+  -X POST 'https://localhost:13000/am/json/authenticate' \
+  -H 'Content-Type: application/json' \
+  -H 'Accept-API-Version: resource=2.0,protocol=1.0' \
+  -o /dev/null -v 2>&1 | grep -i 'x-auth-provider\|x-transform-engine'
+# → x-auth-provider: PingAM
+# → x-transform-engine: message-xform
+
+# Test 4: Hot-reload active (30s)
+docker logs platform-pingaccess 2>&1 | grep 'Registry reloaded'
+# → Registry reloaded: specs=4, profile=platform-am  (every 30s)
+```
+
+#### Docker Compose v2 requirement
+
+docker-compose v1 (1.29.x, the Ubuntu package `docker-compose`) has a
+`KeyError: 'ContainerConfig'` bug with newer Docker images, including
+PingDirectory 11.0. This causes `docker-compose up` to crash when
+recreating containers.
+
+**Fix:** Install Docker Compose v2:
+```bash
+sudo apt-get install -y docker-compose-v2
+# Verify: docker compose version → 2.37.1 or later
+```
+
+After installation, use `docker compose` (space, not hyphen) for all commands.
+The `docker-compose.yml` file format is compatible with both versions — only
+the CLI binary changed.
+
+> **Affected images (confirmed):** `pingidentity/pingdirectory:11.0.0.1-latest`.
+> The `pingam:8.0.2` custom build and `pingidentity/pingaccess:latest` also
+> trigger this when docker-compose v1 tries to recreate them.
+
+---
+
 ## Part V — Operations
 
 ### 10. Log Monitoring
@@ -937,7 +1148,7 @@ SEARCH RESULT ... base="" scope=0 filter="(objectClass=*)" attrs="1.1" resultCod
 | `CONTAINER FAILURE: Resolve the location of your dsconfig directory` | dsconfig mounted at wrong path | Mount at `/opt/staging/pd.profile/dsconfig/`, **NOT** `/opt/staging/dsconfig/` |
 | `The string value 'etag' is not a valid attribute type` | etag schema not loaded before dsconfig | Mount schema at `pd.profile/server-root/pre-setup/config/schema/99-etag.ldif` (pre-setup, not runtime) |
 | `Schema configuration file 99-etag.ldif ... cannot be parsed` | Incorrect LDIF format for schema file | Use `objectClass: subschema` (not `subschemaSubentry`). No `LDIF:UNWRAP` header. |
-| `KeyError: 'ContainerConfig'` from docker-compose | docker-compose v1 incompatible with newer image format | Use `docker run` directly, or upgrade to docker-compose v2 (`docker compose`) |
+| `KeyError: 'ContainerConfig'` from docker-compose | docker-compose v1 incompatible with newer image format | Install `docker-compose-v2`: `sudo apt-get install -y docker-compose-v2`. Use `docker compose` (space). See [§9c](#docker-compose-v2-requirement). |
 | `Encryption key must be provided.` from configurator | `AM_ENC_KEY` parameter is empty | Generate a random key: `openssl rand -base64 24` |
 | `keystore password was incorrect` on Tomcat HTTPS | PKCS#12 keystore mounted without matching `SSL_PWD` env var | Pass `SSL_PWD` to container or accept HTTP-only (HTTPS connector fails, HTTP still works) |
 | `/json/authenticate` hangs or returns empty with `X-OpenAM-*` headers | ZeroPageLogin disabled (default in AM 8.0) — this is intentional | Use callback-based auth (2-step `authId` flow) instead. See [PingAM §8](./pingam-operations-guide.md#8-rest-authentication--callback-pattern) |
@@ -949,6 +1160,10 @@ SEARCH RESULT ... base="" scope=0 filter="(objectClass=*)" attrs="1.1" resultCod
 | docker-compose v1 can't start PA (`container name already in use`) | Existing containers created via `docker run` lack compose labels | Use `docker run` directly on same network, or `docker rm -f` the stale container first |
 | `No Configuration found` on `authIndexType=service&authIndexValue=WebAuthnJourney` | Tree nodes weren't created (curl `-sf` hid errors) | Re-run import with `-s` (not `-sf`). Verify nodes exist before importing the tree. Use `Host:` header, not `--resolve` |
 | Changing `orgConfig` to a tree name breaks **all** authentication | `orgConfig` must point to a chain or tree that AM can resolve at startup | Revert via `authIndexType=service&authIndexValue=ldapService` (which always works), then PUT orgConfig back to `ldapService` |
+| `Rule with name '...' already exists.` | Plugin rule already created (script re-run) | Script is idempotent — existing rules are reused |
+| Transform not applied (original `tokenId` in response) | Rule not attached to application resource, or profile doesn't match path | Verify: `curl …/pa-admin-api/v3/applications/1/resources` shows rule in policy. Check `activeProfile` matches YAML filename (without `.yaml`). |
+| PA logs show `Registry reloaded: specs=0` | Specs directory empty or mountpoint wrong | Verify: `docker exec platform-pingaccess ls /specs/` shows YAML files |
+| Headers not appearing in response | Case mismatch — PA lowercases headers | Check for `x-auth-provider` (lowercase) not `X-Auth-Provider` |
 
 #### Startup order
 
@@ -1015,16 +1230,19 @@ docker compose up -d pingam
 │  PingAccess       Engine:13000  Admin :19000  (container: 3000/9000) │
 │                   user: administrator        pw: 2Access            │
 │                                                                     │
-│  AM Auth (callback — 2 steps):                                      │
-│    1. AUTH_ID=$(curl -sf -X POST http://am:8080/am/json/authenticate │
-│         -H 'Content-Type: application/json'                          │
-│         -H 'Accept-API-Version: resource=2.0,protocol=1.0'           │
-│         | python3 -c "import sys,json;                                │
-│           print(json.load(sys.stdin)['authId'])")                    │
-│    2. curl -sf -X POST http://am:8080/am/json/authenticate           │
-│         -H 'Content-Type: application/json'                          │
-│         -H 'Accept-API-Version: resource=2.0,protocol=1.0'           │
-│         -d '{"authId":"$AUTH_ID","callbacks":[...]}'                 │
+│  AM Auth (callback — 2 steps via PA):                                │
+│    1. POST https://localhost:13000/am/json/authenticate               │
+│       → { authId, callbacks[] }                                      │
+│    2. POST with filled callbacks                                     │
+│       → { token, authenticated, redirectUrl, realm }                 │
+│       (transformed by message-xform from tokenId/successUrl)         │
+│                                                                     │
+│  Transform plugin:                                                   │
+│    Specs:    /specs/am-auth-response.yaml, am-header-inject.yaml    │
+│    Profile:  /profiles/platform-am.yaml                              │
+│    Headers:  x-auth-provider: PingAM                                │
+│              x-transform-engine: message-xform                      │
+│    Setup:    ./scripts/configure-pa-plugin.sh                       │
 │                                                                     │
 │  PD tweaks (both required before AM config):                        │
 │    1. single-structural-objectclass-behavior: accept                │
@@ -1037,7 +1255,7 @@ docker compose up -d pingam
 
 ## See Also
 
-- [PingAM Operations Guide](./pingam-operations-guide.md) — image build, product deep-dive, PD compatibility details
-- [PingAccess Operations Guide](./pingaccess-operations-guide.md) — reverse proxy configuration
+- [PingAM Operations Guide](./pingam-operations-guide.md) — image build, product deep-dive, PD compatibility, [transformed response surface](./pingam-operations-guide.md#transformed-response-via-pingaccess--message-xform)
+- [PingAccess Operations Guide](./pingaccess-operations-guide.md) — reverse proxy configuration, [Admin API recipe](./pingaccess-operations-guide.md#5-admin-api--full-configuration-recipe), [deployment patterns](./pingaccess-operations-guide.md#13-deployment-patterns-hot-reload--faq)
 - [Implementation Plan](../../deployments/platform/PLAN.md) — phased plan with live tracker
 - [Platform README](../../deployments/platform/README.md) — architecture overview and quick start

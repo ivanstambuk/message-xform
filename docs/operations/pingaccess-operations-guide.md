@@ -2427,6 +2427,8 @@ including all request/response schemas.
 ## 20. See Also & Changelog
 - [Feature 002 Spec](../architecture/features/002/spec.md) — Full functional requirements
 - [PingAccess SDK Guide](../reference/pingaccess-sdk-guide.md) — SDK class reference
+- [Platform Deployment Guide](./platform-deployment-guide.md) — 3-container deployment with PA, AM, PD; includes [plugin wiring (§9c)](./platform-deployment-guide.md#9c-message-xform-plugin-wiring)
+- [PingAM Operations Guide](./pingam-operations-guide.md) — AM build, config, callback auth, transformed response surface
 - [ADR-0023](../decisions/ADR-0023-cross-profile-routing-is-product-defined.md) — Cross-profile routing is product-defined
 - [ADR-0006](../decisions/ADR-0006-profile-match-resolution.md) — Most-specific-wins match resolution
 - [ADR-0031](../decisions/ADR-0031-pa-provided-dependencies.md) — PA-provided dependencies
@@ -2445,3 +2447,4 @@ including all request/response schemas.
 | 2026-02-15 | Added §25 — OIDC / Common Token Provider: token provider types, discovery requirements, issuer matching, Web Session config, auth code flow, session cookie format, mock-OIDC proxy architecture, metadata caching, OIDC 403 debugging, API endpoint reference |
 | 2026-02-15 | §25 major update — expanded to three OIDC configurations (added PingFederate Runtime requirement), added `ping_end_session_endpoint` to discovery requirements, fixed mock-oauth2-server HTTPS config (SERVER_SSL_* env vars, not JSON_CONFIG/NettyWrapper), added Admin API GET-modify-PUT pattern, added programmatic metadata pre-fetch for E2E tests |
 | 2026-02-16 | Restructured: 25 flat sections → 20 sections in 7 Parts + Appendices. Deployment consolidated (§12+§13+§18–§23 → Part IV). Debugging merged (§10+§15 → §15). Rule Execution Order moved from §24 → §10. |
+| 2026-02-16 | Added cross-references to Platform Deployment Guide and PingAM Operations Guide. Platform integration with message-xform plugin documented in §9c of the platform guide. |

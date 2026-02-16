@@ -469,7 +469,9 @@ keytool -importcert \
 >
 > **Gotcha — docker-compose v1:** The `pingam:8.0.2` image (built with newer
 > Docker) causes `KeyError: 'ContainerConfig'` in docker-compose v1 (1.29.x).
-> Use `docker run` directly or upgrade to docker-compose v2.
+> Install Docker Compose v2: `sudo apt-get install -y docker-compose-v2`.
+> Then use `docker compose` (space, not hyphen). See
+> [Platform Deployment Guide §9c](./platform-deployment-guide.md#docker-compose-v2-requirement).
 >
 > **Gotcha — HTTPS keystore:** If mounting a custom PKCS#12 keystore in
 > `server.xml`, ensure the `SSL_PWD` environment variable matches the keystore
@@ -650,6 +652,30 @@ curl -s -H "Host: am.platform.local:18080" \
   }"
 # Returns: { "tokenId": "AQIC5wM…", "successUrl": "/am/console", "realm": "/" }
 ```
+
+#### Transformed response (via PingAccess + message-xform)
+
+When PingAM is fronted by PingAccess with the message-xform adapter, the
+success response is transformed before reaching the client:
+
+| AM raw response | Transformed response |
+|----------------|---------------------|
+| `"tokenId": "AQIC5wM…"` | `"token": "AQIC5wM…"` |
+| `"successUrl": "/am/console"` | `"redirectUrl": "/am/console"` |
+| (none) | `"authenticated": true` |
+| `"realm": "/"` | `"realm": "/"` |
+
+Additionally, response headers are injected:
+- `x-auth-provider: PingAM`
+- `x-transform-engine: message-xform`
+
+Callback responses (containing `authId` + `callbacks[]`) are **not** transformed —
+the JSLT `if (.tokenId)` guard ensures only final success responses are modified.
+This is critical because AM's callback protocol requires the `authId` JWT to be
+echoed back verbatim in subsequent requests.
+
+> **See:** [Platform Deployment Guide §9c](./platform-deployment-guide.md#9c-message-xform-plugin-wiring)
+> for the full plugin wiring procedure, spec files, and profile configuration.
 
 #### Why callbacks are preferred over ZeroPageLogin
 

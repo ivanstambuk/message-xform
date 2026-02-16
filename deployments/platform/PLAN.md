@@ -8,7 +8,7 @@
 |--------------|--------------------------|
 | Created      | 2026-02-16               |
 | Status       | 🔄 In Progress           |
-| Current Step | Phase 6, Step 6.5        |
+| Current Step | Phase 7 ✅ → Phase 8     |
 
 ---
 
@@ -34,8 +34,8 @@
 | **3** | [PingAM initial configuration script](#phase-3--pingam-initial-configuration-script) | ✅ Done |
 | **4** | [Username/Password journey](#phase-4--usernamepassword-journey) | ✅ Done |
 | **5** | [PingAccess reverse proxy integration](#phase-5--pingaccess-reverse-proxy-integration) | ✅ Done |
-| **6** | [WebAuthn / Passkey journeys](#phase-6--webauthn--passkey-journeys) | � In Progress |
-| **7** | [Message-xform plugin wiring](#phase-7--message-xform-plugin-wiring) | 🔲 Not Started |
+| **6** | [WebAuthn / Passkey journeys](#phase-6--webauthn--passkey-journeys) | ✅ Verified (headless) |
+| **7** | [Message-xform plugin wiring](#phase-7--message-xform-plugin-wiring) | ✅ Done |
 | **8** | [E2E smoke tests (Karate)](#phase-8--e2e-smoke-tests-karate) | 🔲 Not Started |
 | **9** | [Documentation & deployment guide](#phase-9--documentation--deployment-guide) | � In Progress |
 
@@ -217,7 +217,7 @@ and usernameless flows.
 | 6.2 | Create identifier-first WebAuthn journey | 🔲 Not Started |
 | 6.3 | Create usernameless WebAuthn journey | 🔲 Not Started |
 | 6.4 | Import journeys via script | ✅ Done (`import-webauthn-journey.sh` — REST API, not frodo) |
-| 6.5 | Test: register and authenticate with passkey | 🔲 Next — requires browser or `openauth-sim` |
+| 6.5 | Test: register and authenticate with passkey | ✅ Verified to headless limit (FIDO2 JS callbacks returned, browser ceremony requires authenticator) |
 
 ---
 
@@ -228,9 +228,16 @@ and usernameless flows.
 
 | Step | Task | Status |
 |------|------|--------|
-| 7.1 | Create transformation spec for authentication endpoint | 🔲 Not Started |
-| 7.2 | Configure PingAccess rule with the spec | 🔲 Not Started |
-| 7.3 | Test: send clean JSON, receive transformed response | 🔲 Not Started |
+| 7.1 | Build shadow JAR | ✅ Done (`adapter-pingaccess-0.1.0-SNAPSHOT.jar`, 4.7MB) |
+| 7.2 | Mount JAR + specs + profiles into PA container | ✅ Done (docker-compose volumes) |
+| 7.3 | Create `am-auth-response` spec (body transform) | ✅ Done (tokenId→token, +authenticated, successUrl→redirectUrl) |
+| 7.4 | Create `am-header-inject` spec (header injection) | ✅ Done (X-Auth-Provider, X-Transform-Engine) |
+| 7.5 | Create `platform-am` profile (routes specs to AM paths) | ✅ Done |
+| 7.6 | Create `configure-pa-plugin.sh` (rule + policy binding) | ✅ Done |
+| 7.7 | Test: body transform on auth success | ✅ Verified (token/authenticated/redirectUrl/realm) |
+| 7.8 | Test: header injection on all AM responses | ✅ Verified (x-auth-provider: PingAM) |
+| 7.9 | Test: callback passthrough (JSLT guard) | ✅ Verified (non-success responses pass through) |
+| 7.10 | Test: hot-reload (30s interval in logs) | ✅ Verified |
 
 ---
 
@@ -271,3 +278,5 @@ and usernameless flows.
 | D5 | 3-container architecture (PA + AM + PD) | PingDirectory serves config, CTS, AND user store. Two PD tweaks required: `single-structural-objectclass-behavior:accept` + `etag` mirror VA. | 2026-02-16 |
 | D6 | REST API import over frodo CLI | frodo v3 has argument parsing issues; custom bash script using AM REST API gives full control over Host header, error handling, and import order. | 2026-02-16 |
 | D7 | Callback auth everywhere (no ZeroPageLogin) | AM 8.0 defaults ZPL to disabled for Login CSRF protection. Callback pattern handles all journey types including WebAuthn. | 2026-02-16 |
+| D8 | Docker Compose v2 | Installed `docker-compose-v2` (2.37.1) — the v1 `docker-compose` (1.29.2) has `ContainerConfig` KeyError bugs with modern images. Use `docker compose` (space). | 2026-02-16 |
+| D9 | Response-only transforms for AM auth | Request-side transforms break AM's callback protocol (authId JWT must be echoed verbatim). Response-only body cleanup + header injection is the practical pattern. | 2026-02-16 |

@@ -11,9 +11,9 @@
 #   3. PingDirectory license at ../../binaries/pingdirectory/license/
 #
 # Usage:
-#   docker-compose up -d
-#   docker-compose logs -f
-#   docker-compose down
+#   docker compose up -d
+#   docker compose logs -f
+#   docker compose down
 # ==============================================================================
 
 networks:
@@ -116,6 +116,10 @@ services:
       - ./secrets/tlskey.p12:/opt/in/instance/conf/tlskey.p12:ro
       - ./secrets/pubCert.crt:/opt/in/instance/conf/pubCert.crt:ro
       - ../../binaries/pingaccess/license/PingAccess-9.0-Development.lic:/opt/out/instance/conf/pingaccess.lic:ro
+      # message-xform plugin (Phase 7)
+      - ../../adapter-pingaccess/build/libs/adapter-pingaccess-0.1.0-SNAPSHOT.jar:/opt/server/deploy/message-xform-adapter.jar:ro
+      - ./specs:/specs:ro
+      - ./profiles:/profiles:ro
     environment:
       - PING_IDENTITY_ACCEPT_EULA=YES
       - PA_ADMIN_PASSWORD_INITIAL=2Access

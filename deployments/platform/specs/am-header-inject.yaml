@@ -1,0 +1,27 @@
+# Transform spec: Add X-Auth-Provider header to all AM responses
+#
+# Injects a custom header to identify the authentication provider.
+# This demonstrates the header injection capability working alongside
+# the body transform spec.
+#
+id: am-header-inject
+version: "1.0.0"
+description: "Inject X-Auth-Provider header on AM responses"
+
+input:
+  schema:
+    type: object
+
+output:
+  schema:
+    type: object
+
+# Identity transform — pass body through unchanged
+transform:
+  lang: jslt
+  expr: "."
+
+headers:
+  add:
+    X-Auth-Provider: "PingAM"
+    X-Transform-Engine: "message-xform"
