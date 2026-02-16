@@ -199,10 +199,10 @@ endpoints accessible through PingAccess on a clean external port.
 
 | Step | Task | Status |
 |------|------|--------|
-| 5.1 | Configure PA site pointing to PingAM backend | 🔲 Not Started |
-| 5.2 | Configure PA application with context `/am` | 🔲 Not Started |
-| 5.3 | Test: access PingAM login via PingAccess address | 🔲 Not Started |
-| 5.4 | Mount message-xform plugin JAR (no transformation rules yet) | 🔲 Not Started |
+| 5.1 | Configure PA site pointing to PingAM backend | ✅ Done (am.platform.local:8080, HTTP) |
+| 5.2 | Configure PA application with context `/am` | ✅ Done (Web type, unprotected, enabled) |
+| 5.3 | Test: access PingAM login via PingAccess address | ✅ Done (callback auth via PA returns tokenId) |
+| 5.4 | Mount message-xform plugin JAR (no transformation rules yet) | 🔲 Deferred to Phase 7 |
 
 ---
 

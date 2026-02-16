@@ -110,12 +110,15 @@ services:
     networks:
       - platform
     ports:
-      - "${PA_ENGINE_PORT:-3000}:3000"
-      - "${PA_ADMIN_PORT:-9000}:9000"
+      - "${PA_ENGINE_PORT:-13000}:3000"
+      - "${PA_ADMIN_PORT:-19000}:9000"
     volumes:
       - ./secrets/tlskey.p12:/opt/in/instance/conf/tlskey.p12:ro
       - ./secrets/pubCert.crt:/opt/in/instance/conf/pubCert.crt:ro
+      - ../../binaries/pingaccess/license/PingAccess-9.0-Development.lic:/opt/out/instance/conf/pingaccess.lic:ro
     environment:
       - PING_IDENTITY_ACCEPT_EULA=YES
+      - PA_ADMIN_PASSWORD_INITIAL=2Access
+      - PING_IDENTITY_PASSWORD=2Access
       - PING_IDENTITY_DEVOPS_USER=${PING_IDENTITY_DEVOPS_USER:-}
       - PING_IDENTITY_DEVOPS_KEY=${PING_IDENTITY_DEVOPS_KEY:-}
