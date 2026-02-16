@@ -32,6 +32,9 @@ docs/operations/pinggateway-operations-guide.md
 # PingDS Operations & Deployment (Docker image build, demo/production modes, secrets, rebuild playbook)
 docs/operations/pingds-operations-guide.md
 
+# PingAM Operations & Deployment (custom Docker image from WAR, Tomcat 10 + JDK 21, rebuild playbook)
+docs/operations/pingam-operations-guide.md
+
 # Feature 004 — Standalone HTTP Proxy Mode
 docs/architecture/features/004/spec.md
 docs/architecture/features/004/plan.md
