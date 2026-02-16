@@ -1,0 +1,146 @@
+# ==============================================================================
+# Test users for PingAM authentication
+# ==============================================================================
+# Created under ou=People,dc=example,dc=com — the subtree AM uses as its
+# identity store (configured via USERSTORE_SUFFIX during AM setup).
+#
+# Password for all users: Password1
+# Hash: pre-computed SSHA via PingDirectory's password policy
+#
+# Usage:
+#   docker cp config/test-users.ldif <pd-container>:/tmp/
+#   docker exec <pd-container> /opt/out/instance/bin/ldapmodify \
+#     --hostname localhost --port 1636 --useSsl --trustAll \
+#     --bindDN "cn=administrator" --bindPassword 2FederateM0re \
+#     --filename /tmp/test-users.ldif
+# ==============================================================================
+
+dn: uid=user.1,ou=People,dc=example,dc=com
+changetype: add
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: inetOrgPerson
+uid: user.1
+cn: Test User 1
+sn: User1
+givenName: Test
+mail: user.1@example.com
+userPassword: Password1
+
+dn: uid=user.2,ou=People,dc=example,dc=com
+changetype: add
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: inetOrgPerson
+uid: user.2
+cn: Test User 2
+sn: User2
+givenName: Test
+mail: user.2@example.com
+userPassword: Password1
+
+dn: uid=user.3,ou=People,dc=example,dc=com
+changetype: add
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: inetOrgPerson
+uid: user.3
+cn: Test User 3
+sn: User3
+givenName: Test
+mail: user.3@example.com
+userPassword: Password1
+
+dn: uid=user.4,ou=People,dc=example,dc=com
+changetype: add
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: inetOrgPerson
+uid: user.4
+cn: Test User 4
+sn: User4
+givenName: Test
+mail: user.4@example.com
+userPassword: Password1
+
+dn: uid=user.5,ou=People,dc=example,dc=com
+changetype: add
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: inetOrgPerson
+uid: user.5
+cn: Test User 5
+sn: User5
+givenName: Test
+mail: user.5@example.com
+userPassword: Password1
+
+dn: uid=user.6,ou=People,dc=example,dc=com
+changetype: add
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: inetOrgPerson
+uid: user.6
+cn: Test User 6
+sn: User6
+givenName: Test
+mail: user.6@example.com
+userPassword: Password1
+
+dn: uid=user.7,ou=People,dc=example,dc=com
+changetype: add
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: inetOrgPerson
+uid: user.7
+cn: Test User 7
+sn: User7
+givenName: Test
+mail: user.7@example.com
+userPassword: Password1
+
+dn: uid=user.8,ou=People,dc=example,dc=com
+changetype: add
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: inetOrgPerson
+uid: user.8
+cn: Test User 8
+sn: User8
+givenName: Test
+mail: user.8@example.com
+userPassword: Password1
+
+dn: uid=user.9,ou=People,dc=example,dc=com
+changetype: add
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: inetOrgPerson
+uid: user.9
+cn: Test User 9
+sn: User9
+givenName: Test
+mail: user.9@example.com
+userPassword: Password1
+
+dn: uid=user.10,ou=People,dc=example,dc=com
+changetype: add
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: inetOrgPerson
+uid: user.10
+cn: Test User 10
+sn: User10
+givenName: Test
+mail: user.10@example.com
+userPassword: Password1

@@ -616,6 +616,53 @@ docker exec <pd-container> /opt/out/instance/bin/ldapsearch \
 # Expected: etag: <number>  (from ds-entry-checksum mirror)
 ```
 
+#### Create test users and enable header-based auth
+
+After AM is configured and verified, run `configure-am-post.sh` to set up
+test users and enable the ZeroPageLogin feature:
+
+```bash
+cd deployments/platform
+./scripts/configure-am-post.sh
+```
+
+This script performs four steps:
+1. Creates 10 test users (user.1–user.10) in PingDirectory under `ou=People`
+2. Obtains an admin token
+3. Enables ZeroPageLogin (allows `X-OpenAM-Username`/`X-OpenAM-Password` headers
+   for the default authentication tree)
+4. Verifies user.1 can authenticate
+
+> **Built-in vs custom journeys:** PingAM 8.0 ships with a `ldapService`
+> authentication tree (ZeroPageLogin → Page Node → Data Store Decision). This
+> is set as the default tree (`orgConfig: ldapService`) and handles standard
+> username/password login out of the box — no custom journey import is needed
+> for basic authentication.
+>
+> **ZeroPageLogin:** By default, this is *disabled*. Without it, the
+> `X-OpenAM-Username`/`X-OpenAM-Password` headers are ignored on the default
+> `/json/authenticate` endpoint, causing silent hangs or empty responses.
+> The `configure-am-post.sh` script enables it automatically.
+
+#### Verify user authentication
+
+```bash
+curl -s -X POST "http://<am-host>:8080/am/json/authenticate" \
+  -H "Content-Type: application/json" \
+  -H "X-OpenAM-Username: user.1" \
+  -H "X-OpenAM-Password: Password1" \
+  -H "Accept-API-Version: resource=2.0,protocol=1.0"
+```
+
+**Expected response:**
+```json
+{
+  "tokenId": "U_eOfuJbtBlB3et1...*",
+  "successUrl": "/am/console",
+  "realm": "/"
+}
+```
+
 ---
 
 ## Part IV — PingAccess Setup

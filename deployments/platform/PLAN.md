@@ -32,7 +32,7 @@
 | **1** | [Verify PingDirectory as AM backend](#phase-1--verify-pingdirectory-as-am-backend) | ✅ Done |
 | **2** | [Docker Compose skeleton + TLS](#phase-2--docker-compose-skeleton--tls) | ✅ Done |
 | **3** | [PingAM initial configuration script](#phase-3--pingam-initial-configuration-script) | ✅ Done |
-| **4** | [Username/Password journey](#phase-4--usernamepassword-journey) | 🔲 Not Started |
+| **4** | [Username/Password journey](#phase-4--usernamepassword-journey) | ✅ Done |
 | **5** | [PingAccess reverse proxy integration](#phase-5--pingaccess-reverse-proxy-integration) | 🔲 Not Started |
 | **6** | [WebAuthn / Passkey journeys](#phase-6--webauthn--passkey-journeys) | 🔲 Not Started |
 | **7** | [Message-xform plugin wiring](#phase-7--message-xform-plugin-wiring) | 🔲 Not Started |
@@ -184,10 +184,10 @@ create test users in PingDirectory, verify login works.
 
 | Step | Task | Status |
 |------|------|--------|
-| 4.1 | Create test users in PingDirectory (user.1–user.10) | 🔲 Not Started |
-| 4.2 | Import username/password journey JSON | 🔲 Not Started |
-| 4.3 | Create `scripts/import-journeys.sh` (uses `frodo-cli` or curl) | 🔲 Not Started |
-| 4.4 | Test: authenticate as user.1 via PingAM XUI | 🔲 Not Started |
+| 4.1 | Create test users in PingDirectory (user.1–user.10) | ✅ Done (config/test-users.ldif) |
+| 4.2 | Import username/password journey JSON | ✅ Done (built-in `ldapService` tree — no custom import needed) |
+| 4.3 | Create `scripts/configure-am-post.sh` (users + ZeroPageLogin + verify) | ✅ Done |
+| 4.4 | Test: authenticate as user.1 via PingAM REST API | ✅ Done (tokenId returned, ZeroPageLogin enabled) |
 
 ---
 
