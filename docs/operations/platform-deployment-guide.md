@@ -26,11 +26,12 @@
 | 6 | [Configure PingAM](#6-configure-pingam) | Initial configuration via REST API |
 | 7 | [Verify PingAM](#7-verify-pingam) | Admin login and health checks |
 | | **Part IV — PingAccess Setup** | |
-| 8 | [Start PingAccess](#8-start-pingaccess) | Reverse proxy and plugin wiring |
+| 8 | [Start PingAccess](#8-start-pingaccess) | Container startup, license, and password hooks |
+| 9 | [Configure PingAccess](#9-configure-pingaccess-reverse-proxy-for-pingam) | Reverse proxy for PingAM via Admin API |
 | | **Part V — Operations** | |
-| 9 | [Log Monitoring](#9-log-monitoring) | Real-time log tailing recipes |
-| 10 | [Troubleshooting](#10-troubleshooting) | Error→fix lookup table |
-| 11 | [Teardown & Reset](#11-teardown--reset) | Clean restart procedures |
+| 10 | [Log Monitoring](#10-log-monitoring) | Real-time log tailing recipes |
+| 11 | [Troubleshooting](#11-troubleshooting) | Error→fix lookup table |
+| 12 | [Teardown & Reset](#12-teardown--reset) | Clean restart procedures |
 
 ---
 
@@ -109,6 +110,7 @@ docker pull pingidentity/pingaccess:latest
 | Item | Source | Notes |
 |------|--------|-------|
 | PingDirectory license | [Ping Identity DevOps](https://devops.pingidentity.com) | Required for production; dev image has evaluation period |
+| PingAccess license | [Backstage](https://backstage.pingidentity.com/downloads) | `PingAccess-9.0-Development.lic` — repo: `binaries/pingaccess/license/` |
 | PingAM WAR | [Backstage](https://backstage.pingidentity.com/downloads) | `AM-8.0.2.war` — 193 MB |
 | DevOps credentials | [Registration](https://devops.pingidentity.com/how-to/devopsRegistration/) | For Docker Hub pulls |
 
@@ -689,18 +691,115 @@ curl -sf -X POST "http://<am-host>:8080/am/json/authenticate" \
 ### 8. Start PingAccess
 
 ```bash
-docker compose up -d pingaccess
+docker-compose up -d pingaccess
+# Or via docker run (if compose can't adopt existing containers):
+set -a && source .env && set +a
+docker run -d --name platform-pingaccess \
+  --hostname "${HOSTNAME_PA}" --network platform_platform \
+  -p ${PA_ENGINE_PORT}:3000 -p ${PA_ADMIN_PORT}:9000 \
+  -v ./secrets/tlskey.p12:/opt/in/instance/conf/tlskey.p12:ro \
+  -v ./secrets/pubCert.crt:/opt/in/instance/conf/pubCert.crt:ro \
+  -v ../../binaries/pingaccess/license/PingAccess-9.0-Development.lic:/opt/out/instance/conf/pingaccess.lic:ro \
+  -e PING_IDENTITY_ACCEPT_EULA=YES \
+  -e PA_ADMIN_PASSWORD_INITIAL=2Access \
+  -e PING_IDENTITY_PASSWORD=2Access \
+  pingidentity/pingaccess:latest
 ```
 
-PingAccess configuration (sites, applications, rules) is done via the Admin API
-on port 9000 after startup. This will be automated in
-`scripts/configure-pa.sh` (Phase 5 of the implementation plan).
+> **License required:** PA will fail with `CONTAINER FAILURE: License File absent`
+> unless a `.lic` file is mounted at `/opt/out/instance/conf/pingaccess.lic`.
+> The development license lives at `binaries/pingaccess/license/PingAccess-9.0-Development.lic`.
+> The docker-compose.yml already mounts this.
+
+> **Password hooks:** PA has a two-phase password system. Set both
+> `PA_ADMIN_PASSWORD_INITIAL` and `PING_IDENTITY_PASSWORD` to the same value
+> (default: `2Access`). If they differ, the `83-change-password.sh` hook will
+> change your password after boot. See [PingAccess Operations Guide §3](./pingaccess-operations-guide.md#3-authentication--password-hooks).
+
+#### Readiness detection
+
+PA writes `"PingAccess running"` to stdout when fully started (typically 20–30s):
+
+```bash
+# Wait for PA readiness
+while ! docker logs platform-pingaccess 2>&1 | grep -q "PingAccess running"; do sleep 5; done
+echo "PA is ready"
+```
+
+#### Verify Admin API
+
+```bash
+curl -sk -u 'administrator:2Access' \
+     -H 'X-XSRF-Header: PingAccess' \
+     https://localhost:${PA_ADMIN_PORT}/pa-admin-api/v3/version
+# → {"version":"9.0.1.0"}
+```
+
+### 9. Configure PingAccess (reverse proxy for PingAM)
+
+After PA is running, configure it to reverse-proxy PingAM:
+
+```bash
+./scripts/configure-pa.sh
+```
+
+This script performs 6 Admin API steps:
+1. Verifies PA is ready (version check)
+2. Uses the existing virtual host (`localhost:3000`, id=1)
+3. Creates a **Site**: `PingAM Backend` → `am.platform.local:8080` (HTTP)
+4. Creates an **Application**: `/am` context root, Web type
+5. **Enables** the application (PA creates apps disabled by default — see [PA Ops §7](./pingaccess-operations-guide.md#7-application--resource-configuration-gotchas))
+6. Configures the **Root Resource** as unprotected (wildcard `/*`, no auth)
+
+The script is idempotent — re-running it skips objects that already exist.
+
+#### Verify proxy
+
+```bash
+# Access PingAM through PingAccess (HTTPS engine port)
+# Host header must match the PA virtual host (localhost:3000)
+curl -sk -H 'Host: localhost:3000' \
+     https://localhost:${PA_ENGINE_PORT}/am/
+# → HTML redirect to AM login page
+```
+
+#### Verify authentication through the proxy (callback-based)
+
+```bash
+# Step 1: Get authId
+AUTH_ID=$(curl -sf -k -H 'Host: localhost:3000' \
+  -X POST "https://localhost:${PA_ENGINE_PORT}/am/json/authenticate" \
+  -H 'Content-Type: application/json' \
+  -H 'Accept-API-Version: resource=2.0,protocol=1.0' \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['authId'])")
+
+# Step 2: Fill callbacks
+curl -sf -k -H 'Host: localhost:3000' \
+  -X POST "https://localhost:${PA_ENGINE_PORT}/am/json/authenticate" \
+  -H 'Content-Type: application/json' \
+  -H 'Accept-API-Version: resource=2.0,protocol=1.0' \
+  -d "{\"authId\":\"${AUTH_ID}\",\"callbacks\":[
+    {\"type\":\"NameCallback\",\"input\":[{\"name\":\"IDToken1\",\"value\":\"user.1\"}],
+     \"output\":[{\"name\":\"prompt\",\"value\":\"User Name\"}],\"_id\":0},
+    {\"type\":\"PasswordCallback\",\"input\":[{\"name\":\"IDToken2\",\"value\":\"Password1\"}],
+     \"output\":[{\"name\":\"prompt\",\"value\":\"Password\"}],\"_id\":1}]}"
+# → {"tokenId":"...", "successUrl":"/am/console", "realm":"/"}
+```
+
+> **Host header is critical:** PA matches incoming requests by `Host:port`.
+> If the Host header doesn't match a virtual host, PA returns **403 Forbidden**.
+> See [PA Ops §6](./pingaccess-operations-guide.md#6-virtual-host-matching-critical).
+
+> **Port mapping note:** The default PA engine port (3000) may conflict with
+> other services (e.g., Tailscale, code-server). The `.env` maps PA to
+> host ports `13000` (engine) and `19000` (admin). Inside the container,
+> PA still listens on 3000/9000.
 
 ---
 
 ## Part V — Operations
 
-### 9. Log Monitoring
+### 10. Log Monitoring
 
 #### Quick reference: log locations
 
@@ -742,7 +841,7 @@ SEARCH RESULT ... base="" scope=0 filter="(objectClass=*)" attrs="1.1" resultCod
 | `Configuration` | Config store read/write failures |
 | `Federation` | SAML/federation errors |
 
-### 10. Troubleshooting
+### 11. Troubleshooting
 
 #### Error → Fix Lookup Table
 
@@ -770,7 +869,11 @@ SEARCH RESULT ... base="" scope=0 filter="(objectClass=*)" attrs="1.1" resultCod
 | `keystore password was incorrect` on Tomcat HTTPS | PKCS#12 keystore mounted without matching `SSL_PWD` env var | Pass `SSL_PWD` to container or accept HTTP-only (HTTPS connector fails, HTTP still works) |
 | `/json/authenticate` hangs or returns empty with `X-OpenAM-*` headers | ZeroPageLogin disabled (default in AM 8.0) — this is intentional | Use callback-based auth (2-step `authId` flow) instead. See [PingAM §8](./pingam-operations-guide.md#8-rest-authentication--callback-pattern) |
 | MAKELDIF test users missing after AM setup | AM configurator overwrites PD base DN structure | Create test users **after** `configure-am.sh` completes, not during PD setup |
-
+| `CONTAINER FAILURE: License File absent` (PingAccess) | No `.lic` file at expected path | Mount license: `-v .../PingAccess-9.0-Development.lic:/opt/out/instance/conf/pingaccess.lic:ro` |
+| PA Admin API returns 401 Unauthorized | Password changed by `83-change-password.sh` hook | Set `PA_ADMIN_PASSWORD_INITIAL` and `PING_IDENTITY_PASSWORD` to the same value |
+| PA engine returns 403 Forbidden | `Host:port` doesn't match any virtual host | Add `-H 'Host: localhost:3000'` to curl. See [PA Ops §6](./pingaccess-operations-guide.md#6-virtual-host-matching-critical) |
+| Port 3000 already in use (PA engine won't start) | Another service (e.g., Tailscale, code-server) binds port 3000 | Remap PA engine: `-p 13000:3000` and use `PA_ENGINE_PORT=13000` in `.env` |
+| docker-compose v1 can't start PA (`container name already in use`) | Existing containers created via `docker run` lack compose labels | Use `docker run` directly on same network, or `docker rm -f` the stale container first |
 
 #### Startup order
 
@@ -791,7 +894,7 @@ docker compose down -v   # removes containers AND volumes
 docker compose up -d     # fresh start
 ```
 
-### 11. Teardown & Reset
+### 12. Teardown & Reset
 
 #### Stop all containers (preserve data)
 
@@ -834,7 +937,8 @@ docker compose up -d pingam
 │  PingAM           HTTP  :8080   HTTPS :8443  path: /am              │
 │                   user: amAdmin             pw: Password1           │
 │                                                                     │
-│  PingAccess       Engine:3000   Admin :9000                         │
+│  PingAccess       Engine:13000  Admin :19000  (container: 3000/9000) │
+│                   user: administrator        pw: 2Access            │
 │                                                                     │
 │  AM Auth (callback — 2 steps):                                      │
 │    1. AUTH_ID=$(curl -sf -X POST http://am:8080/am/json/authenticate │
