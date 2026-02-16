@@ -158,21 +158,32 @@ fi
 # ── Step 4: Run the configurator ──────────────────────────────────────────────
 log "Step 4/5 — Configuring PingAM (this takes 2-5 minutes)"
 
-# Check if AM is already configured by trying admin auth
+# Check if AM is already configured by trying callback-based admin auth
 log "Checking if AM is already configured..."
-AUTH_CHECK=$(curl -sf -o /dev/null -w "%{http_code}" \
-    --resolve "${HOSTNAME_AM}:${AM_HTTP_PORT}:127.0.0.1" \
-    -X POST "http://${HOSTNAME_AM}:${AM_HTTP_PORT}/${AM_DEPLOYMENT_URI}/json/authenticate" \
-    -H "Content-Type: application/json" \
-    -H "X-OpenAM-Username: amAdmin" \
-    -H "X-OpenAM-Password: ${AM_ADMIN_PWD}" \
-    -H "Accept-API-Version: resource=2.0,protocol=1.0" 2>/dev/null || echo "000")
+AM_BASE="http://${HOSTNAME_AM}:${AM_HTTP_PORT}/${AM_DEPLOYMENT_URI}"
+RESOLVE_FLAG="--resolve ${HOSTNAME_AM}:${AM_HTTP_PORT}:127.0.0.1"
 
-if [[ "$AUTH_CHECK" == "200" ]]; then
-    ok "AM is already configured and admin auth works. Skipping configuration."
-    exit 0
+# Try callback-based auth: step 1 (get authId), step 2 (fill callbacks)
+AUTH_ID=$(curl -sf ${RESOLVE_FLAG} \
+    -X POST "${AM_BASE}/json/authenticate" \
+    -H "Content-Type: application/json" \
+    -H "Accept-API-Version: resource=2.0,protocol=1.0" 2>/dev/null \
+    | python3 -c "import sys,json; print(json.load(sys.stdin).get('authId',''))" 2>/dev/null || echo "")
+
+if [[ -n "$AUTH_ID" ]]; then
+    CHECK_TOKEN=$(curl -sf ${RESOLVE_FLAG} \
+        -X POST "${AM_BASE}/json/authenticate" \
+        -H "Content-Type: application/json" \
+        -H "Accept-API-Version: resource=2.0,protocol=1.0" \
+        -d "{\"authId\":\"${AUTH_ID}\",\"callbacks\":[{\"type\":\"NameCallback\",\"input\":[{\"name\":\"IDToken1\",\"value\":\"amAdmin\"}],\"output\":[{\"name\":\"prompt\",\"value\":\"User Name\"}],\"_id\":0},{\"type\":\"PasswordCallback\",\"input\":[{\"name\":\"IDToken2\",\"value\":\"${AM_ADMIN_PWD}\"}],\"output\":[{\"name\":\"prompt\",\"value\":\"Password\"}],\"_id\":1}]}" 2>/dev/null \
+        | python3 -c "import sys,json; print(json.load(sys.stdin).get('tokenId',''))" 2>/dev/null || echo "")
+
+    if [[ -n "$CHECK_TOKEN" ]]; then
+        ok "AM is already configured and admin auth works. Skipping configuration."
+        exit 0
+    fi
 fi
-log "AM is not yet configured (auth returned HTTP ${AUTH_CHECK}). Proceeding..."
+log "AM is not yet configured. Proceeding..."
 
 # Send the configurator POST
 # Content-Type is application/x-www-form-urlencoded (NOT JSON)
@@ -242,8 +253,8 @@ if [[ $CONFIG_ELAPSED -ge $MAX_CONFIG_WAIT ]]; then
     fail "Configuration did not complete within ${MAX_CONFIG_WAIT}s"
 fi
 
-# ── Step 5: Verify admin authentication ───────────────────────────────────────
-log "Step 5/5 — Verifying admin authentication"
+# ── Step 5: Verify admin authentication (callback-based) ─────────────────────
+log "Step 5/5 — Verifying admin authentication (callback-based)"
 
 # First request after config triggers lazy initialization (30-60s)
 log "Sending first auth request (may take 30-60s for lazy init)..."
@@ -252,20 +263,28 @@ sleep 5  # brief pause for AM to restart after config
 MAX_AUTH_WAIT=90
 AUTH_ELAPSED=0
 while [[ $AUTH_ELAPSED -lt $MAX_AUTH_WAIT ]]; do
-    AUTH_RESPONSE=$(curl -sf \
-        --resolve "${HOSTNAME_AM}:${AM_HTTP_PORT}:127.0.0.1" \
-        -X POST "http://${HOSTNAME_AM}:${AM_HTTP_PORT}/${AM_DEPLOYMENT_URI}/json/authenticate" \
+    # Callback step 1: get authId
+    STEP1=$(curl -sf ${RESOLVE_FLAG} \
+        -X POST "${AM_BASE}/json/authenticate" \
         -H "Content-Type: application/json" \
-        -H "X-OpenAM-Username: amAdmin" \
-        -H "X-OpenAM-Password: ${AM_ADMIN_PWD}" \
-        -H "Accept-API-Version: resource=2.0,protocol=1.0" \
-        2>/dev/null || echo "")
+        -H "Accept-API-Version: resource=2.0,protocol=1.0" 2>/dev/null || echo "")
 
-    if echo "$AUTH_RESPONSE" | grep -q "tokenId"; then
-        TOKEN_ID=$(echo "$AUTH_RESPONSE" | grep -o '"tokenId":"[^"]*"' | head -1)
-        ok "Admin authentication successful!"
-        ok "  ${TOKEN_ID}"
-        break
+    AUTH_ID=$(echo "$STEP1" | python3 -c "import sys,json; print(json.load(sys.stdin).get('authId',''))" 2>/dev/null || echo "")
+
+    if [[ -n "$AUTH_ID" ]]; then
+        # Callback step 2: fill in credentials
+        AUTH_RESPONSE=$(curl -sf ${RESOLVE_FLAG} \
+            -X POST "${AM_BASE}/json/authenticate" \
+            -H "Content-Type: application/json" \
+            -H "Accept-API-Version: resource=2.0,protocol=1.0" \
+            -d "{\"authId\":\"${AUTH_ID}\",\"callbacks\":[{\"type\":\"NameCallback\",\"input\":[{\"name\":\"IDToken1\",\"value\":\"amAdmin\"}],\"output\":[{\"name\":\"prompt\",\"value\":\"User Name\"}],\"_id\":0},{\"type\":\"PasswordCallback\",\"input\":[{\"name\":\"IDToken2\",\"value\":\"${AM_ADMIN_PWD}\"}],\"output\":[{\"name\":\"prompt\",\"value\":\"Password\"}],\"_id\":1}]}" 2>/dev/null || echo "")
+
+        if echo "$AUTH_RESPONSE" | grep -q "tokenId"; then
+            TOKEN_ID=$(echo "$AUTH_RESPONSE" | grep -o '"tokenId":"[^"]*"' | head -1)
+            ok "Admin authentication successful (callback-based)!"
+            ok "  ${TOKEN_ID}"
+            break
+        fi
     fi
 
     sleep 5
@@ -287,6 +306,7 @@ echo "  Admin console: http://localhost:${AM_HTTP_PORT}/${AM_DEPLOYMENT_URI}"
 echo "  Admin user:    amAdmin"
 echo "  Admin pass:    ${AM_ADMIN_PWD}"
 echo "  Cookie domain: ${COOKIE_DOMAIN}"
+echo "  Auth method:   Callback-based (ZeroPageLogin disabled)"
 echo ""
 echo "  Config store:  ${HOSTNAME_PD}:${PD_PORT} (${PD_BASE})"
 echo "  User store:    ${HOSTNAME_PD}:${PD_PORT} (${PD_BASE})"

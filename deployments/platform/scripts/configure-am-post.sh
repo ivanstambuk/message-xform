@@ -5,10 +5,14 @@
 # Run AFTER configure-am.sh has completed initial setup.
 # This script handles:
 #   1. Create test users in PingDirectory
-#   2. Enable ZeroPageLogin (header-based auth)
-#   3. Optionally create a sub-realm (for multi-tenant scenarios)
-#   4. Import custom journeys (if provided)
-#   5. Verify user authentication works
+#   2. Verify admin authentication (callback-based)
+#   3. Verify user authentication (callback-based)
+#
+# Authentication uses the callback pattern (2-step):
+#   Step 1: POST /json/authenticate → get authId + callbacks
+#   Step 2: POST /json/authenticate with filled callbacks → get tokenId
+# This is the vendor-recommended approach. ZeroPageLogin (header-based)
+# is deliberately kept disabled for security (Login CSRF protection).
 #
 # Usage:
 #   ./scripts/configure-am-post.sh
@@ -38,38 +42,62 @@ AM_ADMIN_PWD="${PINGAM_ADMIN_PASSWORD:-Password1}"
 PD_PASSWORD="${PD_ROOT_USER_PWD:-2FederateM0re}"
 PD_DN="${PD_ROOT_USER_DN:-cn=administrator}"
 
+AM_BASE="http://${HOSTNAME_AM}:${AM_HTTP_PORT}/${AM_DEPLOYMENT_URI}"
+RESOLVE="--resolve ${HOSTNAME_AM}:${AM_HTTP_PORT}:127.0.0.1"
+
 # ── Helper functions ──────────────────────────────────────────────────────────
 
 log()  { echo "$(date +%H:%M:%S) ── $*"; }
 ok()   { echo "$(date +%H:%M:%S) ✓  $*"; }
 fail() { echo "$(date +%H:%M:%S) ❌ $*" >&2; exit 1; }
 
-get_admin_token() {
-    local token
-    token=$(curl -sf \
-        --resolve "${HOSTNAME_AM}:${AM_HTTP_PORT}:127.0.0.1" \
-        -X POST "http://${HOSTNAME_AM}:${AM_HTTP_PORT}/${AM_DEPLOYMENT_URI}/json/authenticate?authIndexType=service&authIndexValue=ldapService" \
-        -H "Content-Type: application/json" \
-        -H "X-OpenAM-Username: amAdmin" \
-        -H "X-OpenAM-Password: ${AM_ADMIN_PWD}" \
-        -H "Accept-API-Version: resource=2.0,protocol=1.0" 2>/dev/null \
-        | python3 -c "import sys,json; print(json.load(sys.stdin)['tokenId'])" 2>/dev/null)
-    echo "$token"
-}
+# Authenticate using the callback pattern (2-step).
+# Usage: authenticate_callback <username> <password>
+# Returns: tokenId on stdout, or empty string on failure.
+authenticate_callback() {
+    local username="$1" password="$2"
 
-am_put() {
-    local path="$1" payload="$2" token="$3"
-    curl -sf \
-        --resolve "${HOSTNAME_AM}:${AM_HTTP_PORT}:127.0.0.1" \
-        -X PUT "http://${HOSTNAME_AM}:${AM_HTTP_PORT}/${AM_DEPLOYMENT_URI}/json${path}" \
-        -H "iPlanetDirectoryPro: ${token}" \
+    # Step 1: Get authId and callbacks
+    local step1
+    step1=$(curl -sf ${RESOLVE} \
+        -X POST "${AM_BASE}/json/authenticate" \
         -H "Content-Type: application/json" \
-        -H "Accept-API-Version: resource=1.0,protocol=2.1" \
-        -d "$payload" 2>/dev/null
+        -H "Accept-API-Version: resource=2.0,protocol=1.0" 2>/dev/null || echo "")
+
+    if [[ -z "$step1" ]]; then
+        echo ""
+        return
+    fi
+
+    local auth_id
+    auth_id=$(echo "$step1" | python3 -c "import sys,json; print(json.load(sys.stdin)['authId'])" 2>/dev/null || echo "")
+
+    if [[ -z "$auth_id" ]]; then
+        echo ""
+        return
+    fi
+
+    # Step 2: Return filled callbacks
+    local step2
+    step2=$(curl -sf ${RESOLVE} \
+        -X POST "${AM_BASE}/json/authenticate" \
+        -H "Content-Type: application/json" \
+        -H "Accept-API-Version: resource=2.0,protocol=1.0" \
+        -d "{
+            \"authId\": \"${auth_id}\",
+            \"callbacks\": [
+                {\"type\":\"NameCallback\",\"input\":[{\"name\":\"IDToken1\",\"value\":\"${username}\"}],\"output\":[{\"name\":\"prompt\",\"value\":\"User Name\"}],\"_id\":0},
+                {\"type\":\"PasswordCallback\",\"input\":[{\"name\":\"IDToken2\",\"value\":\"${password}\"}],\"output\":[{\"name\":\"prompt\",\"value\":\"Password\"}],\"_id\":1}
+            ]
+        }" 2>/dev/null || echo "")
+
+    local token_id
+    token_id=$(echo "$step2" | python3 -c "import sys,json; print(json.load(sys.stdin).get('tokenId',''))" 2>/dev/null || echo "")
+    echo "$token_id"
 }
 
 # ── Step 1: Create test users ────────────────────────────────────────────────
-log "Step 1/4 — Creating test users in PingDirectory"
+log "Step 1/3 — Creating test users in PingDirectory"
 
 USERS_LDIF="${PLATFORM_DIR}/config/test-users.ldif"
 if [[ ! -f "$USERS_LDIF" ]]; then
@@ -92,48 +120,27 @@ else
         --hostname localhost --port 1636 --useSsl --trustAll \
         --bindDN "$PD_DN" --bindPassword "$PD_PASSWORD" \
         --filename /tmp/test-users.ldif 2>&1)
-    
+
     SUCCESS_COUNT=$(echo "$RESULT" | grep -c "Result Code:  0" || echo "0")
     ok "Created ${SUCCESS_COUNT} test users"
 fi
 
-# ── Step 2: Get admin token ──────────────────────────────────────────────────
-log "Step 2/4 — Authenticating as amAdmin"
-TOKEN=$(get_admin_token)
+# ── Step 2: Verify admin authentication (callback-based) ────────────────────
+log "Step 2/3 — Authenticating as amAdmin (callback-based)"
+TOKEN=$(authenticate_callback "amAdmin" "${AM_ADMIN_PWD}")
 if [[ -z "$TOKEN" ]]; then
     fail "Could not get admin token. Is AM configured?"
 fi
-ok "Admin token obtained"
+ok "Admin token obtained (callback-based)"
 
-# ── Step 3: Enable ZeroPageLogin ─────────────────────────────────────────────
-log "Step 3/4 — Enabling ZeroPageLogin (header-based authentication)"
+# ── Step 3: Verify user authentication (callback-based) ─────────────────────
+log "Step 3/3 — Verifying user.1 authentication (callback-based)"
 
-RESPONSE=$(am_put "/realms/root/realm-config/authentication" \
-    '{"security":{"zeroPageLoginEnabled":true}}' \
-    "$TOKEN")
-
-ZPL_ENABLED=$(echo "$RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin).get('security',{}).get('zeroPageLoginEnabled'))" 2>/dev/null || echo "unknown")
-if [[ "$ZPL_ENABLED" == "True" ]]; then
-    ok "ZeroPageLogin enabled"
+USER_TOKEN=$(authenticate_callback "user.1" "Password1")
+if [[ -n "$USER_TOKEN" ]]; then
+    ok "user.1 authenticated successfully (callback-based)!"
 else
-    log "Warning: ZeroPageLogin state: ${ZPL_ENABLED} (may already be enabled)"
-fi
-
-# ── Step 4: Verify user authentication ───────────────────────────────────────
-log "Step 4/4 — Verifying user authentication"
-
-AUTH_RESPONSE=$(curl -sf \
-    --resolve "${HOSTNAME_AM}:${AM_HTTP_PORT}:127.0.0.1" \
-    -X POST "http://${HOSTNAME_AM}:${AM_HTTP_PORT}/${AM_DEPLOYMENT_URI}/json/authenticate" \
-    -H "Content-Type: application/json" \
-    -H "X-OpenAM-Username: user.1" \
-    -H "X-OpenAM-Password: Password1" \
-    -H "Accept-API-Version: resource=2.0,protocol=1.0" 2>/dev/null || echo "")
-
-if echo "$AUTH_RESPONSE" | grep -q "tokenId"; then
-    ok "user.1 authenticated successfully!"
-else
-    fail "user.1 authentication failed. Response: ${AUTH_RESPONSE}"
+    fail "user.1 authentication failed."
 fi
 
 echo ""
@@ -143,10 +150,19 @@ echo ""
 echo "  Test users:  user.1 through user.10"
 echo "  Password:    Password1"
 echo "  Auth tree:   ldapService (built-in, default)"
+echo "  Auth method: Callback-based (ZeroPageLogin is disabled)"
 echo ""
-echo "  Authenticate via:"
-echo "    curl -X POST http://${HOSTNAME_AM}:${AM_HTTP_PORT}/${AM_DEPLOYMENT_URI}/json/authenticate \\"
-echo "      -H 'X-OpenAM-Username: user.1' \\"
-echo "      -H 'X-OpenAM-Password: Password1' \\"
-echo "      -H 'Accept-API-Version: resource=2.0,protocol=1.0'"
+echo "  Authenticate via callbacks (2-step):"
+echo ""
+echo "  # Step 1: Get authId"
+echo "    AUTH_ID=\$(curl -sf -X POST '${AM_BASE}/json/authenticate' \\"
+echo "      -H 'Content-Type: application/json' \\"
+echo "      -H 'Accept-API-Version: resource=2.0,protocol=1.0' \\"
+echo "      | python3 -c \"import sys,json; print(json.load(sys.stdin)['authId'])\")"
+echo ""
+echo "  # Step 2: Return filled callbacks"
+echo "    curl -sf -X POST '${AM_BASE}/json/authenticate' \\"
+echo "      -H 'Content-Type: application/json' \\"
+echo "      -H 'Accept-API-Version: resource=2.0,protocol=1.0' \\"
+echo "      -d '{\"authId\":\"\${AUTH_ID}\",\"callbacks\":[...]}'"
 echo "═══════════════════════════════════════════════════════════════"

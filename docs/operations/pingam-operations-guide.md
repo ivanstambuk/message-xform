@@ -536,8 +536,8 @@ Look for:
 | PD access log evidence | ✅ 4000+ successful LDAP ops from AM |
 | PD `single-structural-objectclass-behavior` | Default: `reject` → set to: `accept` |
 | PD `etag` virtual attribute | Created: mirror `ds-entry-checksum → etag` |
-| User authentication (`user.1`) | ✅ Valid `tokenId` via `ldapService` tree |
-| ZeroPageLogin | ✅ Enabled, header-based auth works |
+| User authentication (`user.1`) | ✅ Valid `tokenId` via callback auth against `ldapService` tree |
+| ZeroPageLogin | Deliberately disabled (AM 8.0 default) — using callbacks instead |
 
 ---
 
@@ -577,11 +577,9 @@ curl -X POST "http://<am-host>:8080/am/json/authenticate" ...
 curl -X POST "http://<am-host>:8080/am/json/authenticate?authIndexType=service&authIndexValue=ldapService" ...
 ```
 
-> **When ZeroPageLogin is disabled** (the default), the default
-> `/json/authenticate` endpoint does NOT process `X-OpenAM-Username` and
-> `X-OpenAM-Password` headers. Requests hang or return empty responses.
-> You must either enable ZeroPageLogin (see §8) or specify the tree explicitly
-> with `authIndexType=service&authIndexValue=ldapService`.
+> **Note:** Our platform keeps ZeroPageLogin **disabled** (the AM 8.0 default).
+> All scripts use the callback-based authentication pattern (see §8). The
+> `X-OpenAM-Username`/`X-OpenAM-Password` header approach is not used.
 
 #### Query all trees via REST
 
@@ -591,45 +589,83 @@ curl -sf "http://<am-host>:8080/am/json/realms/root/realm-config/authentication/
   -H "Accept-API-Version: resource=1.0,protocol=2.1"
 ```
 
-### 8. ZeroPageLogin
+### 8. REST Authentication — Callback Pattern
 
-ZeroPageLogin allows credentials to be submitted via HTTP headers (`X-OpenAM-Username`,
-`X-OpenAM-Password`) in a single request, bypassing the interactive callback flow.
+PingAM supports two REST authentication patterns. We use **callbacks** (the
+vendor-recommended approach). ZeroPageLogin (header-based) is deliberately
+kept disabled.
 
-**Default state:** Disabled (PingAM 8.0.2).
+#### Callback authentication (recommended — what we use)
 
-#### Why it matters
+The callback pattern is a 2-step flow:
 
-Without ZeroPageLogin, the `X-OpenAM-*` headers are silently ignored on the
-default `/json/authenticate` endpoint. The ZeroPageLogin node in the tree
-checks for these headers and, if found, routes the request through the
-"true" (credentials present) branch directly to the Data Store Decision.
-If disabled, the request takes the "false" branch to the interactive Page
-Node, which expects callbacks — leading to silent failures or empty responses
-for REST-only clients.
-
-#### Enable via REST API
+1. **Initiate** — `POST /json/authenticate` with empty body. AM returns an
+   `authId` JWT and an array of callbacks describing what information it needs.
+2. **Complete** — `POST /json/authenticate` with the `authId` and filled-in
+   callbacks. AM returns a `tokenId` (session token).
 
 ```bash
-curl -X PUT "http://<am-host>:8080/am/json/realms/root/realm-config/authentication" \
-  -H "iPlanetDirectoryPro: <admin-token>" \
+# Step 1: Get authId and callbacks
+STEP1=$(curl -sf -X POST "http://<am-host>:8080/am/json/authenticate" \
   -H "Content-Type: application/json" \
-  -H "Accept-API-Version: resource=1.0,protocol=2.1" \
-  -d '{"security":{"zeroPageLoginEnabled":true}}'
+  -H "Accept-API-Version: resource=2.0,protocol=1.0")
+
+# STEP1 contains:
+# {
+#   "authId": "eyJ0eXAiOi...",
+#   "callbacks": [
+#     { "type": "NameCallback",     "input": [{"name":"IDToken1","value":""}], "_id": 0 },
+#     { "type": "PasswordCallback", "input": [{"name":"IDToken2","value":""}], "_id": 1 }
+#   ]
+# }
+
+AUTH_ID=$(echo "$STEP1" | python3 -c "import sys,json; print(json.load(sys.stdin)['authId'])")
+
+# Step 2: Return filled callbacks
+curl -sf -X POST "http://<am-host>:8080/am/json/authenticate" \
+  -H "Content-Type: application/json" \
+  -H "Accept-API-Version: resource=2.0,protocol=1.0" \
+  -d "{
+    \"authId\": \"${AUTH_ID}\",
+    \"callbacks\": [
+      {\"type\":\"NameCallback\",\"input\":[{\"name\":\"IDToken1\",\"value\":\"bjensen\"}],
+       \"output\":[{\"name\":\"prompt\",\"value\":\"User Name\"}],\"_id\":0},
+      {\"type\":\"PasswordCallback\",\"input\":[{\"name\":\"IDToken2\",\"value\":\"Ch4ng31t\"}],
+       \"output\":[{\"name\":\"prompt\",\"value\":\"Password\"}],\"_id\":1}
+    ]
+  }"
+# Returns: { "tokenId": "AQIC5wM…", "successUrl": "/am/console", "realm": "/" }
 ```
 
-#### Verify status
+#### Why callbacks are preferred over ZeroPageLogin
 
-```bash
-curl -sf "http://<am-host>:8080/am/json/realms/root/realm-config/authentication" \
-  -H "iPlanetDirectoryPro: <admin-token>" \
-  -H "Accept-API-Version: resource=1.0,protocol=2.1" \
-  | python3 -c "import sys,json; print(json.load(sys.stdin)['security']['zeroPageLoginEnabled'])"
-# Expected: True
-```
+| Aspect | Callback (2-step) | ZeroPageLogin (headers) |
+|--------|-------------------|-------------------------|
+| Security | `authId` JWT acts as CSRF token | Vulnerable to Login CSRF |
+| Default state | Works out of the box | Disabled by default (AM 8.0) |
+| MFA support | Handles any journey (MFA, WebAuthn, etc.) | Username/password only |
+| Extensibility | Adding MFA nodes works transparently | Breaks silently if tree changes |
+| Credential exposure | Credentials in POST body (not logged) | Headers may be logged by proxies |
+| Vendor recommendation | ✅ Primary documented approach | Convenience shortcut only |
 
-> **Automation:** The `scripts/configure-am-post.sh` script enables ZeroPageLogin
-> automatically as part of post-configuration setup.
+#### Why ZeroPageLogin is disabled (security rationale)
+
+ZeroPageLogin (`openam.auth.zero.page.login.enabled`) defaults to `false`
+in PingAM 8.0 for three reasons:
+
+1. **Login CSRF protection** — With ZPL enabled, a malicious site can forge a
+   POST to `/json/authenticate` with `X-OpenAM-Username`/`X-OpenAM-Password`
+   headers, potentially authenticating a victim's browser. The `authId` JWT in
+   the callback flow acts as a natural CSRF token.
+2. **Credential logging risk** — The original ZPL setting also controlled
+   GET-based login (credentials in URL query parameters), which browsers cache
+   and servers log. Disabling it by default prevents accidental exposure.
+3. **Principle of least privilege** — Forces administrators to make an explicit
+   security decision if they need the shortcut.
+
+> **Historical note:** The ForgeRock/Ping webinar reference code
+> (`webinar-pingfed-pingam`) used ZeroPageLogin headers because it was built
+> for AM 7.4/7.5 where the default was `true`. AM 8.0 tightened the defaults.
 
 ### 9. Identity Store & Test Users
 

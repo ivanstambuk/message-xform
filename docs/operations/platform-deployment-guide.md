@@ -563,14 +563,27 @@ configuration triggers lazy initialization of all AM subsystems (CTS connections
 LDAP pools, crypto key generation). This can take 30–60 seconds — expect the
 first call to hang or time out. Subsequent requests are fast.
 
-#### Admin authentication
+#### Admin authentication (callback-based)
+
+Authentication uses a 2-step callback pattern (ZeroPageLogin is disabled for
+security — see [PingAM §8](./pingam-operations-guide.md#8-rest-authentication--callback-pattern)):
 
 ```bash
-curl -s -X POST "http://<am-host>:8080/am/json/authenticate" \
+# Step 1: Get authId and callbacks
+STEP1=$(curl -sf -X POST "http://<am-host>:8080/am/json/authenticate" \
   -H "Content-Type: application/json" \
-  -H "X-OpenAM-Username: amAdmin" \
-  -H "X-OpenAM-Password: Password1" \
-  -H "Accept-API-Version: resource=2.0,protocol=1.0"
+  -H "Accept-API-Version: resource=2.0,protocol=1.0")
+AUTH_ID=$(echo "$STEP1" | python3 -c "import sys,json; print(json.load(sys.stdin)['authId'])")
+
+# Step 2: Fill callbacks with credentials
+curl -sf -X POST "http://<am-host>:8080/am/json/authenticate" \
+  -H "Content-Type: application/json" \
+  -H "Accept-API-Version: resource=2.0,protocol=1.0" \
+  -d "{\"authId\":\"${AUTH_ID}\",\"callbacks\":[
+    {\"type\":\"NameCallback\",\"input\":[{\"name\":\"IDToken1\",\"value\":\"amAdmin\"}],
+     \"output\":[{\"name\":\"prompt\",\"value\":\"User Name\"}],\"_id\":0},
+    {\"type\":\"PasswordCallback\",\"input\":[{\"name\":\"IDToken2\",\"value\":\"Password1\"}],
+     \"output\":[{\"name\":\"prompt\",\"value\":\"Password\"}],\"_id\":1}]}"
 ```
 
 **Expected response:**
@@ -580,8 +593,6 @@ curl -s -X POST "http://<am-host>:8080/am/json/authenticate" \
   "successUrl": "/am/console",
   "realm": "/"
 }
-
-Set-Cookie: iPlanetDirectoryPro=d8ImuQ...; Path=/; Domain=test.local; HttpOnly
 ```
 
 > **Gotcha — FQDN validation:** PingAM rejects requests where the Host header
@@ -616,22 +627,20 @@ docker exec <pd-container> /opt/out/instance/bin/ldapsearch \
 # Expected: etag: <number>  (from ds-entry-checksum mirror)
 ```
 
-#### Create test users and enable header-based auth
+#### Create test users and verify authentication
 
 After AM is configured and verified, run `configure-am-post.sh` to set up
-test users and enable the ZeroPageLogin feature:
+test users and verify callback-based authentication:
 
 ```bash
 cd deployments/platform
 ./scripts/configure-am-post.sh
 ```
 
-This script performs four steps:
+This script performs three steps:
 1. Creates 10 test users (user.1–user.10) in PingDirectory under `ou=People`
-2. Obtains an admin token
-3. Enables ZeroPageLogin (allows `X-OpenAM-Username`/`X-OpenAM-Password` headers
-   for the default authentication tree)
-4. Verifies user.1 can authenticate
+2. Verifies admin authentication (callback-based)
+3. Verifies user.1 can authenticate (callback-based)
 
 > **Built-in vs custom journeys:** PingAM 8.0 ships with a `ldapService`
 > authentication tree (ZeroPageLogin → Page Node → Data Store Decision). This
@@ -639,19 +648,29 @@ This script performs four steps:
 > username/password login out of the box — no custom journey import is needed
 > for basic authentication.
 >
-> **ZeroPageLogin:** By default, this is *disabled*. Without it, the
-> `X-OpenAM-Username`/`X-OpenAM-Password` headers are ignored on the default
-> `/json/authenticate` endpoint, causing silent hangs or empty responses.
-> The `configure-am-post.sh` script enables it automatically.
+> **ZeroPageLogin is disabled** (AM 8.0 default). All scripts use the
+> vendor-recommended callback pattern (2-step `authId` flow). This avoids
+> Login CSRF vulnerabilities and works with any journey complexity.
+> See [PingAM §8](./pingam-operations-guide.md#8-rest-authentication--callback-pattern).
 
-#### Verify user authentication
+#### Verify user authentication (callback-based)
 
 ```bash
-curl -s -X POST "http://<am-host>:8080/am/json/authenticate" \
+# Step 1: Get authId
+AUTH_ID=$(curl -sf -X POST "http://<am-host>:8080/am/json/authenticate" \
   -H "Content-Type: application/json" \
-  -H "X-OpenAM-Username: user.1" \
-  -H "X-OpenAM-Password: Password1" \
-  -H "Accept-API-Version: resource=2.0,protocol=1.0"
+  -H "Accept-API-Version: resource=2.0,protocol=1.0" \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['authId'])")
+
+# Step 2: Fill callbacks
+curl -sf -X POST "http://<am-host>:8080/am/json/authenticate" \
+  -H "Content-Type: application/json" \
+  -H "Accept-API-Version: resource=2.0,protocol=1.0" \
+  -d "{\"authId\":\"${AUTH_ID}\",\"callbacks\":[
+    {\"type\":\"NameCallback\",\"input\":[{\"name\":\"IDToken1\",\"value\":\"user.1\"}],
+     \"output\":[{\"name\":\"prompt\",\"value\":\"User Name\"}],\"_id\":0},
+    {\"type\":\"PasswordCallback\",\"input\":[{\"name\":\"IDToken2\",\"value\":\"Password1\"}],
+     \"output\":[{\"name\":\"prompt\",\"value\":\"Password\"}],\"_id\":1}]}"
 ```
 
 **Expected response:**
@@ -749,7 +768,7 @@ SEARCH RESULT ... base="" scope=0 filter="(objectClass=*)" attrs="1.1" resultCod
 | `KeyError: 'ContainerConfig'` from docker-compose | docker-compose v1 incompatible with newer image format | Use `docker run` directly, or upgrade to docker-compose v2 (`docker compose`) |
 | `Encryption key must be provided.` from configurator | `AM_ENC_KEY` parameter is empty | Generate a random key: `openssl rand -base64 24` |
 | `keystore password was incorrect` on Tomcat HTTPS | PKCS#12 keystore mounted without matching `SSL_PWD` env var | Pass `SSL_PWD` to container or accept HTTP-only (HTTPS connector fails, HTTP still works) |
-| `/json/authenticate` hangs or returns empty with `X-OpenAM-*` headers | ZeroPageLogin disabled (default in AM 8.0) | Enable via REST API: `PUT /json/realms/root/realm-config/authentication` with `{"security":{"zeroPageLoginEnabled":true}}` |
+| `/json/authenticate` hangs or returns empty with `X-OpenAM-*` headers | ZeroPageLogin disabled (default in AM 8.0) — this is intentional | Use callback-based auth (2-step `authId` flow) instead. See [PingAM §8](./pingam-operations-guide.md#8-rest-authentication--callback-pattern) |
 | MAKELDIF test users missing after AM setup | AM configurator overwrites PD base DN structure | Create test users **after** `configure-am.sh` completes, not during PD setup |
 
 
@@ -817,10 +836,16 @@ docker compose up -d pingam
 │                                                                     │
 │  PingAccess       Engine:3000   Admin :9000                         │
 │                                                                     │
-│  AM Auth:  curl -X POST http://am:8080/am/json/authenticate \       │
-│            -H "X-OpenAM-Username: amAdmin"                   \      │
-│            -H "X-OpenAM-Password: Password1"                 \      │
-│            -H "Accept-API-Version: resource=2.0,protocol=1.0"       │
+│  AM Auth (callback — 2 steps):                                      │
+│    1. AUTH_ID=$(curl -sf -X POST http://am:8080/am/json/authenticate │
+│         -H 'Content-Type: application/json'                          │
+│         -H 'Accept-API-Version: resource=2.0,protocol=1.0'           │
+│         | python3 -c "import sys,json;                                │
+│           print(json.load(sys.stdin)['authId'])")                    │
+│    2. curl -sf -X POST http://am:8080/am/json/authenticate           │
+│         -H 'Content-Type: application/json'                          │
+│         -H 'Accept-API-Version: resource=2.0,protocol=1.0'           │
+│         -d '{"authId":"$AUTH_ID","callbacks":[...]}'                 │
 │                                                                     │
 │  PD tweaks (both required before AM config):                        │
 │    1. single-structural-objectclass-behavior: accept                │
