@@ -32,8 +32,11 @@ docs/operations/pinggateway-operations-guide.md
 # PingDS Operations & Deployment (Docker image build, demo/production modes, secrets, rebuild playbook)
 docs/operations/pingds-operations-guide.md
 
-# PingAM Operations & Deployment (custom Docker image from WAR, Tomcat 10 + JDK 21, rebuild playbook)
+# PingAM Operations & Deployment (Docker image, REST API gotchas, WebAuthn journeys, tree import, auth patterns)
 docs/operations/pingam-operations-guide.md
+
+# Platform Deployment Guide (3-container stack: PingAccess + PingAM + PingDirectory, docker-compose, WebAuthn)
+docs/operations/platform-deployment-guide.md
 
 # Feature 004 — Standalone HTTP Proxy Mode
 docs/architecture/features/004/spec.md
