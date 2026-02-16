@@ -179,15 +179,16 @@ generation, and the `.env` template.
 
 ## Phase 4 — Username/Password Journey
 
-**Goal:** Import a simple username/password authentication tree into PingAM,
-create test users in PingDirectory, verify login works.
+**Goal:** Verify the built-in `ldapService` authentication tree works,
+create test users in PingDirectory, verify callback-based login works.
 
 | Step | Task | Status |
 |------|------|--------|
 | 4.1 | Create test users in PingDirectory (user.1–user.10) | ✅ Done (config/test-users.ldif) |
-| 4.2 | Import username/password journey JSON | ✅ Done (built-in `ldapService` tree — no custom import needed) |
-| 4.3 | Create `scripts/configure-am-post.sh` (users + ZeroPageLogin + verify) | ✅ Done |
-| 4.4 | Test: authenticate as user.1 via PingAM REST API | ✅ Done (tokenId returned, ZeroPageLogin enabled) |
+| 4.2 | Verify built-in `ldapService` tree (no custom import needed) | ✅ Done |
+| 4.3 | Create `scripts/configure-am-post.sh` (users + callback auth verify) | ✅ Done |
+| 4.4 | Test: authenticate as user.1 via callback-based REST API | ✅ Done |
+| 4.5 | Switch from ZeroPageLogin to callback-based auth (security hardening) | ✅ Done |
 
 ---
 
