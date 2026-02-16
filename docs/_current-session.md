@@ -12,7 +12,7 @@
   - Documented session context chain (SessionContext + AttributesContext + OAuth2Context)
   - Researched Heaplet configuration model, ClassAliasResolver registration
   - Determined deployment strategy (shadow JAR in `$HOME/.openig/extra/`)
-  - Created: `docs/research/pinggateway-filter-api.md`
+  - Created: `docs/reference/pinggateway-sdk-guide.md`
 - Updated spec.md with research findings and `🔬 Research` status
 
 ## Next Steps

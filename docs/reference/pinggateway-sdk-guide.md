@@ -1,4 +1,4 @@
-# PingGateway Filter/Handler API — Research Notes
+# PingGateway SDK Guide
 
 Date: 2026-02-16
 Status: Complete

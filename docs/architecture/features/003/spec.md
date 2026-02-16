@@ -17,7 +17,7 @@
 ## Key Research
 
 - PingGateway reference: `docs/reference/vendor/pinggateway-2025.11.txt` (30,588 lines)
-- PingGateway filter API research: `docs/research/pinggateway-filter-api.md` (COMPLETE)
+- PingGateway SDK guide: `docs/reference/pinggateway-sdk-guide.md` (COMPLETE)
 - PingGateway OOTB capability: `docs/research/pinggateway-ootb-transformation-capabilities.md` (COMPLETE)
 - Gateway Candidates: `docs/research/gateway-candidates.md` (evaluation complete)
 
