@@ -30,8 +30,8 @@
 | Phase | Description | Status |
 |-------|-------------|--------|
 | **1** | [Verify PingDirectory as AM backend](#phase-1--verify-pingdirectory-as-am-backend) | ✅ Done |
-| **2** | [Docker Compose skeleton + TLS](#phase-2--docker-compose-skeleton--tls) | � In Progress |
-| **3** | [PingAM initial configuration script](#phase-3--pingam-initial-configuration-script) | 🔲 Not Started |
+| **2** | [Docker Compose skeleton + TLS](#phase-2--docker-compose-skeleton--tls) | ✅ Done |
+| **3** | [PingAM initial configuration script](#phase-3--pingam-initial-configuration-script) | ✅ Done |
 | **4** | [Username/Password journey](#phase-4--usernamepassword-journey) | 🔲 Not Started |
 | **5** | [PingAccess reverse proxy integration](#phase-5--pingaccess-reverse-proxy-integration) | 🔲 Not Started |
 | **6** | [WebAuthn / Passkey journeys](#phase-6--webauthn--passkey-journeys) | 🔲 Not Started |
@@ -155,7 +155,7 @@ generation, and the `.env` template.
 | 2.5 | Create PD post-setup dsconfig (schema relaxation + etag VA) | ✅ Done |
 | 2.6 | Create PD etag schema LDIF | ✅ Done |
 | 2.7 | Add `secrets/` to `.gitignore` | ✅ Done |
-| 2.8 | Test: `docker compose up` — all 3 containers start cleanly | 🔲 Not Started |
+| 2.8 | Test: `docker compose up` — all 3 containers start cleanly | ✅ Done |
 
 ---
 
@@ -166,12 +166,12 @@ generation, and the `.env` template.
 
 | Step | Task | Status |
 |------|------|--------|
-| 3.1 | Create `scripts/configure-am.sh` — call `/config/configurator` endpoint | 🔲 Not Started |
-| 3.2 | Configure AM to use PingDirectory for config store | 🔲 Not Started |
-| 3.3 | Configure AM to use PingDirectory for CTS store | 🔲 Not Started |
-| 3.4 | Configure AM to use PingDirectory for identity store | 🔲 Not Started |
-| 3.5 | Create realm, configure cookie domain, session settings | 🔲 Not Started |
-| 3.6 | Test: run script, verify AM admin console accessible | 🔲 Not Started |
+| 3.1 | Create `scripts/configure-am.sh` — call `/config/configurator` endpoint | ✅ Done |
+| 3.2 | Configure AM to use PingDirectory for config store | ✅ Done (single PD, one configurator POST) |
+| 3.3 | Configure AM to use PingDirectory for CTS store | ✅ Done (single PD, one configurator POST) |
+| 3.4 | Configure AM to use PingDirectory for identity store | ✅ Done (single PD, one configurator POST) |
+| 3.5 | Create realm, configure cookie domain, session settings | ✅ Done (cookie=platform.local, base_dir=/home/forgerock/openam) |
+| 3.6 | Test: run script, verify AM admin console accessible | ✅ Done (98 steps, 0 errors, tokenId returned) |
 
 **Reference:** `webinar-pingfed-pingam/src/.../Main.java` → `configurePingAM()`
 
