@@ -749,6 +749,8 @@ SEARCH RESULT ... base="" scope=0 filter="(objectClass=*)" attrs="1.1" resultCod
 | `KeyError: 'ContainerConfig'` from docker-compose | docker-compose v1 incompatible with newer image format | Use `docker run` directly, or upgrade to docker-compose v2 (`docker compose`) |
 | `Encryption key must be provided.` from configurator | `AM_ENC_KEY` parameter is empty | Generate a random key: `openssl rand -base64 24` |
 | `keystore password was incorrect` on Tomcat HTTPS | PKCS#12 keystore mounted without matching `SSL_PWD` env var | Pass `SSL_PWD` to container or accept HTTP-only (HTTPS connector fails, HTTP still works) |
+| `/json/authenticate` hangs or returns empty with `X-OpenAM-*` headers | ZeroPageLogin disabled (default in AM 8.0) | Enable via REST API: `PUT /json/realms/root/realm-config/authentication` with `{"security":{"zeroPageLoginEnabled":true}}` |
+| MAKELDIF test users missing after AM setup | AM configurator overwrites PD base DN structure | Create test users **after** `configure-am.sh` completes, not during PD setup |
 
 
 #### Startup order

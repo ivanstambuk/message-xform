@@ -23,6 +23,10 @@
 | 5 | [Full Rebuild from Scratch](#5-full-rebuild-from-scratch) | Step-by-step for a clean machine |
 | | **Part III — PingDirectory Compatibility** | |
 | 6 | [Using PingDirectory as AM Backend](#6-using-pingdirectory-as-am-backend) | Verified: PingAM 8.0.2 on PingDirectory 11.0 |
+| | **Part IV — Authentication & Identity** | |
+| 7 | [Built-in Authentication Trees](#7-built-in-authentication-trees) | ldapService, Agent, amsterService |
+| 8 | [ZeroPageLogin](#8-zeropagelogin) | Header-based auth for REST APIs |
+| 9 | [Identity Store & Test Users](#9-identity-store--test-users) | User creation under ou=People |
 
 ---
 
@@ -532,3 +536,146 @@ Look for:
 | PD access log evidence | ✅ 4000+ successful LDAP ops from AM |
 | PD `single-structural-objectclass-behavior` | Default: `reject` → set to: `accept` |
 | PD `etag` virtual attribute | Created: mirror `ds-entry-checksum → etag` |
+| User authentication (`user.1`) | ✅ Valid `tokenId` via `ldapService` tree |
+| ZeroPageLogin | ✅ Enabled, header-based auth works |
+
+---
+
+## Part IV — Authentication & Identity
+
+### 7. Built-in Authentication Trees
+
+PingAM 8.0.2 ships with **3 built-in authentication trees** in the root realm
+(no custom journey import needed for basic username/password login):
+
+| Tree ID | Purpose | Node Flow |
+|---------|---------|----------|
+| `ldapService` | Username/password login (default) | ZeroPageLogin → Page Node (Username + Password) → Data Store Decision |
+| `Agent` | Agent authentication | ZeroPageLogin → Page Node → Agent Data Store Decision |
+| `amsterService` | Amster CLI authentication | Amster JWT Decision Node |
+
+The default tree for the root realm is controlled by the `orgConfig` field:
+
+```json
+{
+  "core": {
+    "adminAuthModule": "ldapService",
+    "orgConfig": "ldapService"
+  }
+}
+```
+
+#### Specifying an authentication tree
+
+When calling `/json/authenticate`, you can select a specific tree:
+
+```bash
+# Default tree (uses orgConfig — ldapService)
+curl -X POST "http://<am-host>:8080/am/json/authenticate" ...
+
+# Explicit tree selection
+curl -X POST "http://<am-host>:8080/am/json/authenticate?authIndexType=service&authIndexValue=ldapService" ...
+```
+
+> **When ZeroPageLogin is disabled** (the default), the default
+> `/json/authenticate` endpoint does NOT process `X-OpenAM-Username` and
+> `X-OpenAM-Password` headers. Requests hang or return empty responses.
+> You must either enable ZeroPageLogin (see §8) or specify the tree explicitly
+> with `authIndexType=service&authIndexValue=ldapService`.
+
+#### Query all trees via REST
+
+```bash
+curl -sf "http://<am-host>:8080/am/json/realms/root/realm-config/authentication/authenticationtrees/trees?_queryFilter=true" \
+  -H "iPlanetDirectoryPro: <admin-token>" \
+  -H "Accept-API-Version: resource=1.0,protocol=2.1"
+```
+
+### 8. ZeroPageLogin
+
+ZeroPageLogin allows credentials to be submitted via HTTP headers (`X-OpenAM-Username`,
+`X-OpenAM-Password`) in a single request, bypassing the interactive callback flow.
+
+**Default state:** Disabled (PingAM 8.0.2).
+
+#### Why it matters
+
+Without ZeroPageLogin, the `X-OpenAM-*` headers are silently ignored on the
+default `/json/authenticate` endpoint. The ZeroPageLogin node in the tree
+checks for these headers and, if found, routes the request through the
+"true" (credentials present) branch directly to the Data Store Decision.
+If disabled, the request takes the "false" branch to the interactive Page
+Node, which expects callbacks — leading to silent failures or empty responses
+for REST-only clients.
+
+#### Enable via REST API
+
+```bash
+curl -X PUT "http://<am-host>:8080/am/json/realms/root/realm-config/authentication" \
+  -H "iPlanetDirectoryPro: <admin-token>" \
+  -H "Content-Type: application/json" \
+  -H "Accept-API-Version: resource=1.0,protocol=2.1" \
+  -d '{"security":{"zeroPageLoginEnabled":true}}'
+```
+
+#### Verify status
+
+```bash
+curl -sf "http://<am-host>:8080/am/json/realms/root/realm-config/authentication" \
+  -H "iPlanetDirectoryPro: <admin-token>" \
+  -H "Accept-API-Version: resource=1.0,protocol=2.1" \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['security']['zeroPageLoginEnabled'])"
+# Expected: True
+```
+
+> **Automation:** The `scripts/configure-am-post.sh` script enables ZeroPageLogin
+> automatically as part of post-configuration setup.
+
+### 9. Identity Store & Test Users
+
+#### Default identity store layout
+
+When PingAM is configured with `USERSTORE_SUFFIX=dc=example,dc=com` and
+`USERSTORE_TYPE=LDAPv3ForOpenDS`, it expects user entries under:
+
+```
+dc=example,dc=com
+├── ou=People          ← user entries (inetOrgPerson)
+└── ou=Groups          ← group entries
+```
+
+AM searches `ou=People` by default for user lookups. The DN format is:
+```
+uid=<username>,ou=People,dc=example,dc=com
+```
+
+#### Creating test users
+
+Test users are defined in `config/test-users.ldif` and loaded via:
+
+```bash
+docker cp config/test-users.ldif <pd-container>:/tmp/
+docker exec <pd-container> /opt/out/instance/bin/ldapmodify \
+  --hostname localhost --port 1636 --useSsl --trustAll \
+  --bindDN "cn=administrator" --bindPassword 2FederateM0re \
+  --filename /tmp/test-users.ldif
+```
+
+Each user entry requires these objectClasses:
+- `top`, `person`, `organizationalPerson`, `inetOrgPerson`
+
+Minimum required attributes:
+- `uid` (the login username)
+- `cn`, `sn` (required by `person`)
+- `userPassword` (plaintext — PD hashes on import via its password policy)
+
+> **PD plaintext password handling:** PingDirectory accepts plaintext passwords
+> in `userPassword` during LDAP add/modify operations and automatically hashes
+> them using its configured password storage scheme (default: PBKDF2-SHA512).
+> No pre-hashing is needed.
+
+> **MAKELDIF users wiped by AM configurator:** If PingDirectory creates users
+> via `MAKELDIF_USERS` during initial setup, those entries may be overwritten
+> or displaced when PingAM's configurator creates its DIT structure
+> (`ou=People`, `ou=Groups`, `ou=services`, `ou=tokens`, etc.) under the base DN.
+> Always create test users **after** AM configuration completes.
