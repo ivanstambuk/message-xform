@@ -1,13 +1,15 @@
 # Current Session State
 
 **Date:** 2026-02-16
-**Focus:** Platform deployment — Phases 1–6 (PD verification through WebAuthn journey)
+**Focus:** Platform deployment — Phase 7 (message-xform plugin wiring) + documentation
 
 ## Summary
 
-Massive buildout day: stood up the full 3-container platform from scratch and
-advanced through 6 of 9 phases. Major discovery: PingAM 8.0.2 runs directly
-on PingDirectory 11.0 (3-container arch), eliminating the need for PingDS.
+Completed Phase 7: wired the message-xform adapter into PingAccess as a live
+Processing Rule transforming PingAM authentication responses. Created transform
+specs, profile, and provisioning script. Verified end-to-end: body transforms,
+header injection, callback passthrough, and hot-reload all working. Migrated to
+Docker Compose v2. Captured all learnings across three ops guides.
 
 ## Phases Completed
 
@@ -18,7 +20,8 @@ on PingDirectory 11.0 (3-container arch), eliminating the need for PingDS.
 | 3 | PingAM initial configuration script | ✅ Done |
 | 4 | Username/Password journey + test users | ✅ Done |
 | 5 | PingAccess reverse proxy integration | ✅ Done |
-| 6 | WebAuthn / Passkey journeys | 🔄 Partial (6.1, 6.4 done; 6.5 next) |
+| 6 | WebAuthn / Passkey journeys | ✅ Done (6.1–6.5) |
+| 7 | Message-xform plugin wiring | ✅ Done (10/10 steps) |
 
 ## Key Decisions Made
 
@@ -26,18 +29,21 @@ on PingDirectory 11.0 (3-container arch), eliminating the need for PingDS.
 - **D5**: 3-container architecture (PA + AM + PD)
 - **D6**: REST API import over frodo CLI (frodo v3 has parsing issues)
 - **D7**: Callback auth everywhere (ZPL disabled, AM 8.0 default)
+- **D8**: Docker Compose v2 (v1 has ContainerConfig KeyError bug)
+- **D9**: Response-only transforms for AM auth (callback protocol constraint)
 
-## Critical Gotchas Documented
+## Verified End-to-End (Phase 7)
 
-1. **Host header**: AM rejects requests without matching Host header → use
-   `-H "Host: am.platform.local:18080"` + `http://127.0.0.1:18080`
-2. **curl -sf**: Silently swallows AM error responses → always use `-s` only
-3. **orgConfig trap**: Setting to invalid name breaks ALL auth → recovery
-   via `authIndexType=service&authIndexValue=ldapService`
-4. **Node import order**: Nodes must exist before tree import (AM doesn't validate)
+| Test | Result |
+|------|--------|
+| Body transform (tokenId → token) | ✅ |
+| Field injection (authenticated: true) | ✅ |
+| Header injection (x-auth-provider: PingAM) | ✅ |
+| Callback passthrough (JSLT guard) | ✅ |
+| Hot-reload (30s interval) | ✅ |
+| Plugin discovery via Admin API | ✅ |
 
 ## Next Steps
 
-1. **Phase 6.5**: Test passkey registration/authentication (needs browser or openauth-sim)
-2. **Phase 7**: Message-xform plugin wiring for PingAccess
-3. **Phase 8**: E2E smoke tests (Karate)
+1. **Phase 8**: E2E smoke tests (Karate)
+2. **Phase 9**: Production hardening (if applicable)
