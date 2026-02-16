@@ -11,9 +11,9 @@
 #   3. PingDirectory license at ../../binaries/pingdirectory/license/
 #
 # Usage:
-#   docker compose up -d
-#   docker compose logs -f
-#   docker compose down
+#   docker-compose up -d
+#   docker-compose logs -f
+#   docker-compose down
 # ==============================================================================
 
 networks:
@@ -41,26 +41,25 @@ services:
       - "${PD_HTTPS_PORT:-1443}:1443"
     volumes:
       - pd-data:/opt/out
-      - ./config/pd-post-setup.dsconfig:/opt/staging/dsconfig/pd-post-setup.dsconfig:ro
+      - ./config/pd-post-setup.dsconfig:/opt/staging/pd.profile/dsconfig/pd-post-setup.dsconfig:ro
+      - ./config/etag-schema.ldif:/opt/staging/pd.profile/server-root/pre-setup/config/schema/99-etag.ldif:ro
       - ${PD_LICENSE_PATH:-../../binaries/pingdirectory/license/PingDirectory-11.0.0.0-Development.lic}:/opt/staging/pd.profile/server-root/pre-setup/PingDirectory.lic:ro
     environment:
       - PING_IDENTITY_ACCEPT_EULA=YES
       - PING_IDENTITY_DEVOPS_USER=${PING_IDENTITY_DEVOPS_USER:-}
       - PING_IDENTITY_DEVOPS_KEY=${PING_IDENTITY_DEVOPS_KEY:-}
       - ROOT_USER_DN=${PD_ROOT_USER_DN:-cn=administrator}
-      - ROOT_USER_PASSWORD_FILE=/run/secrets/pd-root-password
+      - ROOT_USER_PASSWORD=${PD_ROOT_USER_PWD:-2FederateM0re}
       - USER_BASE_DN=${PD_BASE_DN:-dc=example,dc=com}
       - MAKELDIF_USERS=${PD_MAKELDIF_USERS:-10}
-      - MAX_HEAP_SIZE=512m
-    secrets:
-      - pd-root-password
+      - MAX_HEAP_SIZE=768m
     healthcheck:
       test: ["CMD", "/opt/server/bin/ldapsearch",
              "--hostname", "localhost",
              "--port", "1636",
              "--useSsl", "--trustAll",
              "--bindDN", "cn=administrator",
-             "--bindPasswordFile", "/run/secrets/pd-root-password",
+             "--bindPassword", "${PD_ROOT_USER_PWD:-2FederateM0re}",
              "--baseDN", "",
              "--searchScope", "base",
              "(objectClass=*)"]
@@ -120,8 +119,3 @@ services:
       - PING_IDENTITY_ACCEPT_EULA=YES
       - PING_IDENTITY_DEVOPS_USER=${PING_IDENTITY_DEVOPS_USER:-}
       - PING_IDENTITY_DEVOPS_KEY=${PING_IDENTITY_DEVOPS_KEY:-}
-
-# ── Docker Secrets ──────────────────────────────────────────────────────────
-secrets:
-  pd-root-password:
-    environment: PD_ROOT_USER_PWD

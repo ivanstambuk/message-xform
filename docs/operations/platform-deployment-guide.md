@@ -681,7 +681,7 @@ docker compose up -d pingam
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│  PLATFORM QUICK REFERENCE                                          │
+│  PLATFORM QUICK REFERENCE                                           │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
 │  Start:    docker compose up -d                                     │
@@ -697,7 +697,7 @@ docker compose up -d pingam
 │                                                                     │
 │  PingAccess       Engine:3000   Admin :9000                         │
 │                                                                     │
-│  AM Auth:  curl -X POST http://am:8080/am/json/authenticate \      │
+│  AM Auth:  curl -X POST http://am:8080/am/json/authenticate \       │
 │            -H "X-OpenAM-Username: amAdmin"                   \      │
 │            -H "X-OpenAM-Password: Password1"                 \      │
 │            -H "Accept-API-Version: resource=2.0,protocol=1.0"       │

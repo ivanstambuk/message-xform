@@ -5,7 +5,7 @@
 # Usage:  ./scripts/generate-keys.sh
 #
 # Generates a self-signed PKCS#12 keystore and public certificate used by all
-# platform containers (PingAccess, PingAM, PingDS, PingDirectory).
+# platform containers (PingAccess, PingAM, PingDirectory).
 #
 # Enterprise extension points:
 #   CUSTOM_KEYSTORE_PATH   — skip generation and use a pre-built keystore
@@ -76,7 +76,6 @@ echo "Generating self-signed TLS keypair..."
 SAN_DNS="dns:${TOP_LEVEL_DOMAIN}"
 SAN_DNS="${SAN_DNS},dns:${HOSTNAME_PA}"
 SAN_DNS="${SAN_DNS},dns:${HOSTNAME_AM}"
-SAN_DNS="${SAN_DNS},dns:${HOSTNAME_DS}"
 SAN_DNS="${SAN_DNS},dns:${HOSTNAME_PD}"
 SAN_DNS="${SAN_DNS},dns:localhost"
 
