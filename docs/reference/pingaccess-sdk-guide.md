@@ -21,50 +21,195 @@
 
 | # | Section | One-liner | Tags |
 |---|---------|-----------|------|
-| 1 | [AsyncRuleInterceptor SPI](#1-asyncruleinterceptor-spi) | The plugin interface your adapter implements | `plugin`, `SPI`, `interceptor`, `lifecycle` |
-| 2 | [Exchange](#2-exchange) | The request/response envelope passed to every handler | `exchange`, `request`, `response`, `identity` |
-| 3 | [Message / Request / Response](#3-message--request--response) | Reading and writing HTTP bodies, headers, status | `message`, `body`, `headers`, `request`, `response` |
-| 4 | [Body](#4-body) | HTTP message body — stateful, streamable, memory-aware | `body`, `streaming`, `memory`, `scalability` |
-| 5 | [Headers](#5-headers) | Full header API — generic, typed, and CORS accessors | `headers`, `CORS`, `cookies`, `content-type` |
-| 6 | [Identity & Session Context](#6-identity--session-context) | Authentication context: user, claims, OAuth, session state | `identity`, `session`, `OAuth`, `OIDC` |
-| 7 | [Plugin Configuration & UI](#7-plugin-configuration--ui) | @UIElement, ConfigurationBuilder, Bean Validation | `configuration`, `UIElement`, `admin`, `validation` |
-| 8 | [ResponseBuilder & Error Handling](#8-responsebuilder--error-handling) | Building responses, DENY mode, ErrorHandlingCallback | `response`, `error`, `DENY`, `ResponseBuilder` |
-| 9 | [Deployment & Classloading](#9-deployment--classloading) | Shadow JAR, PA-provided deps, classloader model, SPI registration | `shadow`, `JAR`, `Jackson`, `compileOnly`, `ADR-0031` |
-| 10 | [Thread Safety](#10-thread-safety) | Init-time vs per-request state, concurrency model | `thread`, `concurrency`, `mutable` |
-| 11 | [Testing Patterns](#11-testing-patterns) | Mockito mock chains, config validation, dependency alignment | `test`, `Mockito`, `mock`, `Validator` |
-| 12 | [Supporting Types](#12-supporting-types) | Outcome, HttpStatus, Method, ExchangeProperty, ServiceFactory | `Outcome`, `HttpStatus`, `ServiceFactory` |
-| 13 | [SSL & Network Types](#13-ssl--network-types) | SslData, TargetHost, SetCookie | `SSL`, `TLS`, `cookie`, `network` |
-| 14 | [OAuth SDK](#14-oauth-sdk) | OAuthConstants, OAuthUtilities, WWW-Authenticate building | `OAuth`, `DPoP`, `RFC6750`, `constants` |
-| 15 | [Other Extension Points](#15-other-extension-points) | IdentityMapping, SiteAuthenticator, LoadBalancing, LocaleOverride, MasterKeyEncryptor | `extension`, `plugin`, `identity`, `encryption`, `locale` |
-| 16 | [Vendor-Built Plugin Analysis](#16-vendor-built-plugin-analysis) | Patterns from PA engine's built-in plugins | `vendor`, `internal`, `engine`, `built-in` |
-| 17 | [Development Setup & Plugin Creation](#17-development-setup--plugin-creation) | SDK directory structure, 7-step creation procedure, Maven/Gradle | `setup`, `Maven`, `Gradle`, `create`, `deploy` |
-| 18 | [Behavioral Notes](#18-behavioral-notes) | Request immutability in response phase, logging | `behavior`, `constraints`, `logging` |
-| 19 | [JMX Monitoring & Custom MBeans](#19-jmx-monitoring--custom-mbeans) | PA's JMX infrastructure, plugin MBean registration pattern | `JMX`, `MBean`, `monitoring`, `metrics` |
+| | **Part I — Getting Started & Foundation** | | |
+| 1 | [Quick Start: Create & Deploy a Plugin](#1-quick-start-create--deploy-a-plugin) | End-to-end 7-step plugin creation and deployment | `quickstart`, `create`, `deploy`, `Maven` |
+| 2 | [SDK Layout, Build & Prerequisites](#2-sdk-layout-build--prerequisites) | SDK directory structure, prerequisites, Gradle adaptation | `SDK`, `layout`, `Maven`, `Gradle`, `prerequisites` |
+| 3 | [Core Plugin SPI & Lifecycle](#3-core-plugin-spi--lifecycle) | Interceptor hierarchy, 7-step lifecycle, injection, @Rule | `SPI`, `interceptor`, `lifecycle`, `injection`, `@Rule` |
+| 4 | [Plugin Configuration & Admin UI](#4-plugin-configuration--admin-ui) | @UIElement, ConfigurationBuilder, Bean Validation, dynamic dropdowns | `configuration`, `UIElement`, `admin`, `validation` |
+| | **Part II — HTTP Model & Exchange** | | |
+| 5 | [Exchange & Policy Context](#5-exchange--policy-context) | The request/response envelope, ExchangeProperty, PolicyConfiguration | `exchange`, `ExchangeProperty`, `PolicyConfiguration` |
+| 6 | [HTTP Messages: Request, Response & Body](#6-http-messages-request-response--body) | Message interface, Request/Response, Body state model | `message`, `request`, `response`, `body`, `streaming` |
+| 7 | [Headers](#7-headers) | Generic, typed, and CORS header accessors, cookies, HeaderField | `headers`, `CORS`, `cookies`, `content-type`, `HeaderField` |
+| 8 | [Identity, Session & OAuth Context](#8-identity-session--oauth-context) | Identity, SessionStateSupport, OAuthTokenMetadata, OAuth constants, $session merge | `identity`, `session`, `OAuth`, `OIDC`, `OAuthConstants` |
+| | **Part III — Response Building & Error Handling** | | |
+| 9 | [ResponseBuilder & DENY Mode](#9-responsebuilder--deny-mode) | Building responses, DENY mode in request/response phases | `ResponseBuilder`, `DENY`, `Outcome`, `response` |
+| 10 | [Error Handling & Error Callbacks](#10-error-handling--error-callbacks) | AccessException, ErrorHandlingCallback, ErrorInfo, localization | `AccessException`, `ErrorHandlingCallback`, `ErrorInfo` |
+| | **Part IV — Cross-Cutting Concerns** | | |
+| 11 | [Thread Safety & Concurrency](#11-thread-safety--concurrency) | Init-time vs per-request state, concurrency model, request immutability | `thread`, `concurrency`, `mutable`, `immutability` |
+| 12 | [Deployment & Classloading](#12-deployment--classloading) | Shadow JAR, PA-provided deps, classloader model, SPI registration | `shadow`, `JAR`, `classloader`, `SPI`, `ADR-0031` |
+| 13 | [Testing Patterns](#13-testing-patterns) | Mockito mock chains, config validation, dependency alignment | `test`, `Mockito`, `mock`, `Validator`, `JUnit` |
+| 14 | [JMX Monitoring & Custom MBeans](#14-jmx-monitoring--custom-mbeans) | PA's JMX infrastructure, plugin MBean registration pattern | `JMX`, `MBean`, `monitoring`, `metrics` |
+| 15 | [Logging](#15-logging) | SLF4J usage, audit logging, PA log integration | `logging`, `SLF4J`, `audit` |
+| | **Part V — Extension Points & Vendor Patterns** | | |
+| 16 | [Additional Extension SPIs](#16-additional-extension-spis) | IdentityMapping, SiteAuthenticator, LoadBalancing, LocaleOverride, MasterKeyEncryptor | `extension`, `identity`, `site-authenticator`, `load-balancing` |
+| 17 | [Vendor-Built Plugin Analysis](#17-vendor-built-plugin-analysis) | Patterns from PA engine's built-in plugins, internal-only APIs | `vendor`, `internal`, `engine`, `built-in` |
+| | **Part VI — Reference** | | |
+| 18 | [Supporting Types & Enumerations](#18-supporting-types--enumerations) | Outcome, HttpStatus, Method, MediaType, SslData, TargetHost, SetCookie | `Outcome`, `HttpStatus`, `Method`, `SslData`, `SetCookie` |
+| 19 | [Service Factories & Utilities](#19-service-factories--utilities) | ServiceFactory, BodyFactory, HeadersFactory, HttpClient, TemplateRenderer | `ServiceFactory`, `BodyFactory`, `HttpClient`, `TemplateRenderer` |
+| 20 | [Complete SPI Inventory & Sources](#20-complete-spi-inventory--sources) | Extension point matrix, SPI registration, Java compat, artefact locations | `SPI`, `matrix`, `services`, `artefacts` |
 
 ---
 
-## 1. AsyncRuleInterceptor SPI
+# Part I — Getting Started & Foundation
 
-> **Tags:** `plugin`, `SPI`, `interceptor`, `lifecycle`, `AsyncRuleInterceptorBase`
+## 1. Quick Start: Create & Deploy a Plugin
 
-A `AsyncRuleInterceptor` is the runtime instantiation of a Rule defined in the
-Administrative API that supports applying access control logic as an asynchronous
-computation. Your adapter extends `AsyncRuleInterceptorBase<T>` which provides
-sensible defaults.
+> **Tags:** `quickstart`, `create`, `deploy`, `Maven`
 
-> **When to use Async vs Sync:** Per the SDK Javadoc, `AsyncRuleInterceptor`
-> should only be used when the logic of the Rule requires using a `HttpClient`.
-> If no `HttpClient` is needed, use `RuleInterceptor` instead. Our adapter uses
-> async because future features may require HTTP callouts.
+### Prerequisites
 
-### Interceptor (tagging interface)
+- **Java SDK** — 17 or 21 (Amazon Corretto, OpenJDK, Oracle JDK — 64-bit)
+- **Apache Maven** (for official samples) or **Gradle** (for custom projects)
+- PingAccess 9.0.x extracted
+
+### 7-Step Creation Procedure (Official)
+
+1. **Create a new, empty Maven project.** The root directory is referred to
+   as `<PLUGIN_HOME>`.
+
+2. **Copy the `pom.xml`** from the appropriate SDK sample in
+   `<PA_HOME>/sdk/samples/`. For example, to create a rule, copy from
+   `<PA_HOME>/sdk/samples/Rules/`.
+
+3. **Modify the `pom.xml`:** Update `groupId`, `artifactId`, `name`, and
+   `version` as appropriate for your plugin.
+
+4. **Create a Java class** that implements the plugin SPI from the SDK, in
+   `<PLUGIN_HOME>/src/main/java/com/yourpackagename/`. For each SPI, base
+   classes are provided that simplify the implementation:
+
+   | Plugin Type | SPI Interface | Base Class |
+   |-------------|--------------|------------|
+   | Sync rule | `RuleInterceptor` | `RuleInterceptorBase` |
+   | Async rule | `AsyncRuleInterceptor` | `AsyncRuleInterceptorBase` |
+   | Site authenticator | `SiteAuthenticatorInterceptor` | `SiteAuthenticatorInterceptorBase` |
+   | Identity mapping | `IdentityMappingPlugin` | `IdentityMappingPluginBase` |
+   | Load balancing | `LoadBalancingPlugin` | `LoadBalancingPluginBase` |
+
+5. **Create a provider-configuration file** (SPI services file) for the plugin.
+   The file name is the FQCN of the SPI interface, and its contents are the FQCN
+   of your implementation class:
+   ```
+   <PLUGIN_HOME>/src/main/resources/META-INF/services/com.pingidentity.pa.sdk.policy.RuleInterceptor
+   ```
+   **Contents:** `com.yourpackagename.YourCustomRule`
+
+6. **Build the Maven project** to obtain a JAR:
+   ```bash
+   cd <PLUGIN_HOME>
+   mvn install
+   ```
+
+7. **Deploy the JAR** to `<PA_HOME>/deploy/` and **restart PingAccess**.
+
+> ⚠️ **Mandatory Restart:** You **must** restart PingAccess after deploying any
+> custom plugin JAR. There is no hot-reload mechanism.
+
+### Installing the SDK Samples
+
+```bash
+cd <PA_HOME>/sdk/samples/Rules
+mvn install
+# Builds, tests, and copies the JAR to <PA_HOME>/lib
+```
+
+---
+
+## 2. SDK Layout, Build & Prerequisites
+
+> **Tags:** `SDK`, `layout`, `Maven`, `Gradle`, `prerequisites`
+
+### SDK Directory Structure
+
+The PingAccess SDK is located at `<PA_HOME>/sdk` alongside the `<PA_HOME>/deploy`
+directory:
+
+| Path | Description |
+|------|-------------|
+| `<PA_HOME>/deploy/` | Deployment directory for custom plugin JARs (auto-migrated on upgrade) |
+| `<PA_HOME>/sdk/README.md` | Overview of the SDK contents |
+| `<PA_HOME>/sdk/apidocs/` | SDK Javadocs (open `index.html` to browse) |
+| `<PA_HOME>/sdk/samples/Rules/` | Maven project with example rule plugin implementations |
+| `<PA_HOME>/sdk/samples/SiteAuthenticator/` | Maven project with example site authenticator plugins |
+| `<PA_HOME>/sdk/samples/IdentityMappings/` | Maven project with example identity mapping plugins |
+| `<PA_HOME>/sdk/samples/LoadBalancingStrategies/` | Maven project with example load balancing plugins |
+| `<PA_HOME>/sdk/samples/LocaleOverrideService/` | Maven project with example locale override plugin |
+
+Each `samples/` subdirectory contains its own `README.md` with sample-specific details.
+
+### Ping Identity Maven Repository
+
+The SDK samples reference Ping Identity's public Maven repository:
+
+```
+http://maven.pingidentity.com/release
+```
+
+> **Note:** This Maven repository **cannot be accessed through a browser** — it
+> is designed solely for backend use (Maven/Gradle dependency resolution).
+
+**Maven `pom.xml` configuration:**
+
+```xml
+<repositories>
+    <repository>
+        <releases>
+            <enabled>true</enabled>
+            <updatePolicy>always</updatePolicy>
+            <checksumPolicy>warn</checksumPolicy>
+        </releases>
+        <id>PingIdentityMaven</id>
+        <name>PingIdentity Release</name>
+        <url>http://maven.pingidentity.com/release/</url>
+        <layout>default</layout>
+    </repository>
+</repositories>
+```
+
+**Offline / no-internet fallback (Maven):**
+
+If Internet access is unavailable, update the SDK dependency in `pom.xml` to
+point to the local PingAccess installation using `system` scope. Replace
+`<PA_HOME>` with the actual path:
+
+```xml
+<dependency>
+    <groupId>com.pingidentity.pingaccess</groupId>
+    <artifactId>pingaccess-sdk</artifactId>
+    <version>9.0.1.0</version>
+    <scope>system</scope>
+    <systemPath><PA_HOME>/lib/pingaccess-sdk-9.0.1.0.jar</systemPath>
+</dependency>
+```
+
+> **Version note:** The `systemPath` versions above are from the official docs
+> (PA 4.x era). For PA 9.0.1.0, the actual JAR filenames in `<PA_HOME>/lib/`
+> may differ. Always verify the exact filenames.
+
+### Gradle Adaptation
+
+For projects using **Gradle** instead of Maven:
+
+| Maven Step | Gradle Equivalent |
+|-----------|-------------------|
+| `pom.xml` with SDK dependency | `build.gradle.kts` with `compileOnly` SDK dependency |
+| `mvn install` | `./gradlew shadowJar` (produces shadow JAR) |
+| Copy JAR to `deploy/` | CI/CD copies shadow JAR to `<PA_HOME>/deploy/` |
+| Ping Maven repo in `<repositories>` | `maven { url = "http://maven.pingidentity.com/release" }` in `repositories {}` |
+| System-scope local JAR | `compileOnly(files("<PA_HOME>/lib/pingaccess-sdk-9.0.1.0.jar"))` |
+
+---
+
+## 3. Core Plugin SPI & Lifecycle
+
+> **Tags:** `SPI`, `interceptor`, `lifecycle`, `injection`, `@Rule`, `AsyncRuleInterceptorBase`
+
+### Interceptor Hierarchy
 
 ```java
 // com.pingidentity.pa.sdk.interceptor.Interceptor
 // An Interceptor is the "receiving object" for an Exchange, following the
-// Chain-of-responsibility pattern. This is a tagging interface to facilitate
-// organizing Interceptors in collections. Implementations should implement
-// a sub-interface (e.g., AsyncRuleInterceptor, RuleInterceptor).
+// Chain-of-responsibility pattern. This is a tagging interface.
 //
 // Sub-interfaces:
 //   RequestInterceptor  — adds handleRequest(Exchange)
@@ -99,6 +244,26 @@ response attached to the Exchange. Called on both CONTINUE and RETURN outcomes
 > **silently ignored** by PingAccess. Only `exchange.getResponse()` may be
 > modified.
 
+```java
+// ❌ WRONG — silently ignored
+@Override
+public CompletionStage<Void> handleResponse(Exchange exchange) {
+    exchange.getRequest().getHeaders().add("X-Debug", "true");  // IGNORED
+    return CompletableFuture.completedFuture(null);
+}
+
+// ✅ CORRECT — modify the response only
+@Override
+public CompletionStage<Void> handleResponse(Exchange exchange) {
+    exchange.getResponse().getHeaders().add("X-Debug", "true");  // OK
+    return CompletableFuture.completedFuture(null);
+}
+```
+
+> **When to use Async vs Sync:** Per the SDK Javadoc, `AsyncRuleInterceptor`
+> should only be used when the logic of the Rule requires using a `HttpClient`.
+> If no `HttpClient` is needed, use `RuleInterceptor` instead.
+
 ### Base class: `AsyncRuleInterceptorBase<T>`
 
 ```java
@@ -119,8 +284,6 @@ TemplateRenderer getTemplateRenderer();
 
 ```java
 // com.pingidentity.pa.sdk.plugins.DescribesUIConfigurable
-// Interface for describing the expected schema for a plugin's configuration,
-// for use by the Administrative API and UI.
 List<ConfigurationField> getConfigurationFields();
 // Returns an ordered set of ConfigurationFields (most easily built with ConfigurationBuilder)
 ```
@@ -130,11 +293,7 @@ List<ConfigurationField> getConfigurationFields();
 ```java
 // com.pingidentity.pa.sdk.plugins.ConfigurablePlugin<T extends PluginConfiguration>
 void configure(T configuration) throws ValidationException;
-// Called to provide the configuration from the UI/Administrative API.
-// Throws jakarta.validation.ValidationException for config validation errors.
-
 T getConfiguration();
-// Retrieves the configuration provided to this ConfigurablePlugin.
 ```
 
 ### Lifecycle (Official 7-Step Sequence)
@@ -174,10 +333,6 @@ as the example (identical for other plugin types):
 
 **Teardown:** No explicit destroy lifecycle. Plugins are garbage-collected on PA
 restart. Clean up resources (if any) using `@PreDestroy` or finalizers.
-
-> **Logging:** Use the **SLF4j API** for all logging in your plugin module.
-> PingAccess ships its own SLF4J provider — do NOT bundle a second SLF4J
-> implementation (causes classpath conflict). See [§9 Deployment](#9-deployment--classloading).
 
 ### Injection
 
@@ -252,7 +407,7 @@ site-only features should be explicitly marked.
 **Annotation patterns:**
 
 ```java
-// Site-only rule (our adapter uses this — we need handleResponse + body access)
+// Site-only rule (use when you need handleResponse + body access)
 @Rule(destination = { RuleInterceptorSupportedDestination.Site }, ...)
 
 // Agent-only rule
@@ -262,11 +417,6 @@ site-only features should be explicitly marked.
 @Rule(destination = { RuleInterceptorSupportedDestination.Site,
                       RuleInterceptorSupportedDestination.Agent }, ...)
 ```
-
-> **Our adapter's choice:** We use `destination = {Site}` because we require:
-> (1) `handleResponse()` for response-phase transforms, (2) request body access
-> for body-based transforms, and (3) destination host information. All three are
-> unavailable to Agent rules.
 
 ### RuleInterceptorCategory (enum)
 
@@ -290,517 +440,7 @@ Site, Agent
 
 ---
 
-## 2. Exchange
-
-> **Tags:** `exchange`, `request`, `response`, `identity`, `PolicyConfiguration`, `ExchangeProperty`
-
-The `Exchange` is the central envelope passed to `handleRequest` and `handleResponse`.
-It holds the request, response, identity, and exchange-scoped properties.
-
-```java
-// com.pingidentity.pa.sdk.http.Exchange
-Request  getRequest();           void setRequest(Request);
-Response getResponse();          void setResponse(Response);  // null until site responds
-Identity getIdentity();          // null for unauthenticated requests
-SslData  getSslData();           // TLS/SSL connection data (certs, SNI)
-String   getOriginalRequestUri();
-String   getSourceIp();
-String   getUserAgentHost();
-String   getUserAgentProtocol();
-String   getTargetScheme();
-List<TargetHost> getTargetHosts();    // backend target host(s)
-Instant  getCreationTime();
-Locale   getResolvedLocale();
-PolicyConfiguration getPolicyConfiguration();   // application + resource metadata
-
-// Exchange properties — strongly-typed cross-rule state
-<T> Optional<T> getProperty(ExchangeProperty<T> property);
-<T> T getRequiredProperty(ExchangeProperty<T> property);    // throws if absent
-boolean isPropertyTrue(ExchangeProperty<Boolean> property); // safe boolean check
-default void removeProperty(ExchangeProperty<?> property);  // equivalent to set(null)
-<T> void setProperty(ExchangeProperty<T> property, T value);
-```
-
-### Critical: `getResponse()` is null during request phase
-
-During `handleRequest()`, the backend has not yet responded, so
-`exchange.getResponse()` returns **`null`**. Any attempt to call methods on it
-will throw `NullPointerException`. See [§8 ResponseBuilder](#8-responsebuilder--error-handling)
-for how to handle this.
-
-### ExchangeProperty<T>
-
-A strongly-typed key for get/set properties on an Exchange. Created via a
-static factory method with a namespace (typically reverse domain name) and identifier.
-
-```java
-// com.pingidentity.pa.sdk.http.ExchangeProperty<T>
-static <T> ExchangeProperty<T> create(String namespace, String identifier, Class<T> type);
-String getNamespace();
-String getIdentifier();
-String getKey();          // "[namespace]:[identifier]"
-Class<T> getType();
-
-// Equality: two ExchangeProperty instances are equal if they have the same
-// namespace and identifier, REGARDLESS of their type. This allows differently
-// typed properties to refer to the same value if types are compatible.
-```
-
-**Usage example:**
-
-```java
-// Define a typed exchange property
-private static final ExchangeProperty<TransformResult> TRANSFORM_RESULT =
-    ExchangeProperty.create("io.messagexform", "transformResult", TransformResult.class);
-
-// Store in handleRequest
-exchange.setProperty(TRANSFORM_RESULT, result);
-
-// Retrieve in handleResponse
-Optional<TransformResult> cached = exchange.getProperty(TRANSFORM_RESULT);
-```
-
-### PolicyConfiguration
-
-Provides details about the application and resource for the current Exchange.
-
-```java
-// com.pingidentity.pa.sdk.policy.PolicyConfiguration
-Application getApplication();
-Resource    getResource();
-```
-
-### Application
-
-```java
-// com.pingidentity.pa.sdk.policy.Application
-int             getId();
-String          getName();
-String          getDescription();
-String          getContextRoot();
-ApplicationType getApplicationType();
-boolean         isCaseSensitivePath();
-String          getDefaultAuthType();
-String          getSpaSupportEnabled();
-String          getWebStorageType();
-int             getSiteId();
-int             getVirtualHostId();
-```
-
-### ApplicationType (enum)
-
-```java
-// Available values:
-Web, API, SinglePageApplication
-```
-
-### Resource
-
-```java
-// com.pingidentity.pa.sdk.policy.Resource
-int     getId();
-String  getName();
-PathPattern getPathPattern();
-List<Method> getMethods();
-```
-
-### PathPattern
-
-```java
-// com.pingidentity.pa.sdk.policy.PathPattern
-String getPattern();
-PathPattern.Type getType();
-
-// PathPattern.Type enum:
-WILDCARD, REGEX
-```
-
-> Useful for context-aware transforms (e.g., different behavior per application).
-> Not exposed in v1 `$session` but available for future `$context` enrichment.
-
----
-
-## 3. Message / Request / Response
-
-> **Tags:** `message`, `body`, `headers`, `request`, `response`, `Body`, `Headers`
-
-### Message (parent of Request and Response)
-
-`Message` defines the representation for an HTTP message. Both `Request` and
-`Response` extend this interface.
-
-```java
-// com.pingidentity.pa.sdk.http.Message
-Body    getBody();                 // never null — returns the body of this Message
-void    setBody(Body body);        // ⚠️ does NOT update Content-Length
-void    setBodyContent(byte[] c);  // replaces body + auto-updates Content-Length (copies array)
-Headers getHeaders();              void setHeaders(Headers srcHeaders);
-String  getStartLine();            // HTTP start line
-String  getVersion();              // "1.0" or "1.1"
-boolean isKeepAlive();
-```
-
-> **⚠️ `setBody()` vs `setBodyContent()`:** Per the Javadoc, `setBody()` does
-> **NOT** update the `Content-Length` header. Use `setBodyContent(byte[])` instead
-> — it updates `Content-Length` automatically. The provided byte array is copied.
->
-> **`setHeaders()` validation:** Throws `IllegalArgumentException` if the
-> specified `Headers` object was not created with the provided `HeadersFactory`
-> (see `ServiceFactory.headersFactory()`).
->
-> **Agent request caveat:** When processing an Agent Request from a PingAccess
-> agent, the headers of the Message might indicate a non-empty body should be
-> returned, but an empty body will be returned.
-
-### Request
-
-```java
-// com.pingidentity.pa.sdk.http.Request extends Message
-Method getMethod();              void setMethod(Method method);
-String getUri();                 void setUri(String uri);
-
-// URI is the path + query component of the URL, e.g.:
-//   /application/resource?key1=value1&key2=value2
-
-Map<String, String[]> getQueryStringParams() throws URISyntaxException;
-// Parses and returns query string parameters.
-// Throws URISyntaxException if the URI is badly formed.
-```
-
-> **Note:** `getUri()` returns a `String` (not `java.net.URI`). It is the path
-> and query component only, not the full URL.
-
-### Response
-
-```java
-// com.pingidentity.pa.sdk.http.Response extends Message
-HttpStatus getStatus();           void setStatus(HttpStatus status);
-int        getStatusCode();       // convenience: getStatus().getCode()
-String     getStatusMessage();    // convenience: getStatus().getMessage()
-```
-
----
-
-## 4. Body
-
-> **Tags:** `body`, `streaming`, `memory`, `scalability`, `read`, `InputStream`
-
-A representation of the body content of an HTTP message. **Body is a stateful
-object** — understanding its state model is critical for correct adapter operation.
-
-```java
-// com.pingidentity.pa.sdk.http.Body
-void         read() throws AccessException, IOException;
-boolean      isRead();          // true if body content has been read (streaming or in-memory)
-boolean      isInMemory();      // true if body content is available in memory
-byte[]       getContent();      // returns COPY of body bytes (requires isInMemory() == true)
-InputStream  newInputStream();  // returns InputStream (requires isInMemory() == true)
-int          getLength();       // body length in bytes (requires isInMemory() == true)
-Map<String, String[]> parseFormParams();  // parses application/x-www-form-urlencoded body
-String       toString();        // debugging: UTF-8 string of content, or "" if not in memory
-```
-
-### ⚠️ Scalability Warning (from Javadoc)
-
-> **"Care needs to be taken when reading a HTTP message body into memory because
-> doing so could impact the scalability of PingAccess. If possible, HTTP message
-> bodies should not be read into memory."**
-
-### State Model
-
-PingAccess by default **streams** a message body from client to server (and
-vice versa) **without** reading the complete body into memory.
-
-| State | `isRead()` | `isInMemory()` | Methods available |
-|-------|-----------|-----------------|-------------------|
-| Not yet consumed | `false` | `false` | Only `read()` |
-| After streaming (default) | `true` | `false` | None — body content consumed |
-| After `read()` | `true` | `true` | `getContent()`, `newInputStream()`, `getLength()`, `parseFormParams()` |
-
-- **`read()`** — Reads body content into memory. If the body size exceeds PA's
-  configured maximum, throws `AccessException`. If already read, returns
-  immediately (no-op). This is the **only** way to make the body available for
-  `getContent()`.
-- **`getContent()`** — Returns a **copy** of the body as `byte[]`. Throws
-  `IllegalStateException` if `isInMemory()` is `false`. To avoid the copy
-  overhead, use `newInputStream()`.
-- **`newInputStream()`** — Returns an `InputStream` over the in-memory body.
-  Throws `IllegalStateException` if `isInMemory()` is `false`.
-- **`getLength()`** — Returns body length in bytes. Throws
-  `IllegalStateException` if `isInMemory()` is `false`.
-- **`parseFormParams()`** — Parses `application/x-www-form-urlencoded` content.
-  Assumes UTF-8 encoding. Throws `IllegalStateException` if body is not in
-  memory, `IllegalArgumentException` if content is not valid form-encoded.
-
-> **Adapter implication:** The adapter MUST call `body.read()` before calling
-> `body.getContent()`. The adapter does not impose additional limits beyond the
-> core engine's `maxOutputSizeBytes`.
-
----
-
-## 5. Headers
-
-> **Tags:** `headers`, `CORS`, `cookies`, `content-type`, `HeaderField`, `HeaderName`
-
-The `Headers` interface provides a comprehensive API for HTTP header
-manipulation. Headers are case-insensitive per RFC 7230.
-
-### Generic Header Access
-
-```java
-// com.pingidentity.pa.sdk.http.Headers
-
-// Read
-List<HeaderField> getHeaderFields();           // all header fields in this object
-String   getFirstValue(String name);           // first value, comma-separated split
-String   getLastValue(String name);            // last value of last field
-String   getValue(String name);                // first value (alias)
-String[] getValues(String name);               // all values for a name
-Map<String, String[]> asMap();                 // all headers (name → values[])
-List<String> getModifiedHeaderNames();         // names added/modified since creation
-
-// Write
-void     add(String name, String value);       // add a header field
-void     add(HeaderName name, String value);   // add with HeaderName
-void     setValue(String name, String value);   // set single value (replaces all)
-void     setValue(String name, List<String> values); // alias for setValues
-void     setValues(String name, List<String> values); // replace all values
-boolean  removeFields(String name);            // remove all fields with name
-```
-
-### Typed Header Accessors
-
-The SDK provides getter/setter pairs for common HTTP headers. Each getter
-returns `null` (for single-value) or empty `List` (for multi-value) if absent.
-Multi-value setters with an empty `List` remove the header.
-
-| Header | Getter | Setter | Type |
-|--------|--------|--------|------|
-| Accept | `getAccept()` | `setAccept(List<String>)` | `List<String>` |
-| Authorization | `getAuthorization()` | `setAuthorization(String)` | `String` |
-| Cache-Control | `getCacheControl()` | `setCacheControl(List<String>)` | `List<String>` |
-| Content-Disposition | `getContentDisposition()` | `setContentDisposition(String)` | `String` |
-| Content-Encoding | `getContentEncoding()` | `setContentEncoding(List<String>)` | `List<String>` |
-| Content-Length | `getContentLength()` | `setContentLength(long)` | `long` |
-| Content-Location | `getContentLocation()` | `setContentLocation(String)` | `String` |
-| Content-Type | `getContentType()` | `setContentType(String)` | `MediaType` / `String` |
-| Date | `getDate()` | — | `Instant` |
-| Host | `getHost()` | — | `String` |
-| Last-Modified | `getLastModified()` | — | `Instant` |
-| Location | `getLocation()` | `setLocation(String)` | `String` |
-| Origin | `getOrigin()` | `setOrigin(String)` | `String` |
-| Pragma | `getPragma()` | `setPragma(List<String>)` | `List<String>` |
-| Set-Cookie | `getSetCookies()` | — | `List<SetCookie>` |
-| Transfer-Encoding | `getTransferEncoding()` | `setTransferEncoding(List<String>)` | `List<String>` |
-| Vary | `getVary()` | `setVary(List<String>)` | `List<String>` |
-| WWW-Authenticate | `getWwwAuthenticate()` | — | `String` |
-| X-Forwarded-For | `getXForwardedFor()` | — | `String` |
-| X-Forwarded-Host | `getXForwardedHost()` | — | `String` |
-| X-Forwarded-Port | `getXForwardedPort()` | — | `String` |
-| X-Forwarded-Proto | `getXForwardedProto()` | — | `String` |
-
-### CORS Header Accessors
-
-Full CORS support with dedicated getter/setter pairs:
-
-```java
-// CORS headers — all have get/set pairs
-String getAccessControlAllowCredentials();   void setAccessControlAllowCredentials(String);
-List<String> getAccessControlAllowHeaders(); void setAccessControlAllowHeaders(List<String>);
-List<String> getAccessControlAllowMethods(); void setAccessControlAllowMethods(List<String>);
-String getAccessControlAllowOrigin();        void setAccessControlAllowOrigin(String);
-List<String> getAccessControlExposeHeaders();void setAccessControlExposeHeaders(List<String>);
-String getAccessControlMaxAge();             void setAccessControlMaxAge(String);
-List<String> getAccessControlRequestHeaders(); void setAccessControlRequestHeaders(List<String>);
-String getAccessControlRequestMethod();      void setAccessControlRequestMethod(String);
-```
-
-### Cookie Access
-
-```java
-Map<String, String[]> getCookies();          // all cookies (from Cookie header fields)
-String getFirstCookieValue(String name);     // first cookie value by name
-Charset getCharset();                        // charset from Content-Type header
-```
-
-### HeaderField and HeaderName
-
-```java
-// com.pingidentity.pa.sdk.http.HeaderField
-HeaderName getName();
-String     getValue();
-
-// com.pingidentity.pa.sdk.http.HeaderName
-// An immutable, case-insensitive HTTP header name per RFC 7230.
-HeaderName(String name);   // trims whitespace, throws if null or empty
-boolean equals(String s);  // case-insensitive comparison with String
-```
-
----
-
-## 6. Identity & Session Context
-
-> **Tags:** `identity`, `session`, `OAuth`, `OIDC`, `claims`, `SessionStateSupport`, `OAuthTokenMetadata`, `JsonNode`
-
-### Identity
-
-An `Identity` object contains attributes and associated values derived from an
-authentication token issued by a token provider. The actual token can be a PA
-JWT cookie or an OAuth token.
-
-```java
-// com.pingidentity.pa.sdk.identity.Identity
-String  getSubject();             // authenticated user principal
-String  getMappedSubject();       // subject set by IdentityMappingPlugin (may be null/empty)
-void    setMappedSubject(String); // used by IdentityMapping — adapter should NOT call this
-String  getTrackingId();          // PA tracking ID (for logging only, NOT globally unique)
-String  getTokenId();             // unique ID presented in the authentication token
-Instant getTokenExpiration();     // token expiry (java.time.Instant, NOT Date)
-JsonNode getAttributes();        // JSON identity attributes (OIDC/token claims)
-SessionStateSupport getSessionStateSupport();  // persistent session key-value store
-OAuthTokenMetadata  getOAuthTokenMetadata();   // null if OAuth is not used
-```
-
-> **`exchange.getIdentity()` may return `null`** for unauthenticated/anonymous
-> resources. Always null-check before accessing identity fields.
->
-> **`getAttributes()` returns an immutable snapshot:** Modifications to the
-> returned `JsonNode` will NOT update the identity's attributes.
->
-> **`getMappedSubject()`** may be `null` if identity mapping was not configured
-> for the request, or an empty string if the `IdentityMappingPlugin` was unable
-> to find a mapped subject.
-
-### SessionStateSupport
-
-Provides access to persistent data across exchanges. Session state data is stored
-in a cookie. Requires a web application with a web session configured.
-
-```java
-// com.pingidentity.pa.sdk.identity.SessionStateSupport
-Map<String, JsonNode> getAttributes();         // unmodifiable map (snapshot)
-Set<String>           getAttributeNames();     // unmodifiable set (snapshot)
-JsonNode              getAttributeValue(String name);  // single attribute or null
-void                  setAttribute(String name, JsonNode value);
-void                  removeAttribute(String name);
-```
-
-> **Caveats from SDK Javadoc:**
-> - `getAttributes()` and `getAttributeNames()` return **unmodifiable snapshots**.
->   Later `setAttribute`/`removeAttribute` calls are NOT reflected in already-returned maps.
->   Modifying the returned Map/Set throws `UnsupportedOperationException`.
-> - Server-side attribute caching may cause cache entries to be deleted if cache
->   limits are exceeded. Implementers should be prepared to re-acquire data.
-> - In a cluster, requests to other nodes may result in a **cache miss**.
-> - API-configured applications may **not support** persistent session state.
->
-> **Adapter usage:** The adapter reads session attributes as read-only context
-> for JSLT transforms. Writing to session state is out of scope for v1.
-
-### OAuthTokenMetadata
-
-The `OAuthTokenMetadata` provides access to additional details about an OAuth
-token apart from the attributes on `Identity`.
-
-```java
-// com.pingidentity.pa.sdk.identity.OAuthTokenMetadata
-String      getClientId();     // client_id of the OAuth client (null if not present)
-Set<String> getScopes();       // granted OAuth scopes (empty if not present)
-String      getTokenType();    // e.g., "Bearer"
-String      getRealm();        // OAuth realm associated with the application (may be null)
-Instant     getExpiresAt();    // calculated expiration from expires_in (null if not present)
-Instant     getRetrievedAt();  // when PingAccess received the access token response
-```
-
-> **Null handling:** `getOAuthTokenMetadata()` returns `null` if OAuth is not
-> used for authentication. Individual fields may also be null.
-
-### Building $session — Flat Merge Pattern
-
-The adapter builds a flat `$session` JsonNode by merging four layers. Later
-layers override earlier layers on key collision:
-
-| Layer | Source | Contents | Precedence |
-|-------|--------|----------|------------|
-| 1 (base) | `Identity` getters | `subject`, `mappedSubject`, `trackingId`, `tokenId`, `tokenExpiration` | Lowest |
-| 2 | `OAuthTokenMetadata` | `clientId`, `scopes`, `tokenType`, `realm`, `tokenExpiresAt`, `tokenRetrievedAt` | |
-| 3 | `Identity.getAttributes()` | OIDC claims / token introspection (spread into flat object) | |
-| 4 (top) | `SessionStateSupport.getAttributes()` | Dynamic session state (spread into flat object) | Highest |
-
-**Why this precedence?** Session state (L4) is the most dynamic — rules can
-write to it during the session. OIDC claims (L3) override PA identity fields
-(L1) because claims are the authoritative token data.
-
-```java
-// Build flat $session JsonNode from Exchange.getIdentity()
-private JsonNode buildSessionContext(Identity identity) {
-    if (identity == null) return null;
-
-    ObjectNode session = objectMapper.createObjectNode();
-
-    // Layer 1: PA identity fields (base)
-    session.put("subject", identity.getSubject());
-    session.put("mappedSubject", identity.getMappedSubject());
-    session.put("trackingId", identity.getTrackingId());
-    session.put("tokenId", identity.getTokenId());
-    if (identity.getTokenExpiration() != null) {
-        session.put("tokenExpiration", identity.getTokenExpiration().toString());
-    }
-
-    // Layer 2: OAuth metadata
-    OAuthTokenMetadata oauth = identity.getOAuthTokenMetadata();
-    if (oauth != null) {
-        session.put("clientId", oauth.getClientId());
-        session.put("tokenType", oauth.getTokenType());
-        session.put("realm", oauth.getRealm());
-        if (oauth.getExpiresAt() != null) {
-            session.put("tokenExpiresAt", oauth.getExpiresAt().toString());
-        }
-        if (oauth.getRetrievedAt() != null) {
-            session.put("tokenRetrievedAt", oauth.getRetrievedAt().toString());
-        }
-        ArrayNode scopesNode = objectMapper.createArrayNode();
-        if (oauth.getScopes() != null) {
-            oauth.getScopes().forEach(scopesNode::add);
-        }
-        session.set("scopes", scopesNode);
-    }
-
-    // Layer 3: OIDC claims / token attributes (SPREAD into flat object)
-    // PA and the adapter share the same Jackson classes (flat classpath, ADR-0031).
-    // No boundary conversion needed — Identity.getAttributes() returns the
-    // same JsonNode class we use.
-    JsonNode paAttributes = identity.getAttributes();
-    if (paAttributes != null && paAttributes.isObject()) {
-        paAttributes.fields().forEachRemaining(entry ->
-            session.set(entry.getKey(), entry.getValue())  // overrides layers 1-2 on collision
-        );
-    }
-
-    // Layer 4: Session state (SPREAD into flat object — highest precedence)
-    // Same flat classpath — SessionStateSupport.getAttributes() returns
-    // Map<String, JsonNode> using the same Jackson classes.
-    SessionStateSupport sss = identity.getSessionStateSupport();
-    if (sss != null && sss.getAttributes() != null) {
-        sss.getAttributes().forEach((key, value) -> {
-            session.set(key, value);  // overrides all previous layers
-        });
-    }
-
-    return session;
-}
-```
-
-> **No boundary conversion needed (ADR-0031).** PingAccess uses a flat classpath
-> — `lib/*` and `deploy/*` share the same `AppClassLoader`. Jackson is
-> PA-provided (`compileOnly`), so `Identity.getAttributes()` and
-> `SessionStateSupport.getAttributes()` return the exact same `JsonNode` class
-> the adapter uses. Direct `session.set(key, paNode)` works without any
-> serialization round-trip.
-
----
-
-## 7. Plugin Configuration & UI
+## 4. Plugin Configuration & Admin UI
 
 > **Tags:** `configuration`, `UIElement`, `admin`, `validation`, `ConfigurationBuilder`, `ConfigurationType`
 
@@ -819,7 +459,6 @@ void setName(String);  // called by PA during configuration (plugin should not c
 // com.pingidentity.pa.sdk.policy.SimplePluginConfiguration implements PluginConfiguration
 // Provides a no-op implementation of PluginConfiguration.
 // Use when your plugin has minimal configuration (just inherits getName/setName).
-// The HeaderRule sample extends this for its Configuration inner class.
 ```
 
 ### ConfigurationType Enum
@@ -901,7 +540,6 @@ instances from the enum constants. It uses `Enum.name()` for the option value an
 `toString()` for the label.
 
 ```java
-// From AllUITypesAnnotationRuleConfiguration sample
 @UIElement(label = "A SELECT field using an enum", type = SELECT, order = 42)
 public EnumField anEnumSelect = null;
 
@@ -1014,7 +652,6 @@ Optional<T> get(String id);                 // translate field value to model ob
 **Pattern 1 — Annotation-driven (recommended):**
 
 ```java
-// Used by Clobber404ResponseRule, RiskAuthorizationRule
 public List<ConfigurationField> getConfigurationFields() {
     return ConfigurationBuilder.from(Configuration.class)  // auto-discovers @UIElement
             .addAll(ErrorHandlerUtil.getConfigurationFields())  // appends error handler fields
@@ -1074,9 +711,7 @@ subFields(Set<ConfigurationField>);      // for TABLE type
 
 // Convenience methods for PingAccess admin model fields:
 privateKeysConfigurationField(String name, String label);
-    // Creates a SELECT with modelAccessor=KeyPairAccessor.class
 trustedCertificatesConfigurationField(String name, String label);
-    // Creates a SELECT with modelAccessor=TrustedCertificateGroupAccessor.class
 
 // Help
 help();                                  // create empty Help
@@ -1088,6 +723,10 @@ helpURL(String);
 List<ConfigurationField> toConfigurationFields();
 clear();
 ```
+
+> **Warning from Javadoc:** "You must provide a `configurationField` to perform
+> operations upon. Ex. Calling `required()` before calling
+> `configurationField(...)` will cause an NPE."
 
 ### ConfigurationField (runtime model)
 
@@ -1147,7 +786,6 @@ List<ConfigurationDependentFieldOption> dependentOptions();
 
 // com.pingidentity.pa.sdk.accessor.DependantFieldAccessorFactory (interface)
 <T extends DependantFieldAccessor> T getDependantFieldAccessor(Class<T> clazz);
-// Factory loaded via ServiceLoader; engine provides DependantFieldAccessorFactoryImpl.
 
 // com.pingidentity.pa.sdk.ui.ConfigurationDependentFieldOption
 public final String value;
@@ -1168,10 +806,6 @@ runtime using a `ConfigurationModelAccessor`:
 DynamicOptionsConfigurationField(ConfigurationField field, Class<? extends ConfigurationModelAccessor> accessor);
 // The admin UI calls the accessor to populate the dropdown at render time.
 ```
-
-> **Warning from Javadoc:** "You must provide a `configurationField` to perform
-> operations upon. Ex. Calling `required()` before calling
-> `configurationField(...)` will cause an NPE."
 
 ### Validation Constraints (JSR-380 / Jakarta Bean Validation)
 
@@ -1220,9 +854,391 @@ static List<ConfigurationField> getConfigurationFields();
 
 ---
 
-## 8. ResponseBuilder & Error Handling
+# Part II — HTTP Model & Exchange
 
-> **Tags:** `response`, `error`, `DENY`, `ResponseBuilder`, `NPE`, `AccessException`, `ErrorHandlingCallback`
+## 5. Exchange & Policy Context
+
+> **Tags:** `exchange`, `ExchangeProperty`, `PolicyConfiguration`, `Application`, `Resource`
+
+### Exchange
+
+The `Exchange` is the central context object passed to every interceptor
+invocation. It represents a single request/response transaction through
+PingAccess.
+
+```java
+// com.pingidentity.pa.sdk.interceptor.Exchange (interface, since PA 4.1)
+// Primary accessors:
+Request            getRequest();
+Response           getResponse();                // null during request phase
+Identity           getIdentity();
+SslData            getSslData();                 // TLS/SNI data (since PA 4.3)
+List<TargetHost>   getTargetHosts();             // configured backend targets
+List<TargetHost>   getDestinations();             // current destination list (modifiable)
+PolicyConfiguration getPolicyConfiguration();    // owning application + resource context
+<T> ExchangeProperty<T> getExchangeProperty(ExchangeProperty<T> property);
+
+// Response management:
+void setResponse(Response response);             // used in DENY mode during request phase
+```
+
+#### Key considerations:
+
+- **`getResponse()` is null during request phase.** The backend has not yet
+  responded. Use `ResponseBuilder` to construct a response if denying.
+- **`getTargetHosts()`** returns the configured backend hosts as an unmodifiable
+  list.
+- **`getDestinations()`** is modifiable — allows plugins to alter routing.
+  Returns empty list for Agent rules.
+
+### ExchangeProperty<T>
+
+```java
+// com.pingidentity.pa.sdk.interceptor.ExchangeProperty<T>
+// Typed key for storing/retrieving values on the Exchange.
+// Instances are typically defined as static final constants.
+static <T> ExchangeProperty<T> create(String name, Class<T> clazz);
+
+// Usage pattern:
+static final ExchangeProperty<String> MY_PROP =
+    ExchangeProperty.create("my.plugin.property", String.class);
+
+// Set on exchange:
+exchange.getExchangeProperty(MY_PROP);  // returns T or null
+```
+
+> Useful for context-aware transforms (e.g., different behavior per application).
+> Not exposed in v1 `$session` but available for future `$context` enrichment.
+
+### PolicyConfiguration
+
+```java
+// com.pingidentity.pa.sdk.policy.PolicyConfiguration (interface)
+Application getApplication();
+Resource    getResource();
+```
+
+### Application
+
+```java
+// com.pingidentity.pa.sdk.policy.Application (interface)
+int             getId();
+String          getName();
+String          getDescription();
+ApplicationType getApplicationType();        // API or Web
+String          getContextRoot();            // e.g., "/myapp"
+String          getDefaultAuthType();
+String          getVirtualHostIds();         // comma-separated IDs
+int             getSiteId();                 // backend site ID
+int             getAgentId();
+boolean         isCaseSensitivePath();
+```
+
+### ApplicationType (enum)
+
+```java
+// com.pingidentity.pa.sdk.policy.ApplicationType
+API, Web
+```
+
+### Resource
+
+```java
+// com.pingidentity.pa.sdk.policy.Resource (interface)
+int         getId();
+String      getName();
+boolean     isAnonymous();
+PathPattern getDefaultAuthTypeOverride();
+PathPattern getPathPattern();
+```
+
+### PathPattern
+
+```java
+// com.pingidentity.pa.sdk.policy.PathPattern (interface)
+String  getPattern();            // the path pattern string
+String  getType();               // "WILDCARD" or "REGEX"
+```
+
+---
+
+## 6. HTTP Messages: Request, Response & Body
+
+> **Tags:** `message`, `request`, `response`, `body`, `streaming`, `Content-Length`
+
+### Message (parent of Request and Response)
+
+Both `Request` and `Response` extend `Message`, which provides shared header and
+body access:
+
+```java
+// com.pingidentity.pa.sdk.http.Message
+Headers getHeaders();
+void    setHeaders(Headers headers);      // replaces headers entirely
+Body    getBody();
+void    setBody(Body body);               // replaces body entirely
+```
+
+> **`setHeaders()` validation:** Throws `IllegalArgumentException` if the
+> specified `Headers` object was not created with the provided `HeadersFactory`
+> (see `ServiceFactory.headersFactory()`).
+
+### Request
+
+```java
+// com.pingidentity.pa.sdk.http.Request extends Message
+Method  getMethod();           // GET, POST, PUT, etc.
+String  getUri();              // path + query string
+void    setUri(String uri);    // rewrite URI (path + query)
+Map<String, String[]> getQueryStringParams();  // parsed query parameters
+```
+
+### Response
+
+```java
+// com.pingidentity.pa.sdk.http.Response extends Message
+int     getStatusCode();
+void    setStatus(HttpStatus status);      // change status code + reason phrase
+```
+
+### Body
+
+The body is a reference to the data sent or received:
+
+```java
+// com.pingidentity.pa.sdk.http.Body (interface)
+byte[]      getContent();             // read body into byte array
+void        setBodyContent(byte[] content);  // replace body (auto-updates Content-Length)
+boolean     isRead();                 // true if body has been read from the network
+boolean     isInMemory();             // true if body has been fully loaded into memory
+InputStream getInputStream();         // streaming access to body
+long        getContentLength();       // declared Content-Length (-1 if unknown)
+```
+
+### State Model
+
+The Body has a 3-state lifecycle (from the Javadoc scalability warning):
+
+| State | `isRead()` | `isInMemory()` | `getContent()` | Notes |
+|-------|-----------|----------------|----------------|-------|
+| **Not read** | `false` | `false` | Reads from network → memory | First call transitions to "Read" |
+| **Read (in memory)** | `true` | `true` | Returns cached byte[] | Subsequent calls return same bytes |
+| **Read (discarded)** | `true` | `false` | **Throws** | Body was read/streamed but not retained |
+
+### ⚠️ Scalability Warning (from Javadoc)
+
+> `getContent()` reads the **entire** body into memory as a byte array. For
+> large bodies, this can cause `OutOfMemoryError`. If you only need to inspect
+> the body (e.g., check Content-Type), use `getInputStream()` with streaming.
+>
+> `isRead()` and `isInMemory()` should be used for diagnostic or guard purposes
+> (not for controlling read behavior directly).
+
+---
+
+## 7. Headers
+
+> **Tags:** `headers`, `CORS`, `cookies`, `content-type`, `HeaderField`, `HeaderName`
+
+### Generic Header Access
+
+```java
+// com.pingidentity.pa.sdk.http.Headers
+List<String>        getValues(String name);       // case-insensitive
+Optional<String>    getFirstValue(String name);   // first value for header
+List<HeaderField>   getFields();                  // all header field entries
+Optional<HeaderField> getField(String name);      // first field by name
+void add(String name, String value);              // adds a value (does not replace)
+void add(HeaderField field);                      // adds a field
+void removeFields(String name);                   // removes ALL values for header
+void removeField(HeaderField field);              // removes specific field
+```
+
+### Typed Header Accessors
+
+```java
+// Convenience methods on Headers
+String getContentType();                   void setContentType(String);
+long   getContentLength();                 void setContentLength(long);
+String getHost();                          void setHost(String);
+String getAuthorization();                 void setAuthorization(String);
+String getUserAgent();
+String getAcceptEncoding();
+String getTransferEncoding();
+```
+
+### CORS Header Accessors
+
+```java
+String getAccessControlAllowHeaders();
+String getAccessControlAllowMethods();
+String getAccessControlAllowOrigin();
+String getAccessControlExposeHeaders();
+String getAccessControlMaxAge();
+String getAccessControlRequestHeaders();
+String getAccessControlRequestMethod();
+String getOrigin();
+```
+
+### Cookie Access
+
+```java
+Map<String, String> getCookies();              // request cookies: name → value
+List<SetCookie>     getSetCookies();           // response Set-Cookie headers (parsed)
+void                addCookie(SetCookie cookie); // add Set-Cookie to response
+```
+
+### HeaderField and HeaderName
+
+```java
+// com.pingidentity.pa.sdk.http.HeaderField
+String getName();
+String getValue();
+HeaderField(String name, String value);
+HeaderField(HeaderName name, String value);  // type-safe name
+
+// com.pingidentity.pa.sdk.http.HeaderName
+// Provides standard header name constants — e.g., HeaderName.CONTENT_TYPE
+```
+
+---
+
+## 8. Identity, Session & OAuth Context
+
+> **Tags:** `identity`, `session`, `OAuth`, `OIDC`, `OAuthTokenMetadata`, `OAuthConstants`, `$session`
+
+### Identity
+
+```java
+// com.pingidentity.pa.sdk.policy.Identity (interface)
+String                  getSubject();                // the authenticated user
+JsonNode                getAttributes();             // full attribute set as Jackson tree
+SessionStateSupport     getSessionStateSupport();
+OAuthTokenMetadata      getOAuthTokenMetadata();
+// Identity is null if the user is not authenticated.
+```
+
+### SessionStateSupport
+
+```java
+// com.pingidentity.pa.sdk.session.SessionStateSupport (interface)
+Map<String, JsonNode> getAttributes();                     // all session attributes
+JsonNode              getAttributeValue(String name);      // single attribute
+void                  setAttribute(String name, JsonNode value);  // write attribute
+void                  removeAttribute(String name);
+```
+
+> **Key pattern:** Session state persists across requests within a PA session.
+> Use namespaced keys (e.g., `com.mycompany.myplugin.cacheKey`) to avoid
+> collisions with other plugins.
+
+### OAuthTokenMetadata
+
+```java
+// com.pingidentity.pa.sdk.policy.OAuthTokenMetadata (interface)
+String      getClientId();
+String      getGrantType();       // e.g., "authorization_code"
+String      getTokenOwner();      // resource owner subject
+Set<String> getScopes();          // granted scopes
+Instant     getTokenExpiration(); // token expiry (null if not available)
+```
+
+### Building $session — Flat Merge Pattern
+
+For the message-xform adapter, session context is built by merging all available
+identity data into a single flat `ObjectNode`:
+
+```java
+ObjectNode session = objectMapper.createObjectNode();
+
+// L1: Subject — always present if authenticated
+session.put("subject", identity.getSubject());
+
+// L2: Token metadata — present on OAuth-protected resources
+OAuthTokenMetadata meta = identity.getOAuthTokenMetadata();
+if (meta != null) {
+    session.put("clientId", meta.getClientId());
+    session.put("grantType", meta.getGrantType());
+    ArrayNode scopeArr = session.putArray("scopes");
+    meta.getScopes().forEach(scopeArr::add);
+}
+
+// L3: User attributes — from token validation (PingFederate, etc.)
+JsonNode attrs = identity.getAttributes();
+if (attrs != null && attrs.isObject()) {
+    attrs.fields().forEachRemaining(e -> session.set(e.getKey(), e.getValue()));
+}
+
+// L4: Web session state — persistent custom data
+SessionStateSupport sss = identity.getSessionStateSupport();
+if (sss != null) {
+    Map<String, JsonNode> sessAttrs = sss.getAttributes();
+    if (sessAttrs != null) {
+        ObjectNode sessNode = session.putObject("sessionState");
+        sessAttrs.forEach(sessNode::set);
+    }
+}
+```
+
+### OAuthConstants
+
+Standard OAuth 2.0 string constants per RFC 6749, RFC 6750, and DPoP.
+
+```java
+// com.pingidentity.pa.sdk.oauth.OAuthConstants
+
+// Authentication schemes
+static final String AUTHENTICATION_SCHEME_BEARER; // "Bearer"
+static final String AUTHENTICATION_SCHEME_DPOP;   // "DPoP"
+
+// Header names
+static final String HEADER_NAME_WWW_AUTHENTICATE; // "WWW-Authenticate"
+static final String HEADER_NAME_DPOP_NONCE;       // "DPoP-Nonce"
+
+// WWW-Authenticate attributes
+static final String ATTRIBUTE_REALM;              // "realm"
+static final String ATTRIBUTE_SCOPE;              // "scope"
+static final String ATTRIBUTE_ERROR;              // "error"
+static final String ATTRIBUTE_ERROR_DESCRIPTION;  // "error_description"
+static final String ATTRIBUTE_ERROR_URI;          // "error_uri"
+
+// Error codes (RFC 6749/6750)
+static final String ERROR_CODE_INVALID_REQUEST;           // "invalid_request"
+static final String ERROR_CODE_UNAUTHORIZED_CLIENT;       // "unauthorized_client"
+static final String ERROR_CODE_ACCESS_DENIED;             // "access_denied"
+static final String ERROR_CODE_UNSUPPORTED_RESPONSE_TYPE; // "unsupported_response_type"
+static final String ERROR_CODE_INVALID_SCOPE;             // "invalid_scope"
+static final String ERROR_CODE_SERVER_ERROR;              // "server_error"
+static final String ERROR_CODE_TEMPORARILY_UNAVAILABLE;   // "temporarily_unavailable"
+static final String ERROR_CODE_INVALID_TOKEN;             // "invalid_token"
+static final String ERROR_CODE_INSUFFICIENT_SCOPE;        // "insufficient_scope"
+static final String ERROR_CODE_UNSUPPORTED_GRANT_TYPE;    // "unsupported_grant_type"
+static final String ERROR_CODE_INVALID_CLIENT;            // "invalid_client"
+// DPoP-specific
+static final String ERROR_CODE_INVALID_DPOP_PROOF;        // "invalid_dpop_proof"
+static final String ERROR_CODE_USE_DPOP_NONCE;            // "use_dpop_nonce"
+```
+
+### OAuthUtilities
+
+Builder utility for constructing RFC 6750 `WWW-Authenticate` response headers.
+
+```java
+// com.pingidentity.pa.sdk.oauth.OAuthUtilities
+static String getWwwAuthenticateHeaderValue(
+    String authenticationScheme,  // "Bearer" or "DPoP"
+    Map<String, String> attributes  // realm, scope, error, etc.
+);
+// Produces: Bearer realm="...", scope="...", error="invalid_token"
+```
+
+---
+
+# Part III — Response Building & Error Handling
+
+## 9. ResponseBuilder & DENY Mode
+
+> **Tags:** `ResponseBuilder`, `DENY`, `Outcome`, `response`, `NPE`
 
 ### ResponseBuilder API
 
@@ -1278,7 +1294,6 @@ ResponseBuilder newInstance(HttpStatus status);
 > factory into your rule class, defaulting to `ResponseBuilder` in production
 > and swapped for a mock/lambda in tests. See `MessageTransformRule.responseFactory`.
 
-
 ### ⚠️ CRITICAL: DENY Mode in handleRequest — Response is NULL
 
 During `handleRequest()`, `exchange.getResponse()` is **`null`** because the
@@ -1287,7 +1302,7 @@ backend has not yet responded. You MUST use `ResponseBuilder` to construct a new
 
 ```java
 // DENY mode — handleRequest error path
-byte[] errorBody = objectMapper.writeValueAsBytes(result.errorResponse()); // errorResponse() returns JsonNode
+byte[] errorBody = objectMapper.writeValueAsBytes(result.errorResponse());
 Response errorResponse = ResponseBuilder.newInstance(HttpStatus.BAD_GATEWAY)
     .header("Content-Type", "application/problem+json")
     .body(errorBody)
@@ -1310,11 +1325,26 @@ During `handleResponse()`, the response object already exists. Rewrite in-place:
 
 ```java
 // DENY mode — handleResponse error path
-byte[] errorBody = objectMapper.writeValueAsBytes(result.errorResponse()); // errorResponse() returns JsonNode
+byte[] errorBody = objectMapper.writeValueAsBytes(result.errorResponse());
 exchange.getResponse().setBodyContent(errorBody);  // auto-updates Content-Length
 exchange.getResponse().setStatus(HttpStatus.BAD_GATEWAY);
 exchange.getResponse().getHeaders().setContentType("application/problem+json");
 ```
+
+### SDK Sample References
+
+- `Clobber404ResponseRule.handleResponse()` uses `ResponseBuilder.notFound()` +
+  `getTemplateRenderer().renderResponse(exchange, ...)` to construct a new response.
+- `RiskAuthorizationRule.handleRequest()` uses `Outcome.RETURN` with
+  `POLICY_ERROR_INFO` to delegate to ErrorHandlingCallback.
+- `WriteResponseRule` throws `AccessException` to trigger
+  `getErrorHandlingCallback().writeErrorResponse(exchange)`.
+
+---
+
+## 10. Error Handling & Error Callbacks
+
+> **Tags:** `AccessException`, `ErrorHandlingCallback`, `ErrorInfo`, `ErrorDescription`, `localization`
 
 ### AccessException
 
@@ -1371,7 +1401,6 @@ throw new AccessException(
 
 ```java
 // com.pingidentity.pa.sdk.policy.error.ErrorInfo
-// Information about an error used to generate an HTTP response.
 HttpStatus       getErrorStatus();    // status code + reason phrase
 LocalizedMessage getErrorMessage();   // localized message for response body (null if N/A)
 Throwable        getErrorCause();     // cause (null if unknown)
@@ -1411,7 +1440,6 @@ ParameterizedLocalizedMessage   // key + parameters for placeholder substitution
 // com.pingidentity.pa.sdk.policy.ErrorHandlingCallback
 void writeErrorResponse(Exchange exchange) throws IOException;
 // Writes an error response when errors are encountered.
-// The exchange is both read from and modified.
 ```
 
 ### RuleInterceptorErrorHandlingCallback
@@ -1421,7 +1449,6 @@ to determine the HTTP status, template file, content type, and status message.
 
 ```java
 // com.pingidentity.pa.sdk.policy.error.RuleInterceptorErrorHandlingCallback
-// Constructors:
 RuleInterceptorErrorHandlingCallback(TemplateRenderer renderer, ErrorHandlerConfiguration config);
 
 // Key field:
@@ -1452,18 +1479,52 @@ LocalizedInternalServerErrorCallback(LocalizedMessageResolver resolver);
 // Constructs a callback that resolves the error message via ResourceBundle.
 ```
 
-### SDK Sample References
+---
 
-- `Clobber404ResponseRule.handleResponse()` uses `ResponseBuilder.notFound()` +
-  `getTemplateRenderer().renderResponse(exchange, ...)` to construct a new response.
-- `RiskAuthorizationRule.handleRequest()` uses `Outcome.RETURN` with
-  `POLICY_ERROR_INFO` to delegate to ErrorHandlingCallback.
-- `WriteResponseRule` throws `AccessException` to trigger
-  `getErrorHandlingCallback().writeErrorResponse(exchange)`.
+# Part IV — Cross-Cutting Concerns
+
+## 11. Thread Safety & Concurrency
+
+> **Tags:** `thread`, `concurrency`, `mutable`, `instance`, `shared`, `immutability`
+
+Plugin instances may be shared across threads (PA uses a thread pool for request
+processing). The adapter MUST distinguish between two categories of state:
+
+### Init-time state (safe for concurrent reads)
+
+These fields are set once during plugin initialization and never modified during
+request processing:
+
+- Fields set via setter injection: `HttpClient`, `TemplateRenderer`
+- Configuration field set by `configure(T)`
+- Any field populated in the constructor or `configure()` method
+
+These are safe for concurrent access because they are effectively immutable
+after initialization.
+
+### Per-request state (MUST be method-local)
+
+Any state derived from a specific request (parsed bodies, transform results,
+error responses) MUST be local to the `handleRequest()` / `handleResponse()`
+method. Do NOT store per-request state in instance fields.
+
+### Evidence from SDK Samples
+
+The `ExternalAuthorizationRule` sample uses instance field `objectMapper`
+(injected via setter) across threads — confirming that PA treats injected
+fields as thread-safe. It stores per-request authorization results in
+`SessionStateSupport` (not instance fields).
+
+### Request Immutability During Response Phase
+
+Any modifications to `exchange.getRequest()` or its headers inside
+`handleResponse()` are **silently ignored** by PingAccess (a warning is logged).
+Only `exchange.getResponse()` may be modified during response processing.
+See [§3 Core Plugin SPI](#3-core-plugin-spi--lifecycle) for code examples.
 
 ---
 
-## 9. Deployment & Classloading
+## 12. Deployment & Classloading
 
 > **Tags:** `shadow`, `JAR`, `Jackson`, `compileOnly`, `classloader`, `SPI`, `SLF4J`, `ServiceLoader`, `ADR-0031`
 
@@ -1551,7 +1612,7 @@ and custom plugin JAR files. Key characteristics:
 
 #### Deployment Procedure
 
-1. Build the shadow JAR (see §9 Shadow JAR Contents above).
+1. Build the shadow JAR.
 2. Copy the JAR to `<PA_HOME>/deploy/` on each PA node.
 3. **Restart PingAccess.**
 
@@ -1568,41 +1629,7 @@ For the message-xform adapter, the deployment path is:
 
 ---
 
-## 10. Thread Safety
-
-> **Tags:** `thread`, `concurrency`, `mutable`, `instance`, `shared`
-
-Plugin instances may be shared across threads (PA uses a thread pool for request
-processing). The adapter MUST distinguish between two categories of state:
-
-### Init-time state (safe for concurrent reads)
-
-These fields are set once during plugin initialization and never modified during
-request processing:
-
-- Fields set via setter injection: `HttpClient`, `TemplateRenderer`
-- Configuration field set by `configure(T)`
-- Any field populated in the constructor or `configure()` method
-
-These are safe for concurrent access because they are effectively immutable
-after initialization.
-
-### Per-request state (MUST be method-local)
-
-Any state derived from a specific request (parsed bodies, transform results,
-error responses) MUST be local to the `handleRequest()` / `handleResponse()`
-method. Do NOT store per-request state in instance fields.
-
-### Evidence from SDK Samples
-
-The `ExternalAuthorizationRule` sample uses instance field `objectMapper`
-(injected via setter) across threads — confirming that PA treats injected
-fields as thread-safe. It stores per-request authorization results in
-`SessionStateSupport` (not instance fields).
-
----
-
-## 11. Testing Patterns
+## 13. Testing Patterns
 
 > **Tags:** `test`, `Mockito`, `mock`, `Validator`, `JUnit`, `Exchange`, `config`
 
@@ -1770,11 +1797,9 @@ import com.pingidentity.pa.sdk.policy.RuleInterceptor;
 
 @Test
 public void testPluginIsRegistered() {
-    // Verify our plugin is loadable via ServiceFactory
     assertTrue(ServiceFactory.isValidImplName(
         RuleInterceptor.class, MyCustomRule.class.getName()));
 
-    // Verify non-plugins are not loadable
     assertFalse(ServiceFactory.isValidImplName(
         RuleInterceptor.class, this.getClass().getName()));
 }
@@ -1789,7 +1814,6 @@ public void testPluginIsRegistered() {
 Test that configuration JSON correctly deserializes and validates:
 
 ```java
-// Spring context: uses LocalValidatorFactoryBean (mock-config.xml)
 @ContextConfiguration("/mock-config.xml")
 @RunWith(SpringJUnit4ClassRunner.class)
 public class ConfigurationTest {
@@ -1797,53 +1821,30 @@ public class ConfigurationTest {
 
     @Test
     public void testValidConfiguration() throws IOException {
-        // Build a Map<String, String> simulating admin UI form data
         Map<String, String> map = new HashMap<>();
         map.put("aText", "value");
         map.put("aSelect", "OptionOne");
         map.put("aTable", "[{\"col1\":\"val\",\"col2\":\"2\"}]");
         map.put("errorResponseCode", "403");
-        // ...
 
-        // Deserialize into configuration using readerForUpdating()
         MyPlugin.Configuration cfg = new MyPlugin.Configuration();
         cfg.setName("testRule");
         ObjectMapper mapper = new ObjectMapper();
         mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         mapper.readerForUpdating(cfg).readValue(TestUtil.getJsonForMap(map));
 
-        // Validate using Jakarta Bean Validation
         Set<ConstraintViolation<?>> violations =
             new HashSet<>(validator.validate(cfg));
         assertThat(violations.size(), is(0));
-    }
-
-    @Test
-    public void testInvalidConfiguration() throws IOException {
-        // Intentionally omit required fields or provide invalid values
-        Map<String, String> map = new HashMap<>();
-        map.put("aConcealed", "123"); // @Size(min=5) violated
-        // ...missing required field "aText"
-
-        MyPlugin.Configuration cfg = new MyPlugin.Configuration();
-        cfg.setName("testRule");
-        getMapper().readerForUpdating(cfg).readValue(TestUtil.getJsonForMap(map));
-
-        Set<ConstraintViolation<?>> violations =
-            new HashSet<>(validator.validate(cfg));
-        assertThat(violations.size(), is(4)); // exact count of violations
     }
 }
 ```
 
 > **Key pattern:** Jackson's `readerForUpdating()` merges JSON into an existing
 > object without replacing defaults. This simulates how PingAccess admin
-> deserializes config posted from the UI. The `TestUtil.getJsonForMap()` helper
-> converts `Map<String,String>` to JSON, auto-detecting array values for TABLE.
+> deserializes config posted from the UI.
 
 ### Test Infrastructure Helpers (from SDK samples)
-
-The SDK tests use a consistent set of mock implementations:
 
 ```java
 // Mock HeadersFactory — returns Mockito mocks for Headers
@@ -1886,9 +1887,540 @@ public static class ConfigurationModelAccessorFactoryImpl
 
 ---
 
-## 12. Supporting Types
+## 14. JMX Monitoring & Custom MBeans
 
-> **Tags:** `Outcome`, `HttpStatus`, `Method`, `ExchangeProperty`, `ResponseBuilder`, `ServiceFactory`, `MediaType`
+> **Tags:** `JMX`, `MBean`, `monitoring`, `metrics`, `heartbeat`, `audit`
+
+PingAccess provides a comprehensive JMX-based monitoring infrastructure.
+The SDK itself does **not** expose a metrics API, but plugins can register
+custom MBeans using standard `java.lang.management` — they run in the same
+JVM as the PA engine.
+
+### PA's built-in monitoring mechanisms
+
+From the **PingAccess Monitoring Guide** (PA 9.0 docs, pages 833–849):
+
+| Mechanism | Description | Configuration |
+|-----------|-------------|---------------|
+| **JMX MBeans** | Ping-recommended primary mechanism. Provides resource metric counters for performance analysis. Compatible with JConsole, Splunk, and SIEM tools. | `pa.mbean.site.connection.pool.enable=true` (default `false`) in `run.properties` |
+| **Heartbeat endpoint** | `/pa/heartbeat.ping` — returns HTTP 200 when healthy. Can return detailed JSON with CPU, memory, response time stats. | `enable.detailed.heartbeat.response=true` + `pa.statistics.window.seconds=N` in `run.properties` |
+| **Audit logging** | Per-transaction timing in `pingaccess_engine_audit.log`. Records total roundtrip, proxy roundtrip, and userinfo roundtrip (ms). | Enabled by `log4j2.xml` configuration |
+| **Splunk integration** | Pre-built PingAccess for Splunk app ([Splunkbase #5368](https://splunkbase.splunk.com/app/5368)). Parses both audit logs and JMX MBean data. | Splunk-formatted audit log appenders |
+
+### JMX connection setup
+
+**Local connection:** In JConsole, select `com.pingidentity.pa.cli.Starter`
+from the Local Process list.
+
+**Remote connection:** Add to `jvm-memory.options`:
+
+```
+-Dcom.sun.management.jmxremote.port=5000
+-Dcom.sun.management.jmxremote.login.config=<YourConfig>
+-Djava.security.auth.login.config=conf/ldap.config
+-Dcom.sun.management.jmxremote.ssl=false
+```
+
+> ⚠️ Enable SSL for production JMX. The `ssl=false` setting is for
+> testing only.
+
+### Heartbeat endpoint JSON response
+
+When `enable.detailed.heartbeat.response=true`:
+
+```json
+{"items":[{
+    "response.statistics.window.seconds": "5",
+    "response.statistics.count": "1",
+    "response.time.statistics.90.percentile": "129",
+    "response.time.statistics.mean": "129",
+    "response.time.statistics.max": "129",
+    "response.time.statistics.min": "129",
+    "response.concurrency.statistics.90.percentile": "1",
+    "response.concurrency.statistics.mean": "1",
+    "cpu.load": "15.53",
+    "total.jvm.memory": "500.695 MB",
+    "free.jvm.memory": "215.339 MB",
+    "used.jvm.memory": "285.356 MB",
+    "number.of.cpus": "8",
+    "open.client.connections": "1",
+    "number.of.applications": "11",
+    "number.of.virtual.hosts": "6"
+}]}
+```
+
+### SDK gap: no metrics API for plugins
+
+The SDK JAR (`pingaccess-sdk-9.0.1.0.jar`) contains **zero** classes related
+to JMX, MBeans, metrics, monitoring, or telemetry. There is no
+`registerMetric()`, no `MetricsService`, and no counters API.
+
+PA's own MBeans (connection pool metrics, heartbeat stats) are registered by
+the engine internally – they are not accessible or extendable from the SDK.
+
+### Plugin MBean registration pattern
+
+Plugins can register their own JMX MBeans using standard Java. This is safe
+because plugins run in the PA engine JVM and have access to
+`ManagementFactory.getPlatformMBeanServer()`.
+
+**Step 1: Define an MXBean interface**
+
+Use the `MXBean` suffix convention — the JMX runtime automatically exposes
+all public getters as attributes and methods as operations:
+
+```java
+public interface MyPluginMetricsMXBean {
+    // Attributes (read-only via JConsole)
+    long getRequestCount();
+    long getErrorCount();
+    double getAverageLatencyMs();
+    long getActiveSpecCount();
+
+    // Operations (invokable via JConsole)
+    void resetCounters();
+}
+```
+
+**Step 2: Implement the MXBean**
+
+```java
+public class MyPluginMetrics implements MyPluginMetricsMXBean {
+    private final LongAdder requestCount = new LongAdder();
+    private final LongAdder errorCount = new LongAdder();
+    private final LongAdder totalLatencyNanos = new LongAdder();
+    private volatile int activeSpecCount;
+
+    @Override public long getRequestCount() { return requestCount.sum(); }
+    @Override public long getErrorCount() { return errorCount.sum(); }
+    @Override public double getAverageLatencyMs() {
+        long count = requestCount.sum();
+        return count == 0 ? 0.0
+            : (totalLatencyNanos.sum() / 1_000_000.0) / count;
+    }
+    @Override public long getActiveSpecCount() { return activeSpecCount; }
+    @Override public void resetCounters() {
+        requestCount.reset();
+        errorCount.reset();
+        totalLatencyNanos.reset();
+    }
+
+    // --- Mutators (called by plugin, not exposed via JMX) ---
+    public void recordSuccess(long elapsedNanos) {
+        requestCount.increment();
+        totalLatencyNanos.add(elapsedNanos);
+    }
+    public void recordError() {
+        requestCount.increment();
+        errorCount.increment();
+    }
+    public void setActiveSpecCount(int count) {
+        this.activeSpecCount = count;
+    }
+}
+```
+
+> **Thread safety:** `LongAdder` is specifically designed for high-contention
+> counter updates from multiple threads. It outperforms `AtomicLong` under
+> contention by using cell-based striping.
+
+**Step 3: Register in `configure()`**
+
+```java
+private ObjectName jmxObjectName;
+private final MyPluginMetrics metrics = new MyPluginMetrics();
+
+@Override
+public void configure(MessageTransformConfig config) {
+    this.config = config;
+
+    if (config.isEnableJmxMetrics()) {
+        try {
+            MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
+            ObjectName name = new ObjectName(
+                "io.messagexform:type=TransformMetrics,instance="
+                    + ObjectName.quote(config.getName()));
+            if (!mbs.isRegistered(name)) {
+                mbs.registerMBean(metrics, name);
+                LOG.info("JMX MBean registered: {}", name);
+            }
+            this.jmxObjectName = name;
+        } catch (Exception e) {
+            LOG.warn("Failed to register JMX MBean — metrics disabled", e);
+        }
+    } else {
+        unregisterMBean();
+    }
+}
+```
+
+**ObjectName convention:** Use a plugin-specific domain (`io.messagexform`)
+to avoid collisions with PA's internal MBeans. The `instance` key property
+uses `config.getName()` (from `PluginConfiguration.getName()`) to
+distinguish multiple rule instances on the same engine.
+
+> **`ObjectName.quote()`:** Always quote the instance name. PA allows
+> arbitrary characters in rule names (including spaces, colons, commas)
+> which are illegal in unquoted ObjectName values.
+
+**Step 4: Unregister on reconfiguration**
+
+PA does not expose a `destroy()` lifecycle callback in the SDK. However,
+if the plugin is reconfigured (new `configure()` call), the pattern above
+handles re-registration. For PA shutdown, the JVM termination implicitly
+cleans up MBeans.
+
+### ObjectName patterns for JConsole
+
+After registration, the MBean appears in JConsole under:
+
+```
+io.messagexform
+  └── TransformMetrics
+      └── instance=<rule-name>
+          ├── Attributes
+          │   ├── RequestCount
+          │   ├── ErrorCount
+          │   ├── AverageLatencyMs
+          │   └── ActiveSpecCount
+          └── Operations
+              └── resetCounters()
+```
+
+---
+
+## 15. Logging
+
+> **Tags:** `logging`, `SLF4J`, `audit`, `Log4j2`
+
+### SLF4J Usage
+
+Use the **SLF4j API** for all logging in plugin modules:
+
+```java
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+private static final Logger LOG = LoggerFactory.getLogger(MyPlugin.class);
+```
+
+PingAccess ships its own SLF4J provider (Log4j2) — do **not** bundle SLF4J
+in your plugin JAR (see [§12 Deployment & Classloading](#12-deployment--classloading)).
+
+### Audit Logging (always available)
+
+Even without JMX, every transform result is logged via SLF4J at INFO level.
+PingAccess routes plugin SLF4J output to `pingaccess.log`. The engine's
+own audit log (`pingaccess_engine_audit.log`) captures per-transaction
+timing automatically — **no plugin code needed**.
+
+Example `pingaccess_engine_audit.log` entry:
+```
+2026-02-11T19:15:12,192|...|tid:...|81 ms| 50 ms| 0 ms|app.example.com []...
+```
+
+Where `81 ms` is total roundtrip (includes our plugin processing time).
+
+---
+
+# Part V — Extension Points & Vendor Patterns
+
+## 16. Additional Extension SPIs
+
+> **Tags:** `extension`, `plugin`, `identity`, `site-authenticator`, `load-balancing`, `encryption`, `locale-override`
+>
+> These extension point interfaces exist in the SDK but are **not used** by the
+> message-xform adapter. Documented here for completeness.
+
+### IdentityMapping Plugins
+
+Maps the `Identity` subject to a backend-system identifier sent to the
+upstream server (e.g., as a header value).
+
+```java
+// com.pingidentity.pa.sdk.identitymapping.IdentityMapping (annotation)
+@IdentityMapping(type = "...", label = "...", expectedConfiguration = ...)
+
+// Sync interface:
+// com.pingidentity.pa.sdk.identitymapping.IdentityMappingPlugin<T>
+void handleMapping(Exchange exchange) throws IOException;
+// Base: IdentityMappingPluginBase<T>
+
+// Async interface:
+// com.pingidentity.pa.sdk.identitymapping.AsyncIdentityMappingPlugin<T>
+CompletionStage<Void> handleMapping(Exchange exchange);
+// Base: AsyncIdentityMappingPluginBase<T>
+```
+
+**HeaderIdentityMappingPlugin** — built-in implementation that copies identity
+attributes to request headers using `AttributeHeaderPair` mappings.
+
+**SDK sample patterns:**
+
+- **`SampleJsonIdentityMapping`**: Builds a JSON object with subject and role,
+  Base64-encodes it, then sets it as a single header value:
+  ```java
+  exchange.getRequest().getHeaders().removeFields(HEADER_NAME);  // "clobber and set"
+  exchange.getRequest().getHeaders().add(HEADER_NAME, encodedJson);
+  ```
+
+- **`SampleTableHeaderIdentityMapping`**: Uses `@UIElement(type = TABLE,
+  subFieldClass = UserAttributeTableEntry.class)` to define a configurable
+  table where each row maps a user attribute name to a header name. At runtime
+  it iterates the table, reads attributes from `identity.getAttributes()`,
+  and sets headers:
+  ```java
+  for (UserAttributeTableEntry entry : getConfiguration().entryList) {
+      JsonNode value = attributes.get(entry.userAttribute);
+      exchange.getRequest().getHeaders().add(entry.headerName, value.asText());
+  }
+  ```
+
+### SiteAuthenticator Plugins
+
+Adds authentication data when proxying to backend sites. Unlike rules, these
+run as part of the **site connection** pipeline, not the application pipeline.
+
+```java
+// com.pingidentity.pa.sdk.siteauthenticator.SiteAuthenticator (annotation)
+@SiteAuthenticator(type = "...", label = "...", expectedConfiguration = ...)
+
+// Sync: SiteAuthenticatorInterceptor<T> / SiteAuthenticatorInterceptorBase<T>
+void handleRequest(Exchange exchange) throws AccessException;
+
+// Async: AsyncSiteAuthenticatorInterceptor<T> / AsyncSiteAuthenticatorInterceptorBase<T>
+CompletionStage<Void> handleRequest(Exchange exchange);
+```
+
+**SDK sample pattern (`AddQueryStringSiteAuthenticator`):**
+
+Demonstrates mutating the request URI to inject authentication query parameters:
+
+```java
+String uriString = exchange.getRequest().getUri();
+URI uri = URI.create(uriString);
+Map<String, String[]> query = exchange.getRequest().getQueryStringParams();
+query.put(config.param, new String[]{ config.paramValue });
+exchange.getRequest().setUri(uri.getPath() + "?" + urlEncode(query));
+```
+
+> **Note:** SiteAuthenticator uses `ConfigurationBuilder` (not `@UIElement`)
+> for configuration fields:
+> ```java
+> return new ConfigurationBuilder()
+>     .configurationField("param", "Query String Param", TEXT).required()
+>     .configurationField("paramValue", "Query String Value", TEXT).required()
+>     .toConfigurationFields();
+> ```
+
+#### SiteAuthenticatorInterceptor Interface Change (post-5.0)
+
+The `SiteAuthenticatorInterceptor` interface no longer extends
+`RequestInterceptor` and `ResponseInterceptor` (as it did pre-5.0), but it
+still defines `handleRequest(Exchange)` and `handleResponse(Exchange)` directly.
+Both methods now throw only `AccessException` (not `IOException` or
+`InterruptedException` as in earlier versions).
+
+### LoadBalancing Plugins
+
+Custom load-balancing strategies for distributing traffic across sites.
+The plugin creates a **handler** that lives for the lifetime of the
+configuration. PA calls `getHandler()` on configuration changes.
+
+```java
+// com.pingidentity.pa.sdk.ha.lb.LoadBalancingStrategy (annotation)
+@LoadBalancingStrategy(type = "...", label = "...", expectedConfiguration = ...)
+
+// Sync:  LoadBalancingPlugin<H, T>   / LoadBalancingPluginBase<H, T>
+// Async: AsyncLoadBalancingPlugin<H, T> / AsyncLoadBalancingPluginBase<H, T>
+//   where H = Handler type, T = Configuration type
+
+// Plugin lifecycle:
+H getHandler();                     // called on first creation
+H getHandler(H existingHandler);    // called on config change — return existing
+                                    // if no change needed, or new instance
+```
+
+**Handler API (`AsyncLoadBalancingHandler`):**
+
+```java
+// com.pingidentity.pa.sdk.ha.lb.AsyncLoadBalancingHandler
+CompletionStage<TargetHost> calculateTargetHost(
+    Exchange exchange,             // the current request
+    List<TargetHost> availableHosts,  // hosts currently UP
+    List<TargetHost> configuredHosts  // all configured hosts
+);
+
+CompletionStage<Void> handleResponse(
+    Exchange exchange,             // completed exchange
+    TargetHost targetHost          // host that was selected
+);
+```
+
+**SDK sample patterns:**
+
+- **`BestEffortStickySessionPlugin`**: Server-side sticky sessions. Handler
+  maintains a `ConcurrentHashMap<String, TargetHost>` mapping session IDs
+  to target hosts. `handleResponse()` reads the upstream `Set-Cookie`
+  session cookie and updates the map.
+
+- **`MetricBasedPlugin`**: Queries an external monitoring API for capacity
+  data and routes to the host with most remaining capacity. Demonstrates:
+  - `HttpClient` injection via `getHttpClient()` on the plugin base
+  - `CompletionStage` chaining with `.thenApply()` / `.exceptionally()`
+  - Graceful degradation: falls back to random host on monitoring failure
+  - Configuration change detection via `equals()` on Configuration objects
+
+**Handler config change pattern (from `MetricBasedPlugin`):**
+```java
+@Override
+public Handler getHandler(Handler existingHandler) {
+    if (existingHandler.updateConfiguration(getConfiguration())) {
+        return existingHandler;  // config unchanged — reuse
+    }
+    return getHandler();  // config changed — create fresh handler
+}
+```
+
+### LocaleOverrideService
+
+SPI for overriding the client's locale preference. If the returned list
+is non-empty, PA uses these locales instead of the `Accept-Language` header.
+
+```java
+// com.pingidentity.pa.sdk.localization.LocaleOverrideService
+List<Locale> getPreferredLocales(Exchange exchange);
+// Returns ordered list of preferred locales. Empty = use Accept-Language.
+```
+
+**SDK sample (`CustomCookieLocaleOverrideService`):**
+Reads a `custom-accept-language` cookie containing a BCP 47 language tag
+(e.g., `nl-NL`) and returns it as the preferred locale.
+
+### EntityScopedHandlerPlugin
+
+```java
+// com.pingidentity.pa.sdk.plugins.EntityScopedHandlerPlugin<T extends PluginConfiguration>
+// Interface for plugins scoped to a specific entity (site or application).
+// Extends ConfigurablePlugin<T> and DescribesUIConfigurable.
+```
+
+### MasterKeyEncryptor
+
+```java
+// com.pingidentity.sdk.key.MasterKeyEncryptor
+// Interface for custom key encryption providers.
+// Throws MasterKeyEncryptorException on errors.
+```
+
+---
+
+## 17. Vendor-Built Plugin Analysis
+
+> **Tags:** `vendor`, `internal`, `engine`, `built-in`
+>
+> These findings come from analysis of class signatures, SPI service files,
+> and public API usage within `pingaccess-engine-9.0.1.0.jar`.
+> They document implementation patterns used by PingIdentity's own built-in
+> plugins. While these plugins use some engine-internal APIs not available in
+> the SDK, they also use many SDK-public APIs and reveal best practices.
+
+### Built-in Plugin Inventory (from engine SPI files)
+
+| Extension Type | Count | Notable Implementations |
+|---------------|-------|------------------------|
+| Sync Rules | 28 | OAuthPolicyInterceptor, CIDRPolicy, RateLimiting, CORS, Rewrite |
+| Async Rules | 4 | PingAuthorizePolicyDecision, PingDataGovernance |
+| Identity Mappings | 5 | HeaderMapping, JWT, ClientCertificate, WebSessionAccessToken |
+| Site Authenticators | 4 | BasicAuth, MutualTLS, TokenMediator, SAMLTokenMediator |
+| Load Balancing | 2 | CookieBasedRoundRobin, HeaderBased |
+| Availability | 1 | OnDemandAvailability |
+| HSM Providers | 2 | AwsCloudHSM, PKCS11 |
+| Risk Policy | 1 | PingOneRiskPolicy |
+| Rejection Handlers | 2 | ErrorTemplate, Redirect |
+| Token Providers | 1 | AzureTokenProvider |
+
+### Key Patterns from Vendor Plugins
+
+**1. PingAuthorizePolicyDecisionAccessControl** (async, extends `AsyncRuleInterceptorBase`)
+
+The closest vendor plugin to our adapter. Key observations:
+
+- Extends `AsyncRuleInterceptorBase` (the SDK base class), confirming this is
+  the correct base for async rules.
+- Uses `@UIElement` with `modelAccessor = ThirdPartyServiceAccessor.class` for
+  the service target dropdown.
+- Uses `ConfigurationBuilder.from(Configuration.class).toConfigurationFields()`
+  — the annotation-driven auto-discovery pattern.
+- Validates config in `configure()` using `CustomViolation` / `CustomViolationException`
+  (engine-internal) for cross-field validation.
+- `ObjectMapper` is injected via `@Inject`/setter, NOT created per-request.
+- Request body is sent as `byte[]` via `objectMapper.writeValueAsBytes()`.
+- Response body parsed via `objectMapper.readValue(clientResponse.getBody(), ...)` (byte[]).
+- Error handling: `handleFailure()` returns `Outcome.RETURN` on `CompletionException`.
+- `getConfiguration().getName()` used for error logging (admin-configured rule name).
+
+**2. OutboundContentRewriteInterceptor** (sync, body rewriting)
+
+- Extends internal `PolicyRuleInterceptorBase` (sync base, not available in SDK).
+- Implements response body rewriting with gzip support and chunked encoding.
+- Uses `@JsonIgnore` on `getErrorHandlingCallback()` to prevent serialization.
+- Returns `new LocalizedInternalServerErrorCallback(localizedMessageResolver)`
+  as the error callback.
+
+**3. OutboundHeaderRewriteInterceptor** (sync, header rewriting)
+
+- `@Rule(destination = {RuleInterceptorSupportedDestination.Site})` — Site-only.
+- `ConfigurationBuilder.from()` + `ConfigurationFieldUtil.setHelpFromBundle()`
+  — vendor pattern for externalized help text from ResourceBundle.
+
+### Vendor Configuration Patterns (from engine Configuration classes)
+
+```java
+// Vendor pattern: full @UIElement usage with modelAccessor for dynamic dropdowns
+@UIElement(label = "Third-Party Service", type = SELECT, order = 0,
+           required = true, modelAccessor = ThirdPartyServiceAccessor.class)
+@NotNull
+private ThirdPartyServiceModel thirdPartyService;
+
+// Vendor pattern: CONCEALED + advanced for secrets
+@UIElement(label = "Shared Secret", type = CONCEALED, order = 20)
+private String sharedSecret;
+
+// Vendor pattern: CHECKBOX with defaultValue
+@UIElement(label = "Include Request Body", type = CHECKBOX,
+           order = 65, defaultValue = "true")
+private boolean includeRequestBody = true;
+
+// Vendor pattern: TABLE with subFieldClass and @Valid/@NotNull
+@UIElement(label = "Mapped Attributes", type = TABLE, order = 70,
+           subFieldClass = MappedAttributeTableEntry.class)
+@Valid @NotNull
+private List<MappedAttributeTableEntry> mappedPayloadAttributes;
+```
+
+### Internal-Only APIs (NOT available in SDK)
+
+The following are used by vendor plugins but are **not** part of the public SDK:
+
+| Internal Class | Purpose | SDK Alternative |
+|---------------|---------|----------------|
+| `PolicyRuleInterceptorBase` | Sync rule base class | `RuleInterceptorBase` |
+| `ExchangeImpl` | Concrete exchange | `Exchange` (interface) |
+| `CustomViolation`/`Exception` | Cross-field validation | `ValidationException` |
+| `ConfigurationFieldUtil` | Help text from ResourceBundle | `ConfigurationBuilder.helpContent()` |
+| `RejectionHandlerModel` | Rejection handler reference | `ErrorHandlerConfigurationImpl` |
+| `RejectionHandlerAccessor` | Rejection handler dropdown | N/A |
+| `BundleSupport` | ResourceBundle for plugin | `TemplateRenderer.getLocalizedMessageResolver()` |
+| `ConflictAwareRuleInterceptor` | Rule conflict detection | N/A |
+
+---
+
+# Part VI — Reference
+
+## 18. Supporting Types & Enumerations
+
+> **Tags:** `Outcome`, `HttpStatus`, `Method`, `MediaType`, `SslData`, `TargetHost`, `SetCookie`
 
 ### Outcome (enum)
 
@@ -1989,8 +2521,55 @@ boolean match(MediaType other);   // wildcard-aware matching
 // com.pingidentity.pa.sdk.http.CommonMediaTypes
 static final MediaType TEXT_HTML;            // text/html
 static final MediaType APPLICATION_JSON;     // application/json
-// (For common content-type checks without string-matching)
 ```
+
+### SslData
+
+Per-connection, TLS/SSL-specific data. Available via `exchange.getSslData()`.
+
+```java
+// com.pingidentity.pa.sdk.ssl.SslData (since PA 4.3)
+List<String> getSniServerNames();
+// SNI server names sent by the client during the SSL/TLS handshake.
+// Returns an unmodifiable list.
+
+List<X509Certificate> getClientCertificateChain();
+// Client certificate chain sent during the TLS/SSL handshake.
+// Returns an unmodifiable list of X509Certificates.
+```
+
+> **Adapter usage:** Useful for mTLS-aware transforms. The client certificate
+> subject/issuer could be exposed as a JSLT variable in future versions.
+
+### TargetHost
+
+```java
+// com.pingidentity.pa.sdk.http.TargetHost
+String getHost();
+int    getPort();
+boolean isSecure();
+```
+
+### SetCookie
+
+```java
+// com.pingidentity.pa.sdk.http.SetCookie
+String getName();
+String getValue();
+String getDomain();
+String getPath();
+Instant getExpires();
+long   getMaxAge();
+boolean isSecure();
+boolean isHttpOnly();
+String  getSameSite();
+```
+
+---
+
+## 19. Service Factories & Utilities
+
+> **Tags:** `ServiceFactory`, `BodyFactory`, `HeadersFactory`, `HttpClient`, `TemplateRenderer`
 
 ### ServiceFactory
 
@@ -2132,302 +2711,11 @@ REQUEST_TIMEOUT, CONNECTION_TIMEOUT, SERVICE_UNAVAILABLE, GENERAL_IO_ERROR
 
 ---
 
-## 13. SSL & Network Types
+## 20. Complete SPI Inventory & Sources
 
-> **Tags:** `SSL`, `TLS`, `cookie`, `network`, `certificate`, `SNI`
+> **Tags:** `SPI`, `matrix`, `services`, `artefacts`, `Java`, `coverage`
 
-### SslData
-
-Per-connection, TLS/SSL-specific data. Available via `exchange.getSslData()`.
-
-```java
-// com.pingidentity.pa.sdk.ssl.SslData (since PA 4.3)
-List<String> getSniServerNames();
-// SNI server names sent by the client during the SSL/TLS handshake.
-// Returns an unmodifiable list.
-
-List<X509Certificate> getClientCertificateChain();
-// Client certificate chain sent during the TLS/SSL handshake.
-// Returns an unmodifiable list of X509Certificates.
-```
-
-> **Adapter usage:** Useful for mTLS-aware transforms. The client certificate
-> subject/issuer could be exposed as a JSLT variable in future versions.
-
-### TargetHost
-
-```java
-// com.pingidentity.pa.sdk.http.TargetHost
-// Represents a backend target host (returned by exchange.getTargetHosts()).
-String getHost();
-int    getPort();
-boolean isSecure();
-```
-
-### SetCookie
-
-```java
-// com.pingidentity.pa.sdk.http.SetCookie
-// Represents a parsed Set-Cookie header value (from Headers.getSetCookies()).
-String getName();
-String getValue();
-String getDomain();
-String getPath();
-Instant getExpires();
-long   getMaxAge();
-boolean isSecure();
-boolean isHttpOnly();
-String  getSameSite();
-```
-
----
-
-## 14. OAuth SDK
-
-> **Tags:** `OAuth`, `DPoP`, `RFC6750`, `constants`, `WWW-Authenticate`
-
-### OAuthConstants
-
-Standard OAuth 2.0 string constants per RFC 6749, RFC 6750, and DPoP.
-
-```java
-// com.pingidentity.pa.sdk.oauth.OAuthConstants
-
-// Authentication schemes
-static final String AUTHENTICATION_SCHEME_BEARER; // "Bearer"
-static final String AUTHENTICATION_SCHEME_DPOP;   // "DPoP"
-
-// Header names
-static final String HEADER_NAME_WWW_AUTHENTICATE; // "WWW-Authenticate"
-static final String HEADER_NAME_DPOP_NONCE;       // "DPoP-Nonce"
-
-// WWW-Authenticate attributes
-static final String ATTRIBUTE_REALM;              // "realm"
-static final String ATTRIBUTE_SCOPE;              // "scope"
-static final String ATTRIBUTE_ERROR;              // "error"
-static final String ATTRIBUTE_ERROR_DESCRIPTION;  // "error_description"
-static final String ATTRIBUTE_ERROR_URI;          // "error_uri"
-
-// Error codes (RFC 6749/6750)
-static final String ERROR_CODE_INVALID_REQUEST;           // "invalid_request"
-static final String ERROR_CODE_UNAUTHORIZED_CLIENT;       // "unauthorized_client"
-static final String ERROR_CODE_ACCESS_DENIED;             // "access_denied"
-static final String ERROR_CODE_UNSUPPORTED_RESPONSE_TYPE; // "unsupported_response_type"
-static final String ERROR_CODE_INVALID_SCOPE;             // "invalid_scope"
-static final String ERROR_CODE_SERVER_ERROR;              // "server_error"
-static final String ERROR_CODE_TEMPORARILY_UNAVAILABLE;   // "temporarily_unavailable"
-static final String ERROR_CODE_INVALID_TOKEN;             // "invalid_token"
-static final String ERROR_CODE_INSUFFICIENT_SCOPE;        // "insufficient_scope"
-static final String ERROR_CODE_UNSUPPORTED_GRANT_TYPE;    // "unsupported_grant_type"
-static final String ERROR_CODE_INVALID_CLIENT;            // "invalid_client"
-// DPoP-specific
-static final String ERROR_CODE_INVALID_DPOP_PROOF;        // "invalid_dpop_proof"
-static final String ERROR_CODE_USE_DPOP_NONCE;            // "use_dpop_nonce"
-```
-
-### OAuthUtilities
-
-Builder utility for constructing RFC 6750 `WWW-Authenticate` response headers.
-
-```java
-// com.pingidentity.pa.sdk.oauth.OAuthUtilities
-static String getWwwAuthenticateHeaderValue(
-    String authenticationScheme,  // "Bearer" or "DPoP"
-    Map<String, String> attributes  // realm, scope, error, etc.
-);
-// Produces: Bearer realm="...", scope="...", error="invalid_token"
-```
-
----
-
-## 15. Other Extension Points
-
-> **Tags:** `extension`, `plugin`, `identity`, `site-authenticator`, `load-balancing`, `encryption`, `locale-override`
->
-> These extension point interfaces exist in the SDK but are **not used** by the
-> message-xform adapter. Documented here for completeness.
-
-### IdentityMapping Plugins
-
-Maps the `Identity` subject to a backend-system identifier sent to the
-upstream server (e.g., as a header value).
-
-```java
-// com.pingidentity.pa.sdk.identitymapping.IdentityMapping (annotation)
-@IdentityMapping(type = "...", label = "...", expectedConfiguration = ...)
-
-// Sync interface:
-// com.pingidentity.pa.sdk.identitymapping.IdentityMappingPlugin<T>
-void handleMapping(Exchange exchange) throws IOException;
-// Base: IdentityMappingPluginBase<T>
-
-// Async interface:
-// com.pingidentity.pa.sdk.identitymapping.AsyncIdentityMappingPlugin<T>
-CompletionStage<Void> handleMapping(Exchange exchange);
-// Base: AsyncIdentityMappingPluginBase<T>
-```
-
-**HeaderIdentityMappingPlugin** — built-in implementation that copies identity
-attributes to request headers using `AttributeHeaderPair` mappings.
-
-**SDK sample patterns:**
-
-- **`SampleJsonIdentityMapping`**: Builds a JSON object with subject and role,
-  Base64-encodes it, then sets it as a single header value:
-  ```java
-  exchange.getRequest().getHeaders().removeFields(HEADER_NAME);  // "clobber and set"
-  exchange.getRequest().getHeaders().add(HEADER_NAME, encodedJson);
-  ```
-
-- **`SampleTableHeaderIdentityMapping`**: Uses `@UIElement(type = TABLE,
-  subFieldClass = UserAttributeTableEntry.class)` to define a configurable
-  table where each row maps a user attribute name to a header name. At runtime
-  it iterates the table, reads attributes from `identity.getAttributes()`,
-  and sets headers:
-  ```java
-  for (UserAttributeTableEntry entry : getConfiguration().entryList) {
-      JsonNode value = attributes.get(entry.userAttribute);
-      exchange.getRequest().getHeaders().add(entry.headerName, value.asText());
-  }
-  ```
-
-### SiteAuthenticator Plugins
-
-Adds authentication data when proxying to backend sites. Unlike rules, these
-run as part of the **site connection** pipeline, not the application pipeline.
-
-```java
-// com.pingidentity.pa.sdk.siteauthenticator.SiteAuthenticator (annotation)
-@SiteAuthenticator(type = "...", label = "...", expectedConfiguration = ...)
-
-// Sync: SiteAuthenticatorInterceptor<T> / SiteAuthenticatorInterceptorBase<T>
-void handleRequest(Exchange exchange) throws AccessException;
-
-// Async: AsyncSiteAuthenticatorInterceptor<T> / AsyncSiteAuthenticatorInterceptorBase<T>
-CompletionStage<Void> handleRequest(Exchange exchange);
-```
-
-**SDK sample pattern (`AddQueryStringSiteAuthenticator`):**
-
-Demonstrates mutating the request URI to inject authentication query parameters:
-
-```java
-// Parse existing URI, merge with configured param, rebuild
-String uriString = exchange.getRequest().getUri();
-URI uri = URI.create(uriString);
-Map<String, String[]> query = exchange.getRequest().getQueryStringParams();
-query.put(config.param, new String[]{ config.paramValue });
-exchange.getRequest().setUri(uri.getPath() + "?" + urlEncode(query));
-```
-
-> **Note:** SiteAuthenticator uses `ConfigurationBuilder` (not `@UIElement`)
-> for configuration fields:
-> ```java
-> return new ConfigurationBuilder()
->     .configurationField("param", "Query String Param", TEXT).required()
->     .configurationField("paramValue", "Query String Value", TEXT).required()
->     .toConfigurationFields();
-> ```
-
-### LoadBalancing Plugins
-
-Custom load-balancing strategies for distributing traffic across sites.
-The plugin creates a **handler** that lives for the lifetime of the
-configuration. PA calls `getHandler()` on configuration changes.
-
-```java
-// com.pingidentity.pa.sdk.ha.lb.LoadBalancingStrategy (annotation)
-@LoadBalancingStrategy(type = "...", label = "...", expectedConfiguration = ...)
-
-// Sync:  LoadBalancingPlugin<H, T>   / LoadBalancingPluginBase<H, T>
-// Async: AsyncLoadBalancingPlugin<H, T> / AsyncLoadBalancingPluginBase<H, T>
-//   where H = Handler type, T = Configuration type
-
-// Plugin lifecycle:
-H getHandler();                     // called on first creation
-H getHandler(H existingHandler);    // called on config change — return existing
-                                    // if no change needed, or new instance
-```
-
-**Handler API (`AsyncLoadBalancingHandler`):**
-
-```java
-// com.pingidentity.pa.sdk.ha.lb.AsyncLoadBalancingHandler
-CompletionStage<TargetHost> calculateTargetHost(
-    Exchange exchange,             // the current request
-    List<TargetHost> availableHosts,  // hosts currently UP
-    List<TargetHost> configuredHosts  // all configured hosts
-);
-
-CompletionStage<Void> handleResponse(
-    Exchange exchange,             // completed exchange
-    TargetHost targetHost          // host that was selected
-);
-```
-
-**SDK sample patterns:**
-
-- **`BestEffortStickySessionPlugin`**: Server-side sticky sessions. Handler
-  maintains a `ConcurrentHashMap<String, TargetHost>` mapping session IDs
-  to target hosts. `handleResponse()` reads the upstream `Set-Cookie`
-  session cookie and updates the map.
-
-- **`MetricBasedPlugin`**: Queries an external monitoring API for capacity
-  data and routes to the host with most remaining capacity. Demonstrates:
-  - `HttpClient` injection via `getHttpClient()` on the plugin base
-  - `CompletionStage` chaining with `.thenApply()` / `.exceptionally()`
-  - Graceful degradation: falls back to random host on monitoring failure
-  - Configuration change detection via `equals()` on Configuration objects
-
-**Handler config change pattern (from `MetricBasedPlugin`):**
-```java
-@Override
-public Handler getHandler(Handler existingHandler) {
-    if (existingHandler.updateConfiguration(getConfiguration())) {
-        return existingHandler;  // config unchanged — reuse
-    }
-    return getHandler();  // config changed — create fresh handler
-}
-```
-
-### LocaleOverrideService
-
-SPI for overriding the client's locale preference. If the returned list
-is non-empty, PA uses these locales instead of the `Accept-Language` header.
-
-```java
-// com.pingidentity.pa.sdk.localization.LocaleOverrideService
-List<Locale> getPreferredLocales(Exchange exchange);
-// Returns ordered list of preferred locales. Empty = use Accept-Language.
-```
-
-**SDK sample (`CustomCookieLocaleOverrideService`):**
-Reads a `custom-accept-language` cookie containing a BCP 47 language tag
-(e.g., `nl-NL`) and returns it as the preferred locale.
-
-### EntityScopedHandlerPlugin
-
-```java
-// com.pingidentity.pa.sdk.plugins.EntityScopedHandlerPlugin<T extends PluginConfiguration>
-// Interface for plugins scoped to a specific entity (site or application).
-// Extends ConfigurablePlugin<T> and DescribesUIConfigurable.
-```
-
-### MasterKeyEncryptor
-
-```java
-// com.pingidentity.sdk.key.MasterKeyEncryptor
-// Interface for custom key encryption providers.
-// Throws MasterKeyEncryptorException on errors.
-```
-
-### Complete SPI Reference (All Extension Points)
-
-The following is the definitive reference for all 5 plugin extension points,
-covering sync and async variants, SPI interfaces, base classes, annotations,
-and `META-INF/services/` provider-configuration files.
-
-#### Sync vs Async Decision
+### Sync vs Async Decision
 
 > **When to use Async:** Use async variants (`AsyncRuleInterceptor`,
 > `AsyncSiteAuthenticatorInterceptor`, etc.) **only when** the plugin logic
@@ -2435,7 +2723,7 @@ and `META-INF/services/` provider-configuration files.
 > classes provide `getHttpClient()`. If no `HttpClient` is needed, use the
 > sync variant.
 
-#### Extension Point Matrix
+### Extension Point Matrix
 
 | Extension Point | Variant | SPI Interface | Base Class | Annotation |
 |----------------|---------|---------------|------------|------------|
@@ -2461,12 +2749,12 @@ the SDK provides `HeaderIdentityMappingPlugin` as a convenience base class
 (extends `IdentityMappingPluginBase`). It handles the common pattern of mapping
 identity attributes to request headers via `AttributeHeaderPair` configuration.
 
-#### SPI Registration Files (`META-INF/services/`)
+### SPI Registration Files (`META-INF/services/`)
 
 Each extension type requires its own provider-configuration file:
 
 | Extension Type | Provider-Configuration File |
-|---------------|-----------------------------|
+|---------------|----------------------------|
 | Sync Rule | `META-INF/services/com.pingidentity.pa.sdk.policy.RuleInterceptor` |
 | Async Rule | `META-INF/services/com.pingidentity.pa.sdk.policy.AsyncRuleInterceptor` |
 | Sync Site Authenticator | `META-INF/services/com.pingidentity.pa.sdk.siteauthenticator.SiteAuthenticatorInterceptor` |
@@ -2477,580 +2765,7 @@ Each extension type requires its own provider-configuration file:
 | Async Load Balancing | `META-INF/services/com.pingidentity.pa.sdk.ha.lb.AsyncLoadBalancingPlugin` |
 | Locale Override | `META-INF/services/com.pingidentity.pa.sdk.localization.LocaleOverrideService` |
 
-#### SiteAuthenticatorInterceptor Interface Change (post-5.0)
-
-The `SiteAuthenticatorInterceptor` interface no longer extends
-`RequestInterceptor` and `ResponseInterceptor` (as it did pre-5.0), but it
-still defines `handleRequest(Exchange)` and `handleResponse(Exchange)` directly.
-Both methods now throw only `AccessException` (not `IOException` or
-`InterruptedException` as in earlier versions).
-
----
-
-## 16. Vendor-Built Plugin Analysis
-
-> **Tags:** `vendor`, `internal`, `engine`, `built-in`
->
-> These findings come from analysis of class signatures, SPI service files,
-> and public API usage within `pingaccess-engine-9.0.1.0.jar`.
-> They document implementation patterns used by PingIdentity's own built-in
-> plugins. While these plugins use some engine-internal APIs not available in
-> the SDK, they also use many SDK-public APIs and reveal best practices.
-
-### Built-in Plugin Inventory (from engine SPI files)
-
-| Extension Type | Count | Notable Implementations |
-|---------------|-------|------------------------|
-| Sync Rules | 28 | OAuthPolicyInterceptor, CIDRPolicy, RateLimiting, CORS, Rewrite |
-| Async Rules | 4 | PingAuthorizePolicyDecision, PingDataGovernance |
-| Identity Mappings | 5 | HeaderMapping, JWT, ClientCertificate, WebSessionAccessToken |
-| Site Authenticators | 4 | BasicAuth, MutualTLS, TokenMediator, SAMLTokenMediator |
-| Load Balancing | 2 | CookieBasedRoundRobin, HeaderBased |
-| Availability | 1 | OnDemandAvailability |
-| HSM Providers | 2 | AwsCloudHSM, PKCS11 |
-| Risk Policy | 1 | PingOneRiskPolicy |
-| Rejection Handlers | 2 | ErrorTemplate, Redirect |
-| Token Providers | 1 | AzureTokenProvider |
-
-### Key Patterns from Vendor Plugins
-
-**1. PingAuthorizePolicyDecisionAccessControl** (async, extends `AsyncRuleInterceptorBase`)
-
-The closest vendor plugin to our adapter. Key observations:
-
-- Extends `AsyncRuleInterceptorBase` (the SDK base class), confirming this is
-  the correct base for async rules.
-- Uses `@UIElement` with `modelAccessor = ThirdPartyServiceAccessor.class` for
-  the service target dropdown — **not** `@Inject @OAuthAuthorizationServer`.
-- Uses `ConfigurationBuilder.from(Configuration.class).toConfigurationFields()`
-  — the annotation-driven auto-discovery pattern.
-- Validates config in `configure()` using `CustomViolation` / `CustomViolationException`
-  (engine-internal) for cross-field validation.
-- `ObjectMapper` is injected via `@Inject`/setter, NOT created per-request.
-- Request body is sent as `byte[]` via `objectMapper.writeValueAsBytes()`.
-- Response body parsed via `objectMapper.readValue(clientResponse.getBody(), ...)` (byte[]).
-- Error handling: `handleFailure()` returns `Outcome.RETURN` on `CompletionException`.
-- `getConfiguration().getName()` used for error logging (admin-configured rule name).
-
-**2. OutboundContentRewriteInterceptor** (sync, body rewriting)
-
-- Extends internal `PolicyRuleInterceptorBase` (sync base, not available in SDK).
-- Implements response body rewriting with gzip support and chunked encoding.
-- Uses `@JsonIgnore` on `getErrorHandlingCallback()` to prevent serialization.
-- Returns `new LocalizedInternalServerErrorCallback(localizedMessageResolver)`
-  as the error callback.
-
-**3. OutboundHeaderRewriteInterceptor** (sync, header rewriting)
-
-- `@Rule(destination = {RuleInterceptorSupportedDestination.Site})` — Site-only.
-- `ConfigurationBuilder.from()` + `ConfigurationFieldUtil.setHelpFromBundle()`
-  — vendor pattern for externalized help text from ResourceBundle.
-- `getConfigurationFields()` returns fields generated from annotation scan.
-
-### Vendor Configuration Patterns (from engine Configuration classes)
-
-```java
-// Vendor pattern: full @UIElement usage with modelAccessor for dynamic dropdowns
-@UIElement(label = "Third-Party Service", type = SELECT, order = 0,
-           required = true, modelAccessor = ThirdPartyServiceAccessor.class)
-@NotNull
-private ThirdPartyServiceModel thirdPartyService;
-
-// Vendor pattern: CONCEALED + advanced for secrets
-@UIElement(label = "Shared Secret", type = CONCEALED, order = 20)
-private String sharedSecret;
-
-// Vendor pattern: CHECKBOX with defaultValue
-@UIElement(label = "Include Request Body", type = CHECKBOX,
-           order = 65, defaultValue = "true")
-private boolean includeRequestBody = true;
-
-// Vendor pattern: TABLE with subFieldClass and @Valid/@NotNull
-@UIElement(label = "Mapped Attributes", type = TABLE, order = 70,
-           subFieldClass = MappedAttributeTableEntry.class)
-@Valid @NotNull
-private List<MappedAttributeTableEntry> mappedPayloadAttributes;
-```
-
-### Internal-Only APIs (NOT available in SDK)
-
-The following are used by vendor plugins but are **not** part of the public SDK:
-
-| Internal Class | Purpose | SDK Alternative |
-|---------------|---------|----------------|
-| `PolicyRuleInterceptorBase` | Sync rule base class | `RuleInterceptorBase` |
-| `ExchangeImpl` | Concrete exchange | `Exchange` (interface) |
-| `CustomViolation`/`Exception` | Cross-field validation | `ValidationException` |
-| `ConfigurationFieldUtil` | Help text from ResourceBundle | `ConfigurationBuilder.helpContent()` |
-| `RejectionHandlerModel` | Rejection handler reference | `ErrorHandlerConfigurationImpl` |
-| `RejectionHandlerAccessor` | Rejection handler dropdown | N/A |
-| `BundleSupport` | ResourceBundle for plugin | `TemplateRenderer.getLocalizedMessageResolver()` |
-| `ConflictAwareRuleInterceptor` | Rule conflict detection | N/A |
-
----
-
-## 17. Development Setup & Plugin Creation
-
-> **Tags:** `setup`, `Maven`, `Gradle`, `create`, `deploy`, `directory`
-
-### SDK Directory Structure
-
-The PingAccess SDK is located at `<PA_HOME>/sdk` alongside the `<PA_HOME>/deploy`
-directory. The following files and directories are provided:
-
-| Path | Description |
-|------|-------------|
-| `<PA_HOME>/deploy/` | Deployment directory for custom plugin JARs (auto-migrated on upgrade) |
-| `<PA_HOME>/sdk/README.md` | Overview of the SDK contents |
-| `<PA_HOME>/sdk/apidocs/` | SDK Javadocs (open `index.html` to browse) |
-| `<PA_HOME>/sdk/samples/Rules/` | Maven project with example rule plugin implementations |
-| `<PA_HOME>/sdk/samples/SiteAuthenticator/` | Maven project with example site authenticator plugins |
-| `<PA_HOME>/sdk/samples/IdentityMappings/` | Maven project with example identity mapping plugins |
-| `<PA_HOME>/sdk/samples/LoadBalancingStrategies/` | Maven project with example load balancing plugins |
-| `<PA_HOME>/sdk/samples/LocaleOverrideService/` | Maven project with example locale override plugin |
-
-Each `samples/` subdirectory contains its own `README.md` with sample-specific details.
-
-### Creating a Plugin From Scratch (Official 7-Step Procedure)
-
-The following is the official procedure from the PingAccess documentation:
-
-1. **Create a new, empty Maven project.** The root directory is referred to
-   as `<PLUGIN_HOME>`.
-
-2. **Copy the `pom.xml`** from the appropriate SDK sample in
-   `<PA_HOME>/sdk/samples/`. For example, to create a rule, copy from
-   `<PA_HOME>/sdk/samples/Rules/`.
-
-3. **Modify the `pom.xml`:** Update `groupId`, `artifactId`, `name`, and
-   `version` as appropriate for your plugin.
-
-4. **Create a Java class** that implements the plugin SPI from the SDK, in
-   `<PLUGIN_HOME>/src/main/java/com/yourpackagename/`. For each SPI, base
-   classes are provided that simplify the implementation:
-
-   | Plugin Type | SPI Interface | Base Class |
-   |-------------|--------------|------------|
-   | Sync rule | `RuleInterceptor` | `RuleInterceptorBase` |
-   | Async rule | `AsyncRuleInterceptor` | `AsyncRuleInterceptorBase` |
-   | Site authenticator | `SiteAuthenticatorInterceptor` | `SiteAuthenticatorInterceptorBase` |
-   | Identity mapping | `IdentityMappingPlugin` | `IdentityMappingPluginBase` |
-   | Load balancing | `LoadBalancingPlugin` | `LoadBalancingPluginBase` |
-
-5. **Create a provider-configuration file** (SPI services file) for the plugin.
-   The file name is the FQCN of the SPI interface, and its contents are the FQCN
-   of your implementation class:
-   ```
-   <PLUGIN_HOME>/src/main/resources/META-INF/services/com.pingidentity.pa.sdk.policy.RuleInterceptor
-   ```
-   **Contents:** `com.yourpackagename.YourCustomRule`
-
-6. **Build the Maven project** to obtain a JAR:
-   ```bash
-   cd <PLUGIN_HOME>
-   mvn install
-   ```
-   This builds the plugin, runs tests, and installs the JAR to the local
-   Maven repository.
-
-7. **Deploy the JAR** to `<PA_HOME>/deploy/` and **restart PingAccess**
-   (see [§9 Deployment Path](#deployment-path)).
-
-### Installing the SDK Samples
-
-To install and test the provided SDK samples:
-
-```bash
-# From the sample directory, e.g.:
-cd <PA_HOME>/sdk/samples/Rules
-mvn install
-# This builds, tests, and copies the JAR to <PA_HOME>/lib
-```
-
-### SDK Prerequisites
-
-The following prerequisites must be met before using the Add-on SDK:
-
-**Required tools:**
-- **Java SDK** — 17 or 21 (see Java Version Compatibility below)
-- **Apache Maven** (for official samples) or **Gradle** (for our project)
-
-**Ping Identity Maven Repository:**
-
-The SDK samples reference Ping Identity's public Maven repository:
-
-```
-http://maven.pingidentity.com/release
-```
-
-> **Note:** This Maven repository **cannot be accessed through a browser** — it
-> is designed solely for backend use (Maven/Gradle dependency resolution).
-
-**Maven `pom.xml` configuration:**
-
-```xml
-<repositories>
-    <repository>
-        <releases>
-            <enabled>true</enabled>
-            <updatePolicy>always</updatePolicy>
-            <checksumPolicy>warn</checksumPolicy>
-        </releases>
-        <id>PingIdentityMaven</id>
-        <name>PingIdentity Release</name>
-        <url>http://maven.pingidentity.com/release/</url>
-        <layout>default</layout>
-    </repository>
-</repositories>
-```
-
-**Offline / no-internet fallback (Maven):**
-
-If Internet access is unavailable, update the SDK dependency in `pom.xml` to
-point to the local PingAccess installation using `system` scope. Replace
-`<PA_HOME>` with the actual path:
-
-```xml
-<dependency>
-    <groupId>com.pingidentity.pingaccess</groupId>
-    <artifactId>pingaccess-sdk</artifactId>
-    <version>9.0.1.0</version>
-    <scope>system</scope>
-    <systemPath><PA_HOME>/lib/pingaccess-sdk-9.0.1.0.jar</systemPath>
-</dependency>
-<dependency>
-    <groupId>javax.validation</groupId>
-    <artifactId>validation-api</artifactId>
-    <version>1.0.0.GA</version>
-    <scope>system</scope>
-    <systemPath><PA_HOME>/lib/validation-api-1.0.0.GA.jar</systemPath>
-</dependency>
-<dependency>
-    <groupId>org.slf4j</groupId>
-    <artifactId>slf4j-api</artifactId>
-    <version>1.7.4</version>
-    <scope>system</scope>
-    <systemPath><PA_HOME>/lib/slf4j-api-1.7.4.jar</systemPath>
-</dependency>
-<dependency>
-    <groupId>org.slf4j</groupId>
-    <artifactId>slf4j-log4j12</artifactId>
-    <version>1.7.4</version>
-    <scope>system</scope>
-    <systemPath><PA_HOME>/lib/slf4j-log4j12-1.7.4.jar</systemPath>
-</dependency>
-```
-
-> **Version note:** The `systemPath` versions above are from the official docs
-> (PA 4.x era). For PA 9.0.1.0, the actual JAR filenames in `<PA_HOME>/lib/`
-> may differ. Always verify the exact filenames.
-
-### Gradle Adaptation (Our Project)
-
-Our message-xform adapter uses **Gradle** instead of Maven. The core steps are
-analogous but differ in tooling:
-
-| Maven Step | Gradle Equivalent |
-|-----------|-------------------|
-| `pom.xml` with SDK dependency | `build.gradle.kts` with `compileOnly` SDK dependency |
-| `mvn install` | `./gradlew shadowJar` (produces shadow JAR) |
-| Copy JAR to `deploy/` | CI/CD copies shadow JAR to `<PA_HOME>/deploy/` |
-| Ping Maven repo in `<repositories>` | `maven { url = "http://maven.pingidentity.com/release" }` in `repositories {}` |
-| System-scope local JAR | `compileOnly(files("<PA_HOME>/lib/pingaccess-sdk-9.0.1.0.jar"))` |
-
-See [§9 Deployment](#9-deployment--classloading) for shadow JAR contents,
-PA-provided dependencies (ADR-0031), and classloader model details.
-
----
-
-## 18. Behavioral Notes
-
-> **Tags:** `behavior`, `constraints`, `logging`
-
-### Request Immutability During Response Phase
-
-Any modifications to `exchange.getRequest()` or its headers inside
-`handleResponse()` are **silently ignored** by PingAccess (a warning is logged).
-Only `exchange.getResponse()` may be modified during response processing.
-
-```java
-// ❌ WRONG — silently ignored
-@Override
-public CompletionStage<Void> handleResponse(Exchange exchange) {
-    exchange.getRequest().getHeaders().add("X-Debug", "true");  // IGNORED
-    return CompletableFuture.completedFuture(null);
-}
-
-// ✅ CORRECT — modify the response only
-@Override
-public CompletionStage<Void> handleResponse(Exchange exchange) {
-    exchange.getResponse().getHeaders().add("X-Debug", "true");  // OK
-    return CompletableFuture.completedFuture(null);
-}
-```
-
-### Logging
-
-Use the **SLF4j API** for all logging in plugin modules:
-
-```java
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-private static final Logger LOG = LoggerFactory.getLogger(MyPlugin.class);
-```
-
-PingAccess ships its own SLF4J provider — do **not** bundle SLF4J in your
-plugin JAR (see [§9 Deployment](#9-deployment--classloading)).
-
----
-
-## 19. JMX Monitoring & Custom MBeans
-
-PingAccess provides a comprehensive JMX-based monitoring infrastructure.
-The SDK itself does **not** expose a metrics API, but plugins can register
-custom MBeans using standard `java.lang.management` — they run in the same
-JVM as the PA engine.
-
-### PA's built-in monitoring mechanisms
-
-From the **PingAccess Monitoring Guide** (PA 9.0 docs, pages 833–849):
-
-| Mechanism | Description | Configuration |
-|-----------|-------------|---------------|
-| **JMX MBeans** | Ping-recommended primary mechanism. Provides resource metric counters for performance analysis. Compatible with JConsole, Splunk, and SIEM tools. | `pa.mbean.site.connection.pool.enable=true` (default `false`) in `run.properties` |
-| **Heartbeat endpoint** | `/pa/heartbeat.ping` — returns HTTP 200 when healthy. Can return detailed JSON with CPU, memory, response time stats. | `enable.detailed.heartbeat.response=true` + `pa.statistics.window.seconds=N` in `run.properties` |
-| **Audit logging** | Per-transaction timing in `pingaccess_engine_audit.log`. Records total roundtrip, proxy roundtrip, and userinfo roundtrip (ms). | Enabled by `log4j2.xml` configuration |
-| **Splunk integration** | Pre-built PingAccess for Splunk app ([Splunkbase #5368](https://splunkbase.splunk.com/app/5368)). Parses both audit logs and JMX MBean data. | Splunk-formatted audit log appenders |
-
-### JMX connection setup
-
-**Local connection:** In JConsole, select `com.pingidentity.pa.cli.Starter`
-from the Local Process list.
-
-**Remote connection:** Add to `jvm-memory.options`:
-
-```
--Dcom.sun.management.jmxremote.port=5000
--Dcom.sun.management.jmxremote.login.config=<YourConfig>
--Djava.security.auth.login.config=conf/ldap.config
--Dcom.sun.management.jmxremote.ssl=false
-```
-
-> ⚠️ Enable SSL for production JMX. The `ssl=false` setting is for
-> testing only.
-
-### Heartbeat endpoint JSON response
-
-When `enable.detailed.heartbeat.response=true`:
-
-```json
-{"items":[{
-    "response.statistics.window.seconds": "5",
-    "response.statistics.count": "1",
-    "response.time.statistics.90.percentile": "129",
-    "response.time.statistics.mean": "129",
-    "response.time.statistics.max": "129",
-    "response.time.statistics.min": "129",
-    "response.concurrency.statistics.90.percentile": "1",
-    "response.concurrency.statistics.mean": "1",
-    "cpu.load": "15.53",
-    "total.jvm.memory": "500.695 MB",
-    "free.jvm.memory": "215.339 MB",
-    "used.jvm.memory": "285.356 MB",
-    "number.of.cpus": "8",
-    "open.client.connections": "1",
-    "number.of.applications": "11",
-    "number.of.virtual.hosts": "6"
-}]}
-```
-
-### SDK gap: no metrics API for plugins
-
-The SDK JAR (`pingaccess-sdk-9.0.1.0.jar`) contains **zero** classes related
-to JMX, MBeans, metrics, monitoring, or telemetry. There is no
-`registerMetric()`, no `MetricsService`, and no counters API.
-
-PA's own MBeans (connection pool metrics, heartbeat stats) are registered by
-the engine internally – they are not accessible or extendable from the SDK.
-
-### Plugin MBean registration pattern
-
-Plugins can register their own JMX MBeans using standard Java. This is safe
-because plugins run in the PA engine JVM and have access to
-`ManagementFactory.getPlatformMBeanServer()`.
-
-**Step 1: Define an MXBean interface**
-
-Use the `MXBean` suffix convention — the JMX runtime automatically exposes
-all public getters as attributes and methods as operations:
-
-```java
-public interface MyPluginMetricsMXBean {
-    // Attributes (read-only via JConsole)
-    long getRequestCount();
-    long getErrorCount();
-    double getAverageLatencyMs();
-    long getActiveSpecCount();
-
-    // Operations (invokable via JConsole)
-    void resetCounters();
-}
-```
-
-**Step 2: Implement the MXBean**
-
-```java
-public class MyPluginMetrics implements MyPluginMetricsMXBean {
-    private final LongAdder requestCount = new LongAdder();
-    private final LongAdder errorCount = new LongAdder();
-    private final LongAdder totalLatencyNanos = new LongAdder();
-    private volatile int activeSpecCount;
-
-    @Override
-    public long getRequestCount() { return requestCount.sum(); }
-
-    @Override
-    public long getErrorCount() { return errorCount.sum(); }
-
-    @Override
-    public double getAverageLatencyMs() {
-        long count = requestCount.sum();
-        return count == 0 ? 0.0
-            : (totalLatencyNanos.sum() / 1_000_000.0) / count;
-    }
-
-    @Override
-    public long getActiveSpecCount() { return activeSpecCount; }
-
-    @Override
-    public void resetCounters() {
-        requestCount.reset();
-        errorCount.reset();
-        totalLatencyNanos.reset();
-    }
-
-    // --- Mutators (called by plugin, not exposed via JMX) ---
-    public void recordSuccess(long elapsedNanos) {
-        requestCount.increment();
-        totalLatencyNanos.add(elapsedNanos);
-    }
-
-    public void recordError() {
-        requestCount.increment();
-        errorCount.increment();
-    }
-
-    public void setActiveSpecCount(int count) {
-        this.activeSpecCount = count;
-    }
-}
-```
-
-> **Thread safety:** `LongAdder` is specifically designed for high-contention
-> counter updates from multiple threads. It outperforms `AtomicLong` under
-> contention by using cell-based striping. All PA request-processing threads
-> can safely call `recordSuccess()` / `recordError()` concurrently.
-
-**Step 3: Register in `configure()`**
-
-```java
-private ObjectName jmxObjectName;
-private final MyPluginMetrics metrics = new MyPluginMetrics();
-
-@Override
-public void configure(MessageTransformConfig config) {
-    this.config = config;
-
-    if (config.isEnableJmxMetrics()) {
-        try {
-            MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
-            ObjectName name = new ObjectName(
-                "io.messagexform:type=TransformMetrics,instance="
-                    + ObjectName.quote(config.getName()));
-            if (!mbs.isRegistered(name)) {
-                mbs.registerMBean(metrics, name);
-                LOG.info("JMX MBean registered: {}", name);
-            }
-            this.jmxObjectName = name;
-        } catch (Exception e) {
-            LOG.warn("Failed to register JMX MBean — metrics disabled", e);
-        }
-    } else {
-        unregisterMBean();  // In case previously enabled
-    }
-}
-
-private void unregisterMBean() {
-    if (jmxObjectName != null) {
-        try {
-            MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
-            if (mbs.isRegistered(jmxObjectName)) {
-                mbs.unregisterMBean(jmxObjectName);
-                LOG.info("JMX MBean unregistered: {}", jmxObjectName);
-            }
-        } catch (Exception e) {
-            LOG.warn("Failed to unregister JMX MBean", e);
-        }
-        jmxObjectName = null;
-    }
-}
-```
-
-**ObjectName convention:** Use a plugin-specific domain (`io.messagexform`)
-to avoid collisions with PA's internal MBeans. The `instance` key property
-uses `config.getName()` (from `PluginConfiguration.getName()`) to
-distinguish multiple rule instances on the same engine.
-
-> **`ObjectName.quote()`:** Always quote the instance name. PA allows
-> arbitrary characters in rule names (including spaces, colons, commas)
-> which are illegal in unquoted ObjectName values.
-
-**Step 4: Unregister on plugin unload**
-
-PA does not expose a `destroy()` lifecycle callback in the SDK. However,
-if the plugin is reconfigured (new `configure()` call), the pattern above
-handles re-registration. For PA shutdown, the JVM termination implicitly
-cleans up MBeans. For safety, wrap unregistration in a try-catch.
-
-### ObjectName patterns for JConsole
-
-After registration, the MBean appears in JConsole under:
-
-```
-io.messagexform
-  └── TransformMetrics
-      └── instance=<rule-name>
-          ├── Attributes
-          │   ├── RequestCount
-          │   ├── ErrorCount
-          │   ├── AverageLatencyMs
-          │   └── ActiveSpecCount
-          └── Operations
-              └── resetCounters()
-```
-
-Administrators already monitoring PA's connection pool MBeans
-(`pa.mbean.site.connection.pool.enable=true`) will see the plugin MBeans
-in the same JConsole session.
-
-### Audit logging (always available)
-
-Even without JMX, every transform result is logged via SLF4J at INFO level.
-PingAccess routes plugin SLF4J output to `pingaccess.log`. The engine's
-own audit log (`pingaccess_engine_audit.log`) captures per-transaction
-timing automatically — **no plugin code needed**.
-
-Example `pingaccess_engine_audit.log` entry:
-```
-2026-02-11T19:15:12,192|...|tid:...|81 ms| 50 ms| 0 ms|app.example.com []...
-```
-
-Where `81 ms` is total roundtrip (includes our plugin processing time).
-
----
-
-## Java Version Compatibility
+### Java Version Compatibility
 
 PingAccess 9.0 officially supports **Java 17 and 21** (Amazon Corretto, OpenJDK,
 Oracle JDK — all 64-bit). The adapter module compiles with **Java 21**, matching
@@ -3058,9 +2773,7 @@ the core module. No cross-compilation needed.
 
 > Source: PingAccess 9.0 docs § "Java runtime environments" (page 78)
 
----
-
-## SDK Class Coverage
+### SDK Class Coverage
 
 Total SDK classes (excluding inner): **112** • Documented: **112** (100%)
 
@@ -3070,9 +2783,7 @@ this guide. The 5 previously undocumented classes were added in this revision:
 `ConfigurationDependentFieldOption`, `DynamicConfigurationParentField`,
 `DynamicOptionsConfigurationField`.
 
----
-
-## SDK Artefact Locations
+### SDK Artefact Locations
 
 | Artefact | Path |
 |----------|------|
