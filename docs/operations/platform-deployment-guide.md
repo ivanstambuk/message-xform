@@ -137,6 +137,12 @@ docker compose logs -f pingdirectory
 > **Startup time:** PingDirectory takes 60–90 seconds on first start
 > (schema loading, index generation, MAKELDIF user creation). Subsequent
 > starts are 10–15 seconds.
+>
+> **Minimum heap:** PD 11.0 requires `MAX_HEAP_SIZE=768m` (minimum). The
+> default `512m` in many examples causes setup failure:
+> ```
+> The memory size '512m' is less than the minimum required size of '768m'
+> ```
 
 #### Manual start (for testing)
 
@@ -291,8 +297,38 @@ docker exec <pd-container> /opt/out/instance/bin/dsconfig \
 ```
 
 > **Docker Compose shortcut:** When using `docker-compose.yml`, both tweaks are
-> applied automatically via `config/pd-post-setup.dsconfig` mounted as a staging
-> dsconfig file.
+> applied automatically:
+> - **Schema**: `etag-schema.ldif` mounted at `pd.profile/server-root/pre-setup/config/schema/99-etag.ldif`
+>   (loaded during PD setup, *before* dsconfig runs)
+> - **dsconfig**: `pd-post-setup.dsconfig` mounted at `pd.profile/dsconfig/pd-post-setup.dsconfig`
+>   (runs after PD setup completes)
+>
+> **Critical ordering:** The etag schema MUST be loaded as a pre-setup schema
+> file, not applied via `ldapmodify` after PD starts. If loaded later, the
+> dsconfig step that creates the mirror VA fails with:
+> ```
+> The string value 'etag' is not a valid attribute type ... there is no such
+> attribute defined in the schema
+> ```
+> PD then starts and immediately shuts down when it encounters the broken VA config.
+>
+> **PD profile paths (mount targets):**
+>
+> | Content | Mount path inside container |
+> |---------|-----------------------------|
+> | dsconfig batch files | `/opt/staging/pd.profile/dsconfig/<name>.dsconfig` |
+> | Pre-setup schema | `/opt/staging/pd.profile/server-root/pre-setup/config/schema/<nn>-<name>.ldif` |
+> | License file | `/opt/staging/pd.profile/server-root/pre-setup/PingDirectory.lic` |
+>
+> **NOT** `/opt/staging/dsconfig/` — that path causes:
+> ```
+> CONTAINER FAILURE: Resolve the location of your dsconfig directory
+> ```
+>
+> **PD schema file format:** Files in `config/schema/` must be native PD schema
+> entries (not LDIF modify format). Use `objectClass: subschema` (not
+> `subschemaSubentry`), no `LDIF:UNWRAP` header, and standard LDIF line wrapping
+> (continuation lines start with a single space).
 
 ---
 
@@ -307,6 +343,18 @@ docker compose up -d pingam
 docker compose logs -f pingam
 # Wait for: "Server startup in [XXXX] milliseconds"
 ```
+
+> **docker-compose v1 bug:** The `pingam:8.0.2` image (built with newer Docker)
+> causes a `KeyError: 'ContainerConfig'` crash in docker-compose v1 (1.29.x).
+> **Workaround:** Use `docker run` directly (see below) or upgrade to
+> docker-compose v2 (`docker compose` without the hyphen).
+
+> **Port collision:** If port 8080 is already in use on the host, override in
+> `.env`:
+> ```bash
+> AM_HTTP_PORT=18080
+> AM_HTTPS_PORT=18443
+> ```
 
 #### Manual start
 
@@ -383,10 +431,24 @@ The content type is `application/x-www-form-urlencoded` (NOT JSON).
 > the POST returns a 302 redirect to the AM console. To reconfigure, you must
 > delete AM's config directory (`/home/forgerock/openam`) or start a fresh container.
 
-#### Configuration command
+#### Automated configuration
+
+The recommended approach is `scripts/configure-am.sh` which handles the complete
+setup sequence: TLS cert import → configurator POST → progress monitoring →
+admin auth verification. It is idempotent (detects already-configured AM).
 
 ```bash
-AM_ENC_KEY=$(openssl rand -hex 16)
+cd deployments/platform
+./scripts/configure-am.sh
+
+# OR skip cert import (if PD cert already in AM truststore):
+./scripts/configure-am.sh --skip-cert
+```
+
+#### Manual configuration command
+
+```bash
+AM_ENC_KEY=$(openssl rand -base64 24)  # MUST NOT be empty
 
 curl -s -w "\n--- HTTP %{http_code} ---\n" \
   -X POST http://<am-host>:8080/am/config/configurator \
@@ -432,7 +494,7 @@ curl -s -w "\n--- HTTP %{http_code} ---\n" \
 | `ROOT_SUFFIX` | `dc=example,dc=com` | PD's base DN — AM creates subtrees under this |
 | `DS_DIRMGRDN` | `cn=administrator` | PD root user DN (not `uid=admin` like PingDS) |
 | `USERSTORE_TYPE` | `LDAPv3ForOpenDS` | PD is OpenDS-compatible for user lookups |
-| `AM_ENC_KEY` | random hex | Encryption key for AM secrets |
+| `AM_ENC_KEY` | random base64 | **Must not be empty.** Encryption key for AM secrets. Generate with `openssl rand -base64 24`. Configurator rejects empty values with `Encryption key must be provided.` |
 | `COOKIE_DOMAIN` | domain suffix | Session cookie domain (`.test.local`, `.platform.local`) |
 
 > **Key insight:** Both the config store (`DS_DIRMGRDN`) and user store
@@ -442,7 +504,8 @@ curl -s -w "\n--- HTTP %{http_code} ---\n" \
 
 #### What happens during configuration
 
-The configurator performs ~100 LDAP operations over 2–5 minutes:
+The configurator performs ~98 LDAP operations. With a local PD, this completes in
+**15–30 seconds**. On slow networks or shared infrastructure, it can take 2–5 minutes:
 
 1. **Schema loading** (~30 LDIF files) — AM-specific objectClasses and attributes
    for config, CTS, UMA, OAuth2, SAML, etc. Key files loaded include:
@@ -478,8 +541,9 @@ The configurator performs ~100 LDAP operations over 2–5 minutes:
    }
    ```
 
-**Timing:** The configurator typically takes 2–5 minutes. You can monitor progress
-via the install log — look for `...Success.` lines (should reach 98+):
+**Timing:** With a local PD, the configurator typically takes 15–30 seconds
+(~98 `Success.` steps). On slow infrastructure, it can take up to 5 minutes.
+Monitor progress via the install log:
 
 ```bash
 # Watch live progress
@@ -631,6 +695,13 @@ SEARCH RESULT ... base="" scope=0 filter="(objectClass=*)" attrs="1.1" resultCod
 | `Configuration failed: The LDAP operation failed.` | Schema violation (Tweak 1 not applied) | Apply `single-structural-objectclass-behavior:accept` first |
 | POST to `/config/configurator` returns 302 | AM already configured | Delete `/home/forgerock/openam` and start fresh container |
 | `bindPassword` conflicts with `bindPasswordFile` | PD tool.properties has defaults | Add `--noPropertiesFile` to dsconfig/ldapsearch commands |
+| `The memory size '512m' is less than the minimum required size of '768m'` | PD 11.0 needs ≥768m heap | Set `MAX_HEAP_SIZE=768m` in environment |
+| `CONTAINER FAILURE: Resolve the location of your dsconfig directory` | dsconfig mounted at wrong path | Mount at `/opt/staging/pd.profile/dsconfig/`, **NOT** `/opt/staging/dsconfig/` |
+| `The string value 'etag' is not a valid attribute type` | etag schema not loaded before dsconfig | Mount schema at `pd.profile/server-root/pre-setup/config/schema/99-etag.ldif` (pre-setup, not runtime) |
+| `Schema configuration file 99-etag.ldif ... cannot be parsed` | Incorrect LDIF format for schema file | Use `objectClass: subschema` (not `subschemaSubentry`). No `LDIF:UNWRAP` header. |
+| `KeyError: 'ContainerConfig'` from docker-compose | docker-compose v1 incompatible with newer image format | Use `docker run` directly, or upgrade to docker-compose v2 (`docker compose`) |
+| `Encryption key must be provided.` from configurator | `AM_ENC_KEY` parameter is empty | Generate a random key: `openssl rand -base64 24` |
+| `keystore password was incorrect` on Tomcat HTTPS | PKCS#12 keystore mounted without matching `SSL_PWD` env var | Pass `SSL_PWD` to container or accept HTTP-only (HTTPS connector fails, HTTP still works) |
 
 
 #### Startup order

@@ -334,6 +334,8 @@ successfully, but session creation fails when CTS tries to persist the session.
 
 1. **Add `etag` attribute to PingDirectory schema:**
 
+For **manual** application via `ldapmodify` (ad-hoc testing), use LDIF modify format:
+
 ```ldif
 dn: cn=schema
 changetype: modify
@@ -347,6 +349,31 @@ attributeTypes: ( 1.3.6.1.4.1.36733.2.1.999.1
   USAGE userApplications
   X-ORIGIN 'PingAM CTS compatibility' )
 ```
+
+For **Docker Compose** (automated), the schema must be a native PD schema entry
+mounted at `pd.profile/server-root/pre-setup/config/schema/99-etag.ldif`. This
+format is different — it uses `objectClass: subschema` and is NOT an LDIF modify:
+
+```ldif
+dn: cn=schema
+objectClass: top
+objectClass: ldapSubentry
+objectClass: subschema
+cn: schema
+attributeTypes: ( 1.3.6.1.4.1.36733.2.1.999.1
+  NAME 'etag'
+  DESC 'CTS entry tag for optimistic concurrency control'
+  EQUALITY caseIgnoreMatch
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.15
+  SINGLE-VALUE
+  USAGE userApplications
+  X-ORIGIN 'PingAM CTS compatibility' )
+```
+
+> **Critical:** The etag schema MUST be loaded as a pre-setup file (before PD
+> setup runs), not via ldapmodify after PD starts. The dsconfig step that creates
+> the mirror VA references `etag` — if the schema isn't loaded yet, dsconfig fails
+> and PD shuts down immediately after starting.
 
 2. **Create mirror virtual attribute mapping `ds-entry-checksum → etag`:**
 
@@ -385,10 +412,29 @@ PingDirectory, use these parameters:
 | `USERSTORE_PORT` | `1636` | Same LDAPS port |
 | `USERSTORE_SUFFIX` | `dc=example,dc=com` | Same or different base DN |
 | `USERSTORE_MGRDN` | `cn=administrator` | PD root user DN |
+| `AM_ENC_KEY` | random base64 | **Must not be empty.** `Encryption key must be provided.` Use `openssl rand -base64 24`. |
 
 > **Key insight:** Both config store and user store point to the **same**
 > PingDirectory instance. PingAM creates its own subtrees
 > (`ou=services`, `ou=tokens`, etc.) under the base DN.
+
+#### Automated Configuration (`configure-am.sh`)
+
+The project includes `scripts/configure-am.sh` which automates the complete
+first-run setup: TLS cert import → configurator POST → progress monitoring →
+admin auth verification.
+
+```bash
+cd deployments/platform
+./scripts/configure-am.sh            # full run
+./scripts/configure-am.sh --skip-cert # skip cert import (already done)
+```
+
+The script is idempotent — it detects already-configured AM by trying admin
+authentication before sending the configurator POST.
+
+With a local PD, configuration completes in ~15-30 seconds (98 steps, 0 errors).
+On remote/slow infrastructure, allow up to 5 minutes.
 
 #### SSL Certificate Trust
 
@@ -412,6 +458,15 @@ keytool -importcert \
 > **Gotcha:** PingAM runs as user `forgerock` (uid 11111), but the JVM cacerts
 > file is owned by root. You must exec into the container as root (`docker exec -u 0`)
 > to import certificates.
+>
+> **Gotcha — docker-compose v1:** The `pingam:8.0.2` image (built with newer
+> Docker) causes `KeyError: 'ContainerConfig'` in docker-compose v1 (1.29.x).
+> Use `docker run` directly or upgrade to docker-compose v2.
+>
+> **Gotcha — HTTPS keystore:** If mounting a custom PKCS#12 keystore in
+> `server.xml`, ensure the `SSL_PWD` environment variable matches the keystore
+> password. If mismatched, Tomcat's HTTPS connector fails with `keystore password
+> was incorrect`, but HTTP continues to work (non-fatal, degraded mode).
 
 #### Monitoring and Debugging
 
