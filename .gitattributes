@@ -1,0 +1,1 @@
+docs/reference/vendor/*.txt filter=lfs diff=lfs merge=lfs -text

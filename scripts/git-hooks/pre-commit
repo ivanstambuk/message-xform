@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# pre-commit — Protect vendor documentation from accidental deletion
+# ==============================================================================
+# This hook prevents the deletion of files in docs/reference/vendor/
+# unless the OVERRIDE_VENDOR_DELETE environment variable is set.
+# ==============================================================================
+
+PROTECTED_DIR="docs/reference/vendor/"
+
+# Find deleted files in the protected directory that are staged for commit
+DELETED_FILES=$(git diff --cached --name-only --diff-filter=D | grep "^${PROTECTED_DIR}" || true)
+
+if [ -n "$DELETED_FILES" ]; then
+    if [ "$OVERRIDE_VENDOR_DELETE" = "true" ]; then
+        echo "⚠️  Warning: Protected files in ${PROTECTED_DIR} are being deleted (Override active)."
+    else
+        echo "❌ Error: You are attempting to delete protected vendor documentation:"
+        echo "$DELETED_FILES" | sed 's/^/   - /'
+        echo ""
+        echo "These files are critical for project research and must not be deleted."
+        echo "If you absolutely MUST delete them, use:"
+        echo "  OVERRIDE_VENDOR_DELETE=true git commit ..."
+        exit 1
+    fi
+fi
+
+exit 0
