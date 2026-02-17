@@ -1,0 +1,239 @@
+############################################################
+# message-xform Platform — Local k3s Values
+#
+# Usage:
+#   helm install platform pingidentity/ping-devops \
+#     -n message-xform \
+#     -f k8s/values-local.yaml
+#
+# Ping Identity chart: ping-devops v0.11.17
+# Products deployed:
+#   - PingDirectory (identity store)
+#   - PingAccess Admin + Engine (reverse proxy + transform engine)
+#
+# PingAM is deployed separately (standalone Deployment) because
+# it is not a native product in the ping-devops chart.
+############################################################
+
+############################################################
+# Global settings
+############################################################
+global:
+  addReleaseNameToResource: none
+
+  envs:
+    PING_IDENTITY_ACCEPT_EULA: "YES"
+
+  image:
+    tag: "latest"
+    pullPolicy: IfNotPresent
+
+  ingress:
+    enabled: false
+
+############################################################
+# InitContainers — available for product inclusion
+############################################################
+initContainers:
+  mxform-plugin:
+    name: mxform-plugin-init
+    image: busybox:1.36
+    command:
+      - sh
+      - -c
+      - |
+        echo "Copying message-xform plugin JAR..."
+        cp /source/adapter-pingaccess-0.1.0-SNAPSHOT.jar /target/message-xform-adapter.jar
+        ls -la /target/
+        echo "Done."
+    volumeMounts:
+      - name: mxform-jar-source
+        mountPath: /source
+        readOnly: true
+      - name: mxform-deploy
+        mountPath: /target
+
+############################################################
+# Top-level volume definitions (referenced by includeVolumes)
+############################################################
+volumes:
+  mxform-jar-source:
+    hostPath:
+      path: /home/ivan/dev/message-xform/adapter-pingaccess/build/libs
+      type: Directory
+  mxform-deploy:
+    emptyDir: {}
+
+############################################################
+# PingDirectory
+############################################################
+pingdirectory:
+  enabled: true
+
+  container:
+    replicaCount: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 768Mi
+      limits:
+        cpu: 2
+        memory: 2Gi
+    envs:
+      MAX_HEAP_SIZE: "768m"
+      ROOT_USER_DN: "cn=administrator"
+      ROOT_USER_PASSWORD_FILE: "/run/secrets/root-user-password"
+
+  # Product-level volumes and volumeMounts (chart merges these
+  # into the main container spec, per _workload.tpl)
+  volumes:
+    - name: pd-license
+      secret:
+        secretName: pd-license
+  volumeMounts:
+    - name: pd-license
+      mountPath: /opt/staging/pd.profile/server-root/pre-setup/PingDirectory.lic
+      subPath: PingDirectory.lic
+      readOnly: true
+
+  services:
+    ldaps:
+      servicePort: 1636
+      containerPort: 1636
+      dataService: true
+    https:
+      servicePort: 1443
+      containerPort: 1443
+      dataService: true
+
+  workload:
+    type: StatefulSet
+
+  persistentvolume:
+    enabled: true
+    volumes:
+      out-dir:
+        mountPath: /opt/out
+        persistentVolumeClaim:
+          accessModes:
+            - ReadWriteOnce
+          storageClassName: local-path
+          resources:
+            requests:
+              storage: 2Gi
+
+############################################################
+# PingAccess Admin
+############################################################
+pingaccess-admin:
+  enabled: true
+
+  container:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 512Mi
+      limits:
+        cpu: 2
+        memory: 2Gi
+    envs:
+      PA_ADMIN_PASSWORD_INITIAL: "2Access"
+      PING_IDENTITY_PASSWORD: "2Access"
+
+  # Product-level volumes and volumeMounts
+  volumes:
+    - name: mxform-specs
+      configMap:
+        name: mxform-specs
+    - name: mxform-profiles
+      configMap:
+        name: mxform-profiles
+    - name: pa-license
+      secret:
+        secretName: pa-license
+  volumeMounts:
+    - name: mxform-deploy
+      mountPath: /opt/staging/deploy
+    - name: mxform-specs
+      mountPath: /specs
+      readOnly: true
+    - name: mxform-profiles
+      mountPath: /profiles
+      readOnly: true
+    - name: pa-license
+      mountPath: /opt/staging/instance/conf/pingaccess.lic
+      subPath: pingaccess.lic
+      readOnly: true
+
+  includeInitContainers:
+    - mxform-plugin
+  includeVolumes:
+    - mxform-jar-source
+    - mxform-deploy
+
+  services:
+    https:
+      servicePort: 9000
+      containerPort: 9000
+      dataService: true
+    clusterconfig:
+      servicePort: 9090
+      containerPort: 9090
+      dataService: true
+
+############################################################
+# PingAccess Engine
+############################################################
+pingaccess-engine:
+  enabled: true
+
+  container:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 512Mi
+      limits:
+        cpu: 2
+        memory: 2Gi
+
+    waitFor:
+      pingaccess-admin:
+        service: https
+        timeoutSeconds: 300
+
+  # Product-level volumes and volumeMounts
+  volumes:
+    - name: mxform-specs
+      configMap:
+        name: mxform-specs
+    - name: mxform-profiles
+      configMap:
+        name: mxform-profiles
+    - name: pa-license
+      secret:
+        secretName: pa-license
+  volumeMounts:
+    - name: mxform-deploy
+      mountPath: /opt/staging/deploy
+    - name: mxform-specs
+      mountPath: /specs
+      readOnly: true
+    - name: mxform-profiles
+      mountPath: /profiles
+      readOnly: true
+    - name: pa-license
+      mountPath: /opt/staging/instance/conf/pingaccess.lic
+      subPath: pingaccess.lic
+      readOnly: true
+
+  includeInitContainers:
+    - mxform-plugin
+  includeVolumes:
+    - mxform-jar-source
+    - mxform-deploy
+
+  services:
+    https:
+      servicePort: 3000
+      containerPort: 3000
+      dataService: true

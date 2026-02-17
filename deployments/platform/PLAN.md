@@ -92,41 +92,41 @@ Install k3s, Helm, kubectl. Verify cluster health.
 
 | Step | Task | Done |
 |------|------|------|
-| 1.1 | Install k3s (`curl -sfL https://get.k3s.io \| sh -`) | |
-| 1.2 | Configure kubectl (`export KUBECONFIG=/etc/rancher/k3s/k3s.yaml`) | |
-| 1.3 | Install Helm (`curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 \| bash`) | |
-| 1.4 | Add Ping Identity Helm repo (`helm repo add pingidentity https://helm.pingidentity.com/`) | |
-| 1.5 | Create namespace `message-xform` | |
-| 1.6 | Verify: `kubectl get nodes` shows Ready, `helm list` works | |
-| 1.7 | Document k3s setup in deployment guide | |
+| 1.1 | Install k3s (`curl -sfL https://get.k3s.io \| sh -`) | ✅ v1.34.4+k3s1 |
+| 1.2 | Configure kubectl (`export KUBECONFIG=/etc/rancher/k3s/k3s.yaml`) | ✅ added to .bashrc |
+| 1.3 | Install Helm (`curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 \| bash`) | ✅ v3.20.0 |
+| 1.4 | Add Ping Identity Helm repo (`helm repo add pingidentity https://helm.pingidentity.com/`) | ✅ ping-devops 0.11.17 |
+| 1.5 | Create namespace `message-xform` | ✅ |
+| 1.6 | Verify: `kubectl get nodes` shows Ready, `helm list` works | ✅ all system pods Running |
+| 1.7 | Document k3s setup in deployment guide | deferred to Phase 7 |
 
 ### Phase 2 — Helm Values & Secrets *(~1 session)*
 Create the values files and K8s Secrets for the three products.
 
 | Step | Task | Done |
 |------|------|------|
-| 2.1 | Study `helm show values pingidentity/ping-devops` — map to our Docker Compose config | |
-| 2.2 | Create `k8s/values-local.yaml` — base values for local k3s deployment | |
-| 2.3 | Create K8s Secrets: `pd-credentials`, `am-credentials`, `pa-credentials`, `pa-license` | |
-| 2.4 | Create ConfigMap `mxform-specs` from `specs/*.yaml` | |
-| 2.5 | Create ConfigMap `mxform-profiles` from `profiles/*.yaml` | |
-| 2.6 | Create TLS Secret from existing `secrets/tlskey.p12` and `secrets/pubCert.crt` | |
-| 2.7 | Validate Q1: test `ping-devops` chart with PingAM via `externalImage` | |
+| 2.1 | Study `helm show values pingidentity/ping-devops` — map to our Docker Compose config | ✅ chart templates studied |
+| 2.2 | Create `k8s/values-local.yaml` — base values for local k3s deployment | ✅ PD + PA admin + PA engine |
+| 2.3 | Create K8s Secrets: `pd-credentials`, `am-credentials`, `pa-credentials`, `pa-license`, `pd-license` | ✅ 5 secrets |
+| 2.4 | Create ConfigMap `mxform-specs` from `specs/*.yaml` | ✅ 8 files |
+| 2.5 | Create ConfigMap `mxform-profiles` from `profiles/*.yaml` | ✅ 1 file |
+| 2.6 | Create TLS Secret from existing `secrets/tlskey.p12` and `secrets/pubCert.crt` | deferred to Phase 4 |
+| 2.7 | Validate Q1: test `ping-devops` chart with PingAM via `externalImage` | ✅ **Q1 RESOLVED**: PingAM is NOT in chart — standalone Deployment |
 
 ### Phase 3 — Core Deployment *(~2 sessions)*
 Deploy PingDirectory, PingAM, and PingAccess via Helm.
 
 | Step | Task | Done |
 |------|------|------|
-| 3.1 | Deploy PingDirectory: verify LDAPS, readiness probe, PVC | |
+| 3.1 | Deploy PingDirectory: verify LDAPS, readiness probe, PVC | ✅ Running, LDAPS OK |
 | 3.2 | Deploy PD schema tweaks (Job or init container): etag VA + structural objectclass | |
-| 3.3 | Deploy PingAM: custom image import into k3s, init container for PD cert trust | |
+| 3.3 | Deploy PingAM: standalone Deployment (not in chart) | |
 | 3.4 | AM configuration Job: run `configure-am.sh` logic as a K8s Job | |
 | 3.5 | AM post-config Job: create test users (`configure-am-post.sh` logic) | |
-| 3.6 | Deploy PingAccess: init container for shadow JAR, ConfigMap mounts for specs/profiles | |
+| 3.6 | Deploy PingAccess: init container for shadow JAR, ConfigMap mounts for specs/profiles | ✅ Admin+Engine Running, JAR + specs + profiles mounted |
 | 3.7 | PA configuration Job: `configure-pa.sh` + `configure-pa-plugin.sh` + `configure-pa-api.sh` | |
 | 3.8 | WebAuthn journey import Job: `import-webauthn-journey.sh` | |
-| 3.9 | Verify: all Pods Running/Completed, PD healthy, AM responding, PA proxying | |
+| 3.9 | Verify: all Pods Running/Completed, PD healthy, AM responding, PA proxying | partial — PD ✅ PA ✅ AM pending |
 
 ### Phase 4 — Networking & Ingress *(~1 session)*
 Configure Ingress for clean URL routing and external access.
