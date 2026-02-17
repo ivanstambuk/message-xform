@@ -60,8 +60,8 @@ The result must:
 |---|----------|--------|-----------|
 | K1 | Local K8s distribution | **k3s** | CNCF-certified, production-grade, <100 MB binary, includes Traefik ingress + local-path-provisioner. Same K8s API as AKS/GKE/EKS. 512 MB RAM minimum — we have 32 GB. |
 | K2 | Helm chart | **`ping-devops` v0.11.17** | Official Ping Identity unified chart. Supports PingDirectory, PingAccess. PingAM will need a custom values entry (see K4). |
-| K3 | PingAccess plugin injection | **Init container** | Init container copies `adapter-pingaccess-0.1.0-SNAPSHOT.jar` into a shared `emptyDir` volume mounted at `/opt/server/deploy/`. No custom PA image needed. |
-| K4 | PingAM image | **Custom image (existing)** | We already build a custom AM WAR-on-Tomcat image. Push to a local registry (k3s) or cloud registry (ACR/GCR/ECR). The `ping-devops` chart supports `externalImage` for non-Ping images. |
+| K3 | PingAccess plugin injection | **Init container** | Init container (busybox) copies `adapter-pingaccess-0.1.0-SNAPSHOT.jar` into a shared `emptyDir` volume mounted at `/opt/staging/deploy/`. The hooks then copy it to `/opt/out/instance/deploy/`. No custom PA image needed. |
+| K4 | PingAM image | **Standalone K8s Deployment** | PingAM is NOT in the `ping-devops` chart (ForgeRock-lineage product). We deploy AM as a standalone Deployment manifest with our custom WAR-on-Tomcat image, imported into k3s via `k3s ctr images import` or pushed to a cloud registry. |
 | K5 | Transform specs/profiles | **ConfigMaps** | Hot-reload works because the engine polls the filesystem. ConfigMap volume mounts update in-place (kubelet sync period ~60s, engine polls every 30s). |
 | K6 | Secrets | **K8s Secrets** | Credentials for PD, AM, PA stored as Secrets. Cloud deployments can use External Secrets Operator or cloud-native secret managers. |
 | K7 | Persistence | **PVCs** | `local-path-provisioner` on k3s, cloud StorageClass on AKS/GKE/EKS. PD and AM both need persistent data across restarts. |
@@ -77,7 +77,7 @@ The result must:
 
 | # | Question | Recommendation | Status |
 |---|----------|---------------|--------|
-| Q1 | Should we use the `ping-devops` chart for PingAM or deploy AM separately? | **Use `ping-devops` with `externalImage`** — the chart supports arbitrary images via the `externalImage` block. This keeps all three products in one Helm release. If the chart's AM support is too limited, fall back to a standalone Deployment manifest. | **OPEN — needs validation** |
+| Q1 | Should we use the `ping-devops` chart for PingAM or deploy AM separately? | **Standalone Deployment manifest.** The `ping-devops` chart does NOT include PingAM as a product — its `externalImage` block is only for `pingtoolkit` and `pingaccess` (init container helpers). PingAM (ForgeRock-lineage) is not a native Ping product. PD and PA use the chart; AM gets its own Deployment. | **RESOLVED** |
 | Q2 | How to handle the AM ↔ PD cert trust (JVM truststore injection)? | **Init container on AM pod** that copies PD's CA cert and runs `keytool -importcert` into the JVM truststore before Tomcat starts. This replaces the manual `docker exec` step. | Recommended |
 | Q3 | Should configuration scripts become Helm hooks or a separate `kubectl apply`? | **Helm post-install hooks** — they run once after all Pods are Ready, have retry semantics, and are part of the release lifecycle. The scripts need to be containerized (Alpine + curl + python3). | Recommended |
 | Q4 | E2E tests: run inside the cluster or from outside? | **Outside the cluster** (same as now) — Karate runs on the host machine, pointing at the Ingress endpoint (or NodePort). This matches how a CI pipeline would test. | Recommended |

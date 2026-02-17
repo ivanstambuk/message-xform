@@ -38,6 +38,11 @@ docs/operations/pingam-operations-guide.md
 # Platform Deployment Guide (3-container stack: PingAccess + PingAM + PingDirectory, docker-compose, WebAuthn)
 docs/operations/platform-deployment-guide.md
 
+# Kubernetes Deployment Operations (k3s, ping-devops Helm, volume mount patterns, Ping container hooks)
+docs/operations/kubernetes-operations-guide.md
+
+# Kubernetes Migration Plan (Docker Compose → k3s/AKS/GKE/EKS, 7-phase plan, technology decisions)
+deployments/platform/PLAN.md
 
 # Feature 004 — Standalone HTTP Proxy Mode
 docs/architecture/features/004/spec.md
