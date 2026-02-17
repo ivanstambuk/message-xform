@@ -109,3 +109,4 @@
 |------|--------|------------|--------|-------|
 | 2026-02-17 (prev sessions) | 9/9 ✅ | 9.0.1.0 | various | Auth tests only (raw AM paths, no clean URLs). Clean URL specs existed but were never live-tested. |
 | 2026-02-17 15:33 | 14/14 ✅ | 9.0.1.0 | — | First verified clean URL run. Fixed profile ID mismatch + PA rule attachment bug. Added 5 new clean URL scenarios. |
+| 2026-02-17 20:12 | 14/14 ✅ | 9.0.1.0 | — | **K8s (k3s)**: Full suite on Kubernetes — all passkey + login + clean URL scenarios pass via Traefik IngressRoute. `karate.env=k8s`, port-forwarded AM/PA Admin. Phase 5 complete. |

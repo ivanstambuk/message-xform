@@ -149,9 +149,9 @@ Run the full 14-scenario Karate suite against the k3s cluster.
 | 5.3 | Run `clean-url-passkey.feature` → 2/2 pass | ✅ |
 | 5.4 | Run `auth-login.feature` → 3/3 pass | ✅ |
 | 5.5 | Run `auth-logout.feature` → 1/1 pass | ✅ |
-| 5.6 | Run `auth-passkey.feature` → 3/3 pass | |
-| 5.7 | Run `auth-passkey-usernameless.feature` → 2/2 pass | |
-| 5.8 | Full suite: 14/14 pass → update `e2e-results.md` | |
+| 5.6 | Run `auth-passkey.feature` → 3/3 pass | ✅ |
+| 5.7 | Run `auth-passkey-usernameless.feature` → 2/2 pass | ✅ |
+| 5.8 | Full suite: 14/14 pass → update `e2e-results.md` | ✅ |
 
 ### Phase 6 — Cloud Deployment Guides *(~1–2 sessions)*
 Document cloud-specific values overlays for the three major providers.

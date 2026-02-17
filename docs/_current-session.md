@@ -1,62 +1,45 @@
-# Current Session — K8s E2E Test Validation (Phase 5)
+# Current Session — K8s E2E Test Validation (Phase 5 Complete)
 
 ## Focus
 Running the platform E2E test suite against the Kubernetes deployment.
 Phase 5 from `deployments/platform/PLAN.md`.
 
 ## Status
-🟡 **PHASE 5 IN PROGRESS** — 9/14 scenarios pass (5/8 steps done).
+✅ **PHASE 5 COMPLETE** — 14/14 scenarios pass on K8s.
 
 ## Completed This Session
 
-### Phase 5 — E2E Test Validation
+### Phase 5 — E2E Test Validation (ALL STEPS DONE)
 
-#### Step 5.1 — karate-config.js K8s Environment
-- Added `k8s` environment block to `karate-config.js` with:
-  - `paEngineUrl = https://localhost` (Traefik port 443)
-  - `paEngineHost = localhost` (matches `*:443` VH, implied port for HTTPS)
-  - `paAdminUrl = https://localhost:29000/...` (port-forwarded)
-  - `amDirectUrl = http://127.0.0.1:28080/am` (port-forwarded)
-  - `amHostHeader = pingam:8080` (matches AM boot.json FQDN including port)
-  - `paPassword = 2Access` (from values-local.yaml product-level override)
-- Enabled `karate.configure('lowerCaseResponseHeaders', true)` **globally** to
-  normalize response header keys across Docker (lowercase) and K8s (Traefik title-cases)
+#### Steps 5.1–5.5 (from previous session)
+- karate-config.js K8s environment, run-e2e.sh --env k8s support
+- auth-login (3/3), auth-logout (1/1), clean-url-login (3/3), clean-url-passkey (2/2) ✅
 
-#### Step 5.1b — run-e2e.sh K8s Support
-- Added `--env k8s` flag to `run-e2e.sh`
-- Script starts `kubectl port-forward` for AM (28080→8080) and PA Admin (29000→9000)
-- Cleanup via `trap EXIT` ensures port-forwards terminate on script exit
-- Passes `-Dkarate.env=k8s` to Karate JAR
+#### Step 5.6 — auth-passkey.feature on K8s
+- 3/3 scenarios passed ✅
+- Full registration + authentication, device-exists auth, unsupported fallback
+- WebAuthn ceremony worked without any K8s-specific issues
 
-#### Steps 5.2–5.5 — Test Execution
-- `auth-login.feature` — 3/3 ✅
-- `auth-logout.feature` — 1/1 ✅
-- `clean-url-login.feature` — 3/3 ✅
-- `clean-url-passkey.feature` — 2/2 ✅
+#### Step 5.7 — auth-passkey-usernameless.feature on K8s
+- 2/2 scenarios passed ✅
+- Full usernameless registration + authentication (UV + residentKey)
+- Discoverable credential entry point verified
 
-### Documentation Capture
-- PLAN.md: Phase 5 steps 5.1–5.5 marked complete
-- E2E guide: 3 new pitfalls (P14 AM Host port, P15 Traefik casing, P11 fix expansion)
-- K8s ops guide: PA password fix (2FederateM0re → 2Access), E2E section added
-- Knowledge items updated (kubernetes_infrastructure, gotchas_and_debugging)
-- Knowledge map entries updated for K8s, E2E guide, platform e2e directory
+#### Step 5.8 — Full suite run
+- **14/14 scenarios, 0 failures** on env=k8s ✅
+- Elapsed: 3.56s, thread time: 2.31s
+- e2e-results.md updated with K8s run entry
+- PLAN.md Phase 5 all steps marked ✅
 
 ## Key Learnings
 
-### Traefik Title-Cases HTTP/1.1 Response Headers
-Traefik normalizes HTTP/1.1 response header names to title-case (`x-auth-session` →
-`X-Auth-Session`). HTTP/2 mandates lowercase, so `curl` sees lowercase, but Karate's
-Apache HttpClient uses HTTP/1.1 and sees title-cased headers. Fix: `lowerCaseResponseHeaders`.
-
-### AM Host Header Requires Port
-AM validates the Host header against its boot.json FQDN. When port-forwarding,
-the Host must be `pingam:8080` (not just `pingam`) to match `http://pingam:8080/am`.
-
-### PA Admin Password Is Product-Level
-`values-local.yaml` sets `PING_IDENTITY_PASSWORD: "2Access"` under
-`pingaccess-admin.container.envs`, not globally. Previous docs incorrectly said `2FederateM0re`.
+### Passkey Tests Required No K8s Adaptations
+Both WebAuthn features (identifier-first and usernameless) worked identically on K8s
+as on Docker. The port-forwarded `amDirectUrl` used by passkey tests avoids any
+Traefik header casing issues. The `origin` in webauthn.js (`https://localhost:13000`)
+is purely a WebAuthn RP origin value — AM validates against its `rpId: localhost`
+config, not the actual port. So the same origin works regardless of deployment mode.
 
 ## Next Steps
-1. **Phase 5.6–5.7** — Passkey E2E tests on K8s (requires WebAuthn device registration)
-2. **Phase 5.8** — Full suite pass → update e2e-results.md
-3. **Phase 6** — Cloud deployment guides (AKS, GKE, EKS)
+1. **Phase 6** — Cloud deployment guides (AKS, GKE, EKS values overlays)
+2. **Phase 7** — Docker Compose removal & documentation rewrite
