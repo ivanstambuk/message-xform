@@ -165,7 +165,7 @@ pingaccess-admin:
         secretName: pa-license
   volumeMounts:
     - name: mxform-deploy
-      mountPath: /opt/staging/deploy
+      mountPath: /opt/out/instance/deploy
     - name: mxform-specs
       mountPath: /specs
       readOnly: true
@@ -226,7 +226,7 @@ pingaccess-engine:
         secretName: pa-license
   volumeMounts:
     - name: mxform-deploy
-      mountPath: /opt/staging/deploy
+      mountPath: /opt/out/instance/deploy
     - name: mxform-specs
       mountPath: /specs
       readOnly: true

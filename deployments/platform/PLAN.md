@@ -124,7 +124,7 @@ Deploy PingDirectory, PingAM, and PingAccess via Helm.
 | 3.4 | AM configuration Job: run `configure-am.sh` logic as a K8s Job | ✅ Configured via kubectl exec curl; FQDN needed for PD (hostname verification) |
 | 3.5 | AM post-config Job: create test users (`configure-am-post.sh` logic) | ✅ 10 test users loaded; user.1 callback auth verified |
 | 3.6 | Deploy PingAccess: init container for shadow JAR, ConfigMap mounts for specs/profiles | ✅ Admin+Engine Running, JAR + specs + profiles mounted |
-| 3.7 | PA configuration Job: `configure-pa.sh` + `configure-pa-plugin.sh` + `configure-pa-api.sh` | |
+| 3.7 | PA configuration Job: `configure-pa.sh` + `configure-pa-plugin.sh` + `configure-pa-api.sh` | ✅ Site + /am + /api apps + MessageTransform rule; transform pipeline verified |
 | 3.8 | WebAuthn journey import Job: `import-webauthn-journey.sh` | |
 | 3.9 | Verify: all Pods Running/Completed, PD healthy, AM responding, PA proxying | ✅ PD ✅ PA ✅ AM ✅ (configured, admin auth verified) |
 
