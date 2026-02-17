@@ -338,6 +338,22 @@ docker exec <pd-container> /opt/out/instance/bin/dsconfig \
 > `subschemaSubentry`), no `LDIF:UNWRAP` header, and standard LDIF line wrapping
 > (continuation lines start with a single space).
 
+> **Kubernetes approach (dual strategy):** On K8s, PD is already running when
+> schema tweaks are needed. Use a two-pronged strategy:
+>
+> 1. **Live apply** — Run `ldapmodify` (schema) and `dsconfig` (VA + relaxation)
+>    directly via `kubectl exec`. The `ldapmodify` for schema must use
+>    `changetype: modify` format (not the pre-setup file format).
+> 2. **Profile mount for fresh deploys** — Create a `pd-profile` ConfigMap
+>    containing `pd-post-setup.dsconfig` and `99-etag.ldif`, and mount them
+>    at the standard staging paths in `values-local.yaml`.
+>
+> Both changes persist in PD's PVC data after first application. The profile
+> mounts are only needed for a fresh PD instance (empty PVC).
+>
+> See [K8s Operations Guide §5a](./kubernetes-operations-guide.md#5a-pingam-standalone-deployment)
+> for the full kubectl commands.
+
 ---
 
 ## Part III — PingAM Setup
@@ -508,6 +524,16 @@ curl -s -w "\n--- HTTP %{http_code} ---\n" \
 > (`USERSTORE_MGRDN`) point to the **same** PingDirectory instance. PingAM
 > automatically creates its own subtrees (`ou=services`, `ou=tokens`, etc.)
 > under the base DN during configuration.
+>
+> **Kubernetes gotcha (hostname verification):** PD's self-signed certificate
+> has CN = `pingdirectory-0.pingdirectory-cluster.<ns>.svc.cluster.local`.
+> AM's LDAP SDK performs SSL hostname verification, so `DIRECTORY_SERVER` and
+> `USERSTORE_HOST` must use the **headless service FQDN**, not the short
+> service name `pingdirectory`. Using the short name causes `Client-Side
+> Timeout` — a misleading error that's actually an SSL hostname mismatch.
+> See [PingAM Operations Guide §13k](./pingam-operations-guide.md#13k-am-configurator-on-k8s)
+> and [K8s Operations Guide §5a](./kubernetes-operations-guide.md#5a-pingam-standalone-deployment)
+> for details.
 
 #### What happens during configuration
 

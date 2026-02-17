@@ -1,11 +1,12 @@
 # PingAM (Access Management) Operations Guide
 
-> Practitioner's guide for building, running, and configuring the PingAM Docker image.
+> Practitioner's guide for building, running, and configuring the PingAM Docker image
+> and Kubernetes deployment.
 
 | Field        | Value                                                     |
 |--------------|-----------------------------------------------------------|
 | Status       | Living document                                           |
-| Last updated | 2026-02-16                                                |
+| Last updated | 2026-02-17                                                |
 | Audience     | Developers, operators, CI/CD pipeline authors             |
 
 ---
@@ -31,6 +32,10 @@
 | | **Part V — WebAuthn / FIDO2 Journeys** | |
 | 10 | [WebAuthn Journey](#10-webauthn-journey) | Passkey journey flow, config, callbacks |
 | 10b | [Importing Trees via REST API](#10b-importing-trees-via-rest-api) | Node-first import procedure |
+| | **Part VI — Kubernetes Deployment** | |
+| 11 | [Standalone K8s Deployment](#11-standalone-k8s-deployment) | Not in Helm chart — standalone Deployment + Service + PVC |
+| 12 | [PD Certificate Trust (Init Container)](#12-pd-certificate-trust-init-container) | openssl + keytool in init container |
+| 13k | [AM Configurator on K8s](#13k-am-configurator-on-k8s) | PD FQDN hostname verification gotcha |
 
 ---
 
@@ -1290,3 +1295,236 @@ frodo journey import -k -f <journey.json> <connection-profile> <realm>
 | Empty curl response | Missing Host header | Add `-H "Host: am.platform.local:18080"` |
 | Node PUT returns 400 | Body includes `_type`/`_outcomes`/`_rev` | Strip those fields — AM manages them |
 | Tree PUT succeeds but invocation fails | Node UUIDs in tree don't match imported nodes | Verify UUIDs are identical |
+
+---
+
+## Part VI — Kubernetes Deployment
+
+### 11. Standalone K8s Deployment
+
+> **PingAM is NOT part of the `ping-devops` Helm chart.** The chart covers
+> PingAccess, PingDirectory, PingFederate, PingAuthorize, and others — but NOT
+> PingAM (ForgeRock-lineage product). PingAM must be deployed as a standalone
+> Kubernetes Deployment manifest.
+
+#### Image import into k3s
+
+Since there is no Docker Hub image for PingAM, the locally-built image must
+be imported into k3s's containerd:
+
+```bash
+# Build (if not already done)
+cd binaries/pingam && docker build . -f docker/Dockerfile -t pingam:8.0.2
+
+# Import into k3s containerd
+docker save pingam:8.0.2 | sudo k3s ctr images import -
+
+# Verify
+sudo k3s ctr images list | grep pingam
+# Expected: docker.io/library/pingam:8.0.2
+```
+
+The K8s Deployment manifest uses `imagePullPolicy: Never` to prevent k3s from
+attempting a registry pull.
+
+#### Required K8s resources
+
+Before deploying PingAM, create these resources:
+
+| Resource | Type | Contents |
+|----------|------|----------|
+| `am-server-xml` | ConfigMap | Tomcat `server.xml` with HTTP (8080) + HTTPS (8443) connectors |
+| `am-tls` | Secret | `tlskey.p12` PKCS#12 keystore + `pubCert.crt` |
+| `am-ssl-password` | Secret | `SSL_PWD` for keystore |
+| `am-credentials` | Secret | `admin-password` + `enc-key` |
+| `am-data` | PVC | 1Gi `local-path` for `/home/forgerock/openam` |
+
+```bash
+# ConfigMap
+kubectl create configmap am-server-xml \
+  --from-file=server.xml=config/server.xml -n message-xform
+
+# Secrets
+kubectl create secret generic am-tls \
+  --from-file=tlskey.p12=secrets/tlskey.p12 \
+  --from-file=pubCert.crt=secrets/pubCert.crt -n message-xform
+
+kubectl create secret generic am-ssl-password \
+  --from-literal=SSL_PWD=<password> -n message-xform
+```
+
+#### Manifest: `k8s/pingam-deployment.yaml`
+
+The manifest contains:
+- **PVC** (`am-data`): RWO, 1Gi for AM configuration persistence
+- **Deployment**: single replica with `Recreate` strategy (PVC is RWO)
+- **Init container** (`trust-pd-cert`): retrieves PD cert and imports into JVM cacerts
+- **Main container**: PingAM with CATALINA_OPTS overriding the truststore
+- **Service** (`pingam`): ClusterIP on ports 8080 (HTTP) and 8443 (HTTPS)
+
+Key deployment settings:
+
+| Setting | Value | Rationale |
+|---------|-------|-----------|
+| `imagePullPolicy` | `Never` | Image imported locally |
+| `runAsUser` | `11111` | forgerock user |
+| `strategy.type` | `Recreate` | PVC is RWO, can't do rolling |
+| Memory limits | 1Gi request / 2Gi limit | AM needs heap for CTS |
+| Startup probe | `30s initial + 30 * 10s` | 5-min window for first config |
+
+#### Deploy
+
+```bash
+kubectl apply -f k8s/pingam-deployment.yaml -n message-xform
+```
+
+### 12. PD Certificate Trust (Init Container)
+
+In Docker Compose, PD cert trust is done by running
+`docker exec -u 0 keytool -importcert ...` after containers start. This
+approach doesn't work in K8s because:
+1. The JVM cacerts is inside the container's read-only image layer
+2. There's no `docker exec -u 0` equivalent that survives pod restarts
+
+**K8s solution: init container + emptyDir**
+
+The init container:
+1. Connects to `pingdirectory:1636` via `openssl s_client`
+2. Extracts the PD TLS certificate to `/trust/pd-cert.pem`
+3. Copies the JVM's `$JAVA_HOME/lib/security/cacerts` to `/trust/cacerts`
+4. Imports the PD cert into the copy via `keytool -importcert`
+
+The main container mounts the same emptyDir at `/trust` (read-only)
+and overrides the JVM truststore via `CATALINA_OPTS`:
+
+```
+-Djavax.net.ssl.trustStore=/trust/cacerts
+-Djavax.net.ssl.trustStorePassword=changeit
+```
+
+This pattern is **self-healing** — every pod restart re-retrieves the PD
+cert, so it survives PD restarts that generate new self-signed certs.
+
+> **Advantage over Docker:** In Docker Compose, if the AM container is
+> recreated (`docker rm -f platform-pingam && docker compose up -d`),
+> the cert import is lost and must be re-done manually. The K8s init
+> container handles this automatically every time the pod starts.
+
+### 13k. AM Configurator on K8s
+
+After first deployment, AM returns HTTP 302 (redirect to setup wizard).
+The configurator POST must use the PD hostname that matches its TLS cert.
+
+#### Critical: PD Hostname Verification
+
+> **Use the PD headless service FQDN, NOT the short service name.**
+>
+> PD's self-signed certificate has CN =
+> `pingdirectory-0.pingdirectory-cluster.<namespace>.svc.cluster.local`.
+>
+> The AM LDAP SDK performs SSL hostname verification. If the `DIRECTORY_SERVER`
+> or `USERSTORE_HOST` parameter uses the short service name `pingdirectory`,
+> hostname verification fails with a silent TCP timeout, reported as:
+>
+> ```
+> Client-Side Timeout
+> ```
+>
+> This error is misleading — it's not a network timeout but an SSL handshake
+> failure due to hostname mismatch.
+
+**Correct hostname for K8s:**
+
+```bash
+# Short service name (ClusterIP) — ❌ FAILS hostname verification
+DIRECTORY_SERVER=pingdirectory
+
+# Headless service FQDN — ✅ WORKS
+DIRECTORY_SERVER=pingdirectory-0.pingdirectory-cluster.message-xform.svc.cluster.local
+```
+
+#### Running the configurator on K8s
+
+```bash
+AM_POD=$(kubectl get pods -n message-xform -l app.kubernetes.io/name=pingam \
+  -o jsonpath='{.items[0].metadata.name}')
+
+PD_FQDN="pingdirectory-0.pingdirectory-cluster.message-xform.svc.cluster.local"
+
+kubectl exec "$AM_POD" -n message-xform -c pingam -- \
+  curl -sf -o /tmp/config-response.txt -w "%{http_code}" \
+  --max-time 300 \
+  -X POST "http://localhost:8080/am/config/configurator" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  --data-urlencode "SERVER_URL=http://pingam:8080" \
+  --data-urlencode "DEPLOYMENT_URI=am" \
+  --data-urlencode "BASE_DIR=/home/forgerock/openam" \
+  --data-urlencode "locale=en_US" \
+  --data-urlencode "PLATFORM_LOCALE=en_US" \
+  --data-urlencode "AM_ENC_KEY=$(openssl rand -base64 24)" \
+  --data-urlencode "ADMIN_PWD=Password1" \
+  --data-urlencode "ADMIN_CONFIRM_PWD=Password1" \
+  --data-urlencode "AMLDAPUSERPASSWD=Password1" \
+  --data-urlencode "COOKIE_DOMAIN=platform.local" \
+  --data-urlencode "acceptLicense=true" \
+  --data-urlencode "DATA_STORE=dirServer" \
+  --data-urlencode "DIRECTORY_SSL=SSL" \
+  --data-urlencode "DIRECTORY_SERVER=$PD_FQDN" \
+  --data-urlencode "DIRECTORY_PORT=1636" \
+  --data-urlencode "DIRECTORY_ADMIN_PORT=4444" \
+  --data-urlencode "DIRECTORY_JMX_PORT=1689" \
+  --data-urlencode "ROOT_SUFFIX=dc=example,dc=com" \
+  --data-urlencode "DS_DIRMGRDN=cn=administrator" \
+  --data-urlencode "DS_DIRMGRPASSWD=2FederateM0re" \
+  --data-urlencode "USERSTORE_TYPE=LDAPv3ForOpenDS" \
+  --data-urlencode "USERSTORE_SSL=SSL" \
+  --data-urlencode "USERSTORE_HOST=$PD_FQDN" \
+  --data-urlencode "USERSTORE_PORT=1636" \
+  --data-urlencode "USERSTORE_SUFFIX=dc=example,dc=com" \
+  --data-urlencode "USERSTORE_MGRDN=cn=administrator" \
+  --data-urlencode "USERSTORE_PASSWD=2FederateM0re"
+```
+
+Expected: `Configuration complete!` in ~16 seconds.
+
+#### Verify
+
+```bash
+# Check boot.json exists (configuration complete)
+kubectl exec "$AM_POD" -n message-xform -c pingam -- \
+  test -f /home/forgerock/openam/config/boot.json && echo "CONFIGURED" || echo "NOT CONFIGURED"
+
+# Admin auth test (callback pattern)
+kubectl exec "$AM_POD" -n message-xform -c pingam -- \
+  curl -sf -X POST "http://localhost:8080/am/json/authenticate" \
+  -H "Content-Type: application/json" \
+  -H "Accept-API-Version: resource=2.0,protocol=1.0" \
+  -H "Host: pingam"
+# Expected: JSON with authId and NameCallback/PasswordCallback
+```
+
+#### Test evidence (Feb 17, 2026 — k3s)
+
+| Test | Result |
+|------|--------|
+| Image imported into k3s containerd | ✅ `docker.io/library/pingam:8.0.2` |
+| Init container PD cert retrieval | ✅ Cert retrieved on attempt 1, imported |
+| AM Tomcat startup | ✅ 6.6s, ports 8080+8443 |
+| AM configurator POST (PD FQDN) | ✅ `Configuration complete!` in 16s |
+| Install log steps | ✅ 98 successful, 0 errors |
+| Admin auth (callback) | ✅ Valid `tokenId` returned |
+| Pod restart cert persistence | ✅ Init container re-imports on every start |
+
+#### K8s vs Docker deployment comparison
+
+| Aspect | Docker Compose | Kubernetes |
+|--------|---------------|------------|
+| PD cert trust | `docker exec -u 0 keytool ...` (manual, lost on recreate) | Init container (automatic, self-healing) |
+| PD hostname | `pd.platform.local` (Docker DNS) | `pingdirectory-0.pingdirectory-cluster...` (headless FQDN) |
+| Data persistence | Docker volume `am-data` | PVC `am-data` (1Gi local-path) |
+| TLS keystore | Bind mount from host | K8s Secret `am-tls` |
+| server.xml | Bind mount from host | ConfigMap `am-server-xml` |
+| Configuration | `scripts/configure-am.sh` | `kubectl exec curl` to configurator API |
+| Health check | Docker healthcheck | K8s startup/readiness/liveness probes |
+| Restart policy | Docker restart policy | K8s Deployment controller |
+
