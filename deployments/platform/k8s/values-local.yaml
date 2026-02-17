@@ -90,10 +90,22 @@ pingdirectory:
     - name: pd-license
       secret:
         secretName: pd-license
+    - name: pd-profile
+      configMap:
+        name: pd-profile
   volumeMounts:
     - name: pd-license
       mountPath: /opt/staging/pd.profile/server-root/pre-setup/PingDirectory.lic
       subPath: PingDirectory.lic
+      readOnly: true
+    # PD schema tweaks for PingAM compatibility
+    - name: pd-profile
+      mountPath: /opt/staging/pd.profile/dsconfig/pd-post-setup.dsconfig
+      subPath: pd-post-setup.dsconfig
+      readOnly: true
+    - name: pd-profile
+      mountPath: /opt/staging/pd.profile/server-root/pre-setup/config/schema/99-etag.ldif
+      subPath: 99-etag.ldif
       readOnly: true
 
   services:

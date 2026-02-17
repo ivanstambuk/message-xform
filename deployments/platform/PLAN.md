@@ -119,7 +119,7 @@ Deploy PingDirectory, PingAM, and PingAccess via Helm.
 | Step | Task | Done |
 |------|------|------|
 | 3.1 | Deploy PingDirectory: verify LDAPS, readiness probe, PVC | ✅ Running, LDAPS OK |
-| 3.2 | Deploy PD schema tweaks (Job or init container): etag VA + structural objectclass | |
+| 3.2 | Deploy PD schema tweaks (Job or init container): etag VA + structural objectclass | ✅ Applied live + ConfigMap mounted for fresh deploys |
 | 3.3 | Deploy PingAM: standalone Deployment (not in chart) | ✅ Running, init container for PD cert trust, PVC provisioned |
 | 3.4 | AM configuration Job: run `configure-am.sh` logic as a K8s Job | |
 | 3.5 | AM post-config Job: create test users (`configure-am-post.sh` logic) | |
