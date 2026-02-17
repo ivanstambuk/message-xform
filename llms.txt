@@ -95,6 +95,7 @@ docs/research/standalone-proxy-http-server.md
 docs/research/e2e-test-framework-research.md
 docs/reference/pinggateway-sdk-guide.md
 docs/research/pinggateway-ootb-transformation-capabilities.md
+docs/research/message-xform-platform-transforms.md
 
 # E2E test infrastructure (Karate DSL — PingAccess adapter)
 docs/operations/e2e-karate-operations-guide.md
