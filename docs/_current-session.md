@@ -1,21 +1,25 @@
 # Current Session State
 
 **Date:** 2026-02-17
-**Focus:** Platform deployment — Usernameless passkey E2E tests (Step 8.11)
+**Focus:** Platform deployment — Passkey JSLT transform specs (Step 8.6)
 
 ## Summary
 
-Completed Step 8.11 (usernameless passkey E2E tests) — the final deferred item
-in the platform deployment plan. All 9 phases are now ✅ Complete with 9/9
-scenarios passing across 4 feature files.
+Completed Step 8.6 (passkey JSLT transform specs). Created `am-webauthn-response`
+spec using JSLT `capture()` regex to extract challenge, rpId, userVerification,
+and timeout from AM's embedded JavaScript in WebAuthn TextOutputCallbacks.
+Updated profile to use ADR-0036 `match.when` body predicates for routing
+WebAuthn vs login callbacks on the same `/am/json/authenticate` endpoint.
 
-Key learnings:
-- **userHandle encoding**: AM stores user.id as `Uint8Array.from(base64(username), charCodeAt)`,
-  so usernameless assertion userHandle must be `base64(username)`, not raw username
-- **userVerification regex**: Auth scripts use unquoted key format, registration scripts
-  use JSON-embedded quoted key — parser regex must handle both
-- **UsernameCollector fallback**: Usernameless journey fallback path needs UsernameCollector
-  before PasswordCollector to populate shared state for DataStoreDecision
+Key decisions:
+- **Approach A (pure JSLT)**: JSLT has `capture()`, `test()`, and `replace()` regex
+  functions — sufficient for extracting structured data from embedded JS.
+  No custom JSLT function needed (Approach B rejected).
+- **Raw challenge passthrough**: Challenge bytes as comma-separated signed integers
+  (matching AM's Int8Array format). Client converts to ArrayBuffer trivially.
+  Server-side base64url encoding deferred — avoids JSLT limitation.
+- **Response-only**: Request-side transforms deferred per D9 (AM callback protocol
+  requires verbatim authId echo).
 
 ## Phases Completed
 
@@ -43,6 +47,5 @@ Key learnings:
 
 ## Deferred Items (future work)
 
-1. **Step 8.6** — Passkey JSLT transform specs (clean API for WebAuthn callbacks)
-2. **Step 8.8** — Clean URL routing (`/api/v1/auth/passkey/*` PA apps)
-3. **D14** — Full OIDC-based PA Web Sessions (requires AM OAuth2 provider + PA OIDC config)
+1. **Step 8.8** — Clean URL routing (`/api/v1/auth/passkey/*` PA apps)
+2. **D14** — Full OIDC-based PA Web Sessions (requires AM OAuth2 provider + PA OIDC config)

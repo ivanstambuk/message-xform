@@ -409,7 +409,7 @@ Response header: `X-Auth-Session: eyJ0...`
 | 8.3 | Create `karate-config.js` with platform env vars | ✅ Done (corrected ports: PA=13000, AM=18080) |
 | 8.4 | Create `UsernamelessJourney` + generic import script | ✅ Done (journey JSON + `import-journey.sh`, `requiresResidentKey=true`, UV=REQUIRED) |
 | 8.5 | Create message-xform specs for login flow | ✅ Done (`am-auth-response-v2` + `am-strip-internal`, profile chaining ADR-0008, JSLT validated) |
-| 8.6 | Create message-xform specs for passkey flows | ⏩ Deferred (existing `cb_type`/`cb_name` maps `HiddenValueCallback` generically; passkey E2E uses raw AM protocol via `openauth-sim`) |
+| 8.6 | Create message-xform specs for passkey flows | ✅ Done (`am-webauthn-response` — JSLT `capture()` regex extracts challenge/rpId/UV/timeout from AM JS; profile `match.when` body predicate routes WebAuthn vs login callbacks per ADR-0036; raw challenge bytes passthrough for client-side ArrayBuffer construction) |
 | 8.7 | Create message-xform spec for session cookie injection (D14) | ✅ Done (merged into `am-auth-response-v2` dynamic header expr) |
 | 8.8 | Configure PA applications/sites for auth endpoints | ✅ N/A (existing `/am` app + profile path match `/am/json/authenticate` is sufficient; clean URL mapping deferred) |
 | 8.9 | E2E test: username/password login (happy path) | ✅ Done (3 scenarios: initiate, submit+cookie, bad-creds=401) |

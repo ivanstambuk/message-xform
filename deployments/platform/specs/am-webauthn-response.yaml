@@ -1,0 +1,128 @@
+# Transform spec: PingAM WebAuthn callback response → clean passkey API
+#
+# This spec handles WebAuthn registration and authentication callback
+# responses from AM's /json/authenticate endpoint when a WebAuthn journey
+# is active.  It extracts structured data from the JavaScript embedded in
+# TextOutputCallback using JSLT capture() regex.
+#
+# Routed via profile-level body predicate (match.when, ADR-0036): the
+# profile applies this spec only when TextOutputCallback contains
+# "navigator.credentials".  Login-callback responses are routed to
+# am-auth-response-v2 instead.
+#
+# A second spec (am-strip-internal) runs after to remove the _authId
+# field from the final response body (profile-level chaining, ADR-0008).
+#
+# ── WebAuthn Authentication response ──
+#
+# AM raw:
+#   4 callbacks: TextOutput[JS], TextOutput[UI], HiddenValue, Confirmation
+#
+# Clean output:
+#   {
+#     "_authId": "eyJ0...",
+#     "type": "webauthn-auth",
+#     "challengeRaw": "69,84,25,-26,-57,...",
+#     "rpId": "localhost",
+#     "userVerification": "required",
+#     "timeout": 60000,
+#     "hasRecoveryOption": true
+#   }
+#   + Header: X-Auth-Session: eyJ0...
+#
+# ── WebAuthn Registration response ──
+#
+# AM raw:
+#   3 callbacks: TextOutput[JS], TextOutput[UI], HiddenValue
+#
+# Clean output:
+#   {
+#     "_authId": "eyJ0...",
+#     "type": "webauthn-register",
+#     "challengeRaw": "121,84,25,-26,...",
+#     "rpId": "localhost",
+#     "userVerification": "required",
+#     "timeout": 60000
+#   }
+#   + Header: X-Auth-Session: eyJ0...
+#
+# Design notes:
+#   - challengeRaw is a comma-separated string of signed bytes matching
+#     AM's Int8Array([...]) format.  The client converts to ArrayBuffer:
+#       new Int8Array(challengeRaw.split(",").map(Number)).buffer
+#   - allowCredentials (auth) and user info (reg) are deferred to a future
+#     version — clients typically have their own credential store, and the
+#     essential ceremony fields (challenge, rpId, UV) are sufficient for
+#     both navigator.credentials.create() and .get().
+#
+id: am-webauthn-response
+version: "1.0.0"
+description: "Transform AM WebAuthn callbacks into structured passkey API"
+
+input:
+  schema:
+    type: object
+
+output:
+  schema:
+    type: object
+
+transform:
+  lang: jslt
+  expr: |
+    // Find the WebAuthn script from TextOutputCallback
+    let script_cbs = [for (.callbacks) .output[0].value
+      if (.type == "TextOutputCallback" and
+          test(.output[0].value, "navigator\\.credentials"))]
+    let script = $script_cbs[0]
+
+    // Detect registration vs authentication
+    let is_reg = test($script, "navigator\\.credentials\\.create")
+
+    // Extract rpId — registration uses rp: { id: "..." }, auth uses rpId: "..."
+    let rpid_from_rp = capture($script, "rp:\\s*\\{[^}]*id:\\s*\"(?<v>[^\"]+)\"")
+    let rpid_direct = capture($script, "rpId:\\s*\"(?<v>[^\"]+)\"")
+    let rpId = if ($rpid_from_rp) $rpid_from_rp.v
+               else if ($rpid_direct) $rpid_direct.v
+               else null
+
+    // Extract challenge bytes as raw comma-separated signed bytes
+    let ch = capture($script, "challenge:\\s*new\\s+Int8Array\\(\\[(?<v>[^\\]]+)\\]\\)")
+    let challengeRaw = if ($ch) $ch.v else null
+
+    // Extract userVerification (handles both JS and JSON quoting styles)
+    let uv = capture($script, "userVerification.?:\\s*\"(?<v>\\w+)\"")
+    let userVerification = if ($uv) $uv.v else "discouraged"
+
+    // Extract timeout value
+    let t = capture($script, "timeout:\\s*(?<v>\\d+)")
+    let timeout = if ($t) number($t.v) else 60000
+
+    // Check for recovery code option (ConfirmationCallback present, auth only)
+    let has_recovery = size([for (.callbacks) .
+      if (.type == "ConfirmationCallback")]) > 0
+
+    if ($is_reg)
+      {
+        "_authId": .authId,
+        "type": "webauthn-register",
+        "challengeRaw": $challengeRaw,
+        "rpId": $rpId,
+        "userVerification": $userVerification,
+        "timeout": $timeout
+      }
+    else
+      {
+        "_authId": .authId,
+        "type": "webauthn-auth",
+        "challengeRaw": $challengeRaw,
+        "rpId": $rpId,
+        "userVerification": $userVerification,
+        "timeout": $timeout,
+        "hasRecoveryOption": $has_recovery
+      }
+
+headers:
+  add:
+    x-auth-session:
+      expr: ._authId

@@ -2,36 +2,66 @@
 #
 # This profile implements the clean API surface for authentication endpoints
 # fronted by PingAccess. Uses profile-level chaining (ADR-0008) to separate
-# concerns:
-#   1. am-auth-response-v2: body transform + header extraction (authId → header,
-#      tokenId → cookie). Produces intermediate body with _-prefixed internal fields.
-#   2. am-strip-internal: removes _-prefixed fields from the final response body.
+# concerns and body-predicate routing (ADR-0036, match.when) to discriminate
+# between WebAuthn and login callback responses.
+#
+# Routing logic (for POST /am/json/authenticate responses):
+#
+#   Has TextOutputCallback with "navigator.credentials"?
+#     YES → am-webauthn-response (passkey registration/authentication)
+#     NO  → am-auth-response-v2  (login callbacks + success responses)
+#
+#   Both routes chain into am-strip-internal to remove _-prefixed fields.
 #
 # AM paths arrive as /am/json/... through the PA reverse proxy.
 #
-# Auth flow:
-#   POST /api/v1/auth/login → PA proxies to → /am/json/authenticate
-#   Response transforms: am-auth-response-v2 → am-strip-internal
+# Auth flows:
+#   POST /api/v1/auth/login     → PA proxies to → /am/json/authenticate
+#   POST /api/v1/auth/passkey/* → PA proxies to → /am/json/authenticate
+#   Response transforms:
+#     WebAuthn: am-webauthn-response → am-strip-internal
+#     Login:   am-auth-response-v2   → am-strip-internal
 #
 profile: platform-am
-version: "2.0.0"
+version: "3.0.0"
 description: "Clean API surface for PingAM authentication via PingAccess"
 
 transforms:
-  # ── Step 1: Body transform + header extraction ──
+  # ── Step 1a: WebAuthn body transform ──
+  # Parses embedded JavaScript from WebAuthn callbacks into structured JSON.
+  # Matched by body predicate: TextOutputCallback contains navigator.credentials.
+  - spec: am-webauthn-response@1.0.0
+    direction: response
+    match:
+      path: "/am/json/authenticate"
+      method: POST
+      when:
+        lang: jslt
+        expr: |
+          .callbacks and
+            size([for (.callbacks) .
+              if (.type == "TextOutputCallback" and
+                  test(.output[0].value, "navigator\\.credentials"))]) > 0
+
+  # ── Step 1b: Login body transform ──
   # Converts AM callback/success responses into clean JSON.
-  # Extracts authId → X-Auth-Session header.
-  # Extracts tokenId → Set-Cookie: iPlanetDirectoryPro header.
-  # Internal fields (_authId, _tokenId) remain in body for header expr eval.
+  # Excludes WebAuthn callbacks (routed to step 1a above).
   - spec: am-auth-response-v2@1.0.0
     direction: response
     match:
       path: "/am/json/authenticate"
       method: POST
+      when:
+        lang: jslt
+        expr: |
+          not(.callbacks) or
+            size([for (.callbacks) .
+              if (.type == "TextOutputCallback" and
+                  test(.output[0].value, "navigator\\.credentials"))]) == 0
 
   # ── Step 2: Strip internal fields ──
   # Removes _-prefixed fields from the response body.
-  # Runs AFTER step 1 (profile-level chaining per ADR-0008).
+  # Runs AFTER step 1a or 1b (profile-level chaining per ADR-0008).
   - spec: am-strip-internal@1.0.0
     direction: response
     match:
