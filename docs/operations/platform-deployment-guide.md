@@ -911,15 +911,19 @@ existing fields rather than restructuring the protocol.
 ```
 deployments/platform/
 ├── specs/
-│   ├── am-auth-response-v2.yaml    # Login callback + success body transform
-│   ├── am-webauthn-response.yaml   # WebAuthn callback → structured passkey API
-│   ├── am-strip-internal.yaml      # Remove _-prefixed internal fields
-│   └── am-header-inject.yaml       # Header injection for all AM responses
+│   ├── am-auth-url-rewrite.yaml       # Request: /api/v1/auth/login → AM (default tree)
+│   ├── am-passkey-url.yaml            # Request: /api/v1/auth/passkey → AM + WebAuthnJourney
+│   ├── am-passkey-usernameless-url.yaml # Request: /api/v1/auth/passkey/usernameless → AM + UsernamelessJourney
+│   ├── am-auth-response-v2.yaml       # Response: login callback + success body transform
+│   ├── am-webauthn-response.yaml      # Response: WebAuthn callback → structured passkey API
+│   ├── am-strip-internal.yaml         # Response: remove _-prefixed internal fields
+│   └── am-header-inject.yaml          # Response: header injection for all AM responses
 ├── profiles/
-│   └── platform-am.yaml           # Routes specs to AM API paths (v3.0.0)
+│   └── platform-am.yaml              # Routes specs to AM API paths (v4.0.0)
 └── scripts/
-    ├── configure-pa.sh            # Base PA config (site, app, resource)
-    └── configure-pa-plugin.sh     # Plugin rule creation + policy binding
+    ├── configure-pa.sh               # Base PA config (site, /am app, resource)
+    ├── configure-pa-api.sh           # Clean URL app (/api) + transform rule binding
+    └── configure-pa-plugin.sh        # Plugin rule creation + policy binding
 ```
 
 Inside the PingAccess container:
@@ -932,7 +936,26 @@ Inside the PingAccess container:
 
 #### Transform specs
 
-##### `am-auth-response-v2.yaml` — Login body transform
+##### Request-side: URL rewrite specs
+
+Three request-side specs rewrite clean API URLs to PingAM's
+`/am/json/authenticate` endpoint. All use JSLT identity transform (`.`) —
+the request body passes through unchanged (D9: authId must be echoed verbatim).
+
+| Spec | Clean URL | Target | Journey query params |
+|------|-----------|--------|---------------------|
+| `am-auth-url-rewrite` | `/api/v1/auth/login` | `/am/json/authenticate` | (none — default tree) |
+| `am-passkey-url` | `/api/v1/auth/passkey` | `/am/json/authenticate` | `authIndexType=service&authIndexValue=WebAuthnJourney` |
+| `am-passkey-usernameless-url` | `/api/v1/auth/passkey/usernameless` | `/am/json/authenticate` | `authIndexType=service&authIndexValue=UsernamelessJourney` |
+
+All three inject:
+- `Accept-API-Version: resource=2.0,protocol=1.0` (required by AM)
+
+After the URL rewrite, PA forwards to AM at the rewritten path. The
+response-side transforms then see the rewritten path (`/am/json/authenticate`)
+in `request.getUri()` and match correctly.
+
+##### Response-side: `am-auth-response-v2.yaml` — Login body transform
 
 Transforms login callback and success responses from PingAM:
 
@@ -1004,19 +1027,39 @@ Adds custom headers to all PingAM API responses (`/am/json/**`):
 
 #### Profile routing
 
-The `platform-am.yaml` profile (v3.0.0) uses body-predicate routing
-(ADR-0036 `match.when`) to discriminate between WebAuthn and login callbacks:
+The `platform-am.yaml` profile (v4.0.0) handles both request-side URL rewriting
+and response-side body transforms:
 
-| Spec | Method | Path | Direction | Body predicate |
-|------|--------|------|-----------|----------------|
+**Request-side (URL rewriting):**
+
+| Spec | Method | Path (incoming) | Direction | Query params injected |
+|------|--------|-----------------|-----------|----------------------|
+| `am-passkey-usernameless-url` | `POST` | `/api/v1/auth/passkey/usernameless` | Request | `authIndexType=service&authIndexValue=UsernamelessJourney` |
+| `am-passkey-url` | `POST` | `/api/v1/auth/passkey` | Request | `authIndexType=service&authIndexValue=WebAuthnJourney` |
+| `am-auth-url-rewrite` | `POST` | `/api/v1/auth/login` | Request | (none — default tree) |
+
+> **Path ordering:** Most specific path first (usernameless before passkey).
+
+**Response-side (body transforms):**
+
+| Spec | Method | Path (rewritten) | Direction | Body predicate |
+|------|--------|-------------------|-----------|----------------|
 | `am-webauthn-response` | `POST` | `/am/json/authenticate` | Response | TextOutputCallback contains `navigator.credentials` |
 | `am-auth-response-v2` | `POST` | `/am/json/authenticate` | Response | Everything else (login callbacks + success) |
 | `am-strip-internal` | `POST` | `/am/json/authenticate` | Response | (always runs — chains after body transform) |
 | `am-header-inject` | `POST` | `/am/json/**` | Response | (no predicate) |
 
-This follows the recommended **one rule per application** pattern: a single
-MessageTransform rule is attached to the PingAM Proxy application, and the
-profile handles all path-based routing internally.
+**PA Application architecture:**
+
+Two PA Applications share the same PingAM backend site:
+
+| Application | Context root | Purpose | Created by |
+|-------------|--------------|---------|------------|
+| PingAM Proxy | `/am` | Direct AM access (legacy, E2E tests) | `configure-pa.sh` |
+| Auth API | `/api` | Clean URL surface for API consumers | `configure-pa-api.sh` |
+
+Both have the MessageTransformRule attached. The profile handles routing
+based on the request path.
 
 #### Setup procedure
 
@@ -1352,6 +1395,12 @@ Results are written to `target/karate-reports/` as HTML. Open
 │    Headers:  x-auth-session (authId), x-auth-provider,              │
 │              x-transform-engine                                      │
 │    Setup:    ./scripts/configure-pa-plugin.sh                       │
+│              ./scripts/configure-pa-api.sh  # clean URL app         │
+│                                                                     │
+│  Clean Auth API (POST via PA, rewritten by message-xform):          │
+│    POST https://localhost:13000/api/v1/auth/login                   │
+│    POST https://localhost:13000/api/v1/auth/passkey                 │
+│    POST https://localhost:13000/api/v1/auth/passkey/usernameless    │
 │                                                                     │
 │  PD tweaks (both required before AM config):                        │
 │    1. single-structural-objectclass-behavior: accept                │

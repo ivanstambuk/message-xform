@@ -1,0 +1,31 @@
+# Transform spec: /api/v1/auth/login → /am/json/authenticate
+#
+# Request-side URL rewrite for the clean login endpoint.
+# Maps clean API URL to PingAM's authenticate endpoint (default tree).
+#
+# Body passes through unchanged (identity transform) — this is safe
+# because D9 only restricts body-level request transforms, not URL rewrites.
+#
+id: am-auth-login-url
+version: "1.0.0"
+description: "Rewrite /api/v1/auth/login → /am/json/authenticate (default tree)"
+
+input:
+  schema:
+    type: object
+
+output:
+  schema:
+    type: object
+
+transform:
+  lang: jslt
+  expr: "."
+
+url:
+  path:
+    expr: '"/am/json/authenticate"'
+
+headers:
+  add:
+    Accept-API-Version: "resource=2.0,protocol=1.0"

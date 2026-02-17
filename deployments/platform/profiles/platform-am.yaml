@@ -5,7 +5,22 @@
 # concerns and body-predicate routing (ADR-0036, match.when) to discriminate
 # between WebAuthn and login callback responses.
 #
-# Routing logic (for POST /am/json/authenticate responses):
+# ── URL Routing (request-side) ──
+#
+# Clean URLs are rewritten to AM's /json/authenticate endpoint:
+#
+#   /api/v1/auth/passkey/usernameless → /am/json/authenticate + UsernamelessJourney
+#   /api/v1/auth/passkey              → /am/json/authenticate + WebAuthnJourney
+#   /api/v1/auth/login                → /am/json/authenticate (default tree)
+#
+# These request-side specs only rewrite the URL and inject headers — the
+# request body passes through unchanged (D9).
+#
+# After the URL rewrite, the PA adapter sets request.setUri() which means
+# the response-side transforms see the REWRITTEN path (/am/json/authenticate)
+# and match correctly.
+#
+# ── Response Routing (body predicates) ──
 #
 #   Has TextOutputCallback with "navigator.credentials"?
 #     YES → am-webauthn-response (passkey registration/authentication)
@@ -15,18 +30,41 @@
 #
 # AM paths arrive as /am/json/... through the PA reverse proxy.
 #
-# Auth flows:
-#   POST /api/v1/auth/login     → PA proxies to → /am/json/authenticate
-#   POST /api/v1/auth/passkey/* → PA proxies to → /am/json/authenticate
-#   Response transforms:
-#     WebAuthn: am-webauthn-response → am-strip-internal
-#     Login:   am-auth-response-v2   → am-strip-internal
-#
+
 profile: platform-am
-version: "3.0.0"
+version: "4.0.0"
 description: "Clean API surface for PingAM authentication via PingAccess"
 
 transforms:
+  # ══════════════════════════════════════════════════════════════════════
+  # REQUEST-SIDE: Clean URL → AM endpoint rewriting
+  # ══════════════════════════════════════════════════════════════════════
+
+  # ── Passkey usernameless (most specific path first) ──
+  - spec: am-passkey-usernameless-url@1.0.0
+    direction: request
+    match:
+      path: "/api/v1/auth/passkey/usernameless"
+      method: POST
+
+  # ── Passkey identifier-first ──
+  - spec: am-passkey-url@1.0.0
+    direction: request
+    match:
+      path: "/api/v1/auth/passkey"
+      method: POST
+
+  # ── Login (default tree) ──
+  - spec: am-auth-url-rewrite@1.0.0
+    direction: request
+    match:
+      path: "/api/v1/auth/login"
+      method: POST
+
+  # ══════════════════════════════════════════════════════════════════════
+  # RESPONSE-SIDE: Body transforms on AM responses
+  # ══════════════════════════════════════════════════════════════════════
+
   # ── Step 1a: WebAuthn body transform ──
   # Parses embedded JavaScript from WebAuthn callbacks into structured JSON.
   # Matched by body predicate: TextOutputCallback contains navigator.credentials.

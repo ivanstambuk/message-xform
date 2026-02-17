@@ -115,6 +115,16 @@ deployments/platform/e2e/helpers/webauthn.js
 deployments/platform/e2e/helpers/delete-device.feature
 deployments/platform/e2e/helpers/basic-auth.js
 
+# Platform transform specs + profile (clean auth API surface)
+deployments/platform/profiles/platform-am.yaml
+deployments/platform/specs/am-auth-url-rewrite.yaml
+deployments/platform/specs/am-passkey-url.yaml
+deployments/platform/specs/am-passkey-usernameless-url.yaml
+deployments/platform/specs/am-auth-response-v2.yaml
+deployments/platform/specs/am-webauthn-response.yaml
+deployments/platform/specs/am-strip-internal.yaml
+deployments/platform/specs/am-header-inject.yaml
+
 # Implementation tracking
 docs/architecture/features/001/tasks.md
 docs/architecture/features/001/plan.md
