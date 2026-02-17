@@ -341,6 +341,7 @@ Configured in each module's `karate-config.js`:
 | Value | Purpose | When Used |
 |-------|---------|-----------|
 | `docker` (default) | Local Docker containers on localhost with mapped ports | Local development, Karate Runner |
+| `k8s` | k3s cluster via Traefik Ingress + port-forwarding | K8s validation (`run-e2e.sh --env k8s`) |
 | `ci` | Override ports/hosts for CI environment | CI pipelines |
 | Custom | Any gateway-specific overrides | Staging, remote targets |
 
@@ -809,6 +810,46 @@ Use a helper function to try both casings:
 > **dot notation** (`responseHeaders.Location`), but this doesn't work
 > when the header name contains special characters or when accessed from
 > JavaScript expressions. Bracket notation is always case-sensitive.
+>
+> **Fix (global):** Enable `karate.configure('lowerCaseResponseHeaders', true)`
+> in `karate-config.js`. This normalizes all response header **keys** to
+> lowercase (values retain original casing). Our platform E2E tests enable
+> this globally so assertions work identically on both Docker (PA sends
+> lowercase) and K8s (Traefik title-cases HTTP/1.1 headers).
+
+#### P14: AM `Host` Header Must Include Port When Port-Forwarded (K8s)
+
+When accessing AM directly via `kubectl port-forward` (e.g., 28080→8080),
+the `Host` header must match AM's configured instance FQDN **including port**:
+
+```
+# AM boot.json says: "instance": "http://pingam:8080/am"
+# So the Host header MUST be:
+Host: pingam:8080
+
+# NOT just:
+Host: pingam        ← AM rejects this (port mismatch)
+```
+
+AM validates the `Host` header against its boot configuration. Omitting the
+port or using the wrong value causes 403 errors or auth tree failures.
+
+#### P15: Traefik Title-Cases HTTP/1.1 Response Headers (K8s)
+
+Traefik (k3s default ingress) normalizes HTTP/1.1 response header names to
+title-case:
+
+| Backend sends | Traefik returns (HTTP/1.1) |
+|---------------|---------------------------|
+| `x-auth-session` | `X-Auth-Session` |
+| `x-auth-provider` | `X-Auth-Provider` |
+| `set-cookie` | `Set-Cookie` |
+
+HTTP/2 connections (e.g., `curl`) see lowercase headers because HTTP/2 mandates
+lowercase. But Karate's Apache HttpClient uses HTTP/1.1, so tests see title-cased
+headers.
+
+**Fix:** `karate.configure('lowerCaseResponseHeaders', true)` — see [P11](#p11-http-response-header-casing-is-case-sensitive-in-karate-bracket-notation).
 
 #### P12: mock-oauth2-server HTTPS Configuration
 
@@ -997,6 +1038,9 @@ e2e-common/
 | JMX counters always 0 | PA creates multiple rule instances; MBean points to a different instance than the one handling requests | Use `MessageTransformMetrics.forInstance()` static registry for shared counters. See [PA Ops Guide — JMX Pitfall 2](pingaccess-operations-guide.md#pitfall-2--pa-creates-multiple-rule-instances-shared-metrics-required) |
 | JMX counter diff assertion flaky | Wildcard `instance=*` with 2+ JMX-enabled rules returns non-deterministic MBean | Query exact instance name. See [PA Ops Guide — JMX Pitfall 3](pingaccess-operations-guide.md#pitfall-3--wildcard-mbean-queries-with-multiple-rules) |
 | Code changes not reflected in E2E | Gradle build cache returns stale shadow JAR | Use `--no-build-cache`: `./gradlew clean :adapter-pingaccess:shadowJar --no-build-cache` |
+| K8s: `x-auth-session` assertion fails | Traefik title-cases HTTP/1.1 headers; Karate bracket notation is case-sensitive | Enable `lowerCaseResponseHeaders` in `karate-config.js`. See [P15](#p15-traefik-title-cases-http11-response-headers-k8s) |
+| K8s: AM returns 403 or empty callbacks | `Host` header doesn't match AM's `boot.json` FQDN (must include port) | Use `pingam:8080` not `pingam`. See [P14](#p14-am-host-header-must-include-port-when-port-forwarded-k8s) |
+| K8s: PA returns 401 for admin API | Wrong password — PA Admin password is `PING_IDENTITY_PASSWORD` from values-local.yaml | Check `pingaccess-admin.container.envs.PING_IDENTITY_PASSWORD` in Helm values |
 
 ---
 
@@ -1025,6 +1069,14 @@ e2e-common/
 | 18080 | Echo Backend | HTTP |
 | 18443 | Mock OIDC Proxy (TLS) | HTTPS |
 | 19999 | JMX Remote | TCP |
+
+### Port Registry (Platform E2E — K8s)
+
+| Port | Service | Protocol | Notes |
+|------|---------|----------|-------|
+| 443 | PA Engine (Traefik Ingress) | HTTPS | Default HTTPS port, `Host: localhost` |
+| 29000 | PA Admin API (port-forward) | HTTPS | `kubectl port-forward svc/pingaccess-admin 29000:9000` |
+| 28080 | AM Direct (port-forward) | HTTP | `kubectl port-forward svc/pingam 28080:8080` |
 
 ### Dependencies
 

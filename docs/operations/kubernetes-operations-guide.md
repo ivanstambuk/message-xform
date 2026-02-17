@@ -495,7 +495,7 @@ running. All commands use `kubectl exec` against `pingaccess-admin-0`.
 ### Admin API wrapper
 
 ```bash
-PA_PASS="2FederateM0re"  # PING_IDENTITY_PASSWORD, NOT PA_ADMIN_PASSWORD_INITIAL
+PA_PASS="2Access"  # PING_IDENTITY_PASSWORD from values-local.yaml
 
 pa_api() {
     local method="$1" path="$2"; shift 2
@@ -676,7 +676,7 @@ container:
 > it to `2Access`, the product-level value wins for the API. Verify with:
 > ```bash
 > kubectl exec pingaccess-admin-0 -n message-xform -c pingaccess-admin -- \
->   curl -sk -u "administrator:2FederateM0re" \
+>   curl -sk -u "administrator:2Access" \
 >   -H "X-XSRF-Header: PingAccess" \
 >   "https://localhost:9000/pa-admin-api/v3/version"
 > ```
@@ -716,7 +716,7 @@ kubectl logs <pod-name> -n message-xform --tail=50
 | Init container `cp: can't create`: "No such file or directory" | Wrong mount path or subPath creates file instead of directory | Use emptyDir without subPath for the target (§5) |
 | `volumeMounts: null` in rendered template | `volumeMounts` placed under `container:` instead of product root | Move to product root level (§3) |
 | AM configurator `Client-Side Timeout` | PD self-signed cert CN doesn't match short service name `pingdirectory` | Use PD headless FQDN `pingdirectory-0.pingdirectory-cluster...` (§5a) |
-| PA Admin API returns 401 with `2Access` | `PA_ADMIN_PASSWORD_INITIAL` is seed only; after first start PA uses `PING_IDENTITY_PASSWORD` | Use the `PING_IDENTITY_PASSWORD` value (e.g. `2FederateM0re`) |
+| PA Admin API returns 401 with `2Access` | `PA_ADMIN_PASSWORD_INITIAL` is seed only; after first start PA uses `PING_IDENTITY_PASSWORD` | Use `PING_IDENTITY_PASSWORD` value — check `pingaccess-admin.container.envs` in values-local.yaml |
 | MessageTransform plugin not found (`className: NOT FOUND`) | JAR in `/opt/staging/deploy/` but not in `/opt/out/instance/deploy/` | Mount emptyDir at `/opt/out/instance/deploy` (§5) |
 
 ### Helm template debugging
@@ -942,6 +942,40 @@ curl -sk http://localhost/api/v1/auth/login
 curl -sk -H "Host: example.com" -X POST https://localhost/api/v1/auth/login
 # Expected: same fields[] response
 ```
+
+### E2E Test Validation (Platform Tests)
+
+The platform E2E tests (`deployments/platform/e2e/`) validate the full auth
+pipeline through PA Engine → AM → PD on Kubernetes.
+
+#### Running tests
+
+```bash
+cd deployments/platform/e2e
+./run-e2e.sh --env k8s                    # all features
+./run-e2e.sh --env k8s auth-login.feature  # single feature
+```
+
+The script:
+1. Starts `kubectl port-forward` for AM (28080→8080) and PA Admin (29000→9000)
+2. Passes `-Dkarate.env=k8s` to the Karate JAR
+3. Cleans up port-forwards on exit (trap EXIT)
+
+#### K8s-specific karate-config.js overrides
+
+| Variable | Docker Value | K8s Value | Why |
+|----------|-------------|-----------|-----|
+| `paEngineUrl` | `https://localhost:3000` | `https://localhost` | Port 443 via Traefik Ingress |
+| `paEngineHost` | `localhost:3000` | `localhost` | `*:443` VH accepts all, implied port |
+| `paAdminUrl` | `https://localhost:9000/...` | `https://localhost:29000/...` | Port-forwarded |
+| `paPassword` | `2FederateM0re` | `2Access` | Helm values override |
+| `amDirectUrl` | `http://127.0.0.1:18080/am` | `http://127.0.0.1:28080/am` | Port-forwarded |
+| `amHostHeader` | `am.platform.local:18080` | `pingam:8080` | AM boot.json FQDN |
+
+> **Gotcha — Traefik title-cases HTTP/1.1 headers:** Karate's Apache HttpClient
+> uses HTTP/1.1, so `x-auth-session` becomes `X-Auth-Session` after passing
+> through Traefik. Enable `lowerCaseResponseHeaders` in karate-config.js to
+> normalize keys. See the [E2E Testing Guide — P15](e2e-karate-operations-guide.md#p15-traefik-title-cases-http11-response-headers-k8s).
 
 ### TLS certificates
 
