@@ -1083,6 +1083,97 @@ curl -s -H "Host: am.platform.local:18080" \
 > **Note:** The device API uses `Accept-API-Version: resource=1.0, protocol=1.0`
 > (different from the authentication API's `resource=2.0`).
 
+### 10a. Usernameless Journey (Discoverable Credentials)
+
+The `UsernamelessJourney` tree enables passkey authentication **without a
+username prompt** — the authenticator holds discoverable (resident) credentials
+and identifies the user via the stored `userHandle`.
+
+#### Journey flow
+
+```
+Start → WebAuthnAuth (discoverable: allowCredentials empty)
+  ├─ success → ✓ SUCCESS (tokenId)
+  ├─ error/unsupported/noDevice → UsernameCollector → PasswordCollector → DataStoreDecision
+  │                                                     ├─ true → WebAuthnRegistration
+  │                                                     │           ├─ success → RecoveryCodeDisplay → WebAuthnAuth (loop)
+  │                                                     │           └─ failure → ✗ FAILURE
+  │                                                     └─ false → ✗ FAILURE
+  ├─ recoveryCode → RecoveryCodeCollectorDecision
+  │                   ├─ true → ✓ SUCCESS
+  │                   └─ false → ✗ FAILURE
+  └─ failure → ✗ FAILURE
+```
+
+**Key difference from `WebAuthnJourney`:** No `UsernameCollector` at the start.
+The fallback path (error/unsupported/noDevice) routes to `UsernameCollector`
+instead of directly to `PasswordCollector` — this ensures the `DataStoreDecision`
+has a username in shared state.
+
+#### Node configuration differences from WebAuthnJourney
+
+| Setting | WebAuthnJourney | UsernamelessJourney | Why |
+|---------|----------------|---------------------|-----|
+| `userVerificationRequirement` | `DISCOURAGED` | `REQUIRED` | Usernameless requires UV to prove user presence |
+| `requiresResidentKey` | `false` | `true` | Discoverable credentials must be resident |
+| Starting node | `UsernameCollector` | `WebAuthnAuth` | No username prompt — authenticator identifies user |
+| Error fallback | → direct to `PasswordCollector` | → `UsernameCollector` → `PasswordCollector` | Username needed for DataStore lookup |
+
+#### userHandle encoding (CRITICAL)
+
+AM's registration script stores the user ID as:
+
+```javascript
+user: {
+    id: Uint8Array.from("dXNlci41", function (c) { return c.charCodeAt(0) }),
+    name: "user.5",
+    displayName: "user.5"
+}
+```
+
+Where `"dXNlci41"` is `base64("user.5")`. **But `Uint8Array.from(str, charCodeAt)`
+does NOT base64-decode** — it creates a byte array of the ASCII character codes
+of the base64 string itself: `[100, 88, 78, 108, 99, 105, 52, 49]`.
+
+In the assertion response, the authenticator returns these bytes as `userHandle`.
+The browser's JavaScript converts them back with:
+```javascript
+var userHandle = String.fromCharCode.apply(null, new Uint8Array(assertion.response.userHandle));
+```
+
+This produces `"dXNlci41"` (the base64 string), NOT `"user.5"`. The `legacyData`
+format includes this as the last `::` field.
+
+**Bottom line:** In usernameless assertion responses, `userHandle` must be
+`base64(username)`, not the raw username. The identifier-first flow doesn't
+check `userHandle` (AM already knows the user from `allowCredentials`), which
+is why this bug only manifests in the usernameless flow.
+
+#### userVerification regex format difference
+
+AM's authentication and registration JavaScript embeds `userVerification` in
+different formats:
+
+| Script type | Format | Example |
+|-------------|--------|---------|
+| Authentication | JS object literal (unquoted key) | `userVerification: "required"` |
+| Registration | JSON-embedded (quoted key inside `authenticatorSelection`) | `"userVerification":"required"` |
+
+A parser regex must handle both:
+```
+/["']?userVerification["']?\s*:\s*["'](\w+)["']/
+```
+
+Failing to handle the quoted-key format causes `userVerification` to default to
+`discouraged`, which then causes AM to reject the registration with HTTP 401
+because the UV flag in the attestation doesn't match the node's requirement.
+
+#### E2E test file
+
+`deployments/platform/e2e/auth-passkey-usernameless.feature` — 2 scenarios:
+1. Full registration + authentication for a fresh user (7 steps)
+2. Discoverable credential entry point validation
+
 ### 10b. Importing Trees via REST API
 
 #### Endpoints

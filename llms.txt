@@ -110,6 +110,7 @@ deployments/platform/e2e/karate-config.js
 deployments/platform/e2e/auth-login.feature
 deployments/platform/e2e/auth-logout.feature
 deployments/platform/e2e/auth-passkey.feature
+deployments/platform/e2e/auth-passkey-usernameless.feature
 deployments/platform/e2e/helpers/webauthn.js
 deployments/platform/e2e/helpers/delete-device.feature
 deployments/platform/e2e/helpers/basic-auth.js

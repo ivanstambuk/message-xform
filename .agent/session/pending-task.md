@@ -1,22 +1,19 @@
 # Pending Task
 
-**Focus**: WebAuthn passkey E2E tests — completed
-**Status**: All 3 passkey scenarios passing (7/7 total E2E scenarios)
-**Next Step**: Push to origin, update PLAN.md passkey task status, Phase 9 documentation
+**Focus**: Platform deployment — all phases complete
+**Status**: All 9 phases done, 9/9 E2E scenarios passing
+**Next Step**: Evaluate deferred items or move to core engine work
 
 ## Context Notes
-- `auth-passkey.feature` has 3 scenarios: full registration+auth, device-exists auth, unsupported fallback
-- `webauthn.js` is a pure JDK-based FIDO2 helper (EC P-256, CBOR, no external deps)
-- `delete-device.feature` is a reusable device cleanup helper via AM Admin API
-- The Python script `/tmp/webauthn_test.py` was a throwaway debugging tool — safe to delete
-- `karate-config.js` was updated with `passkeyTestUser` (user.4) and journey params
+- Platform deployment PLAN.md is fully green (Phase 1–9 complete)
+- D11 revised: embedded webauthn.js replaced the planned openauth-sim dependency
+- UsernamelessJourney requires UsernameCollector in fallback path (error→username→password→DataStore)
+- userHandle = base64(username) in discoverable credential assertions — identifier-first doesn't check this
 
-## Key Debugging Findings
-1. **Root cause of auth loop**: ConfirmationCallback set to 0 = "Use Recovery Code" → wrong journey branch
-2. **legacyData escaping**: ONE level of `"` → `\"` escaping. Double = HTTP 401
-3. **allowCredentials regex**: Nested `Int8Array([...])` breaks naive bracket matching
-4. **Device API version**: `resource=1.0, protocol=1.0` (different from auth API's 2.0)
-
-## SDD Gaps (if any)
-- None — this is platform infrastructure, not feature-level SDD work
-- All learnings captured in PingAM operations guide §10 and KI webauthn_journey.md
+## Deferred Items (optional future work)
+- **Step 8.6**: Passkey JSLT transform specs — convert raw AM WebAuthn callbacks to clean JSON API
+  - Challenge: JSLT lacks regex/base64; extracting challenge from embedded JS is fragile
+  - Options: pure JSLT string ops (fragile), or add custom JSLT function (10-line Java, requires JAR rebuild)
+  - Proposal was drafted in this session — user said "let's do /retro first"
+- **Step 8.8**: Clean URL routing — separate PA apps for `/api/v1/auth/passkey` and `/api/v1/auth/passkey/usernameless`
+- **D14**: Full OIDC-based PA Web Sessions — requires AM OAuth2 provider + PA OIDC configuration
