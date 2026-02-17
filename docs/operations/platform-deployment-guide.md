@@ -6,7 +6,7 @@
 | Field        | Value                                                     |
 |--------------|-----------------------------------------------------------|
 | Status       | Living document                                           |
-| Last updated | 2026-02-16                                                |
+| Last updated | 2026-02-17                                                |
 | Audience     | Developers, operators, CI/CD pipeline authors             |
 
 ---
@@ -36,6 +36,8 @@
 | 10 | [Log Monitoring](#10-log-monitoring) | Real-time log tailing recipes |
 | 11 | [Troubleshooting](#11-troubleshooting) | Error→fix lookup table |
 | 12 | [Teardown & Reset](#12-teardown--reset) | Clean restart procedures |
+| | **Part VI — E2E Testing** | |
+| 13 | [E2E Test Suite](#13-e2e-test-suite) | Karate tests for all authentication flows |
 
 ---
 
@@ -1166,6 +1168,10 @@ SEARCH RESULT ... base="" scope=0 filter="(objectClass=*)" attrs="1.1" resultCod
 | Headers not appearing in response | Case mismatch — PA lowercases headers | Check for `x-auth-provider` (lowercase) not `X-Auth-Provider` |
 | `ConfigurationException: Configuration store is not available` + AM stuck in `health: starting` | AM container was recreated (`docker rm -f` + `docker compose up -d`), losing the PD cert from JVM truststore | Re-import PD cert and restart AM. See [PingAM Ops Guide §6](./pingam-operations-guide.md#ssl-certificate-trust) for the exact steps. The JVM `cacerts` file lives in the container filesystem, NOT on the `am-data` volume. |
 | Karate E2E logout through PA returns 403 despite correct `iPlanetDirectoryPro` header | Karate's HTTP client auto-forwarded AM's `Domain=platform.local` cookies to PA's `localhost:3000` VH — AM rejects the domain mismatch | Add `* configure cookies = null` before each cross-domain request in Karate feature files. Always clear cookies when switching between AM-direct and PA-proxied calls. |
+| WebAuthn auth loops back to recovery code prompt instead of succeeding | `ConfirmationCallback` value set to `0` (= "Use Recovery Code") triggers the `recoveryCode` branch of the journey | Leave `ConfirmationCallback` at its default value (`100`) — do NOT set it to `0`. Only `HiddenValueCallback` and `MetadataCallback` carry WebAuthn data. |
+| WebAuthn assertion fails with HTTP 401 | `legacyData` field has double-escaped quotes (`\\"` instead of `\"`) | Apply exactly ONE level of `"` → `\"` escaping when building the HiddenValueCallback. Double-escaping causes AM to reject the credential. |
+| `allowCredentials` parsing fails (empty or malformed) | AM's JS uses `Int8Array([...])` inside `allowCredentials`, breaking naive bracket regex on nested arrays | Use `indexOf('Int8Array')` + substring isolation instead of regex for parsing credential IDs from the challenge script. |
+| Device cleanup API returns 404 or 401 | Wrong `Accept-API-Version` header for device management | Use `resource=1.0, protocol=1.0` (NOT `resource=2.0`) for the `/users/{uid}/devices/2fa/webauthn` endpoint. |
 
 #### Startup order
 
@@ -1211,6 +1217,77 @@ docker compose up -d pingam
 
 ---
 
+## Part VI — E2E Testing
+
+### 13. E2E Test Suite
+
+Platform E2E tests live in `deployments/platform/e2e/` and use a standalone
+Karate JAR (no Gradle submodule — D10). They test all authentication flows
+through the full stack: Karate → PingAccess → PingAM → PingDirectory.
+
+#### Test inventory
+
+| Feature | File | Scenarios | Description |
+|---------|------|-----------|-------------|
+| Login | `auth-login.feature` | 3 | Initiate callback, submit credentials + cookie, bad credentials → 401 |
+| Logout | `auth-logout.feature` | 1 | Authenticate → logout → validate session = false |
+| Passkey | `auth-passkey.feature` | 3 | Full registration + auth, device-exists auth, unsupported fallback |
+| **Total** | | **7** | |
+
+#### Helpers
+
+| File | Purpose |
+|------|---------|
+| `helpers/webauthn.js` | Pure JDK FIDO2 ceremony engine — EC P-256 key generation, CBOR attestation encoding, assertion signing (SHA256withECDSA). No external dependencies. |
+| `helpers/delete-device.feature` | Reusable device cleanup via AM Admin API (`/users/{uid}/devices/2fa/webauthn`) |
+| `helpers/basic-auth.js` | HTTP Basic Auth header generator for AM admin operations |
+
+#### Prerequisites
+
+- Platform stack running (`docker compose up -d`)
+- AM configured (`configure-am.sh` + `configure-am-post.sh`)
+- WebAuthn journey imported (`import-webauthn-journey.sh`)
+- Message-xform plugin wired (`configure-pa-plugin.sh`)
+- PD cert imported into AM's JVM truststore (lost on container recreation)
+
+#### Running tests
+
+```bash
+cd deployments/platform/e2e
+
+# Run all tests (auto-downloads Karate JAR on first run)
+./run-e2e.sh
+
+# Run a specific feature
+java -jar karate-1.4.1.jar auth-passkey.feature
+
+# Run a specific scenario by line number
+java -jar karate-1.4.1.jar auth-passkey.feature:15
+```
+
+Results are written to `target/karate-reports/` as HTML. Open
+`karate-summary.html` for the full test report.
+
+#### Key gotchas
+
+- **Cookie jar isolation**: Clear Karate cookies (`* configure cookies = null`)
+  between AM-direct and PA-proxied calls to avoid domain mismatch (platform.local
+  vs localhost:3000).
+- **ConfirmationCallback trap**: In the WebAuthn journey, setting
+  `ConfirmationCallback` value to `0` selects "Use Recovery Code" and sends the
+  journey into an infinite loop. Leave it at its default value (`100`).
+- **legacyData escaping**: When building the `HiddenValueCallback` for WebAuthn
+  assertions, apply exactly ONE level of `"` → `\"` escaping. Double-escaping
+  causes AM to reject with HTTP 401.
+- **Device API version**: The AM Admin API for WebAuthn device management uses
+  `Accept-API-Version: resource=1.0, protocol=1.0` — different from the auth
+  API's `resource=2.0`.
+- **PD cert trust**: The JVM truststore lives in the container filesystem, not
+  on the `am-data` volume. Recreating the AM container loses the PD cert.
+  Re-import with `configure-am.sh` or manually (see §5).
+
+---
+
 ## Quick Reference Card
 
 ```
@@ -1249,6 +1326,12 @@ docker compose up -d pingam
 │  PD tweaks (both required before AM config):                        │
 │    1. single-structural-objectclass-behavior: accept                │
 │    2. etag mirror VA: ds-entry-checksum → etag                      │
+│                                                                     │
+│  E2E Tests (7 scenarios):                                           │
+│    cd deployments/platform/e2e                                      │
+│    ./run-e2e.sh                     # all tests                     │
+│    java -jar karate-1.4.1.jar auth-passkey.feature  # single file   │
+│    Results: target/karate-reports/karate-summary.html               │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
 ```

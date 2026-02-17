@@ -7,8 +7,8 @@
 | Field        | Value                    |
 |--------------|--------------------------|
 | Created      | 2026-02-16               |
-| Status       | 🔄 In Progress           |
-| Current Step | Phase 8 🔄 (steps 8.1–8.3 done) |
+| Status       | 🔄 In Progress (8.11 deferred) |
+| Current Step | Phase 9 done; 8.11 (usernameless passkeys) outstanding |
 
 ---
 
@@ -36,8 +36,8 @@
 | **5** | [PingAccess reverse proxy integration](#phase-5--pingaccess-reverse-proxy-integration) | ✅ Done |
 | **6** | [WebAuthn / Passkey journeys](#phase-6--webauthn--passkey-journeys) | ✅ Verified (headless) |
 | **7** | [Message-xform plugin wiring](#phase-7--message-xform-plugin-wiring) | ✅ Done |
-| **8** | [E2E smoke tests (Karate)](#phase-8--e2e-smoke-tests-karate) | 🔲 Not Started |
-| **9** | [Documentation & deployment guide](#phase-9--documentation--deployment-guide) | � In Progress |
+| **8** | [E2E smoke tests (Karate)](#phase-8--e2e-smoke-tests-karate) | 🔄 7/7 pass (8.11 deferred) |
+| **9** | [Documentation & deployment guide](#phase-9--documentation--deployment-guide) | ✅ Done |
 
 ---
 
@@ -413,8 +413,8 @@ Response header: `X-Auth-Session: eyJ0...`
 | 8.7 | Create message-xform spec for session cookie injection (D14) | ✅ Done (merged into `am-auth-response-v2` dynamic header expr) |
 | 8.8 | Configure PA applications/sites for auth endpoints | ✅ N/A (existing `/am` app + profile path match `/am/json/authenticate` is sufficient; clean URL mapping deferred) |
 | 8.9 | E2E test: username/password login (happy path) | ✅ Done (3 scenarios: initiate, submit+cookie, bad-creds=401) |
-| 8.10 | E2E test: passkey identifier-first (register + authenticate) | 🔲 Not Started (see implementation notes below) |
-| 8.11 | E2E test: passkey usernameless (register + authenticate) | 🔲 Not Started (see implementation notes below) |
+| 8.10 | E2E test: passkey identifier-first (register + authenticate) | ✅ Done (3 scenarios in `auth-passkey.feature`: full reg+auth, device-exists auth, unsupported fallback) |
+| 8.11 | E2E test: passkey usernameless (register + authenticate) | ⏩ Deferred (requires `UsernamelessJourney` — Phase 6.3 not started) |
 | 8.12 | E2E test: logout | ✅ Done (1 scenario: auth→logout→validate=false) |
 
 ### Prerequisites
@@ -475,8 +475,8 @@ The REST API pattern:
 |------|------|--------|
 | 9.1 | Create `docs/operations/platform-deployment-guide.md` | ✅ Done (1042 lines) |
 | 9.2 | Update PingAM ops guide with REST API gotchas + WebAuthn sections | ✅ Done (§8b + §10 + §10b) |
-| 9.3 | Update `llms.txt` and `knowledge-map.md` | 🔲 Not Started |
-| 9.4 | Final review and commit | 🔲 Not Started |
+| 9.3 | Update `llms.txt` and `knowledge-map.md` | ✅ Done (platform E2E section added to `llms.txt`; `knowledge-map.md` updated with passkey tests + helpers) |
+| 9.4 | Final review and commit | ✅ Done (added §13 E2E Test Suite + passkey troubleshooting to platform deployment guide) |
 
 ---
 

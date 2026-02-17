@@ -1,6 +1,6 @@
 # Knowledge Map
 
-Status: Draft | Last updated: 2026-02-15
+Status: Draft | Last updated: 2026-02-17
 
 This document maps the architectural relationships between modules, specs, ADRs,
 and key concepts in message-xform. It serves as a navigational aid for agents and
@@ -183,4 +183,4 @@ ADR-0036 (Conditional Routing) governs ── FR-001-15, FR-001-16, updates ADR-
 | `docs/operations/pingam-operations-guide.md` | PingAM operations, Docker image, REST API gotchas (Host header, curl -sf, orgConfig), WebAuthn journey (flow, callbacks, config), tree import via REST, auth patterns, transformed response surface (via message-xform) | Infrastructure (identity provider for E2E), Feature 002 E2E |
 | `docs/operations/platform-deployment-guide.md` | 3-container platform (PA + AM + PD) deployment guide, docker-compose v2, TLS, configuration scripts, WebAuthn import, message-xform plugin wiring (§9c), transform specs/profiles, troubleshooting | Infrastructure (all features requiring live IdP), Feature 002 integration |
 | `docs/operations/e2e-karate-operations-guide.md` | Gateway-neutral E2E test architecture, Docker lifecycle, Gradle integration, Karate patterns, IDE extension patches | All E2E modules, Feature 002, future gateway features |
-| `deployments/platform/e2e/` | Standalone platform E2E tests (Karate JAR, no Gradle). Tests: `auth-login.feature` (3 scenarios), `auth-logout.feature` (1 scenario). Config: `karate-config.js`. Runner: `run-e2e.sh`. Key gotcha: clear cookie jar between AM-direct and PA-proxied calls. | Phase 8 of platform PLAN |
+| `deployments/platform/e2e/` | Standalone platform E2E tests (Karate JAR, no Gradle). Tests: `auth-login.feature` (3 scenarios), `auth-logout.feature` (1 scenario), `auth-passkey.feature` (3 scenarios: full reg+auth, device-exists auth, unsupported fallback). Helpers: `webauthn.js` (pure JDK FIDO2 ceremony — EC P-256, CBOR, SHA256withECDSA), `delete-device.feature` (AM Admin API device cleanup), `basic-auth.js` (HTTP basic auth helper). Config: `karate-config.js`. Runner: `run-e2e.sh`. Key gotchas: clear cookie jar between AM-direct and PA-proxied calls; ConfirmationCallback must stay at default value (not 0). | Phase 8 of platform PLAN |
