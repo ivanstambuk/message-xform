@@ -383,4 +383,175 @@ Response:
 
 ---
 
-*Status: COMPLETE — Full authentication REST API documented from official source*
+---
+
+## Session Management — API-Native Approach
+
+> Research conducted: 2026-02-16
+> Goal: Determine how to issue a session token to the frontend without
+> exposing PingAM's raw `tokenId` or requiring browser redirects.
+
+### PingFederate `pi.flow` — NOT Available in PingAM
+
+PingFederate supports `response_mode=pi.flow` for **redirectless OIDC flows**:
+```
+GET /as/authorization.oauth2?client_id=im_client&response_type=token&response_mode=pi.flow
+```
+This allows mobile apps and SPAs to complete OIDC flows entirely via REST.
+
+**PingAM does NOT support this.** PingAM 8's supported response modes
+(from vendor docs, line 276214):
+- `fragment`, `jwt`, `form_post.jwt`, `form_post`, `fragment.jwt`, `query`, `query.jwt`
+
+No `pi.flow` or equivalent redirectless OIDC mode exists.
+
+### Option 1: ROPC Grant (Single-Call OAuth2 Token)
+
+PingAM supports Resource Owner Password Credentials — a direct token endpoint:
+
+```bash
+POST /am/oauth2/access_token
+  -data "grant_type=password&username=user.1&password=Password1
+         &client_id=paClient&client_secret=secret&scope=openid"
+```
+Returns:
+```json
+{
+  "access_token": "eyJ0...",
+  "token_type": "Bearer",
+  "expires_in": 3599
+}
+```
+
+**Pros:** Single call, no AM tokenId visible, standard OAuth2 token.
+**Cons:** Deprecated by OAuth2.1. **Cannot support WebAuthn/passkey** — ROPC only
+handles simple username/password via a configured auth tree. Multi-step interactive
+callbacks are impossible with ROPC.
+
+**Verdict: Rejected** — does not cover passkey flows.
+
+### Option 2: PA Web Session with SPA Support (Full OIDC)
+
+PingAccess SPA Support (vendor docs line 17907-17912):
+
+> *"SPA support merges the conventional 401 unauthorized response of an API
+> application with the traditional 302 redirect response of a Web application.
+> The SPA supported result is a 401 response containing a JavaScript body that
+> can initiate a redirect. API clients will ignore the JavaScript body and react
+> appropriately to the 401 response."*
+
+When `SPA Support = Enabled` and `Accept: application/json`:
+- GET/POST → **401 + JSON body** (not 302 redirect)
+- JSON body contains the OIDC auth URL
+
+The full flow would be:
+1. Client hits protected PA resource → PA returns **401 JSON** with OIDC auth URL
+2. Client calls AM's REST auth endpoint (callbacks) to authenticate
+3. Client exchanges SSO token for auth code (REST, using `iPlanetDirectoryPro` cookie)
+4. Client presents auth code to PA's `/pa/oidc/cb` callback endpoint
+5. PA creates session (`PA-MH` cookie)
+
+**Requires:**
+- AM configured as full OIDC provider (OAuth2 service, client registration, redirect URIs)
+- PA OIDC configuration (Token Provider, PF Runtime, OIDC Provider — see existing
+  `e2e-pingaccess/src/test/java/e2e/setup/create-oidc-provider.feature`)
+- PA Web Session creation (see `create-web-session.feature`)
+- Multi-step client orchestration
+
+**Pros:** True PA-issued opaque token. AM tokens fully hidden.
+**Cons:** Significant infrastructure. Client must orchestrate 5+ HTTP calls
+across different endpoints.
+
+**Verdict: Deferred** — correct long-term architecture, but too much infrastructure
+for Phase 8 scope. Can evolve to this later.
+
+### Option 3: Hybrid — REST Auth + Transform-Injected Cookie (CHOSEN)
+
+Message-xform transforms the AM authentication response to:
+1. **Strip** `tokenId` from the response JSON body
+2. **Inject** `Set-Cookie: iPlanetDirectoryPro=<tokenId>; Path=/; HttpOnly; Secure`
+3. Return clean JSON: `{ "authenticated": true, "realm": "/" }`
+
+Subsequent requests carry the cookie automatically. PA + AM session
+validation handles authorization on downstream calls.
+
+**Pros:**
+- ✅ Works with ALL auth flows (username/password, passkey, identifier-first, usernameless)
+- ✅ REST-native — no browser redirects
+- ✅ AM token hidden from response body (cookie is HttpOnly, not inspectable by JS)
+- ✅ Uses only message-xform's existing capabilities (header injection, body transform)
+- ✅ Client code is simple — standard cookie-based session
+
+**Cons:**
+- ❌ Session IS technically AM's SSO token (in a cookie), not a PA-issued opaque token
+- ❌ Session lifetime tied to AM session config, not PA session config
+- ❌ No token refresh mechanism (AM SSO tokens have fixed TTL)
+
+**Verdict: Chosen** — pragmatic, Phase 8 scope, covers all auth flows.
+Captured as decision D14 in PLAN.md.
+
+### PingAM 2-Step REST Token Issuance (Reference)
+
+For future Option 2 implementation, here's the documented REST-only pattern
+for obtaining OAuth2 tokens from PingAM (vendor docs lines 263591-263677):
+
+**Step 1:** Authenticate → get SSO token:
+```bash
+POST /am/json/realms/root/realms/alpha/authenticate
+  -header "X-OpenAM-Username: bjensen"
+  -header "X-OpenAM-Password: Ch4ng31t"
+  -header "Accept-API-Version: resource=2.0, protocol=1.0"
+→ { "tokenId": "AQIC5wM…TU3OQ*" }
+```
+
+**Step 2:** Exchange SSO token → OAuth2 token via `/oauth2/authorize`:
+```bash
+POST /am/oauth2/realms/root/realms/alpha/authorize
+  -cookie "iPlanetDirectoryPro=AQIC5wM…TU3OQ*"
+  -data "client_id=myClient&response_type=token&decision=allow&csrf=AQIC5wM…TU3OQ*"
+→ HTTP 302 Location: https://...callback#access_token=<token>&...
+```
+
+The auth code must be extracted from the Location header's fragment.
+This is fully REST-based but requires client-side orchestration of two calls.
+
+---
+
+## `authId` Handling — Header vs Body
+
+### Problem
+
+PingAM's callback protocol requires echoing `authId` (a JWT) in every
+callback submission. In the raw API, this is a top-level field in the
+request/response JSON body:
+
+```json
+{
+  "authId": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
+  "stage": "DataStore1",
+  "callbacks": [ ... ]
+}
+```
+
+This pollutes the clean API surface with protocol-level state.
+
+### Solution (D15)
+
+Move `authId` to a custom response header:
+
+- **Response:** `X-Auth-Session: eyJ0...` (message-xform extracts from body → header)
+- **Request:** Client echoes `X-Auth-Session: eyJ0...` (message-xform injects from header → body)
+
+The JSON body becomes clean — only application-level fields (`fields[]`,
+`challenge`, `authenticated`, etc.).
+
+### Implementation
+
+Requires **bidirectional** header/body transforms:
+1. **Response transform:** `body.authId → header X-Auth-Session` (extract + remove from body)
+2. **Request transform:** `header X-Auth-Session → body.authId` (inject into body)
+3. Filter: only apply to callbacks (not success responses which have `tokenId`)
+
+---
+
+*Status: COMPLETE — Full authentication REST API + session management research documented*

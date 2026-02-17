@@ -8,7 +8,7 @@
 |--------------|--------------------------|
 | Created      | 2026-02-16               |
 | Status       | 🔄 In Progress           |
-| Current Step | Phase 7 ✅ → Phase 8     |
+| Current Step | Phase 8 🔄 (steps 8.1–8.3 done) |
 
 ---
 
@@ -241,16 +241,229 @@ and usernameless flows.
 
 ---
 
-## Phase 8 — E2E Smoke Tests (Karate)
+## Phase 8 — E2E Authentication Tests (Karate)
 
-**Goal:** Automated end-to-end tests validating the full stack.
+**Goal:** Comprehensive end-to-end tests covering all authentication flows
+(username/password, passkey identifier-first, passkey usernameless) with a
+clean REST API surface. Tests run via standalone Karate runner in
+`deployments/platform/e2e/`. Uses `openauth-sim` for FIDO2 ceremony emulation.
+
+### Architecture Overview
+
+```
+                       ┌──────────────────────────────────┐
+                       │        Karate E2E Runner          │
+                       │  deployments/platform/e2e/        │
+                       │  (standalone JAR / script)         │
+                       └──────────┬───────────────────────┘
+                                  │  HTTP
+                                  ▼
+  ┌─────────────────────────────────────────────────────────┐
+  │              PingAccess (port 3000)                      │
+  │  + message-xform plugin (body transforms + header inject)│
+  │  Routes:                                                 │
+  │    /api/v1/auth/login       → AM ldapService             │
+  │    /api/v1/auth/passkey     → AM WebAuthnJourney         │
+  │    /api/v1/auth/passkey/usernameless → AM Usernameless   │
+  │    /api/v1/auth/logout      → AM /sessions/?_action=...  │
+  └─────────────────┬───────────────────────────────────────┘
+                    │  HTTP
+                    ▼
+  ┌─────────────────────────────────────────────────────────┐
+  │               PingAM (port 8080)                         │
+  │  Journeys: ldapService, WebAuthnJourney, Usernameless    │
+  │  OAuth2/OIDC provider (future)                           │
+  └─────────────────┬───────────────────────────────────────┘
+                    │  LDAPS
+                    ▼
+  ┌─────────────────────────────────────────────────────────┐
+  │            PingDirectory (port 1636)                     │
+  │  Users: user.1–user.10                                   │
+  └─────────────────────────────────────────────────────────┘
+
+  ┌───────────────────────────────────────────────────────────┐
+  │  openauth-sim (sibling project, REST API)                  │
+  │  /api/v1/webauthn/attest   — generate attestation          │
+  │  /api/v1/webauthn/evaluate — generate assertion            │
+  │  Used by Karate to emulate FIDO2 ceremony programmatically │
+  └───────────────────────────────────────────────────────────┘
+```
+
+### API Surface
+
+All endpoints are fronted by PingAccess. Message-xform transforms both
+request (clean JSON → AM callbacks) and response (AM callbacks → clean JSON)
+at each step. The client **never** sees PingAM's raw callback format.
+
+| Endpoint | Method | AM Backend Journey | Description |
+|----------|--------|--------------------|-------------|
+| `/api/v1/auth/login` | POST | `ldapService` | Username/password authentication |
+| `/api/v1/auth/passkey` | POST | `WebAuthnJourney` | Passkey — identifier-first (username provided) |
+| `/api/v1/auth/passkey/usernameless` | POST | `UsernamelessJourney` | Passkey — usernameless (discoverable credential) |
+| `/api/v1/auth/logout` | POST | `/sessions/?_action=logout` | Session invalidation |
+
+### Transformed JSON — Login Flow
+
+**Step 1 — Initiate (empty POST):**
+```
+POST /api/v1/auth/login  →  {}
+```
+Response (transformed from AM's NameCallback + PasswordCallback):
+```json
+{
+  "fields": [
+    { "name": "username", "type": "text", "prompt": "User Name" },
+    { "name": "password", "type": "password", "prompt": "Password" }
+  ]
+}
+```
+Response header: `X-Auth-Session: eyJ0...` (the AM authId JWT)
+
+**Step 2 — Submit credentials:**
+```
+POST /api/v1/auth/login
+X-Auth-Session: eyJ0...
+Body: { "username": "user.1", "password": "Password1" }
+```
+Request transform: converts clean JSON + header → AM callback format (authId + callbacks[]).
+Response transform: strips AM tokenId from body, injects as cookie.
+```json
+{
+  "authenticated": true,
+  "realm": "/"
+}
+```
+Response headers:
+- `Set-Cookie: iPlanetDirectoryPro=AQIC5w...; Path=/; HttpOnly; Secure`
+- `X-Auth-Provider: PingAM`
+
+**Session token strategy (D14):** The AM SSO token (`tokenId`) is **not**
+returned in the response body. Instead, message-xform injects it into a
+`Set-Cookie` header. Subsequent requests carry this cookie automatically.
+The client never sees or handles the raw AM token.
+
+### Transformed JSON — Passkey Flow (Identifier-First)
+
+**Step 1 — Initiate with username:**
+```
+POST /api/v1/auth/passkey
+Body: { "username": "user.1" }
+```
+Response (transformed from WebAuthnAuthenticationNode challenge):
+```json
+{
+  "challenge": "<base64url-encoded challenge>",
+  "rpId": "localhost",
+  "allowCredentials": [ ... ],
+  "userVerification": "preferred"
+}
+```
+Response header: `X-Auth-Session: eyJ0...`
+
+**Step 2 — Submit WebAuthn assertion (generated by openauth-sim):**
+```
+POST /api/v1/auth/passkey
+X-Auth-Session: eyJ0...
+Body: { "assertion": "<base64url-encoded assertion response>" }
+```
+Response: same as login success (authenticated + cookie).
+
+### Transformed JSON — Passkey Flow (Usernameless)
+
+**Step 1 — Initiate (empty POST):**
+```
+POST /api/v1/auth/passkey/usernameless  →  {}
+```
+Response (WebAuthn challenge, no allowCredentials — requires discoverable credential):
+```json
+{
+  "challenge": "<base64url-encoded challenge>",
+  "rpId": "localhost",
+  "userVerification": "required"
+}
+```
+Response header: `X-Auth-Session: eyJ0...`
+
+**Step 2** — Same as identifier-first step 2.
+
+### Passkey Design Notes
+
+- **Default passkey flow is usernameless** — this is the modern standard
+  (discoverable credentials, no username prompt)
+- **Identifier-first is the secondary variant** — username provided, server
+  sends `allowCredentials` list targeting that user's registered devices
+- Existing `WebAuthnJourney` serves as the identifier-first flow (starts with
+  `UsernameCollectorNode` → `WebAuthnAuthenticationNode`)
+- New `UsernamelessJourney` needed: starts directly at
+  `WebAuthnAuthenticationNode` with `requiresResidentKey=true`, no username node
+- Two separate PA endpoints (not body-based routing) for simplicity (D13)
+- `openauth-sim` REST API generates attestations and assertions
+  programmatically, enabling full FIDO2 ceremony emulation without a browser
+
+### Steps
 
 | Step | Task | Status |
 |------|------|--------|
-| 8.1 | Create Karate test project structure | 🔲 Not Started |
-| 8.2 | Test: PingDirectory health check | 🔲 Not Started |
-| 8.3 | Test: PingAM login via PingAccess | 🔲 Not Started |
-| 8.4 | Test: Transformed API surface | 🔲 Not Started |
+| 8.1 | Create `deployments/platform/e2e/` directory structure | ✅ Done (flat layout, `.gitignore` for JAR) |
+| 8.2 | Create standalone Karate runner (`run-e2e.sh` + auto-download JAR) | ✅ Done (no Gradle submodule — D10) |
+| 8.3 | Create `karate-config.js` with platform env vars | ✅ Done (corrected ports: PA=13000, AM=18080) |
+| 8.4 | Create `UsernamelessJourney` + generic import script | ✅ Done (journey JSON + `import-journey.sh`, `requiresResidentKey=true`, UV=REQUIRED) |
+| 8.5 | Create message-xform specs for login flow | ✅ Done (`am-auth-response-v2` + `am-strip-internal`, profile chaining ADR-0008, JSLT validated) |
+| 8.6 | Create message-xform specs for passkey flows | ⏩ Deferred (existing `cb_type`/`cb_name` maps `HiddenValueCallback` generically; passkey E2E uses raw AM protocol via `openauth-sim`) |
+| 8.7 | Create message-xform spec for session cookie injection (D14) | ✅ Done (merged into `am-auth-response-v2` dynamic header expr) |
+| 8.8 | Configure PA applications/sites for auth endpoints | ✅ N/A (existing `/am` app + profile path match `/am/json/authenticate` is sufficient; clean URL mapping deferred) |
+| 8.9 | E2E test: username/password login (happy path) | ✅ Done (3 scenarios: initiate, submit+cookie, bad-creds=401) |
+| 8.10 | E2E test: passkey identifier-first (register + authenticate) | 🔲 Not Started (see implementation notes below) |
+| 8.11 | E2E test: passkey usernameless (register + authenticate) | 🔲 Not Started (see implementation notes below) |
+| 8.12 | E2E test: logout | ✅ Done (1 scenario: auth→logout→validate=false) |
+
+### Prerequisites
+
+- Platform stack running (`docker compose up`)
+- `openauth-sim` running or accessible (for passkey tests — see D11)
+- Test users provisioned (user.1–user.10 in PingDirectory)
+- Phase 6.3 complete (usernameless journey imported)
+- PD cert imported into AM's JVM truststore (lost on container recreation — see [PingAM Ops Guide](../../docs/operations/pingam-operations-guide.md#ssl-certificate-trust))
+
+### Implementation Notes for Steps 8.10/8.11 (Passkey E2E)
+
+Karate is HTTP-level only — it cannot execute browser JS or interact with FIDO2
+authenticators. The passkey E2E tests require a **WebAuthn authenticator simulator**
+that exposes a REST API for generating FIDO2 attestations and assertions.
+
+**Decision D11:** Use `openauth-sim` (or equivalent FIDO2 authenticator emulator).
+The REST API pattern:
+1. `POST /api/v1/webauthn/attest` — generate attestation for registration
+2. `POST /api/v1/webauthn/evaluate` — generate assertion for authentication
+
+**FIDO2 ceremony in Karate (pseudocode for 8.10):**
+```
+1. POST /am/json/authenticate?authIndexType=service&authIndexValue=WebAuthnJourney
+   → Get NameCallback (username prompt)
+2. Submit username → Get WebAuthnRegistrationNode callbacks:
+   - HiddenValueCallback (challenge, rpId, user info, pubKeyCredParams)
+   - MetadataCallback (WebAuthn registration metadata)
+3. Parse challenge data from HiddenValueCallback.value
+4. POST to openauth-sim /api/v1/webauthn/attest with rpId + challenge
+   → Get attestationObject + clientDataJSON
+5. Submit attestation back to AM via callback
+   → Registration success
+6. Start auth journey with same user
+   → Get WebAuthnAuthenticationNode callbacks (challenge + allowCredentials)
+7. POST to openauth-sim /api/v1/webauthn/evaluate with challenge
+   → Get authenticatorData + signature + clientDataJSON
+8. Submit assertion back to AM
+   → Authentication success (tokenId)
+```
+
+**Key gotchas to remember:**
+- Clear Karate cookie jar (`* configure cookies = null`) between AM-direct and
+  PA-proxied calls to avoid domain mismatch (platform.local vs localhost:3000)
+- Custom headers from message-xform are lowercase (`x-auth-session`, not `X-Auth-Session`)
+- Standard HTTP headers preserve original casing (`Set-Cookie`, not `set-cookie`)
+- WebAuthn callbacks in AM use `HiddenValueCallback` with JSON-encoded challenge data
+- The `authId` JWT in the `X-Auth-Session` response header must be echoed back in
+  the request body (request direction is NOT transformed — D9)
 
 ---
 
@@ -280,3 +493,10 @@ and usernameless flows.
 | D7 | Callback auth everywhere (no ZeroPageLogin) | AM 8.0 defaults ZPL to disabled for Login CSRF protection. Callback pattern handles all journey types including WebAuthn. | 2026-02-16 |
 | D8 | Docker Compose v2 | Installed `docker-compose-v2` (2.37.1) — the v1 `docker-compose` (1.29.2) has `ContainerConfig` KeyError bugs with modern images. Use `docker compose` (space). | 2026-02-16 |
 | D9 | Response-only transforms for AM auth | Request-side transforms break AM's callback protocol (authId JWT must be echoed verbatim). Response-only body cleanup + header injection is the practical pattern. | 2026-02-16 |
+| D10 | Platform E2E tests in `deployments/platform/e2e/` — standalone Karate JAR | **No Gradle submodule.** Run via `java -jar karate.jar` or `run-e2e.sh`. Platform stack is manually managed (`docker compose`), Gradle Docker lifecycle makes no sense. Clean separation from adapter E2E tests (`e2e-pingaccess/`). | 2026-02-16 |
+| D11 | `openauth-sim` as FIDO2 authenticator emulator | Karate is HTTP-level — cannot execute browser JS or interact with authenticators. `openauth-sim` REST API (`/api/v1/webauthn/attest`, `/evaluate`) generates attestations/assertions programmatically. Full FIDO2 ceremony coverage. | 2026-02-16 |
+| D12 | Two passkey varieties (identifier-first + usernameless) | Identifier-first = existing `WebAuthnJourney` (username → allowCredentials). Usernameless = new `UsernamelessJourney` (discoverable credential, no username). Usernameless is the modern default. | 2026-02-16 |
+| D13 | Separate endpoints per passkey flow (not body-based routing) | Two PA Applications: `/api/v1/auth/passkey` → `WebAuthnJourney`, `/api/v1/auth/passkey/usernameless` → `UsernamelessJourney`. Simpler than conditional request-side URL rewriting. Body-based routing deferred as future polish. | 2026-02-16 |
+| D14 | AM SSO token hidden via cookie injection (hybrid session) | Message-xform strips `tokenId` from response body, injects it into `Set-Cookie: iPlanetDirectoryPro=...` header. Client never sees raw AM token. Full PA Web Sessions (OIDC auth code flow) deferred — requires AM OAuth2 provider + PA OIDC config. Option 3 (pragmatic). | 2026-02-16 |
+| D15 | `authId` in response header, not body | `X-Auth-Session` response header carries AM's `authId` JWT. Keeps the response body clean (fields only). Client echoes this header on subsequent callback submissions. Message-xform header transforms handle the mapping. | 2026-02-16 |
+| ~~D16~~ | ~~PingFederate `pi.flow` equivalent~~ | **NOT AVAILABLE** — PingAM does not support `response_mode=pi.flow`. Supported modes: `fragment`, `jwt`, `form_post`, `query` variants only. Hybrid session (D14) is the pragmatic alternative. | 2026-02-16 |

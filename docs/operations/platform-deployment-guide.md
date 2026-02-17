@@ -1164,6 +1164,8 @@ SEARCH RESULT ... base="" scope=0 filter="(objectClass=*)" attrs="1.1" resultCod
 | Transform not applied (original `tokenId` in response) | Rule not attached to application resource, or profile doesn't match path | Verify: `curl …/pa-admin-api/v3/applications/1/resources` shows rule in policy. Check `activeProfile` matches YAML filename (without `.yaml`). |
 | PA logs show `Registry reloaded: specs=0` | Specs directory empty or mountpoint wrong | Verify: `docker exec platform-pingaccess ls /specs/` shows YAML files |
 | Headers not appearing in response | Case mismatch — PA lowercases headers | Check for `x-auth-provider` (lowercase) not `X-Auth-Provider` |
+| `ConfigurationException: Configuration store is not available` + AM stuck in `health: starting` | AM container was recreated (`docker rm -f` + `docker compose up -d`), losing the PD cert from JVM truststore | Re-import PD cert and restart AM. See [PingAM Ops Guide §6](./pingam-operations-guide.md#ssl-certificate-trust) for the exact steps. The JVM `cacerts` file lives in the container filesystem, NOT on the `am-data` volume. |
+| Karate E2E logout through PA returns 403 despite correct `iPlanetDirectoryPro` header | Karate's HTTP client auto-forwarded AM's `Domain=platform.local` cookies to PA's `localhost:3000` VH — AM rejects the domain mismatch | Add `* configure cookies = null` before each cross-domain request in Karate feature files. Always clear cookies when switching between AM-direct and PA-proxied calls. |
 
 #### Startup order
 

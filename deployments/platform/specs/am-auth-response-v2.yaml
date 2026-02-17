@@ -1,0 +1,116 @@
+# Transform spec: PingAM authentication response → clean API surface
+#
+# This spec handles BOTH callback and success responses from AM's
+# /json/authenticate endpoint. It runs first in the profile chain,
+# producing an intermediate body that includes internal fields needed
+# by the dynamic header expressions.
+#
+# A second spec (am-strip-internal) runs after to remove internal fields
+# from the final response body (profile-level chaining per ADR-0008).
+#
+# ── Callback response (AM has more questions) ──
+#
+# AM raw:
+#   {
+#     "authId": "eyJ0...",
+#     "stage": "DataStore1",
+#     "callbacks": [
+#       { "type": "NameCallback",
+#         "output": [{"name": "prompt", "value": " User Name: "}],
+#         "input": [{"name": "IDToken1", "value": ""}] },
+#       { "type": "PasswordCallback",
+#         "output": [{"name": "prompt", "value": " Password: "}],
+#         "input": [{"name": "IDToken2", "value": ""}] }
+#     ]
+#   }
+#
+# Intermediate output:
+#   {
+#     "_authId": "eyJ0...",              ← kept for header expr, stripped later
+#     "fields": [
+#       { "name": "username", "type": "text", "prompt": "User Name" },
+#       { "name": "password", "type": "password", "prompt": "Password" }
+#     ]
+#   }
+#   + Header: X-Auth-Session: eyJ0...
+#
+# ── Success response (authentication complete) ──
+#
+# AM raw:
+#   {
+#     "tokenId": "AQIC5wM2LY...",
+#     "successUrl": "/am/console",
+#     "realm": "/"
+#   }
+#
+# Intermediate output:
+#   {
+#     "_tokenId": "AQIC5wM2LY...",       ← kept for cookie expr, stripped later
+#     "authenticated": true,
+#     "realm": "/"
+#   }
+#   + Header: Set-Cookie: iPlanetDirectoryPro=AQIC5w...; Path=/; HttpOnly; Secure
+#   + Header: X-Auth-Provider: PingAM
+#
+id: am-auth-response-v2
+version: "1.0.0"
+description: "Transform AM auth responses (callback + success) with header extraction"
+
+input:
+  schema:
+    type: object
+
+output:
+  schema:
+    type: object
+
+transform:
+  lang: jslt
+  expr: |
+    def cb_type(cb)
+      if      ($cb.type == "NameCallback")          "text"
+      else if ($cb.type == "PasswordCallback")      "password"
+      else if ($cb.type == "HiddenValueCallback")   "hidden"
+      else if ($cb.type == "TextInputCallback")     "text"
+      else if ($cb.type == "ChoiceCallback")        "choice"
+      else                                          "unknown"
+
+    def cb_name(cb)
+      if      ($cb.type == "NameCallback")          "username"
+      else if ($cb.type == "PasswordCallback")      "password"
+      else    lowercase($cb.type)
+
+    def cb_prompt(cb)
+      if ($cb.output) trim($cb.output[0].value) else $cb.type
+
+    if (.callbacks)
+      {
+        "_authId": .authId,
+        "fields": [for (.callbacks)
+          {
+            "name": cb_name(.),
+            "type": cb_type(.),
+            "prompt": cb_prompt(.)
+          }
+        ]
+      }
+    else if (.tokenId)
+      {
+        "_tokenId": .tokenId,
+        "authenticated": true,
+        "realm": .realm
+      }
+    else
+      .
+
+headers:
+  add:
+    x-auth-session:
+      expr: ._authId
+    set-cookie:
+      expr: |
+        if (._tokenId)
+          "iPlanetDirectoryPro=" + ._tokenId + "; Path=/; HttpOnly; Secure; SameSite=Lax"
+        else
+          null
+    x-auth-provider: "PingAM"

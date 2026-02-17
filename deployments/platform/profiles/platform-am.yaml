@@ -1,28 +1,39 @@
-# Platform transform profile — routes specs to AM API paths
+# Platform transform profile — routes specs to AM authentication API paths
 #
-# This profile is used by the MessageTransform rule that fronts PingAM
-# through PingAccess. It demonstrates the recommended deployment pattern:
-# one rule per application + profile routing (ops guide §21).
+# This profile implements the clean API surface for authentication endpoints
+# fronted by PingAccess. Uses profile-level chaining (ADR-0008) to separate
+# concerns:
+#   1. am-auth-response-v2: body transform + header extraction (authId → header,
+#      tokenId → cookie). Produces intermediate body with _-prefixed internal fields.
+#   2. am-strip-internal: removes _-prefixed fields from the final response body.
 #
 # AM paths arrive as /am/json/... through the PA reverse proxy.
 #
+# Auth flow:
+#   POST /api/v1/auth/login → PA proxies to → /am/json/authenticate
+#   Response transforms: am-auth-response-v2 → am-strip-internal
+#
 profile: platform-am
-version: "1.0.0"
-description: "Routes transform specs to PingAM API paths"
+version: "2.0.0"
+description: "Clean API surface for PingAM authentication via PingAccess"
 
 transforms:
-  # ── Response body cleanup for /json/authenticate ──
-  # Cleans up AM's verbose success response into a friendlier API surface.
-  # Only fires on responses (AM → PA → client).
-  - spec: am-auth-response@1.0.0
+  # ── Step 1: Body transform + header extraction ──
+  # Converts AM callback/success responses into clean JSON.
+  # Extracts authId → X-Auth-Session header.
+  # Extracts tokenId → Set-Cookie: iPlanetDirectoryPro header.
+  # Internal fields (_authId, _tokenId) remain in body for header expr eval.
+  - spec: am-auth-response-v2@1.0.0
     direction: response
     match:
       path: "/am/json/authenticate"
       method: POST
 
-  # ── Header injection for all AM /json/** responses ──
-  # Adds X-Auth-Provider header to all AM API responses.
-  - spec: am-header-inject@1.0.0
+  # ── Step 2: Strip internal fields ──
+  # Removes _-prefixed fields from the response body.
+  # Runs AFTER step 1 (profile-level chaining per ADR-0008).
+  - spec: am-strip-internal@1.0.0
     direction: response
     match:
-      path: "/am/json/**"
+      path: "/am/json/authenticate"
+      method: POST

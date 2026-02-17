@@ -1,0 +1,37 @@
+# Transform spec: Strip internal fields from transformed body
+#
+# Runs AFTER am-auth-response-v2 in the profile chain (ADR-0008).
+# Removes underscore-prefixed internal fields that were kept in the
+# intermediate body only for dynamic header expression evaluation.
+#
+# Before (intermediate body from am-auth-response-v2):
+#   {
+#     "_authId": "eyJ0...",        ← headers already extracted this
+#     "fields": [ ... ]
+#   }
+#
+# After (final body sent to client):
+#   {
+#     "fields": [ ... ]
+#   }
+#
+# For success responses:
+#   Before: { "_tokenId": "AQIC5w...", "authenticated": true, "realm": "/" }
+#   After:  { "authenticated": true, "realm": "/" }
+#
+id: am-strip-internal
+version: "1.0.0"
+description: "Remove internal underscore-prefixed fields from response body"
+
+input:
+  schema:
+    type: object
+
+output:
+  schema:
+    type: object
+
+transform:
+  lang: jslt
+  expr: |
+    {for (.) .key : .value if (not(starts-with(.key, "_")))}

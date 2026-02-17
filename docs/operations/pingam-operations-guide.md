@@ -477,6 +477,46 @@ keytool -importcert \
 > `server.xml`, ensure the `SSL_PWD` environment variable matches the keystore
 > password. If mismatched, Tomcat's HTTPS connector fails with `keystore password
 > was incorrect`, but HTTP continues to work (non-fatal, degraded mode).
+>
+> **Gotcha — cert trust lost after container recreation (CRITICAL):**
+> The JVM truststore (`cacerts`) lives inside the container filesystem, **not** on
+> the `am-data` Docker volume (`/home/forgerock/openam`). If the AM container is
+> deleted and recreated (e.g. `docker rm -f platform-pingam && docker compose up -d`),
+> the PD certificate import is lost. AM will start Tomcat successfully but fail
+> every healthcheck with HTTP 500 and log:
+>
+> ```
+> ConfigurationException: Configuration store is not available.
+> ```
+>
+> **Symptoms:** AM container stuck in `health: starting` for 5+ minutes. The
+> Docker Compose healthcheck (`curl -sf http://localhost:8080/am/`) returns
+> exit code 1 because AM responds with HTTP 500 (which `-f` treats as failure).
+>
+> **Fix:** Re-import the PD certificate and restart AM:
+>
+> ```bash
+> # Extract PD cert from host (PD container lacks openssl)
+> echo | openssl s_client -connect localhost:1636 -showcerts </dev/null 2>/dev/null \
+>   | openssl x509 -outform PEM > /tmp/pd-cert.pem
+>
+> # Import into AM container
+> docker cp /tmp/pd-cert.pem platform-pingam:/tmp/pd-cert.pem
+> docker exec -u 0 platform-pingam keytool -importcert \
+>   -alias pingdirectory -file /tmp/pd-cert.pem \
+>   -cacerts -storepass changeit -trustcacerts -noprompt
+>
+> # Restart AM to pick up truststore change
+> docker restart platform-pingam
+> ```
+>
+> **Note:** The PD container image does NOT include `openssl`, so you must
+> extract the certificate from the **host** using the mapped port (1636), not
+> from inside the PD container.
+>
+> **After restart:** AM connects to PD's LDAPS within seconds, healthcheck
+> passes on the first probe (HTTP 200), and PA (which depends on `service_healthy`
+> from AM) starts automatically.
 
 #### Monitoring and Debugging
 
