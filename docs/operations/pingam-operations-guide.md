@@ -1291,7 +1291,11 @@ frodo journey import -k -f <journey.json> <connection-profile> <realm>
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
+| `"No Configuration found"` on invocation | Node IDs not UUIDs (AM requires UUID format) | Regenerate with `uuid.uuid4()` — see `PITFALLS.md` §1 |
 | `"No Configuration found"` on invocation | Nodes don't exist (curl -sf hid errors) | Re-import with `-s` not `-sf`; verify each response |
+| `"No Configuration found"` on invocation | Missing LDAP schema (e.g., `boundDevices`) | Apply LDIF from AM's template dir to PD |
+| `"No Configuration found"` on invocation | Required realm service not configured | Enable service (e.g., `DeviceBindingService`) |
+| `"Values for Application Ids is required."` | `applicationIds: []` on Device* nodes | Must have at least one value, e.g., `["com.example.test"]` |
 | Empty curl response | Missing Host header | Add `-H "Host: am.platform.local:18080"` |
 | Node PUT returns 400 | Body includes `_type`/`_outcomes`/`_rev` | Strip those fields — AM manages them |
 | Tree PUT succeeds but invocation fails | Node UUIDs in tree don't match imported nodes | Verify UUIDs are identical |

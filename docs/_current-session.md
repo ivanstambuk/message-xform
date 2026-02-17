@@ -1,37 +1,33 @@
-# Current Session — K8s Migration Complete (Phases 5–7)
+# Current Session — Device Binding Phase 1 Complete
 
 ## Focus
-Completing the Kubernetes migration — E2E validation, cloud guides, Docker cleanup.
+Implementing PingAM Device Binding for device-specific MFA using asymmetric cryptography.
 
 ## Status
-✅ **ALL PHASES COMPLETE** — Migration from Docker Compose to Kubernetes is done.
+✅ **Phase 1 Complete** — Journeys deployed and verified on K8s.
 
 ## Summary of Work Done
 
-### Phase 5 — E2E Test Validation ✅
-- 14/14 scenarios pass on K8s (k3s/Traefik).
-- Captured and fixed Traefik title-case header gotcha (`lowerCaseResponseHeaders`).
-- Verified usernameless (discoverable) and passkey flows.
-
-### Phase 6 — Cloud Deployment Guides ✅
-- Created values overlays: `values-aks.yaml`, `values-gke.yaml`, `values-eks.yaml`.
-- Created `k8s/docker/Dockerfile.plugin` for cloud registry JAR injection.
-- Wrote `k8s/cloud-deployment-guide.md` (~380 lines, 10 sections).
-
-### Phase 7 — Docker Compose Removal & Documentation ✅
-- Deleted: `docker-compose.yml`, `.env.template`, `PLAN.md`.
-- Archived: 7 Docker-specific scripts → `scripts/legacy/`.
-- Kept: `generate-keys.sh` (TLS certs, reusable).
-- Rewrote: `README.md` (K8s-first start guide).
-- Updated: `platform-deployment-guide.md` (K8s-migration banner + cross-refs).
-- Updated: `llms.txt`, `knowledge-map.md`.
+### Phase 1 — Journey Definition & K8s Deployment ✅
+- Created `DeviceBindingJourney.journey.json` (registration flow with DeviceBindingStorageNode).
+- Created `DeviceSigningJourney.journey.json` (verification flow).
+- Created `setup-device-binding.sh` (service enablement + journey import).
+- Applied `boundDevices` LDIF to PingDirectory schema.
+- Enabled `DeviceBindingService` (encryption=NONE) in AM root realm.
+- Imported both journeys with UUID node IDs.
+- Verified `DeviceBindingCallback` returned with challenge, userId, and input fields.
+- Created `deployments/platform/PITFALLS.md` (13 platform deployment pitfalls).
+- Updated PingAM operations guide troubleshooting table.
+- Updated KI artifacts (gotchas, authentication trees, metadata).
 
 ## Key Learnings
-- **Staging Copy Hook Trap**: Ping Docker images copy from `/opt/staging` to `/opt/out/instance`. Mounting directly at `/opt/out` blocks these hooks.
-- **Header Normalization**: Traefik title-cases headers; Karate needs `lowerCaseResponseHeaders`.
-- **PD FQDN**: AM's LDAP SDK requires FQDN for SSL hostname verification; short service names fail.
-- **RP ID**: `localhost` is robust across environments for WebAuthn tests.
+- **Node IDs MUST be UUIDs**: Human-readable IDs silently fail at invocation time with "No Configuration found".
+- **applicationIds cannot be empty**: Device* nodes require at least one app ID value.
+- **boundDevices schema**: Not present in PD by default — LDIF from AM's WAR template dir must be manually applied.
+- **DeviceBindingStorageNode required**: DeviceBindingNode doesn't persist — need storage node after it.
+- **Test users start at user.1**: Not zero-indexed in K8s PD deployment.
 
 ## Handover
-The mission is complete. The repository is now Kubernetes-native.
-The next session can focus on new features or cloud CI/CD.
+Phase 1 is done. Phase 2 (E2E Crypto Helper — `device-binding.js`) is next.
+The `DeviceBindingCallback` returns all data needed: challenge, userId, authenticationType=NONE.
+The helper must: generate RSA-2048 key pair, sign JWS with RS512, return IDToken1jws + deviceName + deviceId.
