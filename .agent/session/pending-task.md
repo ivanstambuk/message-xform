@@ -1,16 +1,31 @@
 # Pending Task
 
-**Focus**: Platform deployment — Step 8.6 complete
-**Status**: All 9 phases done, 9/9 E2E scenarios passing, Step 8.6 (passkey JSLT transforms) complete
-**Next Step**: Evaluate remaining deferred items or move to core engine work
+**Focus**: Phase 8 complete — all platform E2E + transform specs done
+**Status**: Phase 8 fully ✅. Documentation fully synced.
+**Next Step**: Identify next phase of work (see suggestions below)
 
 ## Context Notes
-- Platform deployment PLAN.md is fully green (Phase 1–9 complete)
-- Step 8.6 completed: `am-webauthn-response` spec using JSLT `capture()` regex
-- Profile updated to v3.0.0 with ADR-0036 `match.when` body predicate routing
-- Key insight: JSLT DOES have regex (`capture()`, `test()`, `replace()`) — Approach A worked
-- Raw challenge bytes passed through as signed Int8Array string (no base64url encoding needed)
+- Profile is now v4.0.0 with both request-side URL rewriting and response-side body transforms
+- PA has two applications: `/am` (direct AM proxy) and `/api` (clean URL surface)
+- `configure-pa-api.sh` must be run after `configure-pa-plugin.sh` when setting up a fresh stack
+- The clean URL specs have NOT been E2E tested yet — they are config-only artifacts
+  that need a running platform stack to verify
 
-## Deferred Items (optional future work)
-- **Step 8.8**: Clean URL routing — separate PA apps for `/api/v1/auth/passkey` and `/api/v1/auth/passkey/usernameless`
-- **D14**: Full OIDC-based PA Web Sessions — requires AM OAuth2 provider + PA OIDC configuration
+## Suggested Next Steps
+
+1. **E2E test the clean URLs** — Update existing E2E tests (or add new scenarios)
+   to exercise `/api/v1/auth/login`, `/api/v1/auth/passkey`, and
+   `/api/v1/auth/passkey/usernameless` instead of the raw AM paths
+
+2. **Phase 9 wrap-up** — All Phase 9 steps are already ✅ Done, but the
+   platform deployment guide should get a new subsection for the /api app setup
+   in the "Setup procedure" section (currently only documents configure-pa.sh
+   and configure-pa-plugin.sh steps)
+
+3. **New feature work** — With the platform fully operational, consider:
+   - Feature 003 (PingGateway adapter)
+   - Feature 004 (standalone proxy enhancements)
+   - Any backlog items from the main PLAN.md
+
+## SDD Gaps
+- None identified — retro audit passed clean

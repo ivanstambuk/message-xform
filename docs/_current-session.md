@@ -1,41 +1,36 @@
-# Current Session — Step 8.8 Clean URL Routing
+# Current Session — Documentation & Clean URL Routing
 
 ## Focus
-Step 8.8: Configure PA applications for clean auth endpoint URLs.
+Update documentation for WebAuthn transforms + implement Step 8.8 clean URL routing.
 
 ## Status
-✅ **COMPLETED** — Step 8.8 implemented.
+✅ **COMPLETED** — All work committed and pushed.
 
 ## Summary
 
-Implemented clean URL routing for authentication endpoints using message-xform's
-request-side URL rewriting:
+### Commit 1: Documentation updates (`cb4d6df`)
+- PingAM ops guide §8: replaced outdated "callbacks not transformed" with
+  two-path routing documentation (WebAuthn + login via match.when body predicates)
+- Platform deployment guide §9c: updated file layout, spec descriptions,
+  profile routing table to reflect v3.0.0 (am-auth-response-v2, am-webauthn-response,
+  am-strip-internal, ADR-0036 match.when predicates)
+- Quick Reference Card: updated spec count and version
+- Knowledge map: updated platform-deployment-guide entry
 
-### What was created:
-1. **3 request-side transform specs:**
-   - `am-auth-url-rewrite.yaml` → `/api/v1/auth/login` → `/am/json/authenticate`
-   - `am-passkey-url.yaml` → `/api/v1/auth/passkey` → `/am/json/authenticate?...WebAuthnJourney`
-   - `am-passkey-usernameless-url.yaml` → `/api/v1/auth/passkey/usernameless` → `/am/json/authenticate?...UsernamelessJourney`
+### Commit 2: Step 8.8 — Clean URL routing (`2e0514e`)
+- 3 request-side URL rewrite specs (am-auth-url-rewrite, am-passkey-url,
+  am-passkey-usernameless-url) using identity body transform + url.path.expr
+- Profile v4.0.0: request-direction entries before response transforms
+- configure-pa-api.sh: PA Application at /api context root
+- D13 revised from "multiple PA apps" to "single /api app + URL rewriting"
 
-2. **Profile updated to v4.0.0** — adds request-direction entries for URL rewriting
-   before the existing response-direction body transforms.
+## Key Decision
+Single PA Application at /api with message-xform request-side URL rewriting
+(not 3 separate PA Applications). Response transforms see the rewritten path
+via request.getUri() and match normally.
 
-3. **`configure-pa-api.sh`** — creates PA Application at `/api` context root,
-   attaches MessageTransformRule, configured as unprotected.
-
-### Key architectural decision:
-- Single PA Application at `/api` with message-xform handling all URL routing
-- Request body passes through unchanged (JSLT identity transform `.`) — safe
-  because D9 only restricts body-level request transforms
-- Response-side transforms see the rewritten path (`/am/json/authenticate`)
-  because PA sets `request.setUri()` after request-side processing
-
-### Docs updated:
-- `pingam-operations-guide.md` §8: Updated transformed response section (WebAuthn + login two-path routing)
-- `platform-deployment-guide.md` §9c: Updated file layout, specs, profile routing, Quick Reference
-- `knowledge-map.md`: Updated platform-deployment-guide entry
-- `llms.txt`: Added all platform transform specs + profile
-- `PLAN.md`: Step 8.8 ✅ Done, D13 updated
+## Phase 8 Status
+All 12 steps ✅ Done. Phase 8 is fully complete.
 
 ## Deferred Items
-- None — all Phase 8 steps are ✅ Done
+None remaining in Phase 8.
