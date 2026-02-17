@@ -1,31 +1,17 @@
 # Pending Task
 
-**Focus**: Phase 8 complete — all platform E2E + transform specs done
-**Status**: Phase 8 fully ✅. Documentation fully synced.
-**Next Step**: Identify next phase of work (see suggestions below)
+**Focus**: Platform K8s Deployment — Phase 4 (Networking & Ingress)
+**Status**: Phase 3 fully complete. All services running and verified on k3s.
+**Next Step**: Configure k3s Traefik IngressRoute for external access to PA engine.
 
 ## Context Notes
-- Profile is now v4.0.0 with both request-side URL rewriting and response-side body transforms
-- PA has two applications: `/am` (direct AM proxy) and `/api` (clean URL surface)
-- `configure-pa-api.sh` must be run after `configure-pa-plugin.sh` when setting up a fresh stack
-- The clean URL specs have NOT been E2E tested yet — they are config-only artifacts
-  that need a running platform stack to verify
-
-## Suggested Next Steps
-
-1. **E2E test the clean URLs** — Update existing E2E tests (or add new scenarios)
-   to exercise `/api/v1/auth/login`, `/api/v1/auth/passkey`, and
-   `/api/v1/auth/passkey/usernameless` instead of the raw AM paths
-
-2. **Phase 9 wrap-up** — All Phase 9 steps are already ✅ Done, but the
-   platform deployment guide should get a new subsection for the /api app setup
-   in the "Setup procedure" section (currently only documents configure-pa.sh
-   and configure-pa-plugin.sh steps)
-
-3. **New feature work** — With the platform fully operational, consider:
-   - Feature 003 (PingGateway adapter)
-   - Feature 004 (standalone proxy enhancements)
-   - Any backlog items from the main PLAN.md
+- PA engine serves on port 3000 (HTTPS) inside the cluster
+- Two PA applications: `/am` (proxy) and `/api` (clean URLs)
+- MessageTransform rule is active on both applications
+- PA admin password is `2FederateM0re` (NOT `2Access`)
+- Plugin JAR must mount at `/opt/out/instance/deploy` (NOT staging)
+- K8s namespace: `message-xform`
+- Helm chart: `pingidentity/ping-devops` v0.11.17 (revision 4)
 
 ## SDD Gaps
-- None identified — retro audit passed clean
+- None — this is infrastructure/operations work, not feature development
