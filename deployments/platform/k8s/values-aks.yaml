@@ -1,0 +1,104 @@
+############################################################
+# message-xform Platform — AKS (Azure Kubernetes Service) Overlay
+#
+# Usage:
+#   helm install platform pingidentity/ping-devops \
+#     -n message-xform --create-namespace \
+#     -f k8s/values-local.yaml \
+#     -f k8s/values-aks.yaml
+#
+# This overlay is applied AFTER values-local.yaml and overrides
+# only the settings that differ for AKS:
+#   - StorageClass: managed-csi (Azure Managed Disk)
+#   - Container images: ACR (Azure Container Registry)
+#   - Init container: ACR image instead of hostPath volume
+#
+# Prerequisites:
+#   1. AKS cluster with kubectl access configured
+#   2. ACR registry created and attached to AKS
+#   3. Plugin image pushed: az acr build -r <acr> -t mxform-plugin:0.1.0 .
+#   4. PingAM image pushed: az acr build -r <acr> -t pingam:8.0.2 .
+#   5. Secrets and ConfigMaps created (same as local — see ops guide)
+############################################################
+
+############################################################
+# Global overrides
+############################################################
+global:
+  image:
+    # Pull from ACR. AKS uses managed identity for ACR pull — no
+    # imagePullSecrets needed if ACR is attached to the AKS cluster
+    # via `az aks update --attach-acr <acr-name>`.
+    pullPolicy: Always
+
+############################################################
+# Init container override — ACR image instead of hostPath
+#
+# The local deployment uses a hostPath volume pointing at the
+# build output directory. On AKS, we build a minimal container
+# image containing the shadow JAR and pull it from ACR.
+#
+# Dockerfile for plugin image:
+#   FROM scratch
+#   COPY adapter-pingaccess/build/libs/adapter-pingaccess-0.1.0-SNAPSHOT.jar /
+#
+# Push:
+#   az acr build -r <acr-name> \
+#     -t mxform-plugin:0.1.0 \
+#     -f deployments/platform/k8s/docker/Dockerfile.plugin .
+############################################################
+initContainers:
+  mxform-plugin:
+    name: mxform-plugin-init
+    # Replace <acr-name> with your ACR login server
+    # e.g., mxformacr.azurecr.io/mxform-plugin:0.1.0
+    image: <acr-name>.azurecr.io/mxform-plugin:0.1.0
+    command:
+      - sh
+      - -c
+      - |
+        echo "Copying message-xform plugin JAR..."
+        cp /adapter-pingaccess-0.1.0-SNAPSHOT.jar /target/message-xform-adapter.jar
+        ls -la /target/
+        echo "Done."
+    volumeMounts:
+      # No mxform-jar-source mount — the JAR is baked into the image
+      - name: mxform-deploy
+        mountPath: /target
+
+############################################################
+# Volume override — remove hostPath, keep emptyDir
+#
+# The local hostPath volume (mxform-jar-source) is not available
+# on AKS. The init container image contains the JAR directly.
+############################################################
+volumes:
+  # mxform-jar-source is intentionally omitted — no hostPath on AKS
+  mxform-deploy:
+    emptyDir: {}
+
+############################################################
+# PingDirectory — AKS StorageClass
+############################################################
+pingdirectory:
+  persistentvolume:
+    enabled: true
+    volumes:
+      out-dir:
+        mountPath: /opt/out
+        persistentVolumeClaim:
+          accessModes:
+            - ReadWriteOnce
+          # Azure Managed Disk CSI driver (default on AKS 1.26+)
+          # Premium SSD: managed-csi-premium
+          # Standard SSD: managed-csi (sufficient for dev/test)
+          storageClassName: managed-csi
+          resources:
+            requests:
+              storage: 2Gi
+############################################################
+# PingAccess — no changes needed beyond init container
+# (handled globally above)
+############################################################
+# pingaccess-admin and pingaccess-engine inherit the global
+# init container override. No additional AKS-specific changes.

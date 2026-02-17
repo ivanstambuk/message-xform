@@ -1,0 +1,15 @@
+# Plugin init container image for cloud deployments
+#
+# Packages the message-xform PingAccess adapter shadow JAR into a
+# minimal container for use as a Kubernetes init container. This
+# replaces the hostPath volume used in local k3s deployments.
+#
+# Build from the project root:
+#   docker build -t mxform-plugin:0.1.0 \
+#     -f deployments/platform/k8s/docker/Dockerfile.plugin .
+#
+# The init container copies the JAR to an emptyDir shared with
+# the PingAccess containers (see values-*.yaml for mount config).
+
+FROM busybox:1.36
+COPY adapter-pingaccess/build/libs/adapter-pingaccess-0.1.0-SNAPSHOT.jar /

@@ -1,0 +1,98 @@
+############################################################
+# message-xform Platform — GKE (Google Kubernetes Engine) Overlay
+#
+# Usage:
+#   helm install platform pingidentity/ping-devops \
+#     -n message-xform --create-namespace \
+#     -f k8s/values-local.yaml \
+#     -f k8s/values-gke.yaml
+#
+# This overlay is applied AFTER values-local.yaml and overrides
+# only the settings that differ for GKE:
+#   - StorageClass: standard-rwo (pd-balanced) or premium-rwo (pd-ssd)
+#   - Container images: Artifact Registry
+#   - Init container: Artifact Registry image instead of hostPath volume
+#
+# Prerequisites:
+#   1. GKE cluster with kubectl access configured
+#   2. Artifact Registry repository created
+#   3. Plugin image pushed (see instructions below)
+#   4. PingAM image pushed (see instructions below)
+#   5. Workload Identity configured for image pull (or imagePullSecrets)
+#   6. Secrets and ConfigMaps created (same as local — see ops guide)
+############################################################
+
+############################################################
+# Global overrides
+############################################################
+global:
+  image:
+    pullPolicy: Always
+
+############################################################
+# Init container override — Artifact Registry image
+#
+# The local deployment uses a hostPath volume pointing at the
+# build output directory. On GKE, we build a minimal container
+# image containing the shadow JAR and push it to Artifact Registry.
+#
+# Dockerfile for plugin image:
+#   FROM scratch
+#   COPY adapter-pingaccess/build/libs/adapter-pingaccess-0.1.0-SNAPSHOT.jar /
+#
+# Push:
+#   gcloud builds submit \
+#     --tag <region>-docker.pkg.dev/<project>/<repo>/mxform-plugin:0.1.0 \
+#     -f deployments/platform/k8s/docker/Dockerfile.plugin .
+#
+#   OR with docker:
+#   docker build -t <region>-docker.pkg.dev/<project>/<repo>/mxform-plugin:0.1.0 \
+#     -f deployments/platform/k8s/docker/Dockerfile.plugin .
+#   docker push <region>-docker.pkg.dev/<project>/<repo>/mxform-plugin:0.1.0
+############################################################
+initContainers:
+  mxform-plugin:
+    name: mxform-plugin-init
+    # Replace with your Artifact Registry path
+    # e.g., us-central1-docker.pkg.dev/my-project/mxform/mxform-plugin:0.1.0
+    image: <region>-docker.pkg.dev/<project>/<repo>/mxform-plugin:0.1.0
+    command:
+      - sh
+      - -c
+      - |
+        echo "Copying message-xform plugin JAR..."
+        cp /adapter-pingaccess-0.1.0-SNAPSHOT.jar /target/message-xform-adapter.jar
+        ls -la /target/
+        echo "Done."
+    volumeMounts:
+      - name: mxform-deploy
+        mountPath: /target
+
+############################################################
+# Volume override — remove hostPath, keep emptyDir
+############################################################
+volumes:
+  mxform-deploy:
+    emptyDir: {}
+
+############################################################
+# PingDirectory — GKE StorageClass
+############################################################
+pingdirectory:
+  persistentvolume:
+    enabled: true
+    volumes:
+      out-dir:
+        mountPath: /opt/out
+        persistentVolumeClaim:
+          accessModes:
+            - ReadWriteOnce
+          # GKE StorageClasses:
+          #   standard-rwo  — pd-balanced (SSD-like perf, lower cost) — DEFAULT on GKE 1.26+
+          #   premium-rwo   — pd-ssd (highest IOPS)
+          #   standard      — pd-standard (HDD, cheapest but slowest)
+          # For LDAP workloads, standard-rwo is the sweet spot.
+          storageClassName: standard-rwo
+          resources:
+            requests:
+              storage: 2Gi

@@ -158,11 +158,11 @@ Document cloud-specific values overlays for the three major providers.
 
 | Step | Task | Done |
 |------|------|------|
-| 6.1 | Create `k8s/values-aks.yaml` — AKS-specific: StorageClass, Ingress (AGIC), ACR image refs | |
-| 6.2 | Create `k8s/values-gke.yaml` — GKE-specific: StorageClass, GCE Ingress, GCR/Artifact Registry | |
-| 6.3 | Create `k8s/values-eks.yaml` — EKS-specific: StorageClass (gp3), ALB Ingress, ECR | |
-| 6.4 | Document container registry push process for each cloud | |
-| 6.5 | Document cert-manager setup for production TLS | |
+| 6.1 | Create `k8s/values-aks.yaml` — AKS-specific: StorageClass, Ingress (AGIC), ACR image refs | ✅ |
+| 6.2 | Create `k8s/values-gke.yaml` — GKE-specific: StorageClass, GCE Ingress, GCR/Artifact Registry | ✅ |
+| 6.3 | Create `k8s/values-eks.yaml` — EKS-specific: StorageClass (gp3), ALB Ingress, ECR | ✅ |
+| 6.4 | Document container registry push process for each cloud | ✅ `k8s/cloud-deployment-guide.md` §3–6 |
+| 6.5 | Document cert-manager setup for production TLS | ✅ `k8s/cloud-deployment-guide.md` §8 |
 
 ### Phase 7 — Docker Compose Removal & Documentation *(~1 session)*
 Remove the old stack, rewrite the deployment guide.

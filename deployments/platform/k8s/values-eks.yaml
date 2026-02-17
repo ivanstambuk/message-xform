@@ -1,0 +1,105 @@
+############################################################
+# message-xform Platform — EKS (Amazon Elastic Kubernetes Service) Overlay
+#
+# Usage:
+#   helm install platform pingidentity/ping-devops \
+#     -n message-xform --create-namespace \
+#     -f k8s/values-local.yaml \
+#     -f k8s/values-eks.yaml
+#
+# This overlay is applied AFTER values-local.yaml and overrides
+# only the settings that differ for EKS:
+#   - StorageClass: gp3 (EBS CSI driver)
+#   - Container images: ECR (Elastic Container Registry)
+#   - Init container: ECR image instead of hostPath volume
+#
+# Prerequisites:
+#   1. EKS cluster with kubectl access configured
+#   2. ECR repositories created for plugin and PingAM images
+#   3. EBS CSI driver addon installed on the EKS cluster
+#   4. IAM role for service account (IRSA) or node role with ECR pull permissions
+#   5. Plugin image pushed (see instructions below)
+#   6. PingAM image pushed (see instructions below)
+#   7. Secrets and ConfigMaps created (same as local — see ops guide)
+############################################################
+
+############################################################
+# Global overrides
+############################################################
+global:
+  image:
+    pullPolicy: Always
+
+############################################################
+# Init container override — ECR image
+#
+# The local deployment uses a hostPath volume pointing at the
+# build output directory. On EKS, we build a minimal container
+# image containing the shadow JAR and push it to ECR.
+#
+# Dockerfile for plugin image:
+#   FROM scratch
+#   COPY adapter-pingaccess/build/libs/adapter-pingaccess-0.1.0-SNAPSHOT.jar /
+#
+# Push:
+#   # Authenticate Docker to ECR
+#   aws ecr get-login-password --region <region> | \
+#     docker login --username AWS --password-stdin <account>.dkr.ecr.<region>.amazonaws.com
+#
+#   # Build and push
+#   docker build -t <account>.dkr.ecr.<region>.amazonaws.com/mxform-plugin:0.1.0 \
+#     -f deployments/platform/k8s/docker/Dockerfile.plugin .
+#   docker push <account>.dkr.ecr.<region>.amazonaws.com/mxform-plugin:0.1.0
+############################################################
+initContainers:
+  mxform-plugin:
+    name: mxform-plugin-init
+    # Replace with your ECR repository URI
+    # e.g., 123456789012.dkr.ecr.eu-west-1.amazonaws.com/mxform-plugin:0.1.0
+    image: <account>.dkr.ecr.<region>.amazonaws.com/mxform-plugin:0.1.0
+    command:
+      - sh
+      - -c
+      - |
+        echo "Copying message-xform plugin JAR..."
+        cp /adapter-pingaccess-0.1.0-SNAPSHOT.jar /target/message-xform-adapter.jar
+        ls -la /target/
+        echo "Done."
+    volumeMounts:
+      - name: mxform-deploy
+        mountPath: /target
+
+############################################################
+# Volume override — remove hostPath, keep emptyDir
+############################################################
+volumes:
+  mxform-deploy:
+    emptyDir: {}
+
+############################################################
+# PingDirectory — EKS StorageClass
+############################################################
+pingdirectory:
+  persistentvolume:
+    enabled: true
+    volumes:
+      out-dir:
+        mountPath: /opt/out
+        persistentVolumeClaim:
+          accessModes:
+            - ReadWriteOnce
+          # EKS StorageClasses (EBS CSI driver required):
+          #   gp3  — General Purpose SSD v3 (default, best value — 3000 IOPS baseline)
+          #   gp2  — General Purpose SSD v2 (legacy, IOPS scales with size)
+          #   io2  — Provisioned IOPS SSD (highest perf, most expensive)
+          #
+          # IMPORTANT: The EBS CSI driver addon must be installed on the
+          # EKS cluster. On EKS 1.23+, it is NOT installed by default.
+          # Install via:
+          #   aws eks create-addon --cluster-name <name> --addon-name aws-ebs-csi-driver
+          #   OR eksctl:
+          #   eksctl create addon --name aws-ebs-csi-driver --cluster <name>
+          storageClassName: gp3
+          resources:
+            requests:
+              storage: 2Gi
