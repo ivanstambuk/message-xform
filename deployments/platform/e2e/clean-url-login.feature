@@ -71,9 +71,9 @@ Feature: Clean URL Routing — Login — E2E
     # tokenId stripped from body
     And match response.tokenId == '#notpresent'
     # Session cookie injected
-    And match responseHeaders['Set-Cookie'][0] contains 'iPlanetDirectoryPro='
-    And match responseHeaders['Set-Cookie'][0] contains 'HttpOnly'
-    And match responseHeaders['Set-Cookie'][0] contains 'Secure'
+    And match responseHeaders['set-cookie'][0] contains 'iPlanetDirectoryPro='
+    And match responseHeaders['set-cookie'][0] contains 'HttpOnly'
+    And match responseHeaders['set-cookie'][0] contains 'Secure'
     # Provider header
     And match responseHeaders['x-auth-provider'][0] == 'PingAM'
 

@@ -2,21 +2,30 @@ function fn() {
     // ---------------------------------------------------------------------------
     // Karate global configuration for Platform E2E tests
     // ---------------------------------------------------------------------------
-    // Target: PingAccess + PingAM + PingDirectory (3-container docker-compose)
+    // Target: PingAccess + PingAM + PingDirectory
+    //
+    // Environments:
+    //   docker (default) — 3-container docker-compose, port-mapped
+    //   k8s              — k3s cluster, Traefik IngressRoute + port-forward
     //
     // Runner: standalone Karate JAR (no Gradle submodule)
     //   java -jar karate.jar .    OR    ./run-e2e.sh
     //
-    // Port mapping (docker-compose → host):
+    // Docker Compose port mapping:
     //   PA Engine:  3000 → 13000 (HTTPS)
     //   PA Admin:   9000 → 19000 (HTTPS)
     //   AM HTTP:    8080 → 18080
     //   AM HTTPS:   8443 → 18443
     //   PD LDAPS:   1636 → 1636
     //
+    // K8s port access:
+    //   PA Engine:  https://localhost (port 443 via Traefik IngressRoute)
+    //   PA Admin:   kubectl port-forward svc/pingaccess-admin 29000:9000 -n message-xform
+    //   AM Direct:  kubectl port-forward svc/pingam 28080:8080 -n message-xform
+    //
     // Prerequisites:
-    //   cd deployments/platform && docker compose up -d
-    //   Wait for all containers to be healthy before running tests.
+    //   Docker:  cd deployments/platform && docker compose up -d
+    //   K8s:     All pods Running + port-forwards active (see run-e2e.sh --env k8s)
     // ---------------------------------------------------------------------------
 
     var env = karate.env || 'docker';
@@ -94,9 +103,45 @@ function fn() {
     };
 
     // Environment-specific overrides
-    if (env === 'ci') {
+    if (env === 'k8s') {
+        karate.log('K8s environment — using Traefik Ingress + port-forward');
+        // PA engine: Traefik IngressRoute on port 443 (default HTTPS)
+        // PA has *:443 VH — no explicit Host header override needed
+        config.paEngineUrl = 'https://localhost';
+        config.paEngineHost = 'localhost';  // matches *:443 VH (implied port for HTTPS)
+
+        // PA Admin: port-forwarded from K8s service
+        config.paAdminUrl = 'https://localhost:29000/pa-admin-api/v3';
+        config.paPassword = '2Access';     // matches values-local.yaml
+
+        // AM direct: port-forwarded from K8s service
+        config.amDirectUrl = 'http://127.0.0.1:28080/am';
+
+        // AM through PA — same paths, different base URL (Traefik port 443)
+        config.loginUrl = 'https://localhost/am/json/authenticate';
+        config.logoutUrl = 'https://localhost/am/json/sessions/?_action=logout';
+        config.passkeyUrl = 'https://localhost/am/json/authenticate';
+        config.passkeyUsernamelessUrl = 'https://localhost/am/json/authenticate';
+
+        // Clean URL endpoints — same paths, Traefik base
+        config.cleanLoginUrl = 'https://localhost/api/v1/auth/login';
+        config.cleanPasskeyUrl = 'https://localhost/api/v1/auth/passkey';
+        config.cleanPasskeyUsernamelessUrl = 'https://localhost/api/v1/auth/passkey/usernameless';
+
+        // Logout through PA (Traefik)
+        config.logoutUrl = 'https://localhost/am/json/sessions/?_action=logout';
+
+        // AM Host header for direct AM admin calls (K8s service name)
+        config.amHostHeader = 'pingam:8080';  // matches boot.json instance URL
+    } else if (env === 'ci') {
         karate.log('CI environment — using default ports');
     }
+
+    // Normalize response header keys to lowercase for case-insensitive matching.
+    // Required because Traefik (K8s Ingress) title-cases HTTP/1.1 headers, e.g.
+    // x-auth-session → X-Auth-Session. PA sends lowercase. Without this, header
+    // assertions fail when running behind an Ingress controller.
+    karate.configure('lowerCaseResponseHeaders', true);
 
     // Karate SSL configuration — skip TLS verification for self-signed certs
     karate.configure('ssl', true);

@@ -75,9 +75,9 @@ Feature: Username/Password Login — E2E
     And match response.tokenId == '#notpresent'
     And match response._tokenId == '#notpresent'
     # Session cookie should be set (injected by dynamic header expr)
-    And match responseHeaders['Set-Cookie'][0] contains 'iPlanetDirectoryPro='
-    And match responseHeaders['Set-Cookie'][0] contains 'HttpOnly'
-    And match responseHeaders['Set-Cookie'][0] contains 'Secure'
+    And match responseHeaders['set-cookie'][0] contains 'iPlanetDirectoryPro='
+    And match responseHeaders['set-cookie'][0] contains 'HttpOnly'
+    And match responseHeaders['set-cookie'][0] contains 'Secure'
     # Provider header
     And match responseHeaders['x-auth-provider'][0] == 'PingAM'
 
