@@ -9,8 +9,8 @@
     },
     "innerNodes": {},
     "nodes": {
-        "ds-usr-01": {
-            "_id": "ds-usr-01",
+        "bc60858b-fd69-4d8a-aef8-4b5fcd226620": {
+            "_id": "bc60858b-fd69-4d8a-aef8-4b5fcd226620",
             "_rev": "1",
             "_type": {
                 "_id": "UsernameCollectorNode",
@@ -24,8 +24,8 @@
                 }
             ]
         },
-        "ds-pwd-01": {
-            "_id": "ds-pwd-01",
+        "626161d3-c2ec-43cb-9e1a-9ee5a5b38770": {
+            "_id": "626161d3-c2ec-43cb-9e1a-9ee5a5b38770",
             "_rev": "1",
             "_type": {
                 "_id": "PasswordCollectorNode",
@@ -39,8 +39,8 @@
                 }
             ]
         },
-        "ds-ds-01": {
-            "_id": "ds-ds-01",
+        "8873eae0-5e9f-4c8e-8c8b-b2500ae232a5": {
+            "_id": "8873eae0-5e9f-4c8e-8c8b-b2500ae232a5",
             "_rev": "1",
             "_type": {
                 "_id": "DataStoreDecisionNode",
@@ -58,8 +58,8 @@
                 }
             ]
         },
-        "ds-verify-01": {
-            "_id": "ds-verify-01",
+        "d342f919-b2fe-44fd-b38e-8e4d6036f39d": {
+            "_id": "d342f919-b2fe-44fd-b38e-8e4d6036f39d",
             "_rev": "1",
             "challenge": true,
             "sharedStateAttribute": "",
@@ -84,7 +84,7 @@
             ],
             "_type": {
                 "_id": "DeviceSigningVerifierNode",
-                "name": "Device Signing Verifier Node",
+                "name": "Device Signing Verifier",
                 "collection": true
             },
             "_outcomes": [
@@ -121,39 +121,39 @@
         "_id": "DeviceSigningJourney",
         "_rev": "1",
         "uiConfig": {},
-        "entryNodeId": "ds-usr-01",
+        "entryNodeId": "bc60858b-fd69-4d8a-aef8-4b5fcd226620",
         "innerTreeOnly": false,
         "nodes": {
-            "ds-usr-01": {
+            "bc60858b-fd69-4d8a-aef8-4b5fcd226620": {
                 "displayName": "Username Collector",
                 "nodeType": "UsernameCollectorNode",
                 "x": 70,
                 "y": 50,
                 "connections": {
-                    "outcome": "ds-pwd-01"
+                    "outcome": "626161d3-c2ec-43cb-9e1a-9ee5a5b38770"
                 }
             },
-            "ds-pwd-01": {
+            "626161d3-c2ec-43cb-9e1a-9ee5a5b38770": {
                 "displayName": "Password Collector",
                 "nodeType": "PasswordCollectorNode",
                 "x": 70,
                 "y": 200,
                 "connections": {
-                    "outcome": "ds-ds-01"
+                    "outcome": "8873eae0-5e9f-4c8e-8c8b-b2500ae232a5"
                 }
             },
-            "ds-ds-01": {
+            "8873eae0-5e9f-4c8e-8c8b-b2500ae232a5": {
                 "displayName": "Data Store Decision",
                 "nodeType": "DataStoreDecisionNode",
                 "x": 70,
                 "y": 400,
                 "connections": {
-                    "true": "ds-verify-01",
+                    "true": "d342f919-b2fe-44fd-b38e-8e4d6036f39d",
                     "false": "e301438c-0bd0-429c-ab0c-66126501069a"
                 }
             },
-            "ds-verify-01": {
-                "displayName": "Device Signing Verifier Node",
+            "d342f919-b2fe-44fd-b38e-8e4d6036f39d": {
+                "displayName": "Device Signing Verifier",
                 "nodeType": "DeviceSigningVerifierNode",
                 "x": 400,
                 "y": 400,

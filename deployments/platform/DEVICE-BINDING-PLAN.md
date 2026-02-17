@@ -1,8 +1,8 @@
 # Device Binding Implementation Plan
 
-> **Status**: 🟡 In Progress — Phase 1
+> **Status**: 🟡 In Progress — Phase 1 Complete
 > **Created**: 2026-02-17
-> **Last Updated**: 2026-02-17 21:35
+> **Last Updated**: 2026-02-17 22:10
 
 ## Overview
 
@@ -25,8 +25,9 @@ Define the authentication trees (journeys) for device binding and verification.
 | 1.1 | Create `DeviceBindingJourney.journey.json` (registration flow) | ✅ |
 | 1.2 | Create `DeviceSigningJourney.journey.json` (verification flow) | ✅ |
 | 1.3 | Create `setup-device-binding.sh` (service + import) | ✅ |
-| 1.4 | Enable `DeviceBindingService` in realm config | ⬜ Needs running AM |
-| 1.5 | Test import + smoke test via curl | ⬜ Needs running AM |
+| 1.4 | Apply `boundDevices` LDAP schema to PingDirectory | ✅ |
+| 1.5 | Enable `DeviceBindingService` in realm config (encryption=NONE) | ✅ |
+| 1.6 | Import journeys and verify `DeviceBindingCallback` returned | ✅ |
 
 **Registration journey flow:**
 ```
@@ -176,3 +177,36 @@ Create message-xform JSLT transforms and clean URL routing.
 |----------|---------|-------|
 | `deviceBindingAttrName` | `boundDevices` | LDAP attribute storing bound device data |
 | `deviceBindingSettingsEncryptionScheme` | `NONE` | Use `NONE` for dev/test |
+
+---
+
+## Gotchas Discovered
+
+### 1. Node IDs MUST be UUIDs
+PingAM 8 requires UUID-format node IDs (e.g. `cd24c56f-f967-4345-a0c3-3ae9f80a9c61`).
+Human-readable IDs like `db-usr-01` cause the cryptic `"No Configuration found"` error
+at journey invocation time, even though the tree and nodes import successfully.
+
+### 2. `applicationIds` cannot be empty
+Both `DeviceBindingNode` and `DeviceSigningVerifierNode` require at least one value in
+their `applicationIds` array. An empty `[]` causes `"Values for Application Ids is required."`
+error on node creation.
+
+### 3. PD `boundDevices` schema must be applied
+The `boundDevices` LDAP attribute (OID `1.3.6.1.4.1.36733.2.2.1.14`) does NOT exist in
+PD by default. It must be applied from AM's template LDIF:
+```bash
+kubectl exec -n $NS deploy/pingam -- cat \
+  /usr/local/tomcat/webapps/am/WEB-INF/template/ldif/pingdirectory/pingdirectory_bounddevices.ldif \
+  | kubectl exec -i -n $NS pingdirectory-0 -- ldapmodify -p 1636 --useSSL --trustAll \
+      -D "cn=administrator" -w "2FederateM0re"
+```
+Without this, DeviceBindingService initialization fails silently.
+
+### 4. `DeviceBindingStorageNode` is required
+The `DeviceBindingNode` generates keys but does NOT persist them.
+`DeviceBindingStorageNode` must follow in the tree to actually write bound device data
+to the user's LDAP entry.
+
+### 5. Test users start at `user.1`
+PingDirectory K8s deployment creates users starting at `user.1`, not `user.0`.

@@ -9,8 +9,8 @@
   },
   "innerNodes": {},
   "nodes": {
-    "db-usr-01": {
-      "_id": "db-usr-01",
+    "cd24c56f-f967-4345-a0c3-3ae9f80a9c61": {
+      "_id": "cd24c56f-f967-4345-a0c3-3ae9f80a9c61",
       "_rev": "1",
       "_type": {
         "_id": "UsernameCollectorNode",
@@ -18,11 +18,14 @@
         "collection": true
       },
       "_outcomes": [
-        { "id": "outcome", "displayName": "Outcome" }
+        {
+          "id": "outcome",
+          "displayName": "Outcome"
+        }
       ]
     },
-    "db-pwd-01": {
-      "_id": "db-pwd-01",
+    "76db39a5-6344-43b3-819f-9a0e43701dad": {
+      "_id": "76db39a5-6344-43b3-819f-9a0e43701dad",
       "_rev": "1",
       "_type": {
         "_id": "PasswordCollectorNode",
@@ -30,11 +33,14 @@
         "collection": true
       },
       "_outcomes": [
-        { "id": "outcome", "displayName": "Outcome" }
+        {
+          "id": "outcome",
+          "displayName": "Outcome"
+        }
       ]
     },
-    "db-ds-01": {
-      "_id": "db-ds-01",
+    "b991b2a8-6681-4150-b20b-c38ddbb12a79": {
+      "_id": "b991b2a8-6681-4150-b20b-c38ddbb12a79",
       "_rev": "1",
       "_type": {
         "_id": "DataStoreDecisionNode",
@@ -42,34 +48,86 @@
         "collection": true
       },
       "_outcomes": [
-        { "id": "true", "displayName": "True" },
-        { "id": "false", "displayName": "False" }
+        {
+          "id": "true",
+          "displayName": "True"
+        },
+        {
+          "id": "false",
+          "displayName": "False"
+        }
       ]
     },
-    "db-bind-01": {
-      "_id": "db-bind-01",
+    "e917bb72-b32c-4bfc-82d3-aa4209aec8a9": {
+      "_id": "e917bb72-b32c-4bfc-82d3-aa4209aec8a9",
       "_rev": "1",
       "authenticationType": "NONE",
-      "title": { "en": "Device Binding" },
-      "subtitle": { "en": "Bind this device to your account" },
-      "description": { "en": "No biometric required (headless test mode)" },
-      "applicationIds": ["com.example.test"],
+      "title": {
+        "en": "Device Binding"
+      },
+      "subtitle": {
+        "en": "Bind this device to your account"
+      },
+      "description": {
+        "en": "No biometric required (headless test mode)"
+      },
+      "applicationIds": [
+        "com.example.test"
+      ],
       "timeout": 60,
       "maxSavedDevices": 0,
       "attestation": false,
       "postponeDeviceProfileStorage": false,
-      "clientErrorOutcomes": ["Abort", "Unsupported", "Timeout"],
+      "clientErrorOutcomes": [
+        "Abort",
+        "Unsupported",
+        "Timeout"
+      ],
       "_type": {
         "_id": "DeviceBindingNode",
-        "name": "Device Binding Node",
+        "name": "Device Binding",
         "collection": true
       },
       "_outcomes": [
-        { "id": "success", "displayName": "Success" },
-        { "id": "failure", "displayName": "Failure" },
-        { "id": "Abort", "displayName": "Abort" },
-        { "id": "Unsupported", "displayName": "Unsupported" },
-        { "id": "Timeout", "displayName": "Timeout" }
+        {
+          "id": "success",
+          "displayName": "Success"
+        },
+        {
+          "id": "failure",
+          "displayName": "Failure"
+        },
+        {
+          "id": "Abort",
+          "displayName": "Abort"
+        },
+        {
+          "id": "Unsupported",
+          "displayName": "Unsupported"
+        },
+        {
+          "id": "Timeout",
+          "displayName": "Timeout"
+        }
+      ]
+    },
+    "a676b5b7-0e1c-46a2-8da5-062e7f08f659": {
+      "_id": "a676b5b7-0e1c-46a2-8da5-062e7f08f659",
+      "_rev": "1",
+      "_type": {
+        "_id": "DeviceBindingStorageNode",
+        "name": "Device Binding Storage",
+        "collection": true
+      },
+      "_outcomes": [
+        {
+          "id": "true",
+          "displayName": "True"
+        },
+        {
+          "id": "false",
+          "displayName": "False"
+        }
       ]
     }
   },
@@ -83,48 +141,58 @@
     "_id": "DeviceBindingJourney",
     "_rev": "1",
     "uiConfig": {},
-    "entryNodeId": "db-usr-01",
+    "entryNodeId": "cd24c56f-f967-4345-a0c3-3ae9f80a9c61",
     "innerTreeOnly": false,
     "nodes": {
-      "db-usr-01": {
+      "cd24c56f-f967-4345-a0c3-3ae9f80a9c61": {
         "displayName": "Username Collector",
         "nodeType": "UsernameCollectorNode",
         "x": 70,
         "y": 50,
         "connections": {
-          "outcome": "db-pwd-01"
+          "outcome": "76db39a5-6344-43b3-819f-9a0e43701dad"
         }
       },
-      "db-pwd-01": {
+      "76db39a5-6344-43b3-819f-9a0e43701dad": {
         "displayName": "Password Collector",
         "nodeType": "PasswordCollectorNode",
         "x": 70,
         "y": 200,
         "connections": {
-          "outcome": "db-ds-01"
+          "outcome": "b991b2a8-6681-4150-b20b-c38ddbb12a79"
         }
       },
-      "db-ds-01": {
+      "b991b2a8-6681-4150-b20b-c38ddbb12a79": {
         "displayName": "Data Store Decision",
         "nodeType": "DataStoreDecisionNode",
         "x": 70,
         "y": 400,
         "connections": {
-          "true": "db-bind-01",
+          "true": "e917bb72-b32c-4bfc-82d3-aa4209aec8a9",
           "false": "e301438c-0bd0-429c-ab0c-66126501069a"
         }
       },
-      "db-bind-01": {
-        "displayName": "Device Binding Node",
+      "e917bb72-b32c-4bfc-82d3-aa4209aec8a9": {
+        "displayName": "Device Binding",
         "nodeType": "DeviceBindingNode",
         "x": 400,
         "y": 400,
         "connections": {
-          "success": "70e691a5-1e33-4ac3-a356-e7b6d60d92e0",
+          "success": "a676b5b7-0e1c-46a2-8da5-062e7f08f659",
           "failure": "e301438c-0bd0-429c-ab0c-66126501069a",
           "Abort": "e301438c-0bd0-429c-ab0c-66126501069a",
           "Unsupported": "e301438c-0bd0-429c-ab0c-66126501069a",
           "Timeout": "e301438c-0bd0-429c-ab0c-66126501069a"
+        }
+      },
+      "a676b5b7-0e1c-46a2-8da5-062e7f08f659": {
+        "displayName": "Device Binding Storage",
+        "nodeType": "DeviceBindingStorageNode",
+        "x": 700,
+        "y": 400,
+        "connections": {
+          "true": "70e691a5-1e33-4ac3-a356-e7b6d60d92e0",
+          "false": "e301438c-0bd0-429c-ab0c-66126501069a"
         }
       }
     },
@@ -134,11 +202,11 @@
         "y": 50
       },
       "70e691a5-1e33-4ac3-a356-e7b6d60d92e0": {
-        "x": 700,
+        "x": 1000,
         "y": 200
       },
       "e301438c-0bd0-429c-ab0c-66126501069a": {
-        "x": 700,
+        "x": 1000,
         "y": 500
       }
     },
