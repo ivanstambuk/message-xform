@@ -892,29 +892,38 @@ The `WebAuthnJourney` tree enables passwordless authentication using
 FIDO2/WebAuthn passkeys. It is adapted from the webinar reference journey
 (`WebinarJourneyWebAuthN.journey.json`) with local-environment overrides.
 
-#### Journey flow
+#### Journey flow (complete wiring)
 
 ```
-Start → Username Collector
-  → WebAuthn Authentication
-      ├─ Device registered → ✓ Success
-      └─ No device → Password Collector → DataStore Decision
-                       → Match? → WebAuthn Registration → Recovery Codes
-                           → loop back to WebAuthn Auth
-                       → No Match? → ✗ Failure
+Start → UsernameCollector → WebAuthnAuth
+  ├─ success → ✓ SUCCESS (tokenId)
+  ├─ noDevice → PasswordCollector → DataStoreDecision
+  │               ├─ true → WebAuthnRegistration
+  │               │           ├─ success → RecoveryCodeDisplay → WebAuthnAuth (loop)
+  │               │           └─ failure/error/unsupported → ✗ FAILURE
+  │               └─ false → ✗ FAILURE
+  ├─ recoveryCode → RecoveryCodeCollectorDecision
+  │                   ├─ true (valid code) → ✓ SUCCESS
+  │                   └─ false (invalid) → ✗ FAILURE
+  ├─ failure/error/unsupported → ✗ FAILURE
 ```
+
+> **Key insight:** The WebAuthn Authentication node has **6 outcomes**, not just
+> success/noDevice. The `recoveryCode` outcome is triggered when the user selects
+> "Use Recovery Code" via the ConfirmationCallback. See [gotchas](#webauthn-e2e-gotchas)
+> for why this matters.
 
 #### Node inventory
 
 | Node Type | UUID | Key Settings |
 |-----------|------|-------------|
 | UsernameCollectorNode | `2d90dc82-...` | — |
-| WebAuthnAuthenticationNode | `f1e03c7e-...` | RP=localhost, origins=[https://localhost:13000] |
+| WebAuthnAuthenticationNode | `f1e03c7e-...` | RP=localhost, origins=[https://localhost:13000], `isRecoveryCodeAllowed:true` |
 | PasswordCollectorNode | `3946ca73-...` | — |
 | DataStoreDecisionNode | `4d9af624-...` | — |
 | WebAuthnRegistrationNode | `7adf255e-...` | RP=localhost, name=Platform Local |
 | RecoveryCodeDisplayNode | `7e41a4ca-...` | — |
-| RecoveryCodeCollectorDecisionNode | `0efd4461-...` | — |
+| RecoveryCodeCollectorDecisionNode | `0efd4461-...` | `recoveryCodeType:OATH` |
 
 #### WebAuthn node configuration
 
@@ -943,18 +952,47 @@ Start → Username Collector
 #### WebAuthn callback structure
 
 When the journey reaches a WebAuthn node (registration or authentication),
-AM returns 3 callbacks:
+AM returns 3–4 callbacks:
 
 | # | Callback Type | Purpose |
 |---|--------------|--------|
 | 0 | `TextOutputCallback` | JavaScript calling `navigator.credentials.create()` or `.get()` |
 | 1 | `TextOutputCallback` | UI helper JavaScript for rendering |
-| 2 | `HiddenValueCallback` | Client submits `webAuthnOutcome` (Base64URL attestation/assertion) |
+| 2 | `HiddenValueCallback` | Client submits `webAuthnOutcome` (JSON with legacyData) |
+| 3 | `ConfirmationCallback` | *(Auth only)* "Use Recovery Code" option |
+
+The `ConfirmationCallback` is only present on **authentication** challenges
+(when `isRecoveryCodeAllowed` is true). See [gotchas](#webauthn-e2e-gotchas).
 
 Special values for `webAuthnOutcome`:
 - `"unsupported"` — WebAuthn not available in the browser
-- `"ERROR::..."` — Error during ceremony
-- Base64URL-encoded response — Successful registration/authentication
+- `{"error":"..."}` — Error during ceremony (JSON)
+- `{"legacyData":"...","authenticatorAttachment":"platform"}` — Success (JSON)
+
+#### webAuthnOutcome `legacyData` format
+
+The `legacyData` field contains raw data separated by `::` delimiters:
+
+**Registration:**
+```
+clientData :: attestationObjectBytes :: credentialId
+```
+
+**Authentication:**
+```
+clientData :: authenticatorDataBytes :: signatureBytes :: rawId :: userHandle
+```
+
+Where:
+- `clientData` — raw JSON string (not base64), e.g. `{"type":"webauthn.create","challenge":"...","origin":"...","crossOrigin":false}`
+- `attestationObjectBytes` / `authenticatorDataBytes` / `signatureBytes` — comma-separated signed byte values (Int8Array `.toString()` format), e.g. `-93,99,102,...`
+- `credentialId` / `rawId` — Base64URL-encoded credential ID
+- `userHandle` — username string (`String.fromCharCode` applied to userHandle bytes)
+
+> **Escaping rule:** The `clientData` JSON contains `"` characters. Within the
+> `legacyData` JSON string, these must be escaped as `\"`. There must be exactly
+> **one level** of escaping — double-escaping (`\\"` or `\\\"`) causes AM to reject
+> the attestation with HTTP 401.
 
 #### Import
 
@@ -975,16 +1013,75 @@ curl -s -H "Host: am.platform.local:18080" \
   -H "Accept-API-Version: resource=2.0,protocol=1.0"
 ```
 
-#### Test walkthrough (user.1)
+#### Test walkthrough (full registration path)
+
+```
+Step 1: POST {} → NameCallback (enter username)
+Step 2: Submit username → WebAuthn Auth → noDevice → PasswordCallback
+Step 3: Submit password → DataStore OK → WebAuthn Registration (3 callbacks)
+Step 4: Submit webAuthnOutcome → Registration success → RecoveryCodeDisplay (TextOutputCallback)
+Step 5: Echo back → WebAuthn Auth challenge (4 callbacks: 2×TextOutput + HiddenValue + Confirmation)
+Step 6: Submit webAuthnOutcome (leave ConfirmationCallback at default!) → ✓ tokenId
+```
+
+#### WebAuthn E2E gotchas
+
+##### ConfirmationCallback trap (CRITICAL)
+
+When the WebAuthn Auth node returns a challenge with `isRecoveryCodeAllowed:true`,
+callback index 3 is a `ConfirmationCallback` with options `["Use Recovery Code"]`
+and default value `100` (not selected).
+
+**Do NOT set this to `0`**. Value `0` selects "Use Recovery Code", which triggers
+the `recoveryCode` outcome on the WebAuthn Auth node → `RecoveryCodeCollectorDecisionNode`
+→ prompts for a recovery code → infinite loop (no valid recovery code to submit).
+
+The browser's JavaScript works correctly because `loginButton_0.click()` submits
+the form with the `HiddenValueCallback` value; it does NOT explicitly set the
+`ConfirmationCallback`. The default value `100` means "not selected" and AM
+processes the assertion via the `success` outcome.
+
+##### allowCredentials parsing
+
+AM's authentication JavaScript uses `new Int8Array([...])` for credential IDs
+within the `allowCredentials` array. When parsing this in a headless client:
+
+1. **Don't use simple regex on the full script** — `allowCredentials:\s*\[...\]`
+   fails because `]` inside `Int8Array([...])` matches before the outer `]`.
+2. **Use `indexOf` + `substring`** to isolate the `allowCredentials:` section
+   (up to the next `};`), then match `Int8Array\(\[([^\]]+)\]\)` within that section.
+3. **AM uses quoted keys** — the `allowCredentials` array may contain
+   `{"id": new Int8Array([...]), "type": "public-key"}` with quoted keys,
+   not bare identifiers. Your regex must handle both formats.
+
+##### Device cleanup for repeatable tests
+
+Users accumulate WebAuthn devices across test runs. To ensure a clean state:
 
 ```bash
-# Step 1: Username → user.1
-# Step 2: WebAuthn Auth → No device → PasswordCallback
-# Step 3: Password → Password1 → DataStore OK
-# Step 4: WebAuthn Registration → 3 callbacks (JS + HiddenValue)
-# Step 5: (client submits webAuthnOutcome) → Recovery Codes
-# Step 6: → loop back to WebAuthn Auth → ✓ Success
+# Authenticate as admin
+ADMIN_TOKEN=$(curl -s -H "Host: am.platform.local:18080" \
+  -X POST "http://127.0.0.1:18080/am/json/authenticate" \
+  -H "Content-Type: application/json" \
+  -H "Accept-API-Version: resource=2.0,protocol=1.0" \
+  -H "X-OpenAM-Username: amAdmin" \
+  -H "X-OpenAM-Password: Password1" | python3 -c "import sys,json;print(json.load(sys.stdin)['tokenId'])")
+
+# List devices
+curl -s -H "Host: am.platform.local:18080" \
+  -H "iplanetDirectoryPro: ${ADMIN_TOKEN}" \
+  -H "Accept-API-Version: resource=1.0, protocol=1.0" \
+  "http://127.0.0.1:18080/am/json/realms/root/users/user.4/devices/2fa/webauthn?_queryFilter=true"
+
+# Delete each device by UUID
+curl -s -H "Host: am.platform.local:18080" \
+  -H "iplanetDirectoryPro: ${ADMIN_TOKEN}" \
+  -H "Accept-API-Version: resource=1.0, protocol=1.0" \
+  -X DELETE "http://127.0.0.1:18080/am/json/realms/root/users/user.4/devices/2fa/webauthn/${DEVICE_UUID}"
 ```
+
+> **Note:** The device API uses `Accept-API-Version: resource=1.0, protocol=1.0`
+> (different from the authentication API's `resource=2.0`).
 
 ### 10b. Importing Trees via REST API
 

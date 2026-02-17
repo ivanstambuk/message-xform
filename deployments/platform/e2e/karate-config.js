@@ -61,6 +61,8 @@ function fn() {
         // -- Test users -----------------------------------------------------------
         testUser: 'user.1',
         testPassword: 'Password1',
+        // Dedicated passkey test user (must not have a pre-registered WebAuthn device)
+        passkeyTestUser: 'user.4',
 
         // AM hostname for Host header (required for AM API calls through PA)
         amHostHeader: 'am.platform.local:18080',
