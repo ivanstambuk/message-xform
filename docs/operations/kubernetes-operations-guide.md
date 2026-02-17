@@ -18,6 +18,7 @@
 | 4 | [Ping Container Lifecycle Hooks](#4-ping-container-lifecycle-hooks) | Hook ordering, staging vs output paths |
 | 5 | [Init Container Pattern](#5-init-container-pattern) | Shadow JAR injection via busybox + emptyDir |
 | 5a | [PingAM Standalone Deployment](#5a-pingam-standalone-deployment) | Image import, PD cert trust, standalone manifest |
+| 5b | [PingAccess Admin API Configuration](#5b-pingaccess-admin-api-configuration) | Site, Apps, MessageTransform rule, password gotcha |
 | 6 | [License Mounting](#6-license-mounting) | PD and PA license Secrets |
 | 7 | [ConfigMap Mounting](#7-configmap-mounting) | Transform specs and profiles |
 | 8 | [K8s Secrets](#8-k8s-secrets) | Credentials, licenses |
@@ -318,7 +319,7 @@ The message-xform PingAccess adapter JAR is injected using an init container +
 emptyDir pattern:
 
 ```
-[hostPath: build/libs/] → [init: busybox cp] → [emptyDir] → [PA container: /opt/staging/deploy/]
+[hostPath: build/libs/] → [init: busybox cp] → [emptyDir] → [PA container: /opt/out/instance/deploy/]
 ```
 
 #### How it works
@@ -326,14 +327,17 @@ emptyDir pattern:
 1. **`mxform-jar-source`** volume: hostPath pointing at the Gradle build output directory
 2. **`mxform-deploy`** volume: emptyDir shared between init container and main container
 3. **Init container** (`busybox:1.36`): copies the JAR from source to emptyDir
-4. **Main container** mounts emptyDir at `/opt/staging/deploy/`
-5. **Hook 06** copies `/opt/staging/deploy/*` to `/opt/out/instance/deploy/`
+4. **Main container** mounts emptyDir directly at `/opt/out/instance/deploy/`
 
-#### Why `/opt/staging/deploy` and NOT `/opt/server/deploy`
-
-Mounting an emptyDir at `/opt/server/deploy` **overlays** the image's directory,
-hiding the original contents. This causes the hook 06 copy to fail or produce
-unexpected results. The staging path is the correct injection point.
+> **Critical: mount at `/opt/out/instance/deploy`, NOT `/opt/staging/deploy`.**
+>
+> The `ping-devops` container hooks do **NOT** copy `/opt/staging/deploy/` →
+> `/opt/out/instance/deploy/`. This was verified empirically: JARs placed in
+> staging/deploy are never picked up by PingAccess at runtime. The emptyDir
+> must be mounted directly at the active classpath location.
+>
+> Do NOT mount at `/opt/server/deploy` either — that overlays the image's
+> directory, hiding the original contents.
 
 #### Init container definition (from values-local.yaml)
 
@@ -369,7 +373,7 @@ pingaccess-admin:
     - mxform-deploy     # emptyDir
   volumeMounts:
     - name: mxform-deploy
-      mountPath: /opt/staging/deploy
+      mountPath: /opt/out/instance/deploy  # NOT /opt/staging/deploy!
 ```
 
 ---
@@ -480,6 +484,44 @@ curl -sf -X POST "http://localhost:8080/am/json/authenticate" \
   -H "Host: pingam"
 # Step 2: submit credentials (fill authId from step 1)
 ```
+---
+
+## 5b. PingAccess Admin API Configuration
+
+PA configuration is done via the Admin API after both admin and engine pods are
+running. All commands use `kubectl exec` against `pingaccess-admin-0`.
+
+### Admin API wrapper
+
+```bash
+PA_PASS="2FederateM0re"  # PING_IDENTITY_PASSWORD, NOT PA_ADMIN_PASSWORD_INITIAL
+
+pa_api() {
+    local method="$1" path="$2"; shift 2
+    kubectl exec pingaccess-admin-0 -n message-xform -c pingaccess-admin -- \
+      curl -sk -u "administrator:${PA_PASS}" \
+      -H 'X-XSRF-Header: PingAccess' \
+      -H 'Content-Type: application/json' \
+      -X "$method" "https://localhost:9000/pa-admin-api/v3${path}" "$@" 2>/dev/null
+}
+```
+
+### Configuration sequence
+
+1. **Create Site** — backend target is `pingam:8080` (K8s service name)
+2. **Create `/am` Application** — context root `/am`, pointing to Site
+3. **Enable Application** — GET → set `enabled=true` → PUT (full-replacement)
+4. **Set root resource** — `unprotected=true`, wildcard `/*`, all methods
+5. **Create MessageTransform rule** — `specsDir=/specs`, `profilesDir=/profiles`
+6. **Attach rule to resource** — `policy.Web = [{"type":"Rule","id":N}]`
+7. **Create `/api` Application** — same pattern for clean URL routing
+8. **Verify** — auth through PA engine, check for transformed `fields[]` output
+
+> **Key API patterns:**
+> - PA uses **full-replacement PUT** — GET the resource, modify, PUT back
+> - The `resourceOrder` field is read-only — remove it before PUT
+> - Virtual host `*:3000` (id=2) matches all traffic on K8s
+> - Site target uses K8s service name `pingam:8080`, not IP
 
 ## 6. License Mounting
 
@@ -625,6 +667,18 @@ container:
 
 > **Gotcha:** If either is missing, hook 83 (`change-password.sh`) fails with:
 > `ERROR: No valid administrator password found`
+>
+> **Password override:** `PA_ADMIN_PASSWORD_INITIAL` is only the **seed**
+> password used during initial setup. After the first start, PA uses
+> `PING_IDENTITY_PASSWORD` as the actual admin password. If the global
+> env sets `PING_IDENTITY_PASSWORD=2FederateM0re` and the product overrides
+> it to `2Access`, the product-level value wins for the API. Verify with:
+> ```bash
+> kubectl exec pingaccess-admin-0 -n message-xform -c pingaccess-admin -- \
+>   curl -sk -u "administrator:2FederateM0re" \
+>   -H "X-XSRF-Header: PingAccess" \
+>   "https://localhost:9000/pa-admin-api/v3/version"
+> ```
 
 ---
 
@@ -661,6 +715,8 @@ kubectl logs <pod-name> -n message-xform --tail=50
 | Init container `cp: can't create`: "No such file or directory" | Wrong mount path or subPath creates file instead of directory | Use emptyDir without subPath for the target (§5) |
 | `volumeMounts: null` in rendered template | `volumeMounts` placed under `container:` instead of product root | Move to product root level (§3) |
 | AM configurator `Client-Side Timeout` | PD self-signed cert CN doesn't match short service name `pingdirectory` | Use PD headless FQDN `pingdirectory-0.pingdirectory-cluster...` (§5a) |
+| PA Admin API returns 401 with `2Access` | `PA_ADMIN_PASSWORD_INITIAL` is seed only; after first start PA uses `PING_IDENTITY_PASSWORD` | Use the `PING_IDENTITY_PASSWORD` value (e.g. `2FederateM0re`) |
+| MessageTransform plugin not found (`className: NOT FOUND`) | JAR in `/opt/staging/deploy/` but not in `/opt/out/instance/deploy/` | Mount emptyDir at `/opt/out/instance/deploy` (§5) |
 
 ### Helm template debugging
 
@@ -678,7 +734,7 @@ grep -A 40 'name: pingaccess-admin$' /tmp/rendered.yaml | head -50
 
 ```bash
 # Check what's mounted inside a running pod
-kubectl exec <pod> -n message-xform -- ls -la /opt/staging/deploy/
+kubectl exec <pod> -n message-xform -- ls -la /opt/out/instance/deploy/
 kubectl exec <pod> -n message-xform -- ls /specs/
 kubectl exec <pod> -n message-xform -- ls /profiles/
 ```
