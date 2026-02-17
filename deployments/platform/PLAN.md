@@ -169,12 +169,12 @@ Remove the old stack, rewrite the deployment guide.
 
 | Step | Task | Done |
 |------|------|------|
-| 7.1 | Delete `docker-compose.yml` and `.env.template` | |
-| 7.2 | Delete Docker-specific configure scripts (or archive to `scripts/legacy/`) | |
-| 7.3 | Rewrite `platform-deployment-guide.md` for Kubernetes | |
-| 7.4 | Update `llms.txt`, `knowledge-map.md`, root `PLAN.md` | |
-| 7.5 | Update `README.md` in `deployments/platform/` | |
-| 7.6 | Final commit: remove Docker Compose artifacts | |
+| 7.1 | Delete `docker-compose.yml` and `.env.template` | ✅ |
+| 7.2 | Delete Docker-specific configure scripts (or archive to `scripts/legacy/`) | ✅ archived to `scripts/legacy/` |
+| 7.3 | Rewrite `platform-deployment-guide.md` for Kubernetes | ✅ K8s banner + cross-refs + updated prerequisites |
+| 7.4 | Update `llms.txt`, `knowledge-map.md`, root `PLAN.md` | ✅ |
+| 7.5 | Update `README.md` in `deployments/platform/` | ✅ K8s-first rewrite |
+| 7.6 | Final commit: remove Docker Compose artifacts | ✅ |
 
 ---
 

@@ -35,11 +35,14 @@ docs/operations/pingds-operations-guide.md
 # PingAM Operations & Deployment (Docker image, REST API gotchas, WebAuthn journeys, tree import, auth patterns)
 docs/operations/pingam-operations-guide.md
 
-# Platform Deployment Guide (3-container stack: PingAccess + PingAM + PingDirectory, docker-compose, WebAuthn)
+# Platform Deployment Guide (3-container stack: PingAccess + PingAM + PingDirectory, K8s + Docker, WebAuthn)
 docs/operations/platform-deployment-guide.md
 
 # Kubernetes Deployment Operations (k3s, ping-devops Helm, volume mount patterns, Ping container hooks)
 docs/operations/kubernetes-operations-guide.md
+
+# Cloud Deployment Guide (AKS/GKE/EKS values overlays, container registry push, cert-manager TLS)
+deployments/platform/k8s/cloud-deployment-guide.md
 
 # Kubernetes Migration Plan (Docker Compose → k3s/AKS/GKE/EKS, 7-phase plan, technology decisions)
 deployments/platform/PLAN.md

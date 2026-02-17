@@ -9,6 +9,19 @@
 | Last updated | 2026-02-17                                                |
 | Audience     | Developers, operators, CI/CD pipeline authors             |
 
+> **🔄 Deployment Mode: Kubernetes (primary)**
+>
+> The platform has migrated from Docker Compose to **Kubernetes** (local k3s,
+> AKS, GKE, EKS). Commands in this guide use `docker exec` for historical
+> reference — the same operations are performed via `kubectl exec` on K8s.
+>
+> **Kubernetes-specific guides:**
+> - [Kubernetes Operations Guide](./kubernetes-operations-guide.md) — k3s, Helm chart, volume mounts, Traefik
+> - [Cloud Deployment Guide](../../deployments/platform/k8s/cloud-deployment-guide.md) — AKS, GKE, EKS
+>
+> **Docker Compose scripts** have been archived to `scripts/legacy/`. The
+> `generate-keys.sh` script remains active for TLS certificate generation.
+
 ---
 
 ## Topic Index
@@ -88,13 +101,14 @@ for the full technical deep-dive.
 
 #### Software
 
-| Requirement | Minimum | Verify |
-|-------------|---------|--------|
-| Docker Engine | 24.0+ | `docker info` |
-| Docker Compose | v2 (built-in) | `docker compose version` |
-| curl | any | `curl --version` |
-| openssl | any | `openssl version` |
-| keytool | JDK bundled | `keytool -help` (optional — only for manual cert work) |
+| Requirement | Docker | Kubernetes | Verify |
+|-------------|--------|------------|--------|
+| Docker Engine | 24.0+ | — (for image build only) | `docker info` |
+| kubectl | — | 1.26+ | `kubectl version` |
+| Helm | — | 3.12+ | `helm version` |
+| k3s (local) | — | v1.28+ | `k3s --version` |
+| curl | any | any | `curl --version` |
+| openssl | any | any | `openssl version` |
 
 #### Docker Images
 

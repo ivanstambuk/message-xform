@@ -33,85 +33,120 @@
                  └─────────────────────────┘
 ```
 
+### Deployment Mode: Kubernetes
+
+The platform is deployed on **Kubernetes** using the `ping-devops` Helm chart
+(PD + PA) and a standalone Deployment manifest (PingAM). Supported targets:
+
+| Target | StorageClass | Ingress | Image Source |
+|--------|-------------|---------|--------------|
+| **k3s** (local) | `local-path` | Traefik (built-in) | `k3s ctr images import` |
+| **AKS** | `managed-csi` | nginx / AGIC | ACR |
+| **GKE** | `standard-rwo` | nginx / GCE | Artifact Registry |
+| **EKS** | `gp3` | nginx / ALB | ECR |
+
 ### Key Finding: Single PingDirectory
 
-Live testing (Feb 16, 2026) confirmed that **PingAM 8.0.2 runs directly on
-PingDirectory 11.0** without needing PingDS (ForgeRock DS) as a separate
-container. Two PingDirectory configuration tweaks are required:
+Live testing (Feb 2026) confirmed **PingAM 8.0.2 runs directly on PingDirectory
+11.0** without needing PingDS (ForgeRock DS). Two PD config tweaks are required:
 
 1. **Schema relaxation**: `single-structural-objectclass-behavior: accept`
-   (PingAM writes entries without structural objectClasses that PingDirectory
-   normally rejects)
-2. **ETag virtual attribute**: A mirror virtual attribute maps the `etag`
-   attribute (expected by PingAM CTS) to PingDirectory's native
-   `ds-entry-checksum`
-
-This eliminates PingDS entirely, giving us a clean 3-container deployment.
+2. **ETag virtual attribute**: Mirror VA maps `etag` → `ds-entry-checksum`
 
 ## Products
 
-| Product | Docker Image | Version | Role |
-|---------|--------------|---------|------|
-| PingAccess | `pingidentity/pingaccess` (Docker Hub) | 9.0 | Reverse proxy, message-xform plugin host |
-| PingAM | Custom Docker image (WAR on Tomcat) | 8.0.2 | Authentication engine, journeys, OAuth2 |
-| PingDirectory | `pingidentity/pingdirectory` (Docker Hub) | 11.0 | Config store, CTS, policy store, user/identity store |
+| Product | Version | Role |
+|---------|---------|------|
+| PingAccess | 9.0 | Reverse proxy, message-xform plugin host |
+| PingAM | 8.0.2 | Authentication engine, journeys, OAuth2 |
+| PingDirectory | 11.0 | Config store, CTS, policy store, user/identity store |
 
-## Quick Start
+## Quick Start (Local k3s)
 
 ```bash
-# 1. Generate TLS keypair and .env
-./scripts/generate-keys.sh
+# 1. Install k3s + Helm
+curl -sfL https://get.k3s.io | sh -
+curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+helm repo add pingidentity https://helm.pingidentity.com/
 
-# 2. Build custom PingAM image if not already built
-cd ../../binaries/pingam && docker build . -f docker/Dockerfile -t pingam:8.0.2
+# 2. Build the shadow JAR
+cd /path/to/message-xform
+./gradlew :adapter-pingaccess:shadowJar
 
-# 3. Start the platform
-docker compose up -d
+# 3. Build & import PingAM image
+cd binaries/pingam && docker build . -f docker/Dockerfile -t pingam:8.0.2
+docker save pingam:8.0.2 | sudo k3s ctr images import -
 
-# 4. Configure PingAM (first run only)
-./scripts/configure-am.sh
+# 4. Create namespace, secrets, ConfigMaps
+kubectl create namespace message-xform
+# (see Kubernetes Operations Guide for full commands)
 
-# 5. Import authentication journeys
-./scripts/import-journeys.sh
+# 5. Deploy via Helm
+cd deployments/platform
+helm install platform pingidentity/ping-devops \
+  -n message-xform -f k8s/values-local.yaml
+
+# 6. Deploy PingAM (standalone)
+kubectl apply -f k8s/pingam-deployment.yaml -n message-xform
+
+# 7. Deploy Ingress
+kubectl apply -f k8s/ingress.yaml -n message-xform
+
+# 8. Wait for all pods Ready
+kubectl get pods -n message-xform -w
+
+# 9. Run E2E tests
+cd e2e && ./run-e2e.sh --env k8s
 ```
 
 ## Directory Layout
 
 ```
 deployments/platform/
-├── README.md                 ← This file
-├── PLAN.md                   ← Phased implementation plan with live tracker
-├── docker-compose.yml        ← 3-container orchestration
-├── .env.template             ← Environment template (passwords, hostnames)
-├── scripts/
-│   ├── generate-keys.sh      ← TLS keypair generation (extensible for enterprise certs)
-│   ├── configure-am.sh       ← PingAM initial setup via REST API
-│   └── import-journeys.sh    ← Import authentication trees/journeys
+├── README.md                     ← This file
+├── PLAN.md                       ← Migration plan with live tracker
+├── k8s/
+│   ├── values-local.yaml         ← Helm values: k3s local deployment
+│   ├── values-aks.yaml           ← Helm values: AKS overlay
+│   ├── values-gke.yaml           ← Helm values: GKE overlay
+│   ├── values-eks.yaml           ← Helm values: EKS overlay
+│   ├── pingam-deployment.yaml    ← PingAM standalone Deployment + Service + PVC
+│   ├── ingress.yaml              ← Traefik IngressRoute (k3s local)
+│   ├── cloud-deployment-guide.md ← Cloud deployment guide (AKS/GKE/EKS)
+│   └── docker/
+│       └── Dockerfile.plugin     ← Plugin init container image (cloud only)
 ├── config/
-│   ├── server.xml            ← Tomcat SSL configuration for PingAM
-│   └── pd-post-setup.sh      ← PingDirectory post-setup (schema relaxation + etag VA)
-├── secrets/                  ← Generated at runtime (gitignored)
-│   ├── tlskey.p12
-│   └── pubCert.crt
-└── journeys/                 ← PingAM authentication tree exports
-    ├── UsernamePassword.json
-    └── WebAuthn.json
+│   ├── server.xml                ← Tomcat SSL configuration for PingAM
+│   ├── pd-post-setup.dsconfig    ← PD schema relaxation + etag VA
+│   ├── etag-schema.ldif          ← etag attribute schema definition
+│   └── test-users.ldif           ← Test user LDIF entries
+├── specs/                        ← Transform specs (mounted via ConfigMap)
+├── profiles/                     ← Transform profiles (mounted via ConfigMap)
+├── journeys/                     ← PingAM authentication tree exports
+├── e2e/                          ← E2E Karate test suite (14 scenarios)
+├── secrets/                      ← Generated TLS certs (gitignored)
+└── scripts/
+    ├── generate-keys.sh          ← TLS keypair generation
+    └── legacy/                   ← Docker Compose era scripts (archived)
 ```
 
-## TLS Certificate Extension Points
+## E2E Test Results
 
-The `scripts/generate-keys.sh` generates a self-signed dev keypair by default.
+The full 14-scenario E2E suite passes on both Docker and Kubernetes:
 
-For enterprise deployments, the following extension points exist:
-- **Custom CA cert**: Mount your CA certificate chain via `CUSTOM_CA_CERT_PATH`
-- **Custom keystore**: Supply a pre-built PKCS#12 keystore via `CUSTOM_KEYSTORE_PATH`
-- **Trust store**: Import additional root/intermediate CAs via `ADDITIONAL_TRUST_CERTS_DIR`
+| Environment | Result | Date |
+|-------------|--------|------|
+| Docker Compose | 14/14 ✅ | 2026-02-17 |
+| Kubernetes (k3s) | 14/14 ✅ | 2026-02-17 |
 
-See [Platform Deployment Guide](../../docs/operations/platform-deployment-guide.md) for details.
+See [e2e/e2e-results.md](e2e/e2e-results.md) for the detailed breakdown.
 
 ## See Also
 
-- [Implementation Plan](./PLAN.md) — phased plan with live tracker
-- [PingAM Operations Guide](../../docs/operations/pingam-operations-guide.md) — individual image build
-- [PingAccess Operations Guide](../../docs/operations/pingaccess-operations-guide.md) — individual image build
+- [Implementation Plan](./PLAN.md) — phased migration plan with live tracker
+- [Kubernetes Operations Guide](../../docs/operations/kubernetes-operations-guide.md) — k3s, Helm, volume mounts, debugging
+- [Cloud Deployment Guide](./k8s/cloud-deployment-guide.md) — AKS, GKE, EKS
 - [Platform Deployment Guide](../../docs/operations/platform-deployment-guide.md) — comprehensive walkthrough
+- [PingAM Operations Guide](../../docs/operations/pingam-operations-guide.md) — image build, REST API patterns
+- [PingAccess Operations Guide](../../docs/operations/pingaccess-operations-guide.md) — Admin API, plugin setup
+- [E2E Testing Guide](../../docs/operations/e2e-karate-operations-guide.md) — Karate test suite documentation

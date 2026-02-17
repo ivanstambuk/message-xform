@@ -2,5 +2,5 @@
 secrets/
 .env
 
-# Docker volumes
+# Container data volumes (Docker or K8s local-path)
 data/
