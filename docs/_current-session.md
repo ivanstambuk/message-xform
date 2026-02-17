@@ -1,53 +1,62 @@
-# Current Session — K8s Platform Deployment (Phase 3)
+# Current Session — K8s Platform Deployment (Phase 4)
 
 ## Focus
 Kubernetes deployment of PingAM + PingDirectory + PingAccess on local k3s cluster.
-Completing Phase 3 steps from `deployments/platform/PLAN.md`.
+Completing Phase 4 (Networking & Ingress) from `deployments/platform/PLAN.md`.
 
 ## Status
-✅ **PHASE 3 COMPLETE** — All 9 steps done.
+✅ **PHASE 4 COMPLETE** — All 5 steps done.
 
 ## Completed This Session
 
-### Step 3.7 — PA Configuration
-- PA Admin API password: `2FederateM0re` (NOT `2Access` — see Key Learnings)
-- Created: Site (pingam:8080), App /am, App /api, MessageTransform rule
-- Attached rule to both applications' root resources
-- **Mount path fix:** `/opt/staging/deploy` → `/opt/out/instance/deploy`
-  (ping-devops hooks DON'T copy staging/deploy → out/instance/deploy)
-- Transform pipeline verified: callbacks → clean `fields[]` + headers
+### Housekeeping — Vendor Doc Symlinks
+- Restored 6 symlinks in `binaries/*/docs/*.txt` into shared artifact store
+- Root cause: bind mount overlay hid git-tracked symlinks
+- Actual vendor doc text files (gitignored) are missing from shared store — NOT blocking
 
-### Step 3.8 — WebAuthn Journey Import
-- Both WebAuthnJourney and UsernamelessJourney imported (14 nodes total)
-- Both invocable via `authIndexType=service`
+### Phase 4 — Networking & Ingress
 
-### Step 3.9 — Final Verification
-- All 4 pods Running 1/1
-- PD LDAPS ✅ AM health ✅ PA proxy 200 ✅ Transform active ✅ Journeys ✅
+#### Step 4.1 — IngressRoute
+- Created `k8s/ingress.yaml` with 4 resources:
+  - `ServersTransport/pa-transport` — `insecureSkipVerify: true` for PA's self-signed cert
+  - `IngressRoute/platform-ingress` — HTTPS entrypoint, both `/am` and `/api` paths
+  - `IngressRoute/platform-ingress-redirect` — HTTP → HTTPS 301 redirect
+  - `Middleware/redirect-to-https` — redirect scheme middleware
+
+#### Step 4.2 — TLS Termination
+- Traefik 3.6.7 terminates TLS using its default self-signed cert
+- Re-encrypts to PA engine on port 3000 (HTTPS backend)
+- `ServersTransport` skips backend TLS verification
+
+#### Step 4.3–4.4 — Verification
+- `/api/v1/auth/login` → clean `fields[]` JSON ✅
+- `/am/json/authenticate` → transformed callbacks ✅
+- Custom headers injected (`x-auth-provider`, `x-auth-session`) ✅
+- HTTP → HTTPS redirect (301) ✅
+
+#### Step 4.5 — Host Header Handling
+- PA virtual host `*:443` created for Ingress port matching
+- Both apps (`/am`, `/api`) bound to VH 2 (`*:3000`) and VH 3 (`*:443`)
+- PA `host: *` accepts any hostname — works with `localhost`, IP, or DNS name
 
 ## Key Learnings
 
-### PA Admin Password Override
-`PA_ADMIN_PASSWORD_INITIAL=2Access` is only the seed password. After first
-start, PingAccess uses `PING_IDENTITY_PASSWORD` (from global envs) as the
-actual admin password. In our deployment: `2FederateM0re`.
+### PA Virtual Host Port Matching
+PA does virtual host matching on both `host` AND `port`. When Traefik terminates
+TLS and forwards to PA, the `Host` header retains the original port (443 via
+Traefik), not PA's internal port (3000). Solution: create a `*:443` virtual host
+in PA and bind all applications to it alongside the `*:3000` VH.
 
-### Plugin JAR Mount Path — deploy vs staging
-The `ping-devops` container hooks do NOT copy `/opt/staging/deploy/` →
-`/opt/out/instance/deploy/`. The init container writes to an emptyDir, which
-must be mounted at `/opt/out/instance/deploy` directly (not `/opt/staging/deploy`).
-
-### PD FQDN Hostname Verification
-PD's self-signed cert CN matches the K8s headless service FQDN, not the short
-ClusterIP service name. AM's LDAP SDK does SSL hostname verification, causing
-`Client-Side Timeout` when the hostname doesn't match the cert CN.
+### Traefik ServersTransport for HTTPS Backends
+When the backend service speaks HTTPS (as PA does), Traefik needs a
+`ServersTransport` with `insecureSkipVerify: true` and `scheme: https` in the
+IngressRoute service definition. Without `scheme: https`, Traefik sends HTTP
+to the backend and PA rejects it.
 
 ## Documentation Updated
-- `docs/operations/kubernetes-operations-guide.md` — PA config section 5b, deploy path fix, troubleshooting
-- `docs/architecture/knowledge-map.md` — added K8s ops guide entry
-- `deployments/platform/PLAN.md` — Steps 3.7, 3.8, 3.9 marked complete
-- KI: `pingam_platform_deployment` — new `kubernetes_infrastructure.md` artifact, gotchas #10-12
+- `deployments/platform/PLAN.md` — Phase 4 steps marked complete, K3 deploy path fixed
+- `deployments/platform/k8s/ingress.yaml` — new file
 
 ## Next Steps
-1. **Phase 4** — Networking & Ingress (k3s Traefik IngressRoute)
-2. **Phase 5** — E2E testing on K8s
+1. **Phase 5** — E2E testing on K8s (14-scenario Karate suite)
+2. **Phase 6** — Cloud deployment guides (AKS, GKE, EKS)

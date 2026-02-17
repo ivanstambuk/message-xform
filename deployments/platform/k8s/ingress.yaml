@@ -1,0 +1,85 @@
+# Traefik Ingress for message-xform platform
+# Routes external HTTPS → PingAccess engine (which routes /am and /api internally)
+#
+# PA engine serves HTTPS on port 3000 with host: * (any hostname).
+# Both /am (PingAM proxy) and /api (clean URL) apps live behind PA.
+# Traefik terminates the external TLS and re-encrypts to PA (HTTPS backend).
+#
+# Usage:
+#   kubectl apply -f ingress.yaml -n message-xform
+
+---
+# ServersTransport: skip TLS verification for PA's self-signed backend cert
+apiVersion: traefik.io/v1alpha1
+kind: ServersTransport
+metadata:
+  name: pa-transport
+  namespace: message-xform
+spec:
+  insecureSkipVerify: true
+
+---
+# IngressRoute: HTTPS entrypoint → PingAccess engine
+# All paths under /am/* and /api/* are forwarded to PA engine on port 3000 (HTTPS).
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: platform-ingress
+  namespace: message-xform
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    # /am/* → PA engine (PingAM proxy application)
+    - match: PathPrefix(`/am`)
+      kind: Rule
+      services:
+        - name: pingaccess-engine
+          port: 3000
+          scheme: https
+          serversTransport: pa-transport
+    # /api/* → PA engine (clean URL application)
+    - match: PathPrefix(`/api`)
+      kind: Rule
+      services:
+        - name: pingaccess-engine
+          port: 3000
+          scheme: https
+          serversTransport: pa-transport
+  # TLS termination at the Traefik edge.
+  # Uses Traefik's default self-signed cert for local dev.
+  # For production: replace with a cert-manager Certificate reference.
+  tls: {}
+
+---
+# HTTP → HTTPS redirect for all platform paths
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: platform-ingress-redirect
+  namespace: message-xform
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: PathPrefix(`/am`) || PathPrefix(`/api`)
+      kind: Rule
+      middlewares:
+        - name: redirect-to-https
+      services:
+        # Traefik requires a service even with redirect middleware.
+        # This service won't actually be hit due to the redirect.
+        - name: pingaccess-engine
+          port: 3000
+
+---
+# Middleware: HTTP → HTTPS redirect
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: redirect-to-https
+  namespace: message-xform
+spec:
+  redirectScheme:
+    scheme: https
+    permanent: true

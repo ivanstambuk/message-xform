@@ -4,7 +4,7 @@
 > Covers k3s local bootstrap, `ping-devops` Helm chart patterns,
 > volume mount gotchas, and Ping container lifecycle hooks.
 >
-> **Last updated:** 2026-02-17 — Phases 1–3 (PD + PA via Helm, AM standalone)
+> **Last updated:** 2026-02-17 — Phases 1–4 (PD + PA via Helm, AM standalone, Traefik Ingress)
 
 ---
 
@@ -24,6 +24,7 @@
 | 8 | [K8s Secrets](#8-k8s-secrets) | Credentials, licenses |
 | 9 | [Debugging & Troubleshooting](#9-debugging--troubleshooting) | Container failures, log inspection |
 | 10 | [Command Reference](#10-command-reference) | One-liners for common operations |
+| 11 | [Traefik Ingress Configuration](#11-traefik-ingress-configuration) | IngressRoute, TLS termination, PA virtual host port matching |
 
 ---
 
@@ -836,3 +837,117 @@ kubectl logs <pod> -n message-xform -f
 # Init container logs
 kubectl logs <pod> -n message-xform -c mxform-plugin-init
 ```
+
+---
+
+## 11. Traefik Ingress Configuration
+
+k3s ships with **Traefik 3.x** as the default ingress controller. We use Traefik
+CRDs (`IngressRoute`, `ServersTransport`, `Middleware`) rather than the standard
+`Ingress` resource for more control over routing and backend TLS.
+
+### Architecture
+
+```
+External Client
+    ↓ HTTPS (port 443)
+Traefik (k3s built-in)
+    ↓ TLS termination → re-encrypt to backend
+PingAccess Engine (port 3000, HTTPS)
+    ├── /am/*    → PingAM proxy app
+    └── /api/*   → Clean URL app (URL rewrite + response transform)
+```
+
+### Manifest: `k8s/ingress.yaml`
+
+The manifest contains 4 resources:
+
+| Resource | Type | Purpose |
+|----------|------|----------|
+| `pa-transport` | ServersTransport | Skip TLS verification for PA's self-signed cert |
+| `platform-ingress` | IngressRoute | HTTPS entrypoint → PA engine for `/am` and `/api` |
+| `platform-ingress-redirect` | IngressRoute | HTTP → HTTPS 301 redirect |
+| `redirect-to-https` | Middleware | Redirect scheme middleware |
+
+### Apply
+
+```bash
+kubectl apply -f k8s/ingress.yaml -n message-xform
+```
+
+### PA virtual host port matching
+
+PingAccess does virtual host matching on both **host** AND **port**. When Traefik
+terminates TLS and forwards to PA, the `Host` header retains the original port
+(443 via Traefik), not PA's internal port (3000).
+
+**Solution:** Create a `*:443` virtual host in PA and bind all applications to it:
+
+```bash
+# Create virtual host *:443
+pa_api POST /virtualhosts '{"host":"*","port":443}'
+
+# Add VH to both applications
+# GET app → add new VH ID to virtualHostIds → PUT app
+```
+
+> **Gotcha:** If you only have `*:3000` virtual hosts, PA will return "Forbidden"
+> for all Ingress traffic because the Host header's implied port (443) doesn't
+> match any virtual host.
+
+### Traefik ServersTransport for HTTPS backends
+
+PA engine serves HTTPS on port 3000 with a self-signed certificate. Traefik
+must be configured to:
+
+1. **Skip TLS verification** on the backend (`insecureSkipVerify: true`)
+2. **Use HTTPS** when connecting (`scheme: https` in the IngressRoute service)
+
+```yaml
+# ServersTransport
+apiVersion: traefik.io/v1alpha1
+kind: ServersTransport
+metadata:
+  name: pa-transport
+spec:
+  insecureSkipVerify: true
+
+# IngressRoute service reference
+services:
+  - name: pingaccess-engine
+    port: 3000
+    scheme: https                     # ← Required for HTTPS backend
+    serversTransport: pa-transport    # ← References the ServersTransport
+```
+
+Without `scheme: https`, Traefik sends HTTP to the backend and PA rejects it.
+
+### Verification
+
+```bash
+# Test /api path (clean URL with transform)
+curl -sk -X POST https://localhost/api/v1/auth/login
+# Expected: {"fields":[{"name":"username",...},{"name":"password",...}]}
+
+# Test /am path (direct AM proxy with transform)
+curl -sk -X POST -H "Accept-API-Version: resource=2.1,protocol=1.0" \
+  https://localhost/am/json/authenticate
+# Expected: {"fields":[...]} + x-auth-provider + x-auth-session headers
+
+# Test HTTP → HTTPS redirect
+curl -sk http://localhost/api/v1/auth/login
+# Expected: 301 Moved Permanently → https://...
+
+# Test with different Host headers (PA host: * accepts all)
+curl -sk -H "Host: example.com" -X POST https://localhost/api/v1/auth/login
+# Expected: same fields[] response
+```
+
+### TLS certificates
+
+| Environment | Certificate Source |
+|-------------|-------------------|
+| Local (k3s) | Traefik generates a self-signed cert automatically (`CN=TRAEFIK DEFAULT CERT`) |
+| Production | Use `cert-manager` with Let's Encrypt or cloud CA issuers. Reference the cert in the IngressRoute `tls:` block |
+
+For local development, the self-signed cert is acceptable. Clients use `-k` / `--insecure` to skip verification.

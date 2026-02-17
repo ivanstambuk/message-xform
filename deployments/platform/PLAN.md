@@ -60,7 +60,7 @@ The result must:
 |---|----------|--------|-----------|
 | K1 | Local K8s distribution | **k3s** | CNCF-certified, production-grade, <100 MB binary, includes Traefik ingress + local-path-provisioner. Same K8s API as AKS/GKE/EKS. 512 MB RAM minimum — we have 32 GB. |
 | K2 | Helm chart | **`ping-devops` v0.11.17** | Official Ping Identity unified chart. Supports PingDirectory, PingAccess. PingAM will need a custom values entry (see K4). |
-| K3 | PingAccess plugin injection | **Init container** | Init container (busybox) copies `adapter-pingaccess-0.1.0-SNAPSHOT.jar` into a shared `emptyDir` volume mounted at `/opt/staging/deploy/`. The hooks then copy it to `/opt/out/instance/deploy/`. No custom PA image needed. |
+| K3 | PingAccess plugin injection | **Init container** | Init container (busybox) copies `adapter-pingaccess-0.1.0-SNAPSHOT.jar` into a shared `emptyDir` volume mounted at `/opt/out/instance/deploy/`. The `ping-devops` hooks do NOT copy from `/opt/staging/deploy/`. No custom PA image needed. |
 | K4 | PingAM image | **Standalone K8s Deployment** | PingAM is NOT in the `ping-devops` chart (ForgeRock-lineage product). We deploy AM as a standalone Deployment manifest with our custom WAR-on-Tomcat image, imported into k3s via `k3s ctr images import` or pushed to a cloud registry. |
 | K5 | Transform specs/profiles | **ConfigMaps** | Hot-reload works because the engine polls the filesystem. ConfigMap volume mounts update in-place (kubelet sync period ~60s, engine polls every 30s). |
 | K6 | Secrets | **K8s Secrets** | Credentials for PD, AM, PA stored as Secrets. Cloud deployments can use External Secrets Operator or cloud-native secret managers. |
@@ -133,11 +133,11 @@ Configure Ingress for clean URL routing and external access.
 
 | Step | Task | Done |
 |------|------|------|
-| 4.1 | Create Ingress resource: `/am/*` → PA Service, `/api/*` → PA Service | |
-| 4.2 | Configure TLS termination at Ingress (Traefik on k3s) | |
-| 4.3 | Test: `curl -sk https://localhost/api/v1/auth/login` returns field prompts | |
-| 4.4 | Test: `curl -sk https://localhost/am/json/authenticate` returns callbacks | |
-| 4.5 | Verify Host header handling (PA virtual host must match Ingress) | |
+| 4.1 | Create Ingress resource: `/am/*` → PA Service, `/api/*` → PA Service | ✅ `k8s/ingress.yaml`: IngressRoute + ServersTransport + HTTP→HTTPS redirect Middleware |
+| 4.2 | Configure TLS termination at Ingress (Traefik on k3s) | ✅ Traefik 3.6.7 default self-signed cert; `insecureSkipVerify` for PA backend |
+| 4.3 | Test: `curl -sk https://localhost/api/v1/auth/login` returns field prompts | ✅ Clean `fields[]` JSON via URL rewrite + response transform |
+| 4.4 | Test: `curl -sk https://localhost/am/json/authenticate` returns callbacks | ✅ Transformed callbacks → `fields[]` + custom headers |
+| 4.5 | Verify Host header handling (PA virtual host must match Ingress) | ✅ PA VH `*:443` added for Ingress port; any Host header accepted |
 
 ### Phase 5 — E2E Test Validation *(~1 session)*
 Run the full 14-scenario Karate suite against the k3s cluster.
