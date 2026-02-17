@@ -494,6 +494,46 @@ Unknown Resource Proxy| | | 172.18.0.1| POST| /api/test| 403
 If you see **"Unknown Resource Proxy"**, it means PA couldn't match the request
 to any virtual host. The fix is always the Host header.
 
+### Kubernetes Ingress (Port 443)
+
+The port-matching problem takes a different shape behind a K8s Ingress controller
+(such as Traefik). The Ingress terminates TLS on port **443** and forwards to
+PA engine on port 3000. The `Host` header seen by PA retains the external port:
+
+```
+External client  →  Host: example.com  →  Traefik (port 443, TLS termination)
+                                              ↓ re-encrypt to backend
+                    PA engine (port 3000)  →  Host header implies port 443
+                                              (no explicit :port = default for scheme)
+                                              →  VH *:3000 doesn't match  →  403!
+```
+
+Unlike the Docker port-mapping case (where you control the `Host` header from
+the client), external Ingress traffic arrives with port 443 and you cannot
+change it.
+
+**Fix:** Create a `*:443` wildcard virtual host in PA and bind all applications
+to **both** `*:3000` (for direct/internal access) and `*:443` (for Ingress traffic):
+
+```bash
+# Create *:443 virtual host
+pa_api POST /virtualhosts '{"host":"*","port":443}'
+# → {"id": 3, ...}
+
+# Add VH to application (include BOTH VH IDs)
+# GET app → add new VH ID to virtualHostIds array → PUT app
+pa_api GET /applications/1
+# edit virtualHostIds: [2, 3]  (where 2=*:3000, 3=*:443)
+pa_api PUT /applications/1 '{...updated app with both VH IDs...}'
+```
+
+> **Gotcha:** If you forget this step, PA returns 403 for *all* Ingress traffic.
+> The PA audit log shows "Unknown Resource Proxy" — the same symptom as the
+> Docker port-mapping problem, but with a different root cause.
+
+See also: [K8s Operations Guide §11](./kubernetes-operations-guide.md#11-traefik-ingress-configuration)
+for the full Traefik IngressRoute, ServersTransport, and HTTP→HTTPS redirect setup.
+
 ---
 
 ## 7. Application & Resource Configuration Gotchas

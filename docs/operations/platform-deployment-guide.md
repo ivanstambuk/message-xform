@@ -1256,6 +1256,8 @@ SEARCH RESULT ... base="" scope=0 filter="(objectClass=*)" attrs="1.1" resultCod
 | `CONTAINER FAILURE: License File absent` (PingAccess) | No `.lic` file at expected path | Mount license: `-v .../PingAccess-9.0-Development.lic:/opt/out/instance/conf/pingaccess.lic:ro` |
 | PA Admin API returns 401 Unauthorized | Password changed by `83-change-password.sh` hook | Set `PA_ADMIN_PASSWORD_INITIAL` and `PING_IDENTITY_PASSWORD` to the same value |
 | PA engine returns 403 Forbidden | `Host:port` doesn't match any virtual host | Add `-H 'Host: localhost:3000'` to curl. See [PA Ops §6](./pingaccess-operations-guide.md#6-virtual-host-matching-critical) |
+| PA returns 403 for all K8s Ingress traffic | VH `*:3000` doesn't match Traefik's port 443 | Create `*:443` VH in PA and bind apps to it. See [PA Ops §6 — K8s Ingress](./pingaccess-operations-guide.md#kubernetes-ingress-port-443) |
+| Traefik returns 502 Bad Gateway to PA engine | Traefik sends HTTP to PA's HTTPS port 3000 | Add `scheme: https` + `serversTransport` in IngressRoute. See [K8s Ops §11](./kubernetes-operations-guide.md#11-traefik-ingress-configuration) |
 | Port 3000 already in use (PA engine won't start) | Another service (e.g., Tailscale, code-server) binds port 3000 | Remap PA engine: `-p 13000:3000` and use `PA_ENGINE_PORT=13000` in `.env` |
 | docker-compose v1 can't start PA (`container name already in use`) | Existing containers created via `docker run` lack compose labels | Use `docker run` directly on same network, or `docker rm -f` the stale container first |
 | `No Configuration found` on `authIndexType=service&authIndexValue=WebAuthnJourney` | Tree nodes weren't created (curl `-sf` hid errors) | Re-run import with `-s` (not `-sf`). Verify nodes exist before importing the tree. Use `Host:` header, not `--resolve` |
@@ -1441,6 +1443,14 @@ Results are written to `target/karate-reports/` as HTML. Open
 │    java -jar karate-1.4.1.jar auth-passkey.feature  # single file   │
 │    Results: target/karate-reports/karate-summary.html               │
 │                                                                     │
+│  K8s Access (via Traefik Ingress, port 443):                         │
+│    POST https://localhost/am/json/authenticate                       │
+│    POST https://localhost/api/v1/auth/login                          │
+│    POST https://localhost/api/v1/auth/passkey                        │
+│    POST https://localhost/api/v1/auth/passkey/usernameless           │
+│    Requires: *:443 VH in PA, ServersTransport in Traefik             │
+│    See: K8s Ops Guide §11                                            │
+│                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -1449,6 +1459,7 @@ Results are written to `target/karate-reports/` as HTML. Open
 ## See Also
 
 - [PingAM Operations Guide](./pingam-operations-guide.md) — image build, product deep-dive, PD compatibility, [transformed response surface](./pingam-operations-guide.md#transformed-response-via-pingaccess--message-xform)
-- [PingAccess Operations Guide](./pingaccess-operations-guide.md) — reverse proxy configuration, [Admin API recipe](./pingaccess-operations-guide.md#5-admin-api--full-configuration-recipe), [deployment patterns](./pingaccess-operations-guide.md#13-deployment-patterns-hot-reload--faq)
+- [PingAccess Operations Guide](./pingaccess-operations-guide.md) — reverse proxy configuration, [Admin API recipe](./pingaccess-operations-guide.md#5-admin-api--full-configuration-recipe), [deployment patterns](./pingaccess-operations-guide.md#13-deployment-patterns-hot-reload--faq), [VH port matching (K8s)](./pingaccess-operations-guide.md#kubernetes-ingress-port-443)
+- [Kubernetes Operations Guide](./kubernetes-operations-guide.md) — k3s bootstrap, Helm chart patterns, [Traefik Ingress configuration](./kubernetes-operations-guide.md#11-traefik-ingress-configuration)
 - [E2E Validation Record](../../deployments/platform/e2e/e2e-results.md) — test breakdown, spec coverage, and run history
 - [Platform README](../../deployments/platform/README.md) — architecture overview and quick start
