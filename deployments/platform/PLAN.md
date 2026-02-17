@@ -7,8 +7,8 @@
 | Field        | Value                    |
 |--------------|--------------------------|
 | Created      | 2026-02-16               |
-| Status       | 🔄 In Progress (8.11 deferred) |
-| Current Step | Phase 9 done; 8.11 (usernameless passkeys) outstanding |
+| Status       | ✅ All phases complete |
+| Current Step | All phases done — 8/8 E2E test groups passing |
 
 ---
 
@@ -34,9 +34,9 @@
 | **3** | [PingAM initial configuration script](#phase-3--pingam-initial-configuration-script) | ✅ Done |
 | **4** | [Username/Password journey](#phase-4--usernamepassword-journey) | ✅ Done |
 | **5** | [PingAccess reverse proxy integration](#phase-5--pingaccess-reverse-proxy-integration) | ✅ Done |
-| **6** | [WebAuthn / Passkey journeys](#phase-6--webauthn--passkey-journeys) | ✅ Verified (headless) |
+| **6** | [WebAuthn / Passkey journeys](#phase-6--webauthn--passkey-journeys) | ✅ Done (identifier-first + usernameless) |
 | **7** | [Message-xform plugin wiring](#phase-7--message-xform-plugin-wiring) | ✅ Done |
-| **8** | [E2E smoke tests (Karate)](#phase-8--e2e-smoke-tests-karate) | 🔄 7/7 pass (8.11 deferred) |
+| **8** | [E2E smoke tests (Karate)](#phase-8--e2e-smoke-tests-karate) | ✅ Done (8/8 steps, all pass) |
 | **9** | [Documentation & deployment guide](#phase-9--documentation--deployment-guide) | ✅ Done |
 
 ---
@@ -214,8 +214,8 @@ and usernameless flows.
 | Step | Task | Status |
 |------|------|--------|
 | 6.1 | Adapt webinar's `WebinarJourneyWebAuthN.journey.json` | ✅ Done (RP→localhost, origins→https://localhost:13000) |
-| 6.2 | Create identifier-first WebAuthn journey | 🔲 Not Started |
-| 6.3 | Create usernameless WebAuthn journey | 🔲 Not Started |
+| 6.2 | Create identifier-first WebAuthn journey | ✅ Done (`WebAuthnJourney.journey.json` — UsernameCollector→PasswordCollector→DataStore→Registration→Auth) |
+| 6.3 | Create usernameless WebAuthn journey | ✅ Done (`UsernamelessJourney.journey.json` — starts at WebAuthn Auth, error→UsernameCollector fallback, UV=REQUIRED, residentKey=REQUIRED) |
 | 6.4 | Import journeys via script | ✅ Done (`import-webauthn-journey.sh` — REST API, not frodo) |
 | 6.5 | Test: register and authenticate with passkey | ✅ Verified to headless limit (FIDO2 JS callbacks returned, browser ceremony requires authenticator) |
 
@@ -414,7 +414,7 @@ Response header: `X-Auth-Session: eyJ0...`
 | 8.8 | Configure PA applications/sites for auth endpoints | ✅ N/A (existing `/am` app + profile path match `/am/json/authenticate` is sufficient; clean URL mapping deferred) |
 | 8.9 | E2E test: username/password login (happy path) | ✅ Done (3 scenarios: initiate, submit+cookie, bad-creds=401) |
 | 8.10 | E2E test: passkey identifier-first (register + authenticate) | ✅ Done (3 scenarios in `auth-passkey.feature`: full reg+auth, device-exists auth, unsupported fallback) |
-| 8.11 | E2E test: passkey usernameless (register + authenticate) | ⏩ Deferred (requires `UsernamelessJourney` — Phase 6.3 not started) |
+| 8.11 | E2E test: passkey usernameless (register + authenticate) | ✅ Done (2 scenarios: full reg+auth with UV+residentKey, discoverable credential entry point check) |
 | 8.12 | E2E test: logout | ✅ Done (1 scenario: auth→logout→validate=false) |
 
 ### Prerequisites
@@ -431,10 +431,10 @@ Karate is HTTP-level only — it cannot execute browser JS or interact with FIDO
 authenticators. The passkey E2E tests require a **WebAuthn authenticator simulator**
 that exposes a REST API for generating FIDO2 attestations and assertions.
 
-**Decision D11:** Use `openauth-sim` (or equivalent FIDO2 authenticator emulator).
-The REST API pattern:
-1. `POST /api/v1/webauthn/attest` — generate attestation for registration
-2. `POST /api/v1/webauthn/evaluate` — generate assertion for authentication
+**Decision D11 (REVISED):** Use embedded `webauthn.js` Karate helper with Java crypto
+(`java.security.KeyPairGenerator`, `java.security.Signature`, `javax.crypto.Mac`).
+No external dependency on `openauth-sim`. The helper generates attestations and
+assertions programmatically using ES256 (P-256 ECDSA) keys.
 
 **FIDO2 ceremony in Karate (pseudocode for 8.10):**
 ```
@@ -494,7 +494,7 @@ The REST API pattern:
 | D8 | Docker Compose v2 | Installed `docker-compose-v2` (2.37.1) — the v1 `docker-compose` (1.29.2) has `ContainerConfig` KeyError bugs with modern images. Use `docker compose` (space). | 2026-02-16 |
 | D9 | Response-only transforms for AM auth | Request-side transforms break AM's callback protocol (authId JWT must be echoed verbatim). Response-only body cleanup + header injection is the practical pattern. | 2026-02-16 |
 | D10 | Platform E2E tests in `deployments/platform/e2e/` — standalone Karate JAR | **No Gradle submodule.** Run via `java -jar karate.jar` or `run-e2e.sh`. Platform stack is manually managed (`docker compose`), Gradle Docker lifecycle makes no sense. Clean separation from adapter E2E tests (`e2e-pingaccess/`). | 2026-02-16 |
-| D11 | `openauth-sim` as FIDO2 authenticator emulator | Karate is HTTP-level — cannot execute browser JS or interact with authenticators. `openauth-sim` REST API (`/api/v1/webauthn/attest`, `/evaluate`) generates attestations/assertions programmatically. Full FIDO2 ceremony coverage. | 2026-02-16 |
+| D11 | Embedded `webauthn.js` as FIDO2 authenticator emulator | **REVISED** — instead of external `openauth-sim`, built an embedded Karate helper (`helpers/webauthn.js`) using Java crypto (ES256 P-256 ECDSA). Zero external dependencies. Generates attestations + assertions programmatically. Key insight: AM stores `user.id` as `Uint8Array.from(base64(username))`, so usernameless assertion `userHandle` must be the base64 of the username. | 2026-02-17 |
 | D12 | Two passkey varieties (identifier-first + usernameless) | Identifier-first = existing `WebAuthnJourney` (username → allowCredentials). Usernameless = new `UsernamelessJourney` (discoverable credential, no username). Usernameless is the modern default. | 2026-02-16 |
 | D13 | Separate endpoints per passkey flow (not body-based routing) | Two PA Applications: `/api/v1/auth/passkey` → `WebAuthnJourney`, `/api/v1/auth/passkey/usernameless` → `UsernamelessJourney`. Simpler than conditional request-side URL rewriting. Body-based routing deferred as future polish. | 2026-02-16 |
 | D14 | AM SSO token hidden via cookie injection (hybrid session) | Message-xform strips `tokenId` from response body, injects it into `Set-Cookie: iPlanetDirectoryPro=...` header. Client never sees raw AM token. Full PA Web Sessions (OIDC auth code flow) deferred — requires AM OAuth2 provider + PA OIDC config. Option 3 (pragmatic). | 2026-02-16 |

@@ -170,6 +170,21 @@
                     "displayName": "Outcome"
                 }
             ]
+        },
+        "a7b8c9d0-e1f2-3456-abcd-567890123456": {
+            "_id": "a7b8c9d0-e1f2-3456-abcd-567890123456",
+            "_rev": "1",
+            "_type": {
+                "_id": "UsernameCollectorNode",
+                "name": "Username Collector",
+                "collection": true
+            },
+            "_outcomes": [
+                {
+                    "id": "outcome",
+                    "displayName": "Outcome"
+                }
+            ]
         }
     },
     "scripts": {},
@@ -203,12 +218,12 @@
                 "x": 296,
                 "y": 20,
                 "connections": {
-                    "noDevice": "d4e5f6a7-b8c9-0123-defa-234567890123",
+                    "noDevice": "a7b8c9d0-e1f2-3456-abcd-567890123456",
                     "success": "70e691a5-1e33-4ac3-a356-e7b6d60d92e0",
                     "recoveryCode": "e5f6a7b8-c9d0-1234-efab-345678901234",
-                    "unsupported": "e301438c-0bd0-429c-ab0c-66126501069a",
+                    "unsupported": "a7b8c9d0-e1f2-3456-abcd-567890123456",
                     "failure": "e301438c-0bd0-429c-ab0c-66126501069a",
-                    "error": "e301438c-0bd0-429c-ab0c-66126501069a"
+                    "error": "a7b8c9d0-e1f2-3456-abcd-567890123456"
                 }
             },
             "c3d4e5f6-a7b8-9012-cdef-123456789012": {
@@ -247,6 +262,15 @@
                 "y": 310,
                 "connections": {
                     "outcome": "b2c3d4e5-f6a7-8901-bcde-f12345678901"
+                }
+            },
+            "a7b8c9d0-e1f2-3456-abcd-567890123456": {
+                "displayName": "Username Collector",
+                "nodeType": "UsernameCollectorNode",
+                "x": 78,
+                "y": 100,
+                "connections": {
+                    "outcome": "d4e5f6a7-b8c9-0123-defa-234567890123"
                 }
             }
         },

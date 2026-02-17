@@ -120,13 +120,16 @@ function fn() {
     }
 
     /** Build authenticatorData for registration (with attested credential data). */
-    function buildRegAuthData(rpId, publicKey, credentialId) {
+    function buildRegAuthData(rpId, publicKey, credentialId, userVerified) {
         var md = MessageDigest.getInstance('SHA-256');
         var rpIdHash = md.digest(new JString(rpId).getBytes('UTF-8'));
 
         var baos = new ByteArrayOutputStream();
         baos.write(rpIdHash, 0, rpIdHash.length);
-        baos.write(0x41); // flags: UP=1, AT=1 (0x01 | 0x40)
+        // flags: UP=0x01, UV=0x04, AT=0x40
+        var flags = 0x41; // UP + AT
+        if (userVerified) flags |= 0x04; // add UV
+        baos.write(flags);
         // signCount = 0 (4 bytes big-endian)
         baos.write(0); baos.write(0); baos.write(0); baos.write(0);
         // AAGUID (16 zero bytes = no attestation)
@@ -147,13 +150,16 @@ function fn() {
     }
 
     /** Build authenticatorData for assertion (no attested credential data). */
-    function buildAssertionAuthData(rpId, signCount) {
+    function buildAssertionAuthData(rpId, signCount, userVerified) {
         var md = MessageDigest.getInstance('SHA-256');
         var rpIdHash = md.digest(new JString(rpId).getBytes('UTF-8'));
 
         var baos = new ByteArrayOutputStream();
         baos.write(rpIdHash, 0, rpIdHash.length);
-        baos.write(0x01); // flags: UP=1 only
+        // flags: UP=0x01, UV=0x04 (if required)
+        var flags = 0x01; // UP
+        if (userVerified) flags |= 0x04; // add UV
+        baos.write(flags);
         baos.write((signCount >> 24) & 0xFF);
         baos.write((signCount >> 16) & 0xFF);
         baos.write((signCount >> 8) & 0xFF);
@@ -222,9 +228,16 @@ function fn() {
         // Detect registration vs authentication
         var isReg = script.indexOf('navigator.credentials.create') >= 0;
 
-        // Parse rpId from rp: { ... id: "..." }
+        // Parse rpId — authentication uses top-level 'rpId:', registration uses 'rp: { ... id: "..." }'
         var rpMatch = script.match(/rp:\s*\{[^}]*id:\s*"([^"]+)"/);
+        if (!rpMatch) rpMatch = script.match(/rpId:\s*"([^"]+)"/);
         var rpId = rpMatch ? rpMatch[1] : 'localhost';
+
+        // Parse userVerification requirement
+        // Auth scripts use JS format:   userVerification: "required"
+        // Reg scripts use JSON format:  "userVerification":"required"  (in authenticatorSelection)
+        var uvMatch = script.match(/["\']?userVerification["\']?\s*:\s*["\'](\w+)["\']/);
+        var userVerification = uvMatch ? uvMatch[1] : 'discouraged';
 
         // Parse allowCredentials credential IDs (for authentication)
         var credIds = [];
@@ -248,6 +261,7 @@ function fn() {
             rpId: rpId,
             isRegistration: isReg,
             credentialIds: credIds,
+            userVerification: userVerification,
             hiddenInputName: hiddenInputName || 'IDToken3'
         };
     }
@@ -260,7 +274,7 @@ function fn() {
      * Returns the outcome string to submit in HiddenValueCallback,
      * plus the private key and credential ID for later authentication.
      */
-    function register(challengeBytes, rpId, origin) {
+    function register(challengeBytes, rpId, origin, userVerified) {
         var kpg = KeyPairGenerator.getInstance('EC');
         kpg.initialize(new ECGenParameterSpec('secp256r1'), random);
         var keyPair = kpg.generateKeyPair();
@@ -272,7 +286,7 @@ function fn() {
         var clientDataJson = buildClientDataJson(challengeBytes, origin, 'webauthn.create');
         var clientDataStr = new JString(clientDataJson, 'UTF-8');
 
-        var authData = buildRegAuthData(rpId, keyPair.getPublic(), credentialId);
+        var authData = buildRegAuthData(rpId, keyPair.getPublic(), credentialId, userVerified);
         var attestationObject = buildAttestationObject(authData);
 
         // Format: { legacyData: clientData + "::" + attBytes(Int8Array) + "::" + credId, authenticatorAttachment: "platform" }
@@ -295,11 +309,11 @@ function fn() {
      *
      * Returns the outcome string to submit in HiddenValueCallback.
      */
-    function authenticate(challengeBytes, rpId, origin, privateKey, credIdB64, userName) {
+    function authenticate(challengeBytes, rpId, origin, privateKey, credIdB64, userName, userVerified) {
         var clientDataJson = buildClientDataJson(challengeBytes, origin, 'webauthn.get');
         var clientDataStr = new JString(clientDataJson, 'UTF-8');
 
-        var authData = buildAssertionAuthData(rpId, 1);
+        var authData = buildAssertionAuthData(rpId, 1, userVerified);
         var signature = signAssertion(privateKey, authData, clientDataJson);
 
         // Format: { legacyData: clientData + "::" + authData(Int8Array) + "::" + sig(Int8Array) + "::" + rawId + "::" + userHandle }
