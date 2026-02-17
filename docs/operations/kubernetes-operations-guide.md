@@ -4,7 +4,7 @@
 > Covers k3s local bootstrap, `ping-devops` Helm chart patterns,
 > volume mount gotchas, and Ping container lifecycle hooks.
 >
-> **Last updated:** 2026-02-17 — Phases 1–3 (PD + PA only, AM pending)
+> **Last updated:** 2026-02-17 — Phases 1–3 (PD + PA via Helm, AM standalone)
 
 ---
 
@@ -17,6 +17,7 @@
 | 3 | [Volume Mount Patterns](#3-volume-mount-patterns) | The chart's three volume mechanisms |
 | 4 | [Ping Container Lifecycle Hooks](#4-ping-container-lifecycle-hooks) | Hook ordering, staging vs output paths |
 | 5 | [Init Container Pattern](#5-init-container-pattern) | Shadow JAR injection via busybox + emptyDir |
+| 5a | [PingAM Standalone Deployment](#5a-pingam-standalone-deployment) | Image import, PD cert trust, standalone manifest |
 | 6 | [License Mounting](#6-license-mounting) | PD and PA license Secrets |
 | 7 | [ConfigMap Mounting](#7-configmap-mounting) | Transform specs and profiles |
 | 8 | [K8s Secrets](#8-k8s-secrets) | Credentials, licenses |
@@ -373,6 +374,84 @@ pingaccess-admin:
 
 ---
 
+## 5a. PingAM Standalone Deployment
+
+PingAM is NOT part of the `ping-devops` Helm chart. It's deployed as a standalone
+K8s Deployment + Service + PVC.
+
+### Image import into k3s
+
+The PingAM Docker image is built locally and must be imported into k3s's containerd:
+
+```bash
+# Build the image (run once, or after WAR update)
+cd binaries/pingam && docker build . -f docker/Dockerfile -t pingam:8.0.2
+
+# Import into k3s containerd
+docker save pingam:8.0.2 | sudo k3s ctr images import -
+
+# Verify
+sudo k3s ctr images list | grep pingam
+```
+
+> **Important:** The Deployment uses `imagePullPolicy: Never` to tell k3s to
+> use the locally imported image without attempting a registry pull.
+
+### PD cert trust (init container)
+
+PingAM needs to connect to PingDirectory via LDAPS. The init container:
+1. Retrieves PD's TLS certificate via `openssl s_client`
+2. Copies the JVM's `cacerts` to a shared emptyDir (`/trust/cacerts`)
+3. Imports the PD cert into the copy via `keytool -importcert`
+4. The main container uses `-Djavax.net.ssl.trustStore=/trust/cacerts` in `CATALINA_OPTS`
+
+This replaces the Docker Compose approach of `docker exec -u 0 keytool ...`.
+
+### Required K8s resources
+
+Before deploying, create these resources:
+
+```bash
+# ConfigMap: Tomcat server.xml
+kubectl create configmap am-server-xml \
+  --from-file=server.xml=config/server.xml \
+  -n message-xform
+
+# Secret: TLS keystore + public cert
+kubectl create secret generic am-tls \
+  --from-file=tlskey.p12=secrets/tlskey.p12 \
+  --from-file=pubCert.crt=secrets/pubCert.crt \
+  -n message-xform
+
+# Secret: SSL password
+kubectl create secret generic am-ssl-password \
+  --from-literal=SSL_PWD=<your-ssl-password> \
+  -n message-xform
+```
+
+### Deploy
+
+```bash
+kubectl apply -f k8s/pingam-deployment.yaml -n message-xform
+```
+
+### First-time setup
+
+After deployment, AM responds with HTTP 302 (redirect to configurator).
+The configuration Job (Step 3.4) posts to the AM configurator API to
+complete initial setup. Until then, AM is alive but unconfigured.
+
+### Verify
+
+```bash
+# Check HTTP status (302 = unconfigured, 200 = configured)
+kubectl exec <pingam-pod> -n message-xform -c pingam -- \
+  curl -sf -o /dev/null -w "%{http_code}" http://localhost:8080/am/
+
+# Check init container cert import
+kubectl logs <pingam-pod> -n message-xform -c trust-pd-cert
+```
+
 ## 6. License Mounting
 
 Ping products require development license files. We mount them from K8s Secrets.
@@ -653,6 +732,10 @@ kubectl exec <engine-pod> -n message-xform -- \
 kubectl exec pingdirectory-0 -n message-xform -- \
   /opt/out/instance/bin/ldapsearch -h localhost -p 1636 -Z -X \
   -b "" -s base "(objectclass=*)" namingContexts
+
+# AM health (302 = unconfigured, 200 = configured)
+kubectl exec <pingam-pod> -n message-xform -c pingam -- \
+  curl -sf -o /dev/null -w "%{http_code}" http://localhost:8080/am/
 ```
 
 ### Log inspection

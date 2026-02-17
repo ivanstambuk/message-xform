@@ -1,0 +1,219 @@
+############################################################
+# PingAM — Standalone Kubernetes Deployment
+#
+# PingAM is NOT part of the ping-devops Helm chart (it's a
+# ForgeRock-lineage product). We deploy it as a standalone
+# Deployment + Service + PVC.
+#
+# Prerequisites:
+#   1. Image: docker save pingam:8.0.2 | sudo k3s ctr images import -
+#   2. ConfigMap: am-server-xml (from config/server.xml)
+#   3. Secrets: am-tls (tlskey.p12, pubCert.crt), am-ssl-password (SSL_PWD), am-credentials
+#   4. PingDirectory must be running (AM connects via LDAPS)
+#
+# Usage:
+#   kubectl apply -f k8s/pingam-deployment.yaml -n message-xform
+############################################################
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: am-data
+  namespace: message-xform
+  labels:
+    app.kubernetes.io/name: pingam
+    app.kubernetes.io/component: data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pingam
+  namespace: message-xform
+  labels:
+    app.kubernetes.io/name: pingam
+    app.kubernetes.io/instance: platform
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate # PVC is RWO — can't run 2 pods
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: pingam
+      app.kubernetes.io/instance: platform
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: pingam
+        app.kubernetes.io/instance: platform
+    spec:
+      # Init container: import PD's CA cert into the JVM truststore
+      # so AM can connect to PD via LDAPS without cert errors.
+      initContainers:
+        - name: trust-pd-cert
+          image: docker.io/library/pingam:8.0.2
+          command:
+            - sh
+            - -c
+            - |
+              echo "Extracting PD CA certificate..."
+              # Wait for PD to be reachable, then grab its cert
+              for i in $(seq 1 30); do
+                if echo | openssl s_client -connect pingdirectory:1636 -servername pingdirectory 2>/dev/null | openssl x509 -outform PEM > /trust/pd-cert.pem 2>/dev/null; then
+                  if [ -s /trust/pd-cert.pem ]; then
+                    echo "PD certificate retrieved (attempt $i)"
+                    # Import into a copy of the JVM cacerts
+                    cp "$JAVA_HOME/lib/security/cacerts" /trust/cacerts
+                    keytool -importcert \
+                      -alias pd-ca \
+                      -file /trust/pd-cert.pem \
+                      -keystore /trust/cacerts \
+                      -storepass changeit \
+                      -trustcacerts \
+                      -noprompt
+                    echo "PD CA imported into truststore"
+                    exit 0
+                  fi
+                fi
+                echo "Waiting for PD (attempt $i/30)..."
+                sleep 5
+              done
+              echo "WARNING: Could not retrieve PD cert after 30 attempts"
+              # Copy unmodified cacerts so AM can at least start
+              cp "$JAVA_HOME/lib/security/cacerts" /trust/cacerts
+              exit 0
+          volumeMounts:
+            - name: trust-volume
+              mountPath: /trust
+
+      containers:
+        - name: pingam
+          image: docker.io/library/pingam:8.0.2
+          imagePullPolicy: Never # Image imported via k3s ctr
+          ports:
+            - containerPort: 8080
+              name: http
+            - containerPort: 8443
+              name: https
+          env:
+            - name: SSL_PWD
+              valueFrom:
+                secretKeyRef:
+                  name: am-ssl-password
+                  key: SSL_PWD
+            - name: HOSTNAME_AM
+              value: "pingam"
+            - name: HOSTNAME_PD
+              value: "pingdirectory"
+            # Override JVM truststore to use our custom one with PD cert
+            - name: CATALINA_OPTS
+              value: >-
+                -server
+                -Xmx1g
+                -XX:MaxRAMPercentage=75
+                -XX:MaxTenuringThreshold=1
+                -Djava.security.egd=file:/dev/urandom
+                -Dcom.sun.identity.configuration.directory=/home/forgerock/openam
+                -Dcom.iplanet.services.stats.state=off
+                -Dorg.forgerock.donotupgrade=true
+                -Djavax.net.ssl.trustStore=/trust/cacerts
+                -Djavax.net.ssl.trustStorePassword=changeit
+                --add-opens java.xml/com.sun.org.apache.xerces.internal.dom=ALL-UNNAMED
+                --add-exports java.xml/com.sun.org.apache.xerces.internal.jaxp=ALL-UNNAMED
+                --add-exports java.xml/com.sun.org.apache.xerces.internal.util=ALL-UNNAMED
+          volumeMounts:
+            - name: am-data
+              mountPath: /home/forgerock/openam
+            - name: tls-keystore
+              mountPath: /usr/local/tomcat/ssl/tlskey.p12
+              subPath: tlskey.p12
+              readOnly: true
+            - name: server-xml
+              mountPath: /usr/local/tomcat/conf/server.xml
+              subPath: server.xml
+              readOnly: true
+            - name: trust-volume
+              mountPath: /trust
+              readOnly: true
+          startupProbe:
+            httpGet:
+              path: /am/
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 30 # 30 * 10s = 5 min startup window
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /am/
+              port: http
+            periodSeconds: 15
+            failureThreshold: 3
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /am/
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            failureThreshold: 4
+            timeoutSeconds: 5
+          resources:
+            requests:
+              cpu: 250m
+              memory: 1Gi
+            limits:
+              cpu: 2
+              memory: 2Gi
+          securityContext:
+            runAsUser: 11111 # forgerock user
+            runAsGroup: 11111
+            allowPrivilegeEscalation: false
+
+      volumes:
+        - name: am-data
+          persistentVolumeClaim:
+            claimName: am-data
+        - name: tls-keystore
+          secret:
+            secretName: am-tls
+            items:
+              - key: tlskey.p12
+                path: tlskey.p12
+        - name: server-xml
+          configMap:
+            name: am-server-xml
+            items:
+              - key: server.xml
+                path: server.xml
+        - name: trust-volume
+          emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pingam
+  namespace: message-xform
+  labels:
+    app.kubernetes.io/name: pingam
+    app.kubernetes.io/instance: platform
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: pingam
+    app.kubernetes.io/instance: platform
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+    - name: https
+      port: 8443
+      targetPort: https
