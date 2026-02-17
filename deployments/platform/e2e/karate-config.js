@@ -44,7 +44,7 @@ function fn() {
         // PA reverse-proxies /am/* to PingAM. The transform profile fires on
         // POST /am/json/authenticate and cleans up the response.
         //
-        // loginUrl goes through PA engine → transform profile fires
+        // "Raw" URLs go through PA's /am application (direct AM paths):
         loginUrl: 'https://localhost:13000/am/json/authenticate',
         logoutUrl: 'https://localhost:13000/am/json/sessions/?_action=logout',
         passkeyUrl: 'https://localhost:13000/am/json/authenticate',
@@ -54,6 +54,15 @@ function fn() {
         loginJourneyParams: '',
         passkeyJourneyParams: 'authIndexType=service&authIndexValue=WebAuthnJourney',
         usernamelessJourneyParams: 'authIndexType=service&authIndexValue=UsernamelessJourney',
+
+        // -- Clean URL endpoints (request-side URL rewriting by message-xform) ----
+        // PA's /api application + message-xform URL rewrite specs:
+        //   /api/v1/auth/login                → /am/json/authenticate
+        //   /api/v1/auth/passkey              → /am/json/authenticate + WebAuthnJourney
+        //   /api/v1/auth/passkey/usernameless → /am/json/authenticate + UsernamelessJourney
+        cleanLoginUrl: 'https://localhost:13000/api/v1/auth/login',
+        cleanPasskeyUrl: 'https://localhost:13000/api/v1/auth/passkey',
+        cleanPasskeyUsernamelessUrl: 'https://localhost:13000/api/v1/auth/passkey/usernameless',
 
         // -- PingDirectory (direct, for setup/verification) -----------------------
         pdLdapsPort: 1636,

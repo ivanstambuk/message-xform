@@ -211,30 +211,34 @@ if [[ -z "$RULE_ID" ]]; then
     log "The /api application is created but transforms won't be applied until the rule exists."
 else
     # Check if rule is already attached to the resource
+    # PA policy entries use object format: {"type": "Rule", "id": N}
     CURRENT_RESOURCE=$(pa_api GET "/applications/${APP_ID}/resources/${ROOT_RESOURCE_ID}")
     HAS_RULE=$(echo "$CURRENT_RESOURCE" | python3 -c "
 import sys,json
 r = json.load(sys.stdin)
-# Check all policy buckets for the rule
+rule_id = ${RULE_ID}
 for bucket in r.get('policy', {}).values():
-    if isinstance(bucket, list) and ${RULE_ID} in bucket:
-        print('yes')
-        break
-else:
-    print('')
+    if isinstance(bucket, list):
+        for entry in bucket:
+            if isinstance(entry, dict) and entry.get('id') == rule_id:
+                print('yes')
+                break
 " 2>/dev/null || echo "")
 
     if [[ "$HAS_RULE" == "yes" ]]; then
         ok "Message-xform rule already attached to /api resource"
     else
-        # Attach rule to the Web policy bucket
+        # Attach rule to the Web policy bucket using PA's required object format
         RESOURCE_WITH_RULE=$(echo "$CURRENT_RESOURCE" | python3 -c "
 import sys,json
 r = json.load(sys.stdin)
+rule_id = ${RULE_ID}
 policy = r.get('policy', {})
 web = policy.get('Web', [])
-if ${RULE_ID} not in web:
-    web.append(${RULE_ID})
+# PA requires {type: 'Rule', id: N} objects, not bare integers
+rule_entry = {'type': 'Rule', 'id': rule_id}
+if not any(e.get('id') == rule_id for e in web if isinstance(e, dict)):
+    web.append(rule_entry)
 policy['Web'] = web
 r['policy'] = policy
 json.dump(r, sys.stdout)

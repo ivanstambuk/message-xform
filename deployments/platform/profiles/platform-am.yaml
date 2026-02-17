@@ -55,7 +55,7 @@ transforms:
       method: POST
 
   # ── Login (default tree) ──
-  - spec: am-auth-url-rewrite@1.0.0
+  - spec: am-auth-login-url@1.0.0
     direction: request
     match:
       path: "/api/v1/auth/login"
