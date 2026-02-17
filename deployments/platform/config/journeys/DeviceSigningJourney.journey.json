@@ -1,0 +1,185 @@
+{
+    "meta": {
+        "origin": "http://am.platform.local:18080/am",
+        "originAmVersion": "7.4.0",
+        "exportedBy": "amAdmin",
+        "exportDate": "2026-02-17T21:30:00.000Z",
+        "exportTool": "hand-authored",
+        "exportToolVersion": "v1.0.0"
+    },
+    "innerNodes": {},
+    "nodes": {
+        "ds-usr-01": {
+            "_id": "ds-usr-01",
+            "_rev": "1",
+            "_type": {
+                "_id": "UsernameCollectorNode",
+                "name": "Username Collector",
+                "collection": true
+            },
+            "_outcomes": [
+                {
+                    "id": "outcome",
+                    "displayName": "Outcome"
+                }
+            ]
+        },
+        "ds-pwd-01": {
+            "_id": "ds-pwd-01",
+            "_rev": "1",
+            "_type": {
+                "_id": "PasswordCollectorNode",
+                "name": "Password Collector",
+                "collection": true
+            },
+            "_outcomes": [
+                {
+                    "id": "outcome",
+                    "displayName": "Outcome"
+                }
+            ]
+        },
+        "ds-ds-01": {
+            "_id": "ds-ds-01",
+            "_rev": "1",
+            "_type": {
+                "_id": "DataStoreDecisionNode",
+                "name": "Data Store Decision",
+                "collection": true
+            },
+            "_outcomes": [
+                {
+                    "id": "true",
+                    "displayName": "True"
+                },
+                {
+                    "id": "false",
+                    "displayName": "False"
+                }
+            ]
+        },
+        "ds-verify-01": {
+            "_id": "ds-verify-01",
+            "_rev": "1",
+            "challenge": true,
+            "sharedStateAttribute": "",
+            "title": {
+                "en": "Device Verification"
+            },
+            "subtitle": {
+                "en": "Verify your bound device"
+            },
+            "description": {
+                "en": "Sign the challenge with your device key"
+            },
+            "applicationIds": [
+                "com.example.test"
+            ],
+            "timeout": 60,
+            "captureFailure": true,
+            "clientErrorOutcomes": [
+                "Abort",
+                "Unsupported",
+                "Timeout"
+            ],
+            "_type": {
+                "_id": "DeviceSigningVerifierNode",
+                "name": "Device Signing Verifier Node",
+                "collection": true
+            },
+            "_outcomes": [
+                {
+                    "id": "success",
+                    "displayName": "Success"
+                },
+                {
+                    "id": "failure",
+                    "displayName": "Failure"
+                },
+                {
+                    "id": "Abort",
+                    "displayName": "Abort"
+                },
+                {
+                    "id": "Unsupported",
+                    "displayName": "Unsupported"
+                },
+                {
+                    "id": "Timeout",
+                    "displayName": "Timeout"
+                }
+            ]
+        }
+    },
+    "scripts": {},
+    "emailTemplates": {},
+    "socialIdentityProviders": {},
+    "themes": [],
+    "saml2Entities": {},
+    "circlesOfTrust": {},
+    "tree": {
+        "_id": "DeviceSigningJourney",
+        "_rev": "1",
+        "uiConfig": {},
+        "entryNodeId": "ds-usr-01",
+        "innerTreeOnly": false,
+        "nodes": {
+            "ds-usr-01": {
+                "displayName": "Username Collector",
+                "nodeType": "UsernameCollectorNode",
+                "x": 70,
+                "y": 50,
+                "connections": {
+                    "outcome": "ds-pwd-01"
+                }
+            },
+            "ds-pwd-01": {
+                "displayName": "Password Collector",
+                "nodeType": "PasswordCollectorNode",
+                "x": 70,
+                "y": 200,
+                "connections": {
+                    "outcome": "ds-ds-01"
+                }
+            },
+            "ds-ds-01": {
+                "displayName": "Data Store Decision",
+                "nodeType": "DataStoreDecisionNode",
+                "x": 70,
+                "y": 400,
+                "connections": {
+                    "true": "ds-verify-01",
+                    "false": "e301438c-0bd0-429c-ab0c-66126501069a"
+                }
+            },
+            "ds-verify-01": {
+                "displayName": "Device Signing Verifier Node",
+                "nodeType": "DeviceSigningVerifierNode",
+                "x": 400,
+                "y": 400,
+                "connections": {
+                    "success": "70e691a5-1e33-4ac3-a356-e7b6d60d92e0",
+                    "failure": "e301438c-0bd0-429c-ab0c-66126501069a",
+                    "Abort": "e301438c-0bd0-429c-ab0c-66126501069a",
+                    "Unsupported": "e301438c-0bd0-429c-ab0c-66126501069a",
+                    "Timeout": "e301438c-0bd0-429c-ab0c-66126501069a"
+                }
+            }
+        },
+        "staticNodes": {
+            "startNode": {
+                "x": 0,
+                "y": 50
+            },
+            "70e691a5-1e33-4ac3-a356-e7b6d60d92e0": {
+                "x": 700,
+                "y": 200
+            },
+            "e301438c-0bd0-429c-ab0c-66126501069a": {
+                "x": 700,
+                "y": 500
+            }
+        },
+        "enabled": true
+    }
+}
