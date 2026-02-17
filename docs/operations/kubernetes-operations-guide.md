@@ -452,6 +452,35 @@ kubectl exec <pingam-pod> -n message-xform -c pingam -- \
 kubectl logs <pingam-pod> -n message-xform -c trust-pd-cert
 ```
 
+### AM configuration (configurator POST)
+
+After first deployment, AM needs its configurator POST to complete setup.
+The key parameters are `DIRECTORY_SERVER` and `USERSTORE_HOST`.
+
+> **Critical: Use the PD headless service FQDN, NOT the short service name.**
+>
+> PD's self-signed certificate has CN =
+> `pingdirectory-0.pingdirectory-cluster.message-xform.svc.cluster.local`.
+> The AM LDAP SDK performs SSL hostname verification, so using the short
+> service name `pingdirectory` causes a `Client-Side Timeout` error.
+>
+> Use the full FQDN:
+> ```
+> DIRECTORY_SERVER=pingdirectory-0.pingdirectory-cluster.message-xform.svc.cluster.local
+> USERSTORE_HOST=pingdirectory-0.pingdirectory-cluster.message-xform.svc.cluster.local
+> ```
+
+After configuration, verify admin auth works:
+
+```bash
+# Step 1: get authId
+curl -sf -X POST "http://localhost:8080/am/json/authenticate" \
+  -H "Content-Type: application/json" \
+  -H "Accept-API-Version: resource=2.0,protocol=1.0" \
+  -H "Host: pingam"
+# Step 2: submit credentials (fill authId from step 1)
+```
+
 ## 6. License Mounting
 
 Ping products require development license files. We mount them from K8s Secrets.
@@ -631,6 +660,7 @@ kubectl logs <pod-name> -n message-xform --tail=50
 | `ERROR: No valid administrator password found` | Missing `PA_ADMIN_PASSWORD_INITIAL` or `PING_IDENTITY_PASSWORD` | Set both env vars to same value (§8) |
 | Init container `cp: can't create`: "No such file or directory" | Wrong mount path or subPath creates file instead of directory | Use emptyDir without subPath for the target (§5) |
 | `volumeMounts: null` in rendered template | `volumeMounts` placed under `container:` instead of product root | Move to product root level (§3) |
+| AM configurator `Client-Side Timeout` | PD self-signed cert CN doesn't match short service name `pingdirectory` | Use PD headless FQDN `pingdirectory-0.pingdirectory-cluster...` (§5a) |
 
 ### Helm template debugging
 

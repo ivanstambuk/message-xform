@@ -121,12 +121,12 @@ Deploy PingDirectory, PingAM, and PingAccess via Helm.
 | 3.1 | Deploy PingDirectory: verify LDAPS, readiness probe, PVC | ✅ Running, LDAPS OK |
 | 3.2 | Deploy PD schema tweaks (Job or init container): etag VA + structural objectclass | ✅ Applied live + ConfigMap mounted for fresh deploys |
 | 3.3 | Deploy PingAM: standalone Deployment (not in chart) | ✅ Running, init container for PD cert trust, PVC provisioned |
-| 3.4 | AM configuration Job: run `configure-am.sh` logic as a K8s Job | |
+| 3.4 | AM configuration Job: run `configure-am.sh` logic as a K8s Job | ✅ Configured via kubectl exec curl; FQDN needed for PD (hostname verification) |
 | 3.5 | AM post-config Job: create test users (`configure-am-post.sh` logic) | |
 | 3.6 | Deploy PingAccess: init container for shadow JAR, ConfigMap mounts for specs/profiles | ✅ Admin+Engine Running, JAR + specs + profiles mounted |
 | 3.7 | PA configuration Job: `configure-pa.sh` + `configure-pa-plugin.sh` + `configure-pa-api.sh` | |
 | 3.8 | WebAuthn journey import Job: `import-webauthn-journey.sh` | |
-| 3.9 | Verify: all Pods Running/Completed, PD healthy, AM responding, PA proxying | partial — PD ✅ PA ✅ AM ✅ (unconfigured, HTTP 302) |
+| 3.9 | Verify: all Pods Running/Completed, PD healthy, AM responding, PA proxying | ✅ PD ✅ PA ✅ AM ✅ (configured, admin auth verified) |
 
 ### Phase 4 — Networking & Ingress *(~1 session)*
 Configure Ingress for clean URL routing and external access.
