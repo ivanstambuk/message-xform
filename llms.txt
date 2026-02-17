@@ -37,7 +37,7 @@ docs/operations/pingam-operations-guide.md
 
 # Platform Deployment Guide (3-container stack: PingAccess + PingAM + PingDirectory, docker-compose, WebAuthn)
 docs/operations/platform-deployment-guide.md
-deployments/platform/PLAN.md
+
 
 # Feature 004 — Standalone HTTP Proxy Mode
 docs/architecture/features/004/spec.md
@@ -106,12 +106,14 @@ e2e-pingaccess/src/test/java/karate-config.js
 e2e-pingaccess/build.gradle.kts
 
 # Platform E2E tests (standalone Karate JAR — 3-container stack)
-deployments/platform/PLAN.md
+deployments/platform/e2e/e2e-results.md
 deployments/platform/e2e/karate-config.js
 deployments/platform/e2e/auth-login.feature
 deployments/platform/e2e/auth-logout.feature
 deployments/platform/e2e/auth-passkey.feature
 deployments/platform/e2e/auth-passkey-usernameless.feature
+deployments/platform/e2e/clean-url-login.feature
+deployments/platform/e2e/clean-url-passkey.feature
 deployments/platform/e2e/helpers/webauthn.js
 deployments/platform/e2e/helpers/delete-device.feature
 deployments/platform/e2e/helpers/basic-auth.js

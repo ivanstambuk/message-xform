@@ -1304,7 +1304,10 @@ through the full stack: Karate → PingAccess → PingAM → PingDirectory.
 | Login | `auth-login.feature` | 3 | Initiate callback, submit credentials + cookie, bad credentials → 401 |
 | Logout | `auth-logout.feature` | 1 | Authenticate → logout → validate session = false |
 | Passkey | `auth-passkey.feature` | 3 | Full registration + auth, device-exists auth, unsupported fallback |
-| **Total** | | **7** | |
+| Passkey (usernameless) | `auth-passkey-usernameless.feature` | 2 | Full reg + auth (discoverable credential), returning-user auth |
+| Clean URL Login | `clean-url-login.feature` | 3 | Initiate via /api/v1/auth/login, full login + cookie, bad creds → 401 |
+| Clean URL Passkey | `clean-url-passkey.feature` | 2 | Identifier-first username prompt, usernameless WebAuthn challenge |
+| **Total** | | **14** | |
 
 #### Helpers
 
@@ -1388,7 +1391,7 @@ Results are written to `target/karate-reports/` as HTML. Open
 │       → { token, authenticated, redirectUrl, realm }                 │
 │       (transformed by message-xform from tokenId/successUrl)         │
 │                                                                     │
-│  Transform plugin (v3.0.0):                                          │
+│  Transform plugin (v4.0.0):                                          │
 │    Specs:    am-auth-response-v2, am-webauthn-response,              │
 │              am-strip-internal, am-header-inject                     │
 │    Profile:  platform-am.yaml (match.when body predicates)           │
@@ -1406,7 +1409,7 @@ Results are written to `target/karate-reports/` as HTML. Open
 │    1. single-structural-objectclass-behavior: accept                │
 │    2. etag mirror VA: ds-entry-checksum → etag                      │
 │                                                                     │
-│  E2E Tests (7 scenarios):                                           │
+│  E2E Tests (14 scenarios):                                           │
 │    cd deployments/platform/e2e                                      │
 │    ./run-e2e.sh                     # all tests                     │
 │    java -jar karate-1.4.1.jar auth-passkey.feature  # single file   │
@@ -1421,5 +1424,5 @@ Results are written to `target/karate-reports/` as HTML. Open
 
 - [PingAM Operations Guide](./pingam-operations-guide.md) — image build, product deep-dive, PD compatibility, [transformed response surface](./pingam-operations-guide.md#transformed-response-via-pingaccess--message-xform)
 - [PingAccess Operations Guide](./pingaccess-operations-guide.md) — reverse proxy configuration, [Admin API recipe](./pingaccess-operations-guide.md#5-admin-api--full-configuration-recipe), [deployment patterns](./pingaccess-operations-guide.md#13-deployment-patterns-hot-reload--faq)
-- [Implementation Plan](../../deployments/platform/PLAN.md) — phased plan with live tracker
+- [E2E Validation Record](../../deployments/platform/e2e/e2e-results.md) — test breakdown, spec coverage, and run history
 - [Platform README](../../deployments/platform/README.md) — architecture overview and quick start
