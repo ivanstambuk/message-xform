@@ -1,26 +1,22 @@
 # Pending Task
 
-**Focus**: Platform E2E tests — passkey flows (Phase 8.10/8.11)
-**Status**: 4/6 Phase 8 scenarios complete; passkey tests not started
-**Next Step**: Set up `openauth-sim` FIDO2 authenticator simulator, then implement passkey E2E tests
+**Focus**: WebAuthn passkey E2E tests — completed
+**Status**: All 3 passkey scenarios passing (7/7 total E2E scenarios)
+**Next Step**: Push to origin, update PLAN.md passkey task status, Phase 9 documentation
 
 ## Context Notes
-- Platform stack is running (PA, AM, PD all healthy as of 2026-02-17 08:00)
-- PD cert must be re-imported into AM's JVM truststore if AM container was recreated
-- WebAuthn journey (`WebAuthnJourney`) already imported into AM; `UsernamelessJourney` config exists but import not verified
-- Transform specs v2 (`am-auth-response-v2` + `am-strip-internal`) are deployed and chained in PA
-- Karate standalone JAR (1.4.1) is downloaded in `deployments/platform/e2e/`
+- `auth-passkey.feature` has 3 scenarios: full registration+auth, device-exists auth, unsupported fallback
+- `webauthn.js` is a pure JDK-based FIDO2 helper (EC P-256, CBOR, no external deps)
+- `delete-device.feature` is a reusable device cleanup helper via AM Admin API
+- The Python script `/tmp/webauthn_test.py` was a throwaway debugging tool — safe to delete
+- `karate-config.js` was updated with `passkeyTestUser` (user.4) and journey params
 
-## Important Gotchas for Next Session
-- Clear Karate cookie jar before cross-domain calls (`* configure cookies = null`)
-- Custom headers from message-xform are lowercase (`x-auth-session`)
-- Standard HTTP headers keep original casing (`Set-Cookie`)
-- `authId` JWT must be echoed back verbatim in request body (D9: response-only transforms)
-
-## Implementation Reference
-- PLAN.md has full FIDO2 ceremony pseudocode in "Implementation Notes for Steps 8.10/8.11"
-- Decision D11 defines `openauth-sim` as the authenticator emulator
-- WebAuthn callbacks use `HiddenValueCallback` with JSON-encoded challenge data
+## Key Debugging Findings
+1. **Root cause of auth loop**: ConfirmationCallback set to 0 = "Use Recovery Code" → wrong journey branch
+2. **legacyData escaping**: ONE level of `"` → `\"` escaping. Double = HTTP 401
+3. **allowCredentials regex**: Nested `Int8Array([...])` breaks naive bracket matching
+4. **Device API version**: `resource=1.0, protocol=1.0` (different from auth API's 2.0)
 
 ## SDD Gaps (if any)
-- None — all checks passed (terminology, ADRs, open questions, spec consistency)
+- None — this is platform infrastructure, not feature-level SDD work
+- All learnings captured in PingAM operations guide §10 and KI webauthn_journey.md
