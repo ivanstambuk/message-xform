@@ -125,8 +125,8 @@ Deploy PingDirectory, PingAM, and PingAccess via Helm.
 | 3.5 | AM post-config Job: create test users (`configure-am-post.sh` logic) | ✅ 10 test users loaded; user.1 callback auth verified |
 | 3.6 | Deploy PingAccess: init container for shadow JAR, ConfigMap mounts for specs/profiles | ✅ Admin+Engine Running, JAR + specs + profiles mounted |
 | 3.7 | PA configuration Job: `configure-pa.sh` + `configure-pa-plugin.sh` + `configure-pa-api.sh` | ✅ Site + /am + /api apps + MessageTransform rule; transform pipeline verified |
-| 3.8 | WebAuthn journey import Job: `import-webauthn-journey.sh` | |
-| 3.9 | Verify: all Pods Running/Completed, PD healthy, AM responding, PA proxying | ✅ PD ✅ PA ✅ AM ✅ (configured, admin auth verified) |
+| 3.8 | WebAuthn journey import Job: `import-webauthn-journey.sh` | ✅ Both WebAuthnJourney + UsernamelessJourney imported; invocable via authIndexType=service |
+| 3.9 | Verify: all Pods Running/Completed, PD healthy, AM responding, PA proxying | ✅ All 4 pods 1/1; PD LDAPS ✅ AM health ✅ PA proxy 200 ✅ Transform active ✅ Journeys ✅ |
 
 ### Phase 4 — Networking & Ingress *(~1 session)*
 Configure Ingress for clean URL routing and external access.
