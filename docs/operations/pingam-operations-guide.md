@@ -695,8 +695,10 @@ curl -s -H "Host: am.platform.local:18080" \
 
 #### Transformed response (via PingAccess + message-xform)
 
-When PingAM is fronted by PingAccess with the message-xform adapter, the
-success response is transformed before reaching the client:
+When PingAM is fronted by PingAccess with the message-xform adapter, responses
+are transformed based on their content type (ADR-0036 body-predicate routing):
+
+##### Login callbacks + success responses
 
 | AM raw response | Transformed response |
 |----------------|---------------------|
@@ -704,15 +706,34 @@ success response is transformed before reaching the client:
 | `"successUrl": "/am/console"` | `"redirectUrl": "/am/console"` |
 | (none) | `"authenticated": true` |
 | `"realm": "/"` | `"realm": "/"` |
+| `"authId": "eyJ0..."` | moved to `X-Auth-Session` header |
 
-Additionally, response headers are injected:
-- `x-auth-provider: PingAM`
-- `x-transform-engine: message-xform`
+Login callback responses (username/password) are converted to a `fields[]`
+array. Success responses have field renames as shown above. The `authId`
+JWT is extracted to a response header (`X-Auth-Session`) so clients echo
+it back on subsequent requests.
 
-Callback responses (containing `authId` + `callbacks[]`) are **not** transformed —
-the JSLT `if (.tokenId)` guard ensures only final success responses are modified.
-This is critical because AM's callback protocol requires the `authId` JWT to be
-echoed back verbatim in subsequent requests.
+##### WebAuthn callback responses
+
+WebAuthn callbacks (TextOutputCallback containing embedded JavaScript) are
+parsed into structured JSON using JSLT `capture()` regex:
+
+| Transformed field | Source |
+|-------------------|--------|
+| `type` | `"webauthn-register"` or `"webauthn-auth"` (from `navigator.credentials.create/get`) |
+| `challengeRaw` | Comma-separated signed bytes from `Int8Array([...])` |
+| `rpId` | RP domain from `rpId:` or `rp: { id: }` |
+| `userVerification` | `"required"`, `"preferred"`, or `"discouraged"` |
+| `timeout` | Timeout in milliseconds |
+| `hasRecoveryOption` | Whether a `ConfirmationCallback` (recovery code) is present (auth only) |
+
+The `authId` is also extracted to the `X-Auth-Session` response header.
+
+The profile uses `match.when` body predicates (ADR-0036) to route:
+- TextOutputCallback with `navigator.credentials` → `am-webauthn-response` spec
+- Everything else → `am-auth-response-v2` spec
+
+Both routes chain into `am-strip-internal` to remove internal `_`-prefixed fields.
 
 > **See:** [Platform Deployment Guide §9c](./platform-deployment-guide.md#9c-message-xform-plugin-wiring)
 > for the full plugin wiring procedure, spec files, and profile configuration.

@@ -911,10 +911,12 @@ existing fields rather than restructuring the protocol.
 ```
 deployments/platform/
 ├── specs/
-│   ├── am-auth-response.yaml      # Body transform for auth success
-│   └── am-header-inject.yaml      # Header injection for all AM responses
+│   ├── am-auth-response-v2.yaml    # Login callback + success body transform
+│   ├── am-webauthn-response.yaml   # WebAuthn callback → structured passkey API
+│   ├── am-strip-internal.yaml      # Remove _-prefixed internal fields
+│   └── am-header-inject.yaml       # Header injection for all AM responses
 ├── profiles/
-│   └── platform-am.yaml           # Routes specs to AM API paths
+│   └── platform-am.yaml           # Routes specs to AM API paths (v3.0.0)
 └── scripts/
     ├── configure-pa.sh            # Base PA config (site, app, resource)
     └── configure-pa-plugin.sh     # Plugin rule creation + policy binding
@@ -930,39 +932,63 @@ Inside the PingAccess container:
 
 #### Transform specs
 
-##### `am-auth-response.yaml` — Body transform
+##### `am-auth-response-v2.yaml` — Login body transform
 
-Transforms PingAM's authentication success response:
+Transforms login callback and success responses from PingAM:
 
 | AM raw field | Transformed field | Notes |
 |-------------|-------------------|-------|
-| `tokenId` | `token` | Cleaner field name |
+| `tokenId` | `token` | Cleaner field name (success responses) |
 | `successUrl` | `redirectUrl` | More descriptive |
 | (none) | `authenticated: true` | Client convenience boolean |
 | `realm` | `realm` | Preserved as-is |
+| `callbacks[]` | `fields[]` | Callback array renamed (callback responses) |
+| `authId` | `_authId` (internal) | Extracted to `X-Auth-Session` header |
 
-The spec uses a JSLT `if (.tokenId)` guard: callback responses (which don't
-contain `tokenId`) pass through unchanged. Only final success responses are
-transformed.
+The spec handles both callback **and** success responses:
+- Callback responses: produces `fields[]` array
+- Success responses: renames `tokenId` → `token`, adds `authenticated: true`
 
-**AM raw response:**
+##### `am-webauthn-response.yaml` — WebAuthn passkey transform
+
+Parses embedded JavaScript from WebAuthn TextOutputCallbacks into structured
+JSON using JSLT `capture()` regex:
+
+**Registration output:**
 ```json
 {
-  "tokenId": "ZNHQ9iMy7F3dMBBy...",
-  "successUrl": "/am/console",
-  "realm": "/"
+  "type": "webauthn-register",
+  "challengeRaw": "121,84,25,-26,...",
+  "rpId": "localhost",
+  "userVerification": "required",
+  "timeout": 60000
 }
 ```
 
-**Transformed response:**
+**Authentication output:**
 ```json
 {
-  "token": "ZNHQ9iMy7F3dMBBy...",
-  "authenticated": true,
-  "redirectUrl": "/am/console",
-  "realm": "/"
+  "type": "webauthn-auth",
+  "challengeRaw": "69,84,25,-26,...",
+  "rpId": "localhost",
+  "userVerification": "required",
+  "timeout": 60000,
+  "hasRecoveryOption": true
 }
 ```
+
+`challengeRaw` is a comma-separated string of signed bytes matching AM's
+`Int8Array([...])` format. The client converts to `ArrayBuffer`:
+```js
+new Int8Array(challengeRaw.split(",").map(Number)).buffer
+```
+
+The `authId` is extracted to the `X-Auth-Session` response header.
+
+##### `am-strip-internal.yaml` — Internal field removal
+
+Removes all `_`-prefixed fields (e.g., `_authId`) from the response body.
+Runs after the body transform step in the profile chain (ADR-0008).
 
 ##### `am-header-inject.yaml` — Header injection
 
@@ -978,12 +1004,15 @@ Adds custom headers to all PingAM API responses (`/am/json/**`):
 
 #### Profile routing
 
-The `platform-am.yaml` profile routes specs to PingAM API paths:
+The `platform-am.yaml` profile (v3.0.0) uses body-predicate routing
+(ADR-0036 `match.when`) to discriminate between WebAuthn and login callbacks:
 
-| Spec | Method | Path | Direction |
-|------|--------|------|-----------|
-| `am-auth-response` | `POST` | `/am/json/authenticate` | Response |
-| `am-header-inject` | `POST` | `/am/json/**` | Response |
+| Spec | Method | Path | Direction | Body predicate |
+|------|--------|------|-----------|----------------|
+| `am-webauthn-response` | `POST` | `/am/json/authenticate` | Response | TextOutputCallback contains `navigator.credentials` |
+| `am-auth-response-v2` | `POST` | `/am/json/authenticate` | Response | Everything else (login callbacks + success) |
+| `am-strip-internal` | `POST` | `/am/json/authenticate` | Response | (always runs — chains after body transform) |
+| `am-header-inject` | `POST` | `/am/json/**` | Response | (no predicate) |
 
 This follows the recommended **one rule per application** pattern: a single
 MessageTransform rule is attached to the PingAM Proxy application, and the
@@ -1316,11 +1345,12 @@ Results are written to `target/karate-reports/` as HTML. Open
 │       → { token, authenticated, redirectUrl, realm }                 │
 │       (transformed by message-xform from tokenId/successUrl)         │
 │                                                                     │
-│  Transform plugin:                                                   │
-│    Specs:    /specs/am-auth-response.yaml, am-header-inject.yaml    │
-│    Profile:  /profiles/platform-am.yaml                              │
-│    Headers:  x-auth-provider: PingAM                                │
-│              x-transform-engine: message-xform                      │
+│  Transform plugin (v3.0.0):                                          │
+│    Specs:    am-auth-response-v2, am-webauthn-response,              │
+│              am-strip-internal, am-header-inject                     │
+│    Profile:  platform-am.yaml (match.when body predicates)           │
+│    Headers:  x-auth-session (authId), x-auth-provider,              │
+│              x-transform-engine                                      │
 │    Setup:    ./scripts/configure-pa-plugin.sh                       │
 │                                                                     │
 │  PD tweaks (both required before AM config):                        │
