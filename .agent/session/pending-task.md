@@ -1,16 +1,16 @@
 # Pending Task
 
-## Focus
-Platform K8s Deployment — **Phase 5: E2E Test Validation**
+**Focus**: K8s E2E Test Validation — Phase 5 of platform PLAN
+**Status**: 9/14 scenarios pass. Steps 5.1–5.5 complete. Steps 5.6–5.8 remain.
+**Next Step**: Run passkey E2E tests on K8s (auth-passkey.feature, auth-passkey-usernameless.feature)
 
-## Next Step
-Run the full 14-scenario Karate E2E suite against the k3s cluster endpoints.
+## Context Notes
+- `run-e2e.sh --env k8s` works — starts port-forwards, runs Karate, cleans up
+- `lowerCaseResponseHeaders = true` is enabled globally; all header assertions use lowercase keys
+- Docker env (`./run-e2e.sh` without `--env k8s`) still works — verified
+- PA Admin password on K8s is `2Access` (product-level override, not global)
+- Passkey tests need WebAuthn device registration which hasn't been verified on K8s yet
+- All documentation and KIs updated for the K8s E2E learnings
 
-### Context
-- Phase 4 (Networking & Ingress) is now complete
-- Traefik IngressRoute configured: `https://localhost/am/*` and `https://localhost/api/*`
-- All transform pipeline paths verified manually
-- Karate E2E tests in `deployments/platform/e2e/` need `karate-config.js` updated for k3s endpoints
-
-### SDD Gaps
-- None for this infrastructure task
+## SDD Gaps (if any)
+- None — all checks passed (session was infrastructure/ops work, no features touched)

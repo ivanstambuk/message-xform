@@ -1,62 +1,62 @@
-# Current Session — K8s Platform Deployment (Phase 4)
+# Current Session — K8s E2E Test Validation (Phase 5)
 
 ## Focus
-Kubernetes deployment of PingAM + PingDirectory + PingAccess on local k3s cluster.
-Completing Phase 4 (Networking & Ingress) from `deployments/platform/PLAN.md`.
+Running the platform E2E test suite against the Kubernetes deployment.
+Phase 5 from `deployments/platform/PLAN.md`.
 
 ## Status
-✅ **PHASE 4 COMPLETE** — All 5 steps done.
+🟡 **PHASE 5 IN PROGRESS** — 9/14 scenarios pass (5/8 steps done).
 
 ## Completed This Session
 
-### Housekeeping — Vendor Doc Symlinks
-- Restored 6 symlinks in `binaries/*/docs/*.txt` into shared artifact store
-- Root cause: bind mount overlay hid git-tracked symlinks
-- Actual vendor doc text files (gitignored) are missing from shared store — NOT blocking
+### Phase 5 — E2E Test Validation
 
-### Phase 4 — Networking & Ingress
+#### Step 5.1 — karate-config.js K8s Environment
+- Added `k8s` environment block to `karate-config.js` with:
+  - `paEngineUrl = https://localhost` (Traefik port 443)
+  - `paEngineHost = localhost` (matches `*:443` VH, implied port for HTTPS)
+  - `paAdminUrl = https://localhost:29000/...` (port-forwarded)
+  - `amDirectUrl = http://127.0.0.1:28080/am` (port-forwarded)
+  - `amHostHeader = pingam:8080` (matches AM boot.json FQDN including port)
+  - `paPassword = 2Access` (from values-local.yaml product-level override)
+- Enabled `karate.configure('lowerCaseResponseHeaders', true)` **globally** to
+  normalize response header keys across Docker (lowercase) and K8s (Traefik title-cases)
 
-#### Step 4.1 — IngressRoute
-- Created `k8s/ingress.yaml` with 4 resources:
-  - `ServersTransport/pa-transport` — `insecureSkipVerify: true` for PA's self-signed cert
-  - `IngressRoute/platform-ingress` — HTTPS entrypoint, both `/am` and `/api` paths
-  - `IngressRoute/platform-ingress-redirect` — HTTP → HTTPS 301 redirect
-  - `Middleware/redirect-to-https` — redirect scheme middleware
+#### Step 5.1b — run-e2e.sh K8s Support
+- Added `--env k8s` flag to `run-e2e.sh`
+- Script starts `kubectl port-forward` for AM (28080→8080) and PA Admin (29000→9000)
+- Cleanup via `trap EXIT` ensures port-forwards terminate on script exit
+- Passes `-Dkarate.env=k8s` to Karate JAR
 
-#### Step 4.2 — TLS Termination
-- Traefik 3.6.7 terminates TLS using its default self-signed cert
-- Re-encrypts to PA engine on port 3000 (HTTPS backend)
-- `ServersTransport` skips backend TLS verification
+#### Steps 5.2–5.5 — Test Execution
+- `auth-login.feature` — 3/3 ✅
+- `auth-logout.feature` — 1/1 ✅
+- `clean-url-login.feature` — 3/3 ✅
+- `clean-url-passkey.feature` — 2/2 ✅
 
-#### Step 4.3–4.4 — Verification
-- `/api/v1/auth/login` → clean `fields[]` JSON ✅
-- `/am/json/authenticate` → transformed callbacks ✅
-- Custom headers injected (`x-auth-provider`, `x-auth-session`) ✅
-- HTTP → HTTPS redirect (301) ✅
-
-#### Step 4.5 — Host Header Handling
-- PA virtual host `*:443` created for Ingress port matching
-- Both apps (`/am`, `/api`) bound to VH 2 (`*:3000`) and VH 3 (`*:443`)
-- PA `host: *` accepts any hostname — works with `localhost`, IP, or DNS name
+### Documentation Capture
+- PLAN.md: Phase 5 steps 5.1–5.5 marked complete
+- E2E guide: 3 new pitfalls (P14 AM Host port, P15 Traefik casing, P11 fix expansion)
+- K8s ops guide: PA password fix (2FederateM0re → 2Access), E2E section added
+- Knowledge items updated (kubernetes_infrastructure, gotchas_and_debugging)
+- Knowledge map entries updated for K8s, E2E guide, platform e2e directory
 
 ## Key Learnings
 
-### PA Virtual Host Port Matching
-PA does virtual host matching on both `host` AND `port`. When Traefik terminates
-TLS and forwards to PA, the `Host` header retains the original port (443 via
-Traefik), not PA's internal port (3000). Solution: create a `*:443` virtual host
-in PA and bind all applications to it alongside the `*:3000` VH.
+### Traefik Title-Cases HTTP/1.1 Response Headers
+Traefik normalizes HTTP/1.1 response header names to title-case (`x-auth-session` →
+`X-Auth-Session`). HTTP/2 mandates lowercase, so `curl` sees lowercase, but Karate's
+Apache HttpClient uses HTTP/1.1 and sees title-cased headers. Fix: `lowerCaseResponseHeaders`.
 
-### Traefik ServersTransport for HTTPS Backends
-When the backend service speaks HTTPS (as PA does), Traefik needs a
-`ServersTransport` with `insecureSkipVerify: true` and `scheme: https` in the
-IngressRoute service definition. Without `scheme: https`, Traefik sends HTTP
-to the backend and PA rejects it.
+### AM Host Header Requires Port
+AM validates the Host header against its boot.json FQDN. When port-forwarding,
+the Host must be `pingam:8080` (not just `pingam`) to match `http://pingam:8080/am`.
 
-## Documentation Updated
-- `deployments/platform/PLAN.md` — Phase 4 steps marked complete, K3 deploy path fixed
-- `deployments/platform/k8s/ingress.yaml` — new file
+### PA Admin Password Is Product-Level
+`values-local.yaml` sets `PING_IDENTITY_PASSWORD: "2Access"` under
+`pingaccess-admin.container.envs`, not globally. Previous docs incorrectly said `2FederateM0re`.
 
 ## Next Steps
-1. **Phase 5** — E2E testing on K8s (14-scenario Karate suite)
-2. **Phase 6** — Cloud deployment guides (AKS, GKE, EKS)
+1. **Phase 5.6–5.7** — Passkey E2E tests on K8s (requires WebAuthn device registration)
+2. **Phase 5.8** — Full suite pass → update e2e-results.md
+3. **Phase 6** — Cloud deployment guides (AKS, GKE, EKS)
