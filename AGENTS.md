@@ -475,3 +475,15 @@ PITFALLS.md before working on a module.**
 
 *Created: 2026-02-07*
 *Status: INITIAL — Expand as project conventions emerge.*
+
+---
+
+## Chrome CDP (browser_subagent)
+
+Chrome runs as a persistent systemd service — **always available** without manual intervention:
+
+```bash
+systemctl --user status chrome-cdp.service   # check
+systemctl --user restart chrome-cdp.service  # restart if subagent gets stuck
+bash scripts/restart-chrome.sh              # same, but script form
+```
