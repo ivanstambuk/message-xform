@@ -117,6 +117,58 @@ in the journey tree design, not explicit in the response.
 HATEOAS metadata in its callback responses. The response says "here are the
 callbacks" but never says "here are your options after this step."
 
+### Callback taxonomy: what maps generically and what doesn't
+
+Not all PingAM callback types are simple form fields. A thorough sweep of the
+PingAM 8 callback reference reveals three categories:
+
+**✅ Simple form callbacks** — generic `type → prompt → inputKey` mapping works:
+
+| Callback type | Maps to | Notes |
+|--------------|---------|-------|
+| `NameCallback` | `text` | Username/text input |
+| `PasswordCallback` | `password` | Password input |
+| `TextInputCallback` | `text` | Free-text input |
+| `ChoiceCallback` | `choice` | Single/multi-select |
+| `ConfirmationCallback` | `confirm` | OK/Cancel buttons |
+| `BooleanAttributeInputCallback` | `boolean` | Checkbox |
+| `TextOutputCallback` | `display` | Message to user (but see WebAuthn below) |
+| `HiddenValueCallback` | `hidden` | Hidden field round-trip |
+| `KbaCreateCallback` | `kba` | Security questions (structured output with predefined questions) |
+
+**⚠️ Flow-control callbacks** — not user inputs, but have dedicated type names
+and structured fields. A generic mapper can pass them through with
+`lowercase(.type)` + full `output`/`input` arrays:
+
+| Callback type | Purpose | Client action |
+|--------------|---------|---------------|
+| `RedirectCallback` | Redirect to external URL (e.g., social login) | HTTP redirect to `redirectUrl` |
+| `IdPCallback` | Native social login (OAuth 2.0/OIDC) | Perform native OAuth flow with `clientId`, `redirectUri`, `scopes` |
+| `PollingWaitCallback` | Wait N ms and re-submit | Timer, then re-POST |
+| `SuspendedTextOutputCallback` | Journey suspended ("email sent") | Show message, stop |
+| `MetadataCallback` | Arbitrary JSON metadata | Extract and promote (this is our HATEOAS vehicle) |
+
+**🔴 Complex ceremony callbacks** — require SDK-level client logic:
+
+| Callback type | Purpose | Why it's complex |
+|--------------|---------|-----------------|
+| `DeviceBindingCallback` | Bind device to user | Client must generate keypair, sign JWS with RS512, return signed challenge |
+| `DeviceSigningVerifierCallback` | Verify device binding | Client must sign challenge with previously bound key |
+| `DeviceProfileCallback` | Collect device fingerprint | Client collects metadata/location, returns escaped JSON blob |
+| `ScriptTextOutputCallback` | Run client-side JavaScript | Value field is **JavaScript source code**, not data |
+| WebAuthn (via `TextOutputCallback`) | Passkey register/authenticate | JS source code embedded in a **generic** `TextOutputCallback` — the only callback that **hides inside another type** |
+
+**Key insight for generic mapping**: Everything except the last row has its
+own dedicated callback type name. A generic mapper can identify them by type
+and pass the full `output`/`input` arrays through — the gateway doesn't need
+journey-specific logic. The **client** must know what to do with each type,
+but that's client-side SDK logic, not gateway transform logic.
+
+**WebAuthn is the sole exception**: It uses a plain `TextOutputCallback` with
+JavaScript source code as the value. A generic mapper cannot distinguish it
+from a regular text message without inspecting the content (see "WebAuthn:
+the hard case" in §6 below).
+
 This leads to a fundamental question: **where should journey knowledge live?**
 
 ```
