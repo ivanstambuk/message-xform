@@ -1,40 +1,27 @@
-# Current Session — Device Binding Phase 2+3
+# Current Session — Device Binding JWS Fix
 
 ## Focus
-Device Binding — Phase 2 (E2E Crypto Helper) + Phase 3 (Feature Tests).
+Device Binding — JWS format research and fix (SDK source analysis).
 
 ## Status
-✅ **Phase 2 Complete** — `device-binding.js` helper created and committed.
-✅ **Phase 3 Written** — `device-binding.feature` created with 3 scenarios.
-🚧 **Phase 3.5 Blocked** — AM's DeviceBindingNode rejects JWS (401).
+✅ **JWS Format Fixed** — reverse-engineered from ForgeRock Android SDK source.
+⏳ **Needs Validation** — K8s E2E test run pending.
 
 ## Summary of Work Done
 
-### Phase 2: E2E Crypto Helper ✅
-- Created `device-binding.js` — pure JDK RSA 2048 + RS512 JWS signing.
-- Functions: `generateKeyPair()`, `buildJws()`, `bind()`, `sign()`, parsers.
-- Created `list-bound-devices.feature` and `delete-bound-device.feature` helpers.
-- Self-test verifies JWS structure + RS512 signature correctness.
+### SDK Source Analysis ✅
+- Cloned `github.com/ForgeRock/forgerock-android-sdk` (MIT license)
+- Found the exact JWS construction in `DeviceBindAuthenticators.kt` lines 77–113
+- Identified 3 categories of missing fields → root cause of 401 rejections
+- Created research doc: `docs/research/device-binding-jws-format.md`
 
-### Phase 3: E2E Feature Tests ✅ (written, blocked on live validation)
-- Created `device-binding.feature` with 3 scenarios.
-- Updated `karate-config.js` with journey params and `deviceBindingTestUser`.
-- Started K8s cluster, enabled DeviceBindingService, applied boundDevices schema.
-- Fixed GraalJS Java List interop bug (type-based callback lookup).
-- Self-test scenario passes; live AM validation returns 401.
-
-### Debugging Work
-- Tried 5 public key placement strategies: header `publicKey`, payload `publicKey`,
-  header `jwk` (standard JWK), no key, dummy JWS — all return 401.
-- AM DeviceBindingNode fails silently — no debug output.
-- Documented 3 new pitfalls in PITFALLS.md (GraalJS interop, service prerequisite, silent failure).
-
-## Blocker
-AM's `DeviceBindingNode` returns `failure` outcome for all JWS submissions.
-Need to determine the exact JWS format via SDK source or AM debug logging.
+### JWS Fix Applied ✅
+- JWK header: added `"use":"sig"` and `"alg":"RS512"` (AM stores these)
+- Payload: added `"iss"` (issuer), `"platform":"android"`, `"android-version":34`
+- Self-test: updated to verify all new claims
 
 ## Handover
-- K8s cluster stopped, pods scaled to 0.
-- DeviceBindingService enabled (persists in PD config store).
-- boundDevices schema applied (persists in PD).
-- Next: determine JWS format, fix helper, rerun tests.
+- K8s cluster still stopped, pods scaled to 0
+- DeviceBindingService enabled (persists in PD config store)
+- boundDevices schema applied (persists in PD)
+- Next: start K8s → rerun E2E tests with fixed JWS format

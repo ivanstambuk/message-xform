@@ -78,9 +78,19 @@ function fn() {
     /**
      * Build a compact JWS (RS512) for a Device Binding or Signing Verifier response.
      *
-     * JWS structure:
-     *   Header:  { "alg": "RS512", "kid": "<kid>" }
-     *   Payload: { "sub": "<userId>", "challenge": "<challenge>", "exp": <ts+60>, "iat": <ts>, "nbf": <ts> }
+     * Format matches the ForgeRock Android SDK (DeviceBindAuthenticators.kt):
+     *
+     * Binding JWS Header:
+     *   { "alg": "RS512", "kid": "<kid>",
+     *     "jwk": { "kty": "RSA", "kid": "<kid>", "use": "sig", "alg": "RS512", "n": "...", "e": "..." } }
+     *
+     * Signing JWS Header:
+     *   { "alg": "RS512", "kid": "<kid>" }
+     *
+     * JWS Payload:
+     *   { "sub": "<userId>", "iss": "<package>", "exp": <ts+timeout>,
+     *     "iat": <ts>, "nbf": <ts>, "platform": "android",
+     *     "android-version": <sdk_int>, "challenge": "<challenge>" }
      *
      * The challenge value is passed through verbatim (base64-encoded as received from AM).
      *
@@ -119,18 +129,27 @@ function fn() {
             var eB64 = urlEncoder.encodeToString(eBytes);
 
             header = '{"alg":"RS512","kid":"' + kid + '"'
-                + ',"jwk":{"kty":"RSA","kid":"' + kid + '","n":"' + nB64 + '","e":"' + eB64 + '"}}';
+                + ',"jwk":{"kty":"RSA","kid":"' + kid + '","use":"sig","alg":"RS512","n":"' + nB64 + '","e":"' + eB64 + '"}}';
         } else {
             // For signing verification: no public key needed (AM already has it)
             header = '{"alg":"RS512","kid":"' + kid + '"}';
         }
 
-        // JWS Payload — matches ForgeRock SDK format
+        // JWS Payload — matches ForgeRock Android SDK (DeviceBindAuthenticators.kt)
+        // Required claims: sub, iss, exp, iat, nbf, platform, android-version, challenge
+        // The 'iss' is the Android app package name; we use a synthetic one for E2E.
+        // AM may validate presence of 'platform' and 'android-version' claims.
+        var issuer = 'io.messagexform.e2e';
+        var androidVersion = 34;  // Android 14 (API 34) — realistic value
         var payload = '{"sub":"' + escapeJsonString(userId)
-            + '","challenge":"' + escapeJsonString(challenge)
+            + '","iss":"' + escapeJsonString(issuer)
             + '","exp":' + (now + 60)
             + ',"iat":' + now
-            + ',"nbf":' + now + '}';
+            + ',"nbf":' + now
+            + ',"platform":"android"'
+            + ',"android-version":' + androidVersion
+            + ',"challenge":"' + escapeJsonString(challenge)
+            + '"}';
 
         // Signing input: base64url(header).base64url(payload)
         var signingInput = b64urlStr(header) + '.' + b64urlStr(payload);
@@ -443,6 +462,15 @@ function fn() {
         }
         if (payloadJson.indexOf('"challenge":"' + challenge + '"') < 0) {
             throw 'JWS self-test FAILED: payload missing challenge claim. Got: ' + payloadJson;
+        }
+        if (payloadJson.indexOf('"iss":"') < 0) {
+            throw 'JWS self-test FAILED: payload missing iss claim. Got: ' + payloadJson;
+        }
+        if (payloadJson.indexOf('"platform":"android"') < 0) {
+            throw 'JWS self-test FAILED: payload missing platform claim. Got: ' + payloadJson;
+        }
+        if (payloadJson.indexOf('"android-version":') < 0) {
+            throw 'JWS self-test FAILED: payload missing android-version claim. Got: ' + payloadJson;
         }
 
         // Verify signature with public key

@@ -1,8 +1,8 @@
 # Pending Task
 
-**Focus**: Device Binding — Phase 3.5: Debug AM JWS Validation
-**Status**: BLOCKED — AM returns 401 on DeviceBindingCallback JWS submission
-**Next Step**: Determine the exact JWS format expected by AM's DeviceBindingNode
+**Focus**: Device Binding — Phase 3.5: Validate Fixed JWS Format
+**Status**: READY — JWS format fixed per SDK source analysis
+**Next Step**: Start K8s cluster and run E2E tests
 
 ## Context Notes
 - K8s cluster stopped, pods scaled to 0 (restart: `sudo systemctl start k3s`,
@@ -14,16 +14,17 @@
 - Self-test passes — crypto helper JWS gen + RS512 verification works
 - GraalJS interop fix applied (type-based callback lookup)
 
-## Blocker: AM JWS Format Unknown
-Tried: publicKey in header, publicKey in payload, jwk in header, no key, dummy JWS.
-All result in DeviceBindingNode → failure → 401.
+## Fix Applied (based on SDK source analysis)
+Cloned `github.com/ForgeRock/forgerock-android-sdk` and analyzed the `sign()`
+method in `DeviceBindAuthenticators.kt` (lines 77–113).
 
-Approaches to unblock:
-1. Extract the bundled `boundDevices` LDIF from AM WAR (pitfall #4) — may contain
-   clues about expected attribute format
-2. Enable AM MESSAGE-level debug (needs Tomcat sys prop or AM console)
-3. Find Ping SDK Android source for DeviceBindingCallback.sign() on GitHub
-4. Use a real Ping SDK to do one binding, capture JWS via network trace
+Three categories of missing fields identified and fixed in `device-binding.js`:
+1. **JWK header**: added `"use":"sig"` and `"alg":"RS512"` (AM stores these)
+2. **Payload claims**: added `"iss"` (issuer), `"platform":"android"`,
+   `"android-version":34`
+3. **Self-test**: updated to verify all new claims
+
+See `docs/research/device-binding-jws-format.md` for full analysis.
 
 ## SDD Gaps
 - None — this work is infrastructure/deployment, not a core engine feature
