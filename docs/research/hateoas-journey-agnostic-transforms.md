@@ -566,7 +566,7 @@ String mapType(String amType) {
 | Aspect | Detail |
 |--------|--------|
 | Deployment | PA Admin UI (no restart, no JAR) |
-| Language | Groovy (interpreted) |
+| Language | Groovy (dynamic, compiled to JVM bytecode) |
 | Testability | ❌ No test harness — syntax-validated on save only |
 | Portability | ❌ PA only |
 | Body write | Manual `byte[]` + `JsonOutput` serialization |
@@ -669,7 +669,7 @@ String mapType(String t) {
 | Aspect | Detail |
 |--------|--------|
 | Deployment | `.groovy` file on disk (hot-reloadable) |
-| Language | Groovy (interpreted, JSR-223) |
+| Language | Groovy (dynamic, compiled to JVM bytecode via JSR-223) |
 | Testability | ❌ Limited — no standard test harness |
 | Portability | ❌ PG only |
 | Body write | `response.entity.json = ...` (convenient) |
@@ -678,7 +678,7 @@ String mapType(String t) {
 
 | Aspect | message-xform | PA Groovy Rule | PA Java Plugin | PG Groovy Filter |
 |--------|--------------|----------------|----------------|------------------|
-| Language | JSLT (declarative) | Groovy (interpreted) | Java (compiled) | Groovy (interpreted) |
+| Language | JSLT (declarative) | Groovy (dynamic, bytecode) | Java (compiled) | Groovy (dynamic, bytecode) |
 | Deployment | JAR (PA) or proxy (PG) | Admin UI | JAR + restart | File on disk |
 | Body write | Declarative spec | `byte[]` + JsonOutput | `setBody()` | `entity.json = ...` |
 | HTTP callouts | ❌ | ❌ | ✅ HttpClient | ✅ http binding |
