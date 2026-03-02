@@ -28,6 +28,7 @@ function fn() {
     var SecureRandom = Java.type('java.security.SecureRandom');
     var UUID = Java.type('java.util.UUID');
     var JString = Java.type('java.lang.String');
+    var Arrays = Java.type('java.util.Arrays');
 
     var urlEncoder = Base64.getUrlEncoder().withoutPadding();
     var random = new SecureRandom();
@@ -83,18 +84,46 @@ function fn() {
      *
      * The challenge value is passed through verbatim (base64-encoded as received from AM).
      *
-     * @param challenge base64-encoded challenge string from the callback
-     * @param userId    user ID string (DN or username) from the callback
+     * @param challenge  base64-encoded challenge string from the callback
+     * @param userId     user ID string (DN or username) from the callback
      * @param privateKey java.security.PrivateKey (RSA)
-     * @param kid       key identifier string (UUID)
+     * @param kid        key identifier string (UUID)
+     * @param publicKey  optional java.security.PublicKey — included in header for binding
      * @returns compact JWS string (header.payload.signature)
      */
-    function buildJws(challenge, userId, privateKey, kid) {
+    function buildJws(challenge, userId, privateKey, kid, publicKey) {
+        var KeyFactory = Java.type('java.security.KeyFactory');
+        var RSAPublicKeySpec = Java.type('java.security.spec.RSAPublicKeySpec');
+
         // Current epoch seconds
         var now = Math.floor(java.lang.System.currentTimeMillis() / 1000);
 
         // JWS Header
-        var header = '{"alg":"RS512","kid":"' + kid + '"}';
+        var header;
+        if (publicKey) {
+            // For device binding: include the RSA public key as a standard JWK
+            // in the header so AM can extract and store it for future verification.
+            // Extract modulus (n) and exponent (e) from the RSA public key.
+            var kf = KeyFactory.getInstance('RSA');
+            var rsaPubSpec = kf.getKeySpec(publicKey, RSAPublicKeySpec.class);
+            var nBytes = rsaPubSpec.getModulus().toByteArray();
+            var eBytes = rsaPubSpec.getPublicExponent().toByteArray();
+
+            // Strip leading zero byte if present (BigInteger.toByteArray() includes sign byte)
+            if (nBytes.length > 0 && nBytes[0] == 0) {
+                var trimmed = Arrays.copyOfRange(nBytes, 1, nBytes.length);
+                nBytes = trimmed;
+            }
+
+            var nB64 = urlEncoder.encodeToString(nBytes);
+            var eB64 = urlEncoder.encodeToString(eBytes);
+
+            header = '{"alg":"RS512","kid":"' + kid + '"'
+                + ',"jwk":{"kty":"RSA","kid":"' + kid + '","n":"' + nB64 + '","e":"' + eB64 + '"}}';
+        } else {
+            // For signing verification: no public key needed (AM already has it)
+            header = '{"alg":"RS512","kid":"' + kid + '"}';
+        }
 
         // JWS Payload — matches ForgeRock SDK format
         var payload = '{"sub":"' + escapeJsonString(userId)
@@ -264,20 +293,26 @@ function fn() {
     function bind(callbacks) {
         var parsed = parseBindingCallback(callbacks);
         var kp = generateKeyPair();
-        var jws = buildJws(parsed.challenge, parsed.userId, kp.privateKey, kp.kid);
+        // Pass publicKey so it's included in the JWS header for AM to store
+        var jws = buildJws(parsed.challenge, parsed.userId, kp.privateKey, kp.kid, kp.publicKey);
 
-        // Set input values on the callback
-        var cb = callbacks[parsed.callbackIndex];
-        for (var i = 0; i < cb.input.length; i++) {
-            var inputName = cb.input[i].name;
-            if (inputName === parsed.inputJws) {
-                cb.input[i].value = jws;
-            } else if (inputName === parsed.inputDeviceName) {
-                cb.input[i].value = 'Karate E2E Test Device';
-            } else if (inputName === parsed.inputDeviceId) {
-                cb.input[i].value = kp.kid;
+        // Set input values on the DeviceBindingCallback
+        for (var i = 0; i < callbacks.length; i++) {
+            if (callbacks[i].type === 'DeviceBindingCallback') {
+                var cb = callbacks[i];
+                for (var j = 0; j < cb.input.length; j++) {
+                    var inputName = cb.input[j].name;
+                    if (inputName === parsed.inputJws) {
+                        cb.input[j].value = jws;
+                    } else if (inputName === parsed.inputDeviceName) {
+                        cb.input[j].value = 'Karate E2E Test Device';
+                    } else if (inputName === parsed.inputDeviceId) {
+                        cb.input[j].value = kp.kid;
+                    }
+                    // clientError left empty (success case)
+                }
+                break;
             }
-            // clientError left empty (success case)
         }
 
         return {
@@ -302,14 +337,19 @@ function fn() {
         var parsed = parseSigningCallback(callbacks);
         var jws = buildJws(parsed.challenge, parsed.userId, privateKey, kid);
 
-        // Set input values on the callback
-        var cb = callbacks[parsed.callbackIndex];
-        for (var i = 0; i < cb.input.length; i++) {
-            var inputName = cb.input[i].name;
-            if (inputName === parsed.inputJws) {
-                cb.input[i].value = jws;
+        // Set input values on the DeviceSigningVerifierCallback
+        for (var i = 0; i < callbacks.length; i++) {
+            if (callbacks[i].type === 'DeviceSigningVerifierCallback') {
+                var cb = callbacks[i];
+                for (var j = 0; j < cb.input.length; j++) {
+                    var inputName = cb.input[j].name;
+                    if (inputName === parsed.inputJws) {
+                        cb.input[j].value = jws;
+                    }
+                    // clientError left empty (success case)
+                }
+                break;
             }
-            // clientError left empty (success case)
         }
 
         return {
