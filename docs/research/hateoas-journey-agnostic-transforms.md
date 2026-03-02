@@ -567,10 +567,11 @@ String mapType(String amType) {
 |--------|--------|
 | Deployment | PA Admin UI (no restart, no JAR) |
 | Language | Groovy (dynamic, compiled to JVM bytecode) |
-| Testability | ❌ No test harness — syntax-validated on save only |
-| Portability | ❌ PA only |
+| Testability | ❌ No unit test harness — syntax-validated on save; logic testing requires a running PA instance |
+| Portability | ❌ PA-specific APIs (`exc`, `pass()`/`fail()`) — cannot run outside PingAccess |
+| HTTP callouts | No managed `HttpClient` (unlike Java plugins); raw `java.net.URL` may work but is unsupported |
 | Body write | Manual `byte[]` + `JsonOutput` serialization |
-| Caveat | Must end with `pass()`/`fail()` — it's an access control rule |
+| Caveat | Must end with `pass()`/`fail()` — it's an access control rule, not a pure transformation filter |
 
 **Best for**: Quick prototyping, environments where deploying a custom JAR
 is not desirable, or situations where message-xform is not deployed.
@@ -605,8 +606,9 @@ dependencies).
 |--------|--------|
 | Deployment | JAR in PA `deploy/` dir (restart required) |
 | Language | Java 21 (compiled) |
-| Testability | ✅ JUnit + mock Exchange |
-| Portability | ❌ PA only |
+| Testability | ✅ JUnit + mock Exchange — full unit test coverage possible |
+| Portability | ❌ PA-specific SPI (`AsyncRuleInterceptor`) — cannot run outside PingAccess |
+| HTTP callouts | ✅ Managed `HttpClient` via `@Inject` |
 
 ### Option D: PingGateway ScriptableFilter (Groovy)
 
@@ -670,8 +672,9 @@ String mapType(String t) {
 |--------|--------|
 | Deployment | `.groovy` file on disk (hot-reloadable) |
 | Language | Groovy (dynamic, compiled to JVM bytecode via JSR-223) |
-| Testability | ❌ Limited — no standard test harness |
-| Portability | ❌ PG only |
+| Testability | ❌ No standard test harness — logic testing requires a running PG instance |
+| Portability | ❌ PG-specific APIs (`next.handle`, `response.entity`) — cannot run outside PingGateway |
+| HTTP callouts | ✅ Built-in `http` client handler binding |
 | Body write | `response.entity.json = ...` (convenient) |
 
 ### Implementation options comparison
@@ -679,12 +682,14 @@ String mapType(String t) {
 | Aspect | message-xform | PA Groovy Rule | PA Java Plugin | PG Groovy Filter |
 |--------|--------------|----------------|----------------|------------------|
 | Language | JSLT (declarative) | Groovy (dynamic, bytecode) | Java (compiled) | Groovy (dynamic, bytecode) |
-| Deployment | JAR (PA) or proxy (PG) | Admin UI | JAR + restart | File on disk |
+| Deployment | JAR (PA) or proxy (PG) | Admin UI (no restart) | JAR + restart | File on disk (hot-reload) |
 | Body write | Declarative spec | `byte[]` + JsonOutput | `setBody()` | `entity.json = ...` |
-| HTTP callouts | ❌ | ❌ | ✅ HttpClient | ✅ http binding |
-| Testability | ✅ Unit tests | ❌ | ✅ JUnit | ❌ |
-| Portability | ✅ PA + PG + standalone | ❌ PA only | ❌ PA only | ❌ PG only |
-| Custom plugin needed | ✅ (existing) | ❌ | ✅ | ❌ |
+| HTTP callouts | ❌ Not in spec | ❌ No managed client | ✅ `HttpClient` via `@Inject` | ✅ Built-in `http` binding |
+| Unit testable | ✅ `TransformEngine` | ❌ E2E only | ✅ JUnit + mock | ❌ E2E only |
+| Runs on PA | ✅ Plugin | ✅ OOTB rule | ✅ Custom JAR | ❌ |
+| Runs on PG | ✅ Standalone proxy | ❌ | ❌ | ✅ Native |
+| Runs standalone | ✅ | ❌ | ❌ | ❌ |
+| Custom plugin needed | ✅ (existing) | ❌ | ✅ (new JAR) | ❌ |
 
 ---
 
