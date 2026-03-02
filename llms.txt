@@ -106,6 +106,7 @@ docs/research/pinggateway-ootb-transformation-capabilities.md
 docs/research/message-xform-platform-transforms.md
 docs/research/pingdirectory-cts-compatibility.md
 docs/research/device-binding-jws-format.md
+docs/research/hateoas-journey-agnostic-transforms.md
 
 # E2E test infrastructure (Karate DSL — PingAccess adapter)
 docs/operations/e2e-karate-operations-guide.md
