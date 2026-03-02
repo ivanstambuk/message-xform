@@ -421,20 +421,53 @@ step — clean API surface without enrichment.
 
 ### WebAuthn: the hard case
 
-The biggest current source of journey-specific logic is the WebAuthn
-`TextOutputCallback` regex parsing. If AM's Scripted Decision Node extracts
-the ceremony data before emitting callbacks, the gateway never sees raw JS:
+Every other PingAM callback sends data as structured fields — `output[0].value`
+is a prompt string, `input[0].name` is a field key. A generic mapper just
+reads those fields and moves on.
+
+WebAuthn is different. The WebAuthn Registration/Authentication node doesn't
+send ceremony data (challenge, rpId, userVerification) as structured JSON.
+Instead, it embeds a **literal JavaScript snippet** inside a
+`TextOutputCallback`:
+
+```json
+{
+  "type": "TextOutputCallback",
+  "output": [{
+    "name": "message",
+    "value": "var options = { publicKey: { challenge: new Int8Array([-3, 65, 13, ...]).buffer, rp: { name: \"platform.local\" }, user: { name: \"demo\", id: new Int8Array([100, 101, 109, 111]).buffer, displayName: \"demo\" }, pubKeyCredParams: [{ type: \"public-key\", alg: -7 }, { type: \"public-key\", alg: -257 }], timeout: 60000, attestation: \"none\", authenticatorSelection: { userVerification: \"required\" } } }; navigator.credentials.create(options).then(function(credential) { ... });"
+  }]
+}
+```
+
+That `value` field is **JavaScript source code**, not data. To extract the
+actual WebAuthn parameters (challenge, rpId, userVerification, timeout), the
+current `am-webauthn-response.yaml` transform has to **parse JavaScript with
+regex** — matching patterns like `challenge: new Int8Array([...])` and
+`userVerification: "..."` out of a code string.
+
+This breaks the generic mapping pattern in two ways:
+
+1. **Indistinguishable from normal text.** A `TextOutputCallback` with a
+   WebAuthn script looks identical (same callback type) to one that just shows
+   the user a message. The only way to tell them apart is to look *inside*
+   the value and check for `navigator.credentials` — which is journey-specific
+   knowledge.
+
+2. **Requires code parsing, not field mapping.** Even once identified,
+   extracting structured ceremony data from a JavaScript string requires
+   regex or a JS parser — not a simple `output[0].value` read.
+
+**Possible workaround — AM-side pre-extraction**: If a Scripted Decision Node
+could extract the ceremony data and re-emit it as a `MetadataCallback`, the
+gateway would never see the raw JavaScript:
 
 ```javascript
 // AM-side WebAuthn enrichment script (Scripted Decision Node)
 var ceremonyData = {
   "_links": {
     "self": { "href": "/api/v1/auth/passkey" },
-    "submit": {
-      "href": "/api/v1/auth/passkey",
-      "method": "POST",
-      "title": "Submit passkey attestation"
-    }
+    "submit": { "href": "/api/v1/auth/passkey", "method": "POST" }
   },
   "webauthn": {
     "type": "webauthn-register",
@@ -454,10 +487,10 @@ callbacks internally — a Scripted Decision Node placed before it doesn't have
 the WebAuthn ceremony data yet, and one placed after it would see the node's
 outcome, not its callbacks.
 
-**Practical approach**: Accept that WebAuthn callbacks will still need
-gateway-side special handling (regex extraction), but use MetadataCallback
-for everything else. The WebAuthn transform spec becomes the only
-journey-specific transform; all other journeys use the generic one.
+**Practical approach**: Accept that WebAuthn is the one callback type that
+cannot be made journey-agnostic. Keep a WebAuthn-specific transform as the
+sole exception alongside the generic one. All other journeys use the generic
+transform; only WebAuthn needs its own.
 
 ---
 
