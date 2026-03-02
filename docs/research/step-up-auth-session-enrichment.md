@@ -103,36 +103,36 @@ Browser                  PingAccess               PingFederate         Backend
    │  (existing PA cookie)   │                         │                  │
    │ ──────────────────────► │                         │                  │
    │                         │                         │                  │
-   │                    [StepUpRule]                    │                  │
+   │                    [StepUpRule]                   │                  │
    │                    checks session state:          │                  │
-   │                    no signing context?             │                  │
+   │                    no signing context?            │                  │
    │                         │                         │                  │
    │  ◄─── 401 Challenge ─── │                         │                  │
    │  Location: /pf/authn    │                         │                  │
    │  ?ACR=txn-signing       │                         │                  │
    │  &state=<nonce>         │                         │                  │
    │                         │                         │                  │
-   │  ──── OIDC redirect ──────────────────────────► │                  │
-   │                         │                    [Re-authenticate]      │
-   │                         │                    (strong auth +         │
-   │                         │                     transaction context)  │
-   │  ◄──── auth code + state ─────────────────────── │                  │
+   │  ──── OIDC redirect ──────────────────────────►   │                  │
+   │                         │                     [Re-authenticate]      │
+   │                         │                     (strong auth +         │
+   │                         │                      transaction context)  │
+   │  ◄──── auth code + state ───────────────────────  │                  │
    │                         │                         │                  │
    │  GET /callback          │                         │                  │
    │  ?code=<code>           │                         │                  │
    │  &state=<nonce>         │                         │                  │
    │ ──────────────────────► │                         │                  │
    │                         │                         │                  │
-   │                    [CallbackRule]                  │                  │
-   │                    exchanges code → tokens         │                  │
-   │                    extracts signing claims         │                  │
-   │                    writes to SessionStateSupport:  │                  │
-   │                      setAttribute(                 │                  │
-   │                        "signing.context",          │                  │
-   │                        { amount, payee,            │                  │
-   │                          acr, timestamp })         │                  │
+   │                    [CallbackRule]                 │                  │
+   │                    exchanges code → tokens        │                  │
+   │                    extracts signing claims        │                  │
+   │                    writes to SessionStateSupport: │                  │
+   │                      setAttribute(                │                  │
+   │                        "signing.context",         │                  │
+   │                        { amount, payee,           │                  │
+   │                          acr, timestamp })        │                  │
    │                         │                         │                  │
-   │  ◄─── 302 → /api/payments (original request)     │                  │
+   │  ◄─── 302 → /api/payments (original request)      │                  │
    │                         │                         │                  │
    │  POST /api/payments     │                         │                  │
    │  (same PA cookie,       │                         │                  │
@@ -140,13 +140,13 @@ Browser                  PingAccess               PingFederate         Backend
    │   state cookie)         │                         │                  │
    │ ──────────────────────► │                         │                  │
    │                         │                         │                  │
-   │                    [StepUpRule]                    │                  │
-   │                    session state has               │                  │
-   │                    signing context ✓               │                  │
-   │                    validates TTL, amount ✓         │                  │
-   │                         │ ─────────────────────────────────────────►│
+   │                    [StepUpRule]                   │                  │
+   │                    session state has              │                  │
+   │                    signing context ✓              │                  │
+   │                    validates TTL, amount ✓        │                  │
+   │                         │ ──────────────────────────────────────────►│
    │                         │                         │             [Process]
-   │  ◄────────────── 200 OK ──────────────────────────────────────── │
+   │  ◄────────────── 200 OK ──────────────────────────────────────────── │
 ```
 
 #### Custom Rules Required (PA)
@@ -574,50 +574,127 @@ more limited — they have Exchange access but no outbound capabilities.
 
 ### PingAccess
 
-The built-in identity mapping types read from `Identity.getAttributes()` —
-which contains **token claims** from PingFederate, not session state
-attributes from `SessionStateSupport`.
+#### Built-in Identity Mapping Types
 
-| Mapping Type | Source | Reads SessionState? |
-|-------------|--------|:-------------------:|
-| `HeaderMapping` | `Identity.getAttributes()` | ❌ |
-| `JWT` | `Identity.getAttributes()` | ❌ |
-| `WebSessionAccessToken` | OIDC tokens | ❌ |
-| `ClientCertificate` | TLS cert | ❌ |
-| Custom `IdentityMappingPlugin` | `Exchange` (full access) | ✅ |
+PingAccess identity mapping produces a representation of the authenticated
+user to send to the backend (typically as a request header).  The built-in
+types all read from `Identity.getAttributes()` — which contains **token
+claims** from PingFederate, not session state attributes from
+`SessionStateSupport`.
 
-**Custom IdentityMappingPlugin for session state:**
+| Mapping Type | Source | Output Format | Reads SessionState? |
+|-------------|--------|--------------|:-------------------:|
+| `HeaderMapping` | `Identity.getAttributes()` | Plain headers (one per attribute) | ❌ |
+| `JWT` | `Identity.getAttributes()` | **Signed JWT** (`X-PA-IDENTITY` header) | ❌ |
+| `WebSessionAccessToken` | OIDC access token | Raw access token as header | ❌ |
+| `ClientCertificate` | TLS cert | Certificate fields as headers | ❌ |
+| Custom `IdentityMappingPlugin` | `Exchange` (full access) | Any format | ✅ |
+
+#### The JWT Identity Mapping Problem
+
+Many backends require a **signed JWT** in a header (e.g., `X-PA-IDENTITY`)
+rather than plain header values.  PingAccess's built-in JWT identity mapping
+produces this JWT from `Identity.getAttributes()` — which contains:
+
+- Subject (`sub`)
+- Token claims from PingFederate (roles, groups, custom claims)
+- OAuth metadata (scopes, client ID)
+
+It does **NOT** include `SessionStateSupport` attributes.  This means:
+
+> **With Approach A (Session State Enrichment), the signing context in
+> `SessionStateSupport` CANNOT appear in the identity-mapped JWT.**
+
+This is a fundamental limitation.  The plain-header workaround ("Option A:
+StepUpRule sets headers directly") works when the backend accepts a simple
+`X-Signing-Context: {json}` header, but it **does not work** when the backend
+requires claims inside the JWT that PingAccess produces via identity mapping.
+
+#### Options for JWT-Based Backend Integration
+
+| Option | How It Works | Fits Approach A? | Fits Approach B? |
+|--------|-------------|:----------------:|:----------------:|
+| **1. Rule sets plain header** | StepUpRule adds `X-Signing-Context` header alongside the JWT identity mapping header | ⚠️ Partial — signing context is a separate header, not inside the JWT | N/A |
+| **2. Custom IdentityMappingPlugin** | New Java plugin that reads `SessionStateSupport` and produces a JWT with signing claims included | ✅ Yes | N/A |
+| **3. Custom JWT cookie (Approach B)** | Gateway issues a separate signed JWT cookie; the backend reads it directly | N/A | ✅ Yes — the JWT IS the signing proof |
+| **4. PF token customization** | PingFederate includes signing claims in the access/ID token during step-up | ✅ Yes — built-in JWT mapping then includes them | ✅ Yes |
+
+**Analysis:**
+
+- **Option 1** is the simplest but breaks the "single JWT" contract if the
+  backend expects all identity + signing claims in one token.
+
+- **Option 2** requires a custom `IdentityMappingPlugin` — a new Java plugin
+  SPI implementation:
 
 ```java
 @IdentityMapping(
-    type = "SessionStateMapping",
-    label = "Session State → Header",
-    expectedConfiguration = SessionStateMappingConfig.class)
-public class SessionStateIdentityMapping
-    extends IdentityMappingPluginBase<SessionStateMappingConfig> {
+    type = "SessionStateJwtMapping",
+    label = "Session State → JWT",
+    expectedConfiguration = SessionStateJwtMappingConfig.class)
+public class SessionStateJwtIdentityMapping
+    extends IdentityMappingPluginBase<SessionStateJwtMappingConfig> {
 
     @Override
     public void handleMapping(Exchange exchange) throws IOException {
         Identity identity = exchange.getIdentity();
         if (identity == null) return;
 
-        SessionStateSupport sss = identity.getSessionStateSupport();
-        if (sss == null) return;
+        // Start with standard identity attributes
+        ObjectNode claims = objectMapper.createObjectNode();
+        claims.put("sub", identity.getSubject());
+        JsonNode attrs = identity.getAttributes();
+        if (attrs != null && attrs.isObject()) {
+            attrs.fields().forEachRemaining(e ->
+                claims.set(e.getKey(), e.getValue()));
+        }
 
-        for (AttributeHeaderPair pair : getConfiguration().getMappings()) {
-            JsonNode value = sss.getAttributeValue(pair.getAttribute());
-            if (value != null) {
-                exchange.getRequest().getHeaders()
-                    .add(pair.getHeader(), value.asText());
+        // Merge session state (signing context)
+        SessionStateSupport sss = identity.getSessionStateSupport();
+        if (sss != null) {
+            JsonNode signingCtx = sss.getAttributeValue("signing.context");
+            if (signingCtx != null) {
+                claims.set("txn", signingCtx);
             }
         }
+
+        // Sign and set as header
+        String jwt = jwtSigner.sign(claims);
+        exchange.getRequest().getHeaders().add(
+            getConfiguration().getHeaderName(), jwt);
     }
 }
 ```
 
-However, as noted in §2.2, this plugin is **not necessary** if the StepUpRule
-already injects the headers.  The rule has the same Exchange access and can
-set headers directly.
+  This is a **new plugin** (separate from message-xform) with its own SPI
+  registration (`META-INF/services/...IdentityMappingPlugin`), key
+  management, and configuration UI.  Medium-to-high effort.
+
+- **Option 3 (Approach B)** avoids the identity mapping problem entirely.
+  The signing JWT is a separate cookie — the backend reads it from the
+  `Cookie` header or the gateway extracts it and forwards it as a header.
+  The backend validates it independently.  The existing identity mapping
+  (JWT or HeaderMapping) continues to work unchanged for the login session.
+
+- **Option 4** pushes the complexity to PingFederate.  If PF can return
+  transaction-scoped claims in the ID token during step-up (custom OIDC
+  scopes, ACR-dependent claim mappings), the standard JWT identity mapping
+  will include them automatically.  This is the cleanest solution but
+  requires PF configuration and may not be feasible for all transaction types.
+
+#### Recommendation for JWT-Based Backends
+
+**Approach B (Custom JWT Cookie) is the preferred solution** when the backend
+requires signing context in a JWT.  It avoids:
+
+- No custom identity mapping plugin
+- No PF token customization
+- No coupling between the session state and the identity mapping pipeline
+- Clean separation: login JWT (identity mapping) vs. signing JWT (custom cookie)
+
+If the backend insists on a **single JWT** containing both identity and
+signing claims, Option 2 (custom `IdentityMappingPlugin`) is the only viable
+path under Approach A.
 
 ### PingGateway
 
@@ -625,8 +702,21 @@ PingGateway has no separate identity mapping SPI.  All header injection is
 done by filters.  Session attributes are directly accessible from any filter
 in the chain via `context.asContext(SessionContext.class).getSession()`.
 
-No custom plugin is needed — a ScriptableFilter can read session state and
-set headers in a single pass.
+A filter can produce a JWT with any combination of identity attributes and
+session state — there is no abstraction boundary between "identity" and
+"session state" that would prevent merging them into a single JWT.
+
+For JWT-based backends, a Groovy ScriptableFilter can:
+
+1. Read identity from `OAuth2Context` or `SsoTokenContext`
+2. Read signing context from `Session`
+3. Merge both into a single JWT
+4. Sign with PG-managed keys (Jose4j/Nimbus on classpath)
+5. Set as a request header
+
+No custom Java plugin is needed.  PingGateway's flat model (everything is a
+filter, everything accesses Context) avoids the identity mapping limitation
+entirely.
 
 ---
 
