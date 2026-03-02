@@ -1,8 +1,11 @@
 # HATEOAS/HAL for Journey-Agnostic Authentication Transforms
 
 > **Status**: Research Spike — exploratory analysis
+>
 > **Created**: 2026-03-02
+>
 > **Author**: AI (research session)
+>
 > **Context**: Can HATEOAS links be added to PingAM authentication responses
 >   without embedding journey-specific business logic in the gateway layer?
 
