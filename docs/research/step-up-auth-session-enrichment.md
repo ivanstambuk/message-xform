@@ -988,7 +988,7 @@ requires claims inside the JWT that PingAccess produces via identity mapping.
 | **1. Rule sets plain header** | StepUpRule adds `X-Signing-Context` header alongside the JWT identity mapping header | ⚠️ Partial — signing context is a separate header, not inside the JWT | N/A |
 | **2. Custom IdentityMappingPlugin** | New Java plugin that reads `SessionStateSupport` and produces a JWT with signing claims included | ✅ Yes | N/A |
 | **3. Custom JWE cookie (Approach B)** | Gateway issues a separate encrypted JWT cookie; decrypts and re-signs for the backend | N/A | ✅ Yes — the JWE IS the signing proof |
-| **4. PF token customization** (✅ confirmed) | PingFederate includes signing claims in the access/ID token during step-up | ✅ Yes — built-in JWT mapping includes them automatically | ✅ Yes |
+| **4. PF token customization** (✅ confirmed) | PingFederate includes signing claims in the step-up token | ⚠️ **No** — step-up token is NOT the web session token (see below) | ✅ Yes — CallbackRule extracts claims from the step-up token |
 
 **Analysis:**
 
@@ -1046,54 +1046,46 @@ public class SessionStateJwtIdentityMapping
   and can re-sign the claims into the backend-facing JWT.  The existing identity
   mapping (JWT or HeaderMapping) continues to work unchanged for the login session.
 
-- **Option 4 (PF token customization) — CONFIRMED AND RECOMMENDED.**
-  PingFederate **does** support returning transaction-scoped claims in the
-  ID token or access token during step-up authentication.  This is achieved
-  through custom OIDC scopes, ACR-dependent claim mappings, or access token
-  management policies in PF.
+- **Option 4 (PF token customization) — CONFIRMED but limited.**
+  PingFederate **does** support returning transaction-scoped claims
+  (`txn_amount`, `txn_payee`, `acr`) in the ID token or access token during
+  step-up re-authentication.  This is achieved through custom OIDC scopes,
+  ACR-dependent claim mappings, or access token management policies.
 
-  When PF returns claims like `txn_amount`, `txn_payee`, `acr` in the token,
-  these claims land in `Identity.getAttributes()` after PA validates the
-  token.  The **built-in JWT identity mapping** then includes them
-  automatically in the backend-facing JWT — no custom plugin, no session
-  state, no code.
+  **However, this does NOT make the claims available in the built-in
+  identity mapping.**  Here's why:
 
-  This is the **simplest path for PingAccess JWT-based backends** because:
-  - Zero custom plugins (no `IdentityMappingPlugin`, no custom rules for
-    JWT production)
-  - StepUpRule only needs to check for the ACR claim in the identity
-    attributes (already in the token)
-  - The built-in JWT identity mapping handles everything
+  - PA's `Identity.getAttributes()` reflects the claims from the **original
+    web session token** — the one established during the initial login.
+  - The step-up re-authentication produces a **new, separate token** via the
+    CallbackRule's custom OIDC flow (code exchange → token endpoint).
+  - This new token is **not** the web session token.  PA's web session
+    (`PA_SUBJECT` cookie) remains bound to the original login token.
+  - Therefore, the step-up token's claims do **not** appear in
+    `Identity.getAttributes()` and do **not** flow into the built-in JWT
+    identity mapping.
 
-  **Trade-off:** The transaction claims are in the access token itself,
-  which is issued by PF and has PF's token lifetime.  For short-lived
-  signing context (5 minutes), you'd need PF to issue a short-lived
-  token scoped to the step-up flow.
+  **Where Option 4 helps:**  The CallbackRule has full access to the step-up
+  token's claims.  Having PF include `txn_amount`, `txn_payee` in the token
+  means the CallbackRule can extract them directly from a validated JWT
+  instead of relying on custom PF attributes or side channels.  The
+  CallbackRule still needs to write them to `SessionStateSupport` (Approach A)
+  or a JWE cookie (Approach B) — but it gets structured, validated data
+  from PF rather than having to construct the signing context from scratch.
 
 #### Recommendation for JWT-Based Backends
 
-**Option 4 (PF token customization) is the preferred solution** for
-PingAccess when the backend requires signing context in a JWT.  It requires:
+**Approach B (Custom JWE Cookie) is the preferred solution** when the backend
+requires signing context in a JWT.  It avoids:
 
-- PF claim mapping configuration (one-time setup)
-- No custom gateway plugins
-- No session state management
-- Built-in JWT identity mapping works unchanged
-
-**Approach B (Custom JWE Cookie) is the fallback** when:
-
-- PF cannot be configured to return transaction claims (policy constraint)
-- Token lifetime cannot be scoped to the step-up flow
-- The signing context must be independent of the OIDC token lifecycle
+- No custom identity mapping plugin
+- No PF token customization
+- No coupling between the session state and the identity mapping pipeline
 - Clean separation: login JWT (identity mapping) vs. signing JWE (custom cookie)
 
-**Option 2 (Custom IdentityMappingPlugin) is a last resort** — only needed
-if session state must be the source of truth AND it must appear in a single
-backend JWT.  With PF token customization confirmed, this scenario is rare.
-
 If the backend insists on a **single JWT** containing both identity and
-signing claims and PF cannot include them, Option 2 (custom
-`IdentityMappingPlugin`) is the only path under Approach A.
+signing claims, Option 2 (custom `IdentityMappingPlugin`) is the only viable
+path under Approach A.
 
 ### PingGateway
 
@@ -1292,10 +1284,9 @@ Both approaches produce cookies that MUST be:
 
 - **Approach A**: PA/PG manages the session cookie signing keys.  No
   additional key management.
-- **Approach B**: The gateway needs an **encryption key** for the JWE cookie.
-  Options: AES-256 symmetric key (`dir` + `A256GCM` — simplest), or RSA/EC
-  asymmetric key (`RSA-OAEP` + `A256GCM` — allows key separation).
-  Key must be managed and rotated by the gateway.
+- **Approach B**: The gateway needs a signing key for the custom JWT.
+  Options: use the PingFederate-issued token directly (no gateway signing),
+  or use a gateway-managed keypair (requires key rotation).
 
 ---
 
@@ -1310,7 +1301,7 @@ Both approaches produce cookies that MUST be:
 | Groovy alternative (StepUpRule) | ✅ Possible | ✅ Possible |
 | Groovy alternative (CallbackRule) | ❌ No HttpClient | ❌ No HttpClient |
 | Identity mapping change | Custom `IdentityMappingPlugin` if JWT-based backend | None (rule sets headers) |
-| Key management | None (session state) or signing key (custom IM plugin) | Gateway encryption key (AES-256 or RSA) |
+| Key management | None (session state) or signing key (custom IM plugin) | Gateway signing key |
 | Total new plugins | 2 rules (+ 1 IM plugin if JWT backend) | 2 rules + JWT signing |
 
 ### PingGateway
@@ -1322,7 +1313,7 @@ Both approaches produce cookies that MUST be:
 | JWT for backend | `JwtBuilderFilter` (OOTB, config-only) | Custom JWT in CallbackFilter |
 | Groovy-only | ✅ Both filters | ✅ Both filters |
 | Session config | `JwtSessionManager` in `config.json` | None (custom cookie) |
-| Key management | PG `SecretsProvider` (JwtBuilderFilter) | Gateway encryption key or PG keys |
+| Key management | PG `SecretsProvider` (JwtBuilderFilter) | Gateway signing key or PG keys |
 | Total new components | 2 filters + 1 route config (no code) | 2 filters + JWT signing |
 
 ---
@@ -1346,18 +1337,17 @@ limitations differ significantly:
 | **Session state in JWT** | ❌ Requires custom `IdentityMappingPlugin` | ✅ Native — `${session['key']}` in template |
 
 > **Key takeaway:** PingGateway's `JwtBuilderFilter` is strictly more powerful
-> than PingAccess's JWT identity mapping.  However, with PF confirmed to
-> support transaction-scoped claims, PingAccess can also produce JWTs with
-> signing context via the built-in JWT identity mapping — as long as PF
-> includes those claims in the token.
+> than PingAccess's JWT identity mapping.  For JWT-based backends that need
+> signing context claims, PingGateway requires **zero custom code** (just route
+> configuration), while PingAccess requires a **custom Java plugin**.
 
 ### Impact on Approach Selection
 
 | Scenario | PingAccess | PingGateway |
 |----------|-----------|-------------|
 | Backend accepts plain headers | Approach A works (rule sets headers) — fallback only | Approach A works (filter sets headers) — fallback only |
-| Backend requires signed JWT | **Option 4 (PF claims)** — built-in JWT mapping works; Approach B as fallback | Approach A works natively via `JwtBuilderFilter`; **both approaches viable** |
-| Backend requires single JWT (identity + signing) | **Option 4** (PF claims in token) or custom `IdentityMappingPlugin` | `JwtBuilderFilter` template merges both sources |
+| Backend requires signed JWT | Approach A needs custom `IdentityMappingPlugin`; **prefer Approach B** | Approach A works natively via `JwtBuilderFilter`; **both approaches viable** |
+| Backend requires single JWT (identity + signing) | Only custom `IdentityMappingPlugin` | `JwtBuilderFilter` template merges both sources |
 
 ---
 
@@ -1371,11 +1361,14 @@ limitations differ significantly:
    can be stored in `SessionStateSupport`?  The session state cookie has
    browser size limits (~4 KB).
 
-3. ~~**PF transaction-scoped claims**~~: **RESOLVED — YES.** PingFederate
-   supports returning custom claims (transaction amount, payee) in the
-   ID token or access token for step-up flows, via custom OIDC scopes
-   and ACR-dependent claim mappings.  This simplifies both approaches,
-   particularly for PingAccess (see §6, Option 4).
+3. ~~**PF transaction-scoped claims**~~: **RESOLVED — YES, but limited.**
+   PingFederate supports returning custom claims (transaction amount, payee)
+   in the ID token or access token for step-up flows.  However, these claims
+   are in the **step-up token**, not the original web session token.
+   `Identity.getAttributes()` still reflects the login token, so the built-in
+   JWT identity mapping does **not** include them.  The CallbackRule must
+   extract the claims from the step-up token and write them to
+   `SessionStateSupport` or a JWE cookie.  See §6, Option 4.
 
 4. **Groovy `ResponseBuilder` access**: Can Groovy scripts in PA actually
    call `ResponseBuilder.newInstance()`?  The static factory uses
