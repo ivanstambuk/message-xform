@@ -50,6 +50,53 @@ If the only mechanism available were web sessions, the solution would require:
 
 This document explores approaches that **avoid** that limitation.
 
+### PingGateway: No Equivalent Limitation
+
+PingGateway uses a fundamentally different abstraction.  The equivalent
+concepts are:
+
+| PingAccess Concept | PingGateway Equivalent | Description |
+|--------------------|------------------------|-------------|
+| **Application** | **Route** | A JSON config file that matches a request (by URL pattern, virtual host, condition expression) and defines a filter chain + handler.  Each route is roughly analogous to a PA Application. |
+| **Web Session** | **Session** (per-route or global) | A session manager (`JwtSessionManager` for stateless, `InMemorySessionManager` for stateful) can be attached to each route independently, or configured globally in `config.json`. |
+| **Rule** | **Filter** | Filters are chained in a pipeline; each filter can read/write session state, make outbound HTTP calls, and short-circuit the response. |
+
+**Critical difference: session isolation, not session affinity.**
+
+PingGateway does **not** have the "one Web Session per Application"
+constraint.  Each route gets its own **independent session object** when
+a request enters it — session state from one route is not inherited by
+another route.  This means:
+
+1. **No duplicate onboarding required.**  If you need separate session
+   contexts (login vs. signing), you define two routes pointing to the
+   same backend.  Each route has its own session automatically — there is
+   no administrative overhead of creating paired Application + Web Session
+   objects.
+
+2. **Multiple session-like constructs per route.**  A single route can
+   use both the built-in `SessionContext` (for long-lived session state)
+   and a custom JWE cookie (for ephemeral signing proof) within the same
+   filter chain.  There is no architectural constraint preventing this.
+
+3. **Session scope is route-scoped by default.**  In PingAccess,
+   `SessionStateSupport` is visible across all applications on the same
+   PA instance (because the session state cookie is a PA-level concept).
+   In PingGateway, session content is scoped to the processing route — a
+   step-up proof written in one route's session is not visible in another
+   route's session unless they share a session configuration that
+   explicitly supports it.
+
+4. **Routes are cheap.**  Route definitions are lightweight JSON files,
+   not heavyweight UI-configured Application objects.  Adding a parallel
+   route for signing is trivial.
+
+**Implication for this design:**  Because PG routes have isolated sessions
+by default, **Approach A (Session Enrichment)** works even more naturally
+on PingGateway than on PingAccess — enriching a route's session with
+step-up proof is a simple `session.put(...)` with no risk of polluting
+another route's state, and no duplicate API onboarding required.
+
 ---
 
 ## 2. Protocol: RFC 9470 Step-Up Authentication Challenge
@@ -240,7 +287,7 @@ Client                   Gateway (PA/PG)          PingFederate/PingAM    Backend
    │                         │                         │                  │
    │  ◄─── 401 Unauthorized  │                         │                  │
    │  WWW-Authenticate:      │                         │                  │
-   │    Bearer error=         │                         │                  │
+   │    Bearer error=        │                         │                  │
    │    "insufficient_user_  │                         │                  │
    │    authentication",     │                         │                  │
    │    acr_values=          │                         │                  │
@@ -257,8 +304,8 @@ Client                   Gateway (PA/PG)          PingFederate/PingAM    Backend
    │                         │                         │                  │
    │  ── authorize request ──────────────────────────► │                  │
    │  acr_values=txn-signing │                         │                  │
-   │  authorization_details= │                     [Authenticate]        │
-   │  [{ type: payment, ...}]│                     (MFA, FIDO2, OTP)    │
+   │  authorization_details= │                     [Authenticate]         │
+   │  [{ type: payment, ...}]│                     (MFA, FIDO2, OTP)      │
    │  ◄──── code + state ───────────────────────────── │                  │
    │                         │                         │                  │
    │  GET /signing-callback  │                         │                  │
@@ -314,12 +361,12 @@ Client                   Gateway (PA/PG)          Backend API            PingFed
    │                    Forwards to backend.           │                  │
    │                         │ ──────────────────────► │                  │
    │                         │                         │                  │
-   │                         │              [Backend evaluates:]         │
-   │                         │              amount > 1000? → step-up     │
+   │                         │              [Backend evaluates:]          │
+   │                         │              amount > 1000? → step-up      │
    │                         │                         │                  │
    │                         │ ◄── 401 Unauthorized ── │                  │
    │                         │  WWW-Authenticate:      │                  │
-   │                         │    Bearer error=         │                  │
+   │                         │    Bearer error=        │                  │
    │                         │    "insufficient_user_  │                  │
    │                         │    authentication",     │                  │
    │                         │    acr_values=          │                  │
@@ -344,7 +391,7 @@ Client                   Gateway (PA/PG)          Backend API            PingFed
    │  (enriched with gateway │                         │                  │
    │   OIDC parameters)      │                         │                  │
    │                         │                         │                  │
-   │  (client handles step-up — same as §3.2)         │                  │
+   │  (client handles step-up — same as §3.2)          │                  │
    │  ...                    │                         │                  │
 ```
 
@@ -1268,6 +1315,14 @@ are more limited — they have Exchange access but no outbound capabilities.
    `insufficient_user_authentication`, does PingAccess's built-in session
    enforcement intercept it before the response processing rule fires?
    The rule execution order matters.
+
+8. **PG cross-route session sharing**: If two PG routes (e.g., `/api`
+   and `/api-sign`) use the same `JwtSessionManager` with the same
+   encryption key, do they share session state via the same cookie?  Or
+   does each route always build a fresh session object regardless?  This
+   matters for the parallel-route scenario where the signing route needs
+   to see the step-up proof written by the callback route.  Needs live
+   testing.
 
 ---
 
