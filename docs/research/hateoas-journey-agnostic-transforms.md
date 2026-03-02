@@ -11,7 +11,7 @@
 
 ---
 
-## Problem Statement
+## 1. Problem Statement
 
 The current platform transforms (`am-auth-response-v2.yaml`,
 `am-webauthn-response.yaml`) contain **journey-specific logic** inside the
@@ -24,8 +24,8 @@ gateway layer:
 | Profile `match.when` | Body-predicate routing knows WebAuthn callbacks have `navigator.credentials` in `TextOutputCallback` |
 
 If a new journey is created (e.g., Device Binding, KBA, Social Login, MFA OTP),
-the gateway transforms need updating to handle the new callback types. The
-transforms are tightly coupled to the journey shape.
+the gateway transforms need updating. The transforms are tightly coupled to
+the journey shape.
 
 **Goal**: Explore architectures where the gateway transform layer is **fully
 journey-agnostic** — it transforms any PingAM callback response into a clean
@@ -33,9 +33,9 @@ API surface with HATEOAS `_links` without knowing which journey is active.
 
 ---
 
-## HATEOAS/HAL: What Would It Look Like?
+## 2. What Would HATEOAS Look Like?
 
-### Current Clean Response (journey-specific)
+### Current response (journey-specific transforms)
 
 ```json
 {
@@ -46,7 +46,7 @@ API surface with HATEOAS `_links` without knowing which journey is active.
 }
 ```
 
-### HAL Response with Actions (journey-agnostic)
+### Target response (journey-agnostic with HAL)
 
 ```json
 {
@@ -96,7 +96,7 @@ the client needing to hard-code journey flows.
 
 ---
 
-## The Core Challenge
+## 3. The Core Challenge
 
 PingAM's callback responses contain:
 
@@ -117,18 +117,51 @@ in the journey tree design, not explicit in the response.
 HATEOAS metadata in its callback responses. The response says "here are the
 callbacks" but never says "here are your options after this step."
 
+This leads to a fundamental question: **where should journey knowledge live?**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ Current Architecture                                            │
+│                                                                  │
+│  PingAM ── raw callbacks ──► Gateway ── journey-specific ──► Client
+│                               transforms                         │
+│                               (knowledge HERE)                   │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│ Proposed: Knowledge at Source                                    │
+│                                                                  │
+│  PingAM ── enriched callbacks ──► Gateway ── generic ──► Client  │
+│  (knowledge HERE via             structural                      │
+│   Scripted Decision Nodes)       mapping only                    │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│ Proposed: Knowledge at Client                                    │
+│                                                                  │
+│  PingAM ── raw callbacks ──► Gateway ── generic ──► Client       │
+│                               structural             (knowledge  │
+│                               mapping only            HERE)      │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+The three solutions below correspond to these three positions.
+
 ---
 
-## Approach A: AM-Side Enrichment via Scripted Decision Node (RECOMMENDED)
+## 4. Solution 1: AM-Side Enrichment via MetadataCallback ⭐
 
-### How It Works
+> **Recommended approach** — journey knowledge stays at the source (PingAM),
+> gateway becomes a generic structural mapper.
 
-Add a Scripted Decision Node at strategic points in the journey tree that
-injects a `MetadataCallback` with HATEOAS-style `_links` and `_actions`
-into the callback response. The gateway layer then performs only **generic
-structural mapping** — no journey knowledge needed.
+### How it works
 
-### PingAM Scripted Decision Node Capabilities
+Add a **Scripted Decision Node** at strategic points in the journey tree that
+injects a `MetadataCallback` with HATEOAS-style `_links` and `_actions`.
+The gateway layer then performs only generic structural mapping — no journey
+knowledge needed.
+
+### PingAM Scripted Decision Node capabilities
 
 From the vendor docs (PingAM 8, §Scripted Decision node API):
 
@@ -141,9 +174,9 @@ From the vendor docs (PingAM 8, §Scripted Decision node API):
 | `idRepository` | Access user profile | ✅ Can check user capabilities |
 
 **Key API**: `callbacksBuilder.metadataCallback(data)` — injects arbitrary
-JSON as a `MetadataCallback` into the response. This is the mechanism.
+JSON as a `MetadataCallback` into the response.
 
-### Example Scripted Decision Node Script
+### Example: Scripted Decision Node script
 
 ```javascript
 // Journey: Login with optional passkey
@@ -153,7 +186,6 @@ var username = nodeState.get("username");
 var hasPasskey = false;
 
 if (username) {
-  // Check if user has registered passkeys
   try {
     var identity = idRepository.getIdentity(username);
     var devices = identity.getAttributeValues("boundDevices");
@@ -163,7 +195,6 @@ if (username) {
   }
 }
 
-// Build HATEOAS metadata
 var metadata = {
   "_links": {
     "self": { "href": "/api/v1/auth/login" },
@@ -193,14 +224,11 @@ if (hasPasskey) {
   };
 }
 
-// Inject as MetadataCallback
 callbacksBuilder.metadataCallback(metadata);
-
-// Continue the journey (this node is a pass-through)
 action.goTo("true");
 ```
 
-### What AM Returns
+### What AM returns with enrichment
 
 ```json
 {
@@ -238,10 +266,11 @@ action.goTo("true");
 }
 ```
 
-### What the Gateway Transform Does (Journey-Agnostic)
+### Generic gateway transform (JSLT)
+
+This single spec replaces all journey-specific transforms:
 
 ```yaml
-# am-auth-response-generic.yaml — journey-agnostic transform spec
 id: am-auth-response-generic
 version: "2.0.0"
 description: "Journey-agnostic AM callback transform with HATEOAS extraction"
@@ -249,13 +278,11 @@ description: "Journey-agnostic AM callback transform with HATEOAS extraction"
 transform:
   lang: jslt
   expr: |
-    // Extract MetadataCallback(s) — HATEOAS data lives here
     let metadata_cbs = [for (.callbacks)
       .output[0].value
         if (.type == "MetadataCallback")]
     let metadata = if (size($metadata_cbs) > 0) $metadata_cbs[0] else null
 
-    // Generic callback mapping — no journey knowledge needed
     let user_callbacks = [for (.callbacks)
       {
         "type": if (.type == "NameCallback") "text"
@@ -305,29 +332,29 @@ and promotes it.
 
 ### Assessment
 
-| Aspect | Rating | Notes |
-|--------|--------|-------|
-| Journey-agnosticism | ✅ High | Gateway knows callback types (structural) but not journey logic |
-| Maintenance burden | ⚠️ Medium | Must add Scripted Decision Node to each journey |
-| AM configuration | 🔧 Required | Script creation via AM Admin API or Amster |
-| Gateway complexity | ✅ Low | Single generic transform spec replaces multiple journey-specific ones |
-| HATEOAS richness | ✅ High | Full control — AM has all context to build accurate links |
-| WebAuthn compat | ⚠️ Unclear | WebAuthn callbacks embed JS in TextOutputCallback — still needs special handling for the JS extraction, unless AM enriches the MetadataCallback with pre-extracted ceremony data |
+| Aspect | Rating |
+|--------|--------|
+| Journey-agnosticism | ✅ High — gateway knows callback types (structural) but not journey logic |
+| HATEOAS richness | ✅ High — full control, AM has all context to build accurate links |
+| Gateway complexity | ✅ Low — single generic transform spec replaces multiple journey-specific ones |
+| AM maintenance | ⚠️ Medium — must add Scripted Decision Node to each journey |
+| WebAuthn compat | ⚠️ Unclear — still needs special handling unless AM pre-extracts ceremony data |
 
 ---
 
-## Approach B: Gateway-Side Generic Callback Mapping (No HATEOAS)
+## 5. Solution 2: Generic Gateway Mapping (No HATEOAS)
 
-### How It Works
+> Simplest gateway — but pushes journey knowledge to the client.
+
+### How it works
 
 Replace the current journey-specific transforms with a single **generic**
 transform that maps ALL PingAM callback types to a universal schema. No
 HATEOAS links — just structural cleanup.
 
-### Transform Spec
+### Transform spec
 
 ```yaml
-# am-auth-generic.yaml — pure structural mapping, no journey knowledge
 id: am-auth-generic
 version: "1.0.0"
 
@@ -356,41 +383,112 @@ transform:
       .
 ```
 
-This is maximally generic — it passes through all callback data with only
-a thin structural cleanup (lowercase type, consistent naming).
-
 ### Assessment
 
-| Aspect | Rating | Notes |
-|--------|--------|-------|
-| Journey-agnosticism | ✅ Full | Zero journey knowledge in gateway |
-| Maintenance burden | ✅ None | Never changes unless PingAM callback format changes |
-| AM configuration | ✅ None | No AM changes needed |
-| Gateway complexity | ✅ Minimal | Trivial transform spec |
-| HATEOAS richness | ❌ None | Client must know the journey flow |
-| WebAuthn compat | ❌ Problem | Raw TextOutputCallback with embedded JS still arrives — client must parse it |
+| Aspect | Rating |
+|--------|--------|
+| Journey-agnosticism | ✅ Full — zero journey knowledge in gateway |
+| HATEOAS richness | ❌ None — client must know the journey flow |
+| Gateway complexity | ✅ Minimal — trivial transform spec, never changes |
+| AM maintenance | ✅ None — no AM changes needed |
+| WebAuthn compat | ❌ Problem — raw TextOutputCallback with embedded JS still arrives |
 
 **Verdict**: Solves the journey-agnosticism problem but **doesn't deliver
-HATEOAS**. The client still needs journey flow knowledge. This is useful as
-a first step — clean API surface without enrichment.
+HATEOAS**. The client still needs journey flow knowledge. Useful as a first
+step — clean API surface without enrichment.
 
 ---
 
-## Approach C: Gateway-Native Scripting (PingAccess + PingGateway)
+## 6. Solution 3: Hybrid (AM Enrichment + Generic Gateway)
 
-Instead of (or alongside) message-xform's declarative YAML+JSLT approach,
-each gateway product has its own native extension mechanism for body
-transformation. This section compares both.
+> The recommended long-term architecture — combines Solutions 1 and 2.
 
-### C1a: PingAccess — Native Groovy Script Rule (OOTB)
+### How it works
 
-PingAccess has a **built-in Groovy Script Rule** type — no custom plugin
-required. Created via the Admin UI (Access → Rules → Add Rule → Type:
-"Groovy Script"), the script has full access to the `Exchange` object during
-both request and response phases.
+1. **AM side**: Scripted Decision Nodes inject `MetadataCallback` with
+   `_links`, `_actions`, and any journey-specific enrichment (e.g.,
+   pre-extracted WebAuthn ceremony data so the gateway doesn't need regex).
 
-**Key objects available in Groovy scripts** (from PingAccess 9.0 docs,
-§Groovy in PingAccess):
+2. **Gateway side**: A single generic transform spec that:
+   - Maps callback types to UI types (static, structural)
+   - Extracts `MetadataCallback` and promotes `_links`/`_actions` to top level
+   - Moves `authId` to `X-Auth-Session` header
+   - Strips internal fields
+
+3. **Works with any gateway** — PingAccess (message-xform plugin or Groovy
+   Script Rule), PingGateway (Groovy ScriptableFilter or message-xform
+   standalone), or standalone proxy.
+
+### WebAuthn: the hard case
+
+The biggest current source of journey-specific logic is the WebAuthn
+`TextOutputCallback` regex parsing. If AM's Scripted Decision Node extracts
+the ceremony data before emitting callbacks, the gateway never sees raw JS:
+
+```javascript
+// AM-side WebAuthn enrichment script (Scripted Decision Node)
+var ceremonyData = {
+  "_links": {
+    "self": { "href": "/api/v1/auth/passkey" },
+    "submit": {
+      "href": "/api/v1/auth/passkey",
+      "method": "POST",
+      "title": "Submit passkey attestation"
+    }
+  },
+  "webauthn": {
+    "type": "webauthn-register",
+    "challenge": "base64url-encoded-challenge",
+    "rpId": "platform.local",
+    "userVerification": "required",
+    "timeout": 60000
+  }
+};
+callbacksBuilder.metadataCallback(ceremonyData);
+action.goTo("true");
+```
+
+**⚠️ Limitation**: The Scripted Decision Node runs **before** or **after**
+other nodes in the tree, not **inside** them. The WebAuthn node generates
+callbacks internally — a Scripted Decision Node placed before it doesn't have
+the WebAuthn ceremony data yet, and one placed after it would see the node's
+outcome, not its callbacks.
+
+**Practical approach**: Accept that WebAuthn callbacks will still need
+gateway-side special handling (regex extraction), but use MetadataCallback
+for everything else. The WebAuthn transform spec becomes the only
+journey-specific transform; all other journeys use the generic one.
+
+---
+
+## 7. Implementation Options
+
+Solutions 1–3 answer *what* to transform and *where* the knowledge lives.
+This section answers *how* to implement the gateway-side transform. These
+options are orthogonal — any of them can be used with any solution above.
+
+### Option A: message-xform (YAML + JSLT)
+
+This is the project's existing approach. The generic callback mapping from
+Solutions 1 and 2 is expressed as a declarative YAML+JSLT transform spec.
+
+| Aspect | Detail |
+|--------|--------|
+| Deployment on PA | `MessageTransformRule` plugin (compiled JAR in `deploy/`) |
+| Deployment on PG | Standalone HTTP proxy alongside PingGateway |
+| Language | JSLT (declarative, JSON-native) |
+| Testability | ✅ Unit tests via `TransformEngine` |
+| Portability | ✅ Runs on PA, PG, and standalone |
+
+This is the **gateway-agnostic** option — a single spec works everywhere.
+
+### Option B: PingAccess Groovy Script Rule (OOTB)
+
+PingAccess has a **built-in Groovy Script Rule** — no custom plugin or JAR
+deployment required. Created via the Admin UI (Access → Rules → Add Rule →
+Type: "Groovy Script"), the script has full access to the `Exchange` object.
+
+**Key objects available** (from PingAccess 9.0 docs, §Groovy in PingAccess):
 
 | Object | Access pattern | Capabilities |
 |--------|---------------|-------------|
@@ -403,10 +501,10 @@ both request and response phases.
 | Properties | `exc?.setProperty(k,v)` | Per-request key-value storage |
 
 **⚠️ Matcher requirement**: PA Groovy scripts must end with a matcher
-instance — `pass()` to allow, `fail()` to deny. The script can modify
-the response body and headers *before* calling the matcher.
+(`pass()` to allow, `fail()` to deny). The script modifies the response
+body and headers *before* calling the matcher.
 
-#### Example: PA Groovy Script Rule for Generic Callback Transform
+#### Example: generic callback transform as a PA Groovy Rule
 
 ```groovy
 // PingAccess Rule: AuthCallbackTransform (Type: Groovy Script)
@@ -416,7 +514,6 @@ import groovy.json.JsonSlurper
 import groovy.json.JsonOutput
 
 if (exc?.response) {
-    // Response phase — transform the AM callback response
     def contentType = exc?.response?.header?.getFirstValue("Content-Type")
     if (contentType?.contains("application/json")) {
         def slurper = new JsonSlurper()
@@ -440,10 +537,8 @@ if (exc?.response) {
                 transformed.putAll(metadataCb.output[0].value)
             }
 
-            // Move authId to response header
             exc?.response?.header?.add("X-Auth-Session", body.authId)
 
-            // Replace response body
             def json = JsonOutput.toJson(transformed)
             exc?.response?.body = json.getBytes("UTF-8")
             exc?.response?.header?.setContentLength(json.length())
@@ -468,32 +563,23 @@ String mapType(String amType) {
 }
 ```
 
-**Advantages over a custom Java plugin:**
-- No JAR compilation, no `deploy/` directory, no PA restart
-- Editable directly in the PA Admin UI (live Groovy editor)
-- Syntax-validated on save
-- Same `Exchange` access as Java plugins
+| Aspect | Detail |
+|--------|--------|
+| Deployment | PA Admin UI (no restart, no JAR) |
+| Language | Groovy (interpreted) |
+| Testability | ❌ No test harness — syntax-validated on save only |
+| Portability | ❌ PA only |
+| Body write | Manual `byte[]` + `JsonOutput` serialization |
+| Caveat | Must end with `pass()`/`fail()` — it's an access control rule |
 
-**Limitations:**
-- Must end with a matcher (`pass()`/`fail()`) — it's an access control rule,
-  not a pure transformation filter
-- Body modification API is lower-level (`byte[]`) compared to PingGateway's
-  `.entity.json` convenience
-- No built-in JSON-to-body setter — must serialize manually via `JsonOutput`
-- Script lives in PA config (database), not as a deployable file artifact
+**Best for**: Quick prototyping, environments where deploying a custom JAR
+is not desirable, or situations where message-xform is not deployed.
 
-### C1b: PingAccess — Custom Java `AsyncRuleInterceptor` Plugin
+### Option C: PingAccess Custom Java Plugin
 
-For more complex scenarios, PingAccess also supports compiled Java plugins
-deployed as JARs. The message-xform `MessageTransformRule` is itself a
-PingAccess `AsyncRuleInterceptor` — so the generic callback mapping could
-be implemented either:
-
-- **Via message-xform** (declarative YAML+JSLT spec — already shown in A/B)
-- **Via a custom Java plugin** (compiled, deployed alongside or instead of
-  message-xform)
-
-A **custom Java plugin** would look like:
+PingAccess also supports compiled Java plugins deployed as JARs via the
+`AsyncRuleInterceptor` SPI. The message-xform `MessageTransformRule` is
+itself such a plugin.
 
 ```java
 // Conceptual — PingAccess AsyncRuleInterceptorBase subclass
@@ -502,25 +588,7 @@ public class CallbackTransformRule extends AsyncRuleInterceptorBase {
     public Outcome handleResponse(Exchange exchange) {
         JsonNode body = parseJson(exchange.getResponse().getBody());
         if (body.has("callbacks")) {
-            ObjectNode transformed = JsonNodeFactory.instance.objectNode();
-            transformed.put("stage", body.path("stage").asText());
-
-            ArrayNode callbacks = transformed.putArray("callbacks");
-            for (JsonNode cb : body.get("callbacks")) {
-                if (!"MetadataCallback".equals(cb.path("type").asText())) {
-                    ObjectNode mapped = callbacks.addObject();
-                    mapped.put("type", mapType(cb.path("type").asText()));
-                    mapped.put("prompt", cb.at("/output/0/value").asText());
-                    mapped.put("inputKey", cb.at("/input/0/name").asText());
-                }
-            }
-
-            // Extract MetadataCallback → promote _links/_actions
-            extractMetadata(body, transformed);
-
-            // authId → X-Auth-Session header
-            exchange.getResponse().setHeader(
-                "X-Auth-Session", body.path("authId").asText());
+            // ... same mapping logic as Groovy example ...
             exchange.getResponse().setBody(transformed.toString());
         }
         return Outcome.CONTINUE;
@@ -528,45 +596,35 @@ public class CallbackTransformRule extends AsyncRuleInterceptorBase {
 }
 ```
 
-**Key insight**: Building a custom Java plugin for this is possible but
-**reinvents message-xform**. The message-xform plugin already provides
-exactly this capability via declarative YAML specs — the generic spec
-from Approach A/B runs on PingAccess via the existing `MessageTransformRule`
-without any new Java code. And for simpler cases, the **native Groovy
-Script Rule** (C1a) avoids the JAR deployment entirely.
+Building a custom Java plugin for this **reinvents message-xform**. Use this
+option only when you need compiled-Java capabilities beyond what Groovy or
+JSLT can express (e.g., custom crypto, complex threading, third-party library
+dependencies).
 
-The real value of a custom PA plugin would be if you needed **imperative
-logic** that JSLT cannot express *and* that requires compiled-Java
-capabilities beyond Groovy (e.g., custom crypto, complex threading,
-third-party library dependencies).
+| Aspect | Detail |
+|--------|--------|
+| Deployment | JAR in PA `deploy/` dir (restart required) |
+| Language | Java 21 (compiled) |
+| Testability | ✅ JUnit + mock Exchange |
+| Portability | ❌ PA only |
 
-### C2: PingGateway — `ScriptableFilter` (Groovy)
+### Option D: PingGateway ScriptableFilter (Groovy)
 
-PingGateway supports Groovy (or any JSR-223 language) scripts as filters
-via `ScriptableFilter`. This provides a **runtime-scriptable** alternative
-to compiled Java.
-
-#### PingGateway Config
+PingGateway supports Groovy scripts as filters via `ScriptableFilter`:
 
 ```json
 {
   "type": "ScriptableFilter",
   "config": {
     "type": "application/x-groovy",
-    "file": "AuthCallbackTransform.groovy",
-    "args": {
-      "amBaseUrl": "https://am.platform.local"
-    }
+    "file": "AuthCallbackTransform.groovy"
   }
 }
 ```
 
-#### Groovy Script
-
 ```groovy
 // AuthCallbackTransform.groovy
 import groovy.json.JsonSlurper
-import groovy.json.JsonOutput
 
 def slurper = new JsonSlurper()
 
@@ -579,24 +637,18 @@ return next.handle(context, request).thenOnResult { response ->
         if (body.callbacks) {
             def transformed = [
                 stage: body.stage,
-                callbacks: body.callbacks.collect { cb ->
-                    [
-                        type: mapType(cb.type),
+                callbacks: body.callbacks.findAll { it.type != 'MetadataCallback' }
+                    .collect { cb -> [type: mapType(cb.type),
                         prompt: cb.output?.getAt(0)?.value?.trim() ?: cb.type,
-                        inputKey: cb.input?.getAt(0)?.name
-                    ]
-                }.findAll { it.type != 'metadata' }
+                        inputKey: cb.input?.getAt(0)?.name] }
             ]
 
-            // Extract MetadataCallback HATEOAS data if present
             def metadataCb = body.callbacks.find { it.type == 'MetadataCallback' }
             if (metadataCb?.output?.getAt(0)?.value) {
                 transformed.putAll(metadataCb.output[0].value)
             }
 
-            // Move authId to header
             response.headers.put('X-Auth-Session', body.authId)
-
             response.entity.json = transformed
         } else if (body.tokenId) {
             response.headers.put('Set-Cookie',
@@ -606,217 +658,78 @@ return next.handle(context, request).thenOnResult { response ->
     }
 }
 
-String mapType(String amType) {
-    switch (amType) {
-        case 'NameCallback': return 'text'
-        case 'PasswordCallback': return 'password'
-        case 'TextInputCallback': return 'text'
-        case 'ChoiceCallback': return 'choice'
-        case 'ConfirmationCallback': return 'confirm'
-        case 'HiddenValueCallback': return 'hidden'
-        case 'TextOutputCallback': return 'display'
-        case 'MetadataCallback': return 'metadata'
-        default: return amType.toLowerCase()
-    }
+String mapType(String t) {
+    [NameCallback:'text', PasswordCallback:'password', TextInputCallback:'text',
+     ChoiceCallback:'choice', ConfirmationCallback:'confirm',
+     HiddenValueCallback:'hidden', TextOutputCallback:'display',
+     MetadataCallback:'metadata'].getOrDefault(t, t.toLowerCase())
 }
 ```
 
-### Side-by-Side: All Three Native Options
+| Aspect | Detail |
+|--------|--------|
+| Deployment | `.groovy` file on disk (hot-reloadable) |
+| Language | Groovy (interpreted, JSR-223) |
+| Testability | ❌ Limited — no standard test harness |
+| Portability | ❌ PG only |
+| Body write | `response.entity.json = ...` (convenient) |
 
-| Aspect | PA Groovy Script Rule | PA Java Plugin | PG Groovy ScriptableFilter |
-|--------|-----------------------|----------------|---------------------------|
-| Language | Groovy (interpreted) | Java 21 (compiled) | Groovy (interpreted, JSR-223) |
-| Deployment | PA Admin UI (no restart) | JAR in `deploy/` dir (restart) | `.groovy` file on disk (hot-reload) |
-| Body read | `exc?.response?.body?.getContent()` | `exchange.getResponse().getBody()` | `response.entity.string` / `.json` |
-| Body write | Manual `byte[]` + `JsonOutput` | `exchange.getResponse().setBody()` | `response.entity.json = ...` |
-| Header access | `exc?.response?.header?.add()` | `exchange.getResponse().setHeader()` | `response.headers.put()` |
-| HTTP callouts | ❌ Not available | `HttpClient` (injected) | Built-in `http` binding |
-| State | `exc.setProperty(k,v)` per-request | Per-request (stateless rule) | `globals` ConcurrentHashMap |
-| Testability | ❌ No test harness | ✅ JUnit + mock Exchange | ❌ Limited |
-| Must return | Matcher (`pass()`/`fail()`) | `Outcome` enum | Promise (handler chain) |
-| Portability | ❌ PA only | ❌ PA only | ❌ PG only |
-| Custom plugin | ❌ Not needed | ✅ Required | ❌ Not needed |
+### Implementation options comparison
 
-### Assessment
-
-| Aspect | Rating | Notes |
-|--------|--------|-------|
-| Journey-agnosticism | ✅ High | Same generic mapping as Approach B, with MetadataCallback extraction |
-| Maintenance burden | ⚠️ Medium | Gateway-specific code must be maintained per product |
-| AM configuration | Same as A/B | MetadataCallback enrichment still needs AM-side scripting |
-| PA Groovy Script | ✅ Easy | OOTB — no plugin, no restart, Admin UI editor |
-| PA Java plugin | ⚠️ Medium | Custom JAR — but message-xform already does this |
-| PG Groovy | ⚠️ Medium | Powerful but harder to test than YAML+JSLT |
-| HATEOAS richness | Same as A | Depends on what AM provides via MetadataCallback |
-
-**Bottom line**: Both gateways can do the generic mapping natively — and
-PingAccess can do it *without any custom plugin* via the built-in Groovy
-Script Rule. However, message-xform still provides a **gateway-agnostic**
-implementation that runs on both (PA plugin or standalone proxy alongside
-PG). The PA Groovy Script Rule is the most interesting alternative for
-quick prototyping or environments where deploying a custom JAR is not
-desirable.
+| Aspect | message-xform | PA Groovy Rule | PA Java Plugin | PG Groovy Filter |
+|--------|--------------|----------------|----------------|------------------|
+| Language | JSLT (declarative) | Groovy (interpreted) | Java (compiled) | Groovy (interpreted) |
+| Deployment | JAR (PA) or proxy (PG) | Admin UI | JAR + restart | File on disk |
+| Body write | Declarative spec | `byte[]` + JsonOutput | `setBody()` | `entity.json = ...` |
+| HTTP callouts | ❌ | ❌ | ✅ HttpClient | ✅ http binding |
+| Testability | ✅ Unit tests | ❌ | ✅ JUnit | ❌ |
+| Portability | ✅ PA + PG + standalone | ❌ PA only | ❌ PA only | ❌ PG only |
+| Custom plugin needed | ✅ (existing) | ❌ | ✅ | ❌ |
 
 ---
 
-## Approach D: Hybrid — AM Enrichment + Generic Gateway Transform
+## 8. Comparison Matrix
 
-### How It Works
-
-Combine Approach A (AM-side) and Approach B (generic gateway mapping):
-
-1. **AM side**: Scripted Decision Nodes inject `MetadataCallback` with
-   `_links`, `_actions`, and any journey-specific enrichment (e.g.,
-   pre-extracted WebAuthn ceremony data so the gateway doesn't need regex).
-
-2. **Gateway side**: A single generic transform spec that:
-   - Maps callback types to UI types (static, structural)
-   - Extracts `MetadataCallback` and promotes `_links`/`_actions` to top level
-   - Moves `authId` to `X-Auth-Session` header
-   - Strips internal fields
-
-3. **Works with both PingAccess (message-xform) and PingGateway (Groovy or
-   message-xform standalone)** — the gateway layer is identical.
-
-### Key Design: WebAuthn Pre-Extraction on AM Side
-
-The biggest current source of journey-specific logic is the WebAuthn
-`TextOutputCallback` regex parsing. If AM's Scripted Decision Node extracts
-the ceremony data before emitting callbacks, the gateway never sees raw JS:
-
-```javascript
-// AM-side WebAuthn enrichment script (Scripted Decision Node)
-// Placed before WebAuthn Registration/Authentication node in journey
-
-var callbacks_from_state = nodeState.get("pageCallbacks");
-// ... or, this runs AFTER the WebAuthn node has produced its callbacks
-
-// Instead of embedding JS in TextOutputCallback, the script adds a
-// MetadataCallback with pre-extracted ceremony data:
-var ceremonyData = {
-  "_links": {
-    "self": { "href": "/api/v1/auth/passkey" },
-    "submit": {
-      "href": "/api/v1/auth/passkey",
-      "method": "POST",
-      "title": "Submit passkey attestation"
-    }
-  },
-  "webauthn": {
-    "type": "webauthn-register",
-    "challenge": "base64url-encoded-challenge",
-    "rpId": "platform.local",
-    "userVerification": "required",
-    "timeout": 60000
-  }
-};
-callbacksBuilder.metadataCallback(ceremonyData);
-action.goTo("true");
-```
-
-**⚠️ Limitation**: The Scripted Decision Node runs **before** or **after** other
-nodes in the tree, not **inside** them. The WebAuthn node generates callbacks
-internally — a Scripted Decision Node placed before it doesn't have the
-WebAuthn ceremony data yet, and one placed after it would see the node's
-outcome, not its callbacks.
-
-**Possible workaround**: Use the Scripted Decision Node to directly emit
-the WebAuthn callbacks instead of using the built-in WebAuthn node. This is
-a full reimplementation of the WebAuthn ceremony in server-side JavaScript,
-which is complex but gives full control over the callback format.
-
-**Simpler alternative**: Accept that WebAuthn callbacks will still need
-gateway-side special handling (regex extraction), but use MetadataCallback
-for everything else. The WebAuthn transform spec becomes the only
-journey-specific transform; all other journeys use the generic one.
+| Criterion | Solution 1: AM Enrichment | Solution 2: Generic Gateway | Solution 3: Hybrid |
+|-----------|--------------------------|---------------------------|-------------------|
+| Journey-agnostic gateway | ✅ | ✅ | ✅ |
+| HATEOAS `_links` | ✅ Rich | ❌ None | ✅ Rich |
+| AM configuration needed | 🔧 Scripts per journey | ❌ None | 🔧 Scripts per journey |
+| PingAccess compatible | ✅ | ✅ | ✅ |
+| PingGateway compatible | ✅ | ✅ | ✅ |
+| Standalone compatible | ✅ | ✅ | ✅ |
+| WebAuthn handling | ⚠️ Complex | ❌ Raw JS | ⚠️ Best-effort |
+| Gateway maintenance | ✅ Low | ✅ Minimal | ✅ Low |
+| AM maintenance | ⚠️ Per journey | ✅ None | ⚠️ Per journey |
+| Testing complexity | ⚠️ E2E required | ✅ Unit testable | ⚠️ E2E required |
 
 ---
 
-## Comparison Matrix
+## 9. PingAM Node Capabilities for Enrichment
 
-| Criterion | A: AM Enrichment | B: Generic Gateway | C: Native Scripting (PA/PG) | D: Hybrid |
-|-----------|-----------------|-------------------|----------------------------|-----------|
-| Journey-agnostic gateway | ✅ | ✅ | ✅ | ✅ |
-| HATEOAS `_links` | ✅ Rich | ❌ None | ✅ If AM provides | ✅ Rich |
-| AM configuration needed | 🔧 Scripts per journey | ❌ None | 🔧 Same as A | 🔧 Scripts per journey |
-| PingAccess compatible | ✅ (message-xform) | ✅ | ✅ (Java plugin) | ✅ |
-| PingGateway compatible | ✅ (message-xform) | ✅ | ✅ (Groovy script) | ✅ |
-| Standalone compatible | ✅ | ✅ | ❌ (gateway-specific) | ✅ |
-| WebAuthn handling | ⚠️ Complex | ❌ Raw JS | ⚠️ Complex | ⚠️ Best-effort |
-| Gateway maintenance | ✅ Low | ✅ Minimal | ⚠️ Medium (per product) | ✅ Low |
-| AM maintenance | ⚠️ Per journey | ✅ None | ⚠️ Per journey | ⚠️ Per journey |
-| Testing complexity | ⚠️ E2E required | ✅ Unit testable | ⚠️ E2E required | ⚠️ E2E required |
+### Page Nodes cannot enrich
 
----
-
-## Key Architectural Decision: Where Does Journey Knowledge Live?
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│ Current Architecture                                            │
-│                                                                  │
-│  PingAM ── raw callbacks ──► Gateway ── journey-specific ──► Client
-│                               transforms                         │
-│                               (knowledge HERE)                   │
-└─────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────┐
-│ Proposed Architecture (Approach A/D)                             │
-│                                                                  │
-│  PingAM ── enriched callbacks ──► Gateway ── generic ──► Client  │
-│  (knowledge HERE via             structural                      │
-│   Scripted Decision Nodes)       mapping only                    │
-└─────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────┐
-│ Minimal Architecture (Approach B)                                │
-│                                                                  │
-│  PingAM ── raw callbacks ──► Gateway ── generic ──► Client       │
-│                               structural             (knowledge  │
-│                               mapping only            HERE)      │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-The fundamental trade-off:
-
-- **Push knowledge to AM (A/D)**: AM already has all the journey context.
-  Enriching callbacks at the source is the most architecturally sound approach.
-  But it requires AM administrative changes per journey, and may be complex
-  for WebAuthn-style nodes.
-
-- **Push knowledge to client (B)**: The gateway becomes a thin structural
-  translator. The client must understand callback types and know what journeys
-  are available. Simplest gateway, but most complex client.
-
-- **Current: knowledge in gateway**: Works but scales poorly — each journey
-  needs gateway transform changes.
-
----
-
-## Page Node and MetadataCallback — Can Page Nodes Enrich?
-
-The user's intuition was correct: **Page Nodes cannot enrich callbacks** with
-HATEOAS metadata. A Page Node (PingAM's UI grouping mechanism) groups
-multiple callbacks into a single step for display purposes, but it only
-controls **which callbacks appear together** — not the callback contents.
+**Page Nodes cannot enrich callbacks** with HATEOAS metadata. A Page Node
+(PingAM's UI grouping mechanism) groups multiple callbacks into a single step
+for display but only controls **which callbacks appear together** — not the
+callback contents themselves.
 
 To add enrichment, you need a **Scripted Decision Node** placed appropriately
 in the tree. The `callbacksBuilder.metadataCallback(data)` API is the only
 built-in mechanism for injecting arbitrary JSON into the callback response.
 
-### Alternative: Custom Node (Java Plugin)
+### Alternative: custom AM node (Java plugin)
 
-Instead of a Scripted Decision Node (server-side JavaScript/Groovy), you
-can write a **custom Java node** that implements `TreeNode` and uses the
-AM node API. This is more complex to deploy (JAR in AM's classpath) but
-provides:
+Instead of a Scripted Decision Node, you can write a **custom Java node** that
+implements `TreeNode` and uses the AM node API. This is more complex to deploy
+(JAR in AM's classpath) but provides:
 
 - Full Java type safety
 - Access to the same bindings (`TreeContext`, `SharedState`, etc.)
 - Ability to emit any callback type including `MetadataCallback`
 - Better testability (JUnit + mock TreeContext)
 
-A custom "HATEOAS Enrichment Node" could be reusable across journeys:
+A reusable "HATEOAS Enrichment Node" could serve all journeys:
 
 ```java
 // Conceptual — not production code
@@ -834,38 +747,34 @@ public class HateoasEnrichmentNode extends SingleOutcomeNode {
 
 ---
 
-## Recommendation
+## 10. Recommendation
 
-**For immediate use**: Approach B (generic gateway mapping) is the quickest
+**For immediate use**: Solution 2 (generic gateway mapping) is the quickest
 win. Replace the current journey-specific transforms with a single generic
 spec that does structural callback mapping. No HATEOAS links but the gateway
 becomes fully journey-agnostic. WebAuthn callbacks remain as raw
 TextOutputCallbacks — clients must handle them.
 
-**For full HATEOAS**: Approach D (hybrid) is the right long-term architecture.
-AM-side Scripted Decision Nodes inject `MetadataCallback` with `_links` and
-`_actions`; the gateway does generic structural mapping + MetadataCallback
-extraction. This requires:
+**For full HATEOAS**: Solution 3 (hybrid) is the right long-term
+architecture. AM-side Scripted Decision Nodes inject `MetadataCallback` with
+`_links` and `_actions`; the gateway does generic structural mapping +
+MetadataCallback extraction. This requires:
 
 1. Per-journey Scripted Decision Node scripts in AM
 2. A single generic message-xform transform spec (replaces 2 current specs)
 3. A WebAuthn-specific transform that may still need JS regex extraction
    (unless AM pre-extracts ceremony data into MetadataCallback)
 
-**For the native scripting question**: Both PingAccess and PingGateway can
-natively implement the same generic callback mapping:
-
-- **PingAccess**: Custom Java `AsyncRuleInterceptor` plugin (compiled JAR)
-- **PingGateway**: Groovy `ScriptableFilter` (interpreted, hot-reloadable)
-
-However, both are **gateway-specific** implementations that must be
-maintained separately. message-xform provides a **single declarative
-approach** (YAML+JSLT) that runs on both gateways (PA plugin or standalone
-proxy alongside PG) — and is easier to test than either native option.
+**For implementation**: message-xform (Option A) is the recommended
+implementation for any solution — it's portable, testable, and declarative.
+The PingAccess Groovy Script Rule (Option B) is the best alternative for
+quick prototyping or environments where deploying a custom JAR is not
+desirable. PingGateway's ScriptableFilter (Option D) is the PG-native
+equivalent.
 
 ---
 
-## Open Questions for Follow-Up
+## 11. Open Questions
 
 1. **MetadataCallback timing**: Can a Scripted Decision Node that runs
    *after* a Page Node add MetadataCallbacks to that Page Node's callback
@@ -891,14 +800,17 @@ proxy alongside PG) — and is easier to test than either native option.
 
 ---
 
-## References
+## 12. References
 
 - PingAM 8 vendor docs, §Scripted Decision node API (lines 290011–290495)
 - PingAM 8 vendor docs, §callbacksBuilder (lines 291795–291900)
 - PingAM 8 vendor docs, `metadataCallback(Object outputValue)` (line 291814)
 - PingAM 8 vendor docs, `withStage(String stage)` (lines 290280, 290359)
+- PingAccess 9.0 vendor docs, §Groovy in PingAccess (lines 14938–15002)
+- PingAccess 9.0 vendor docs, §Groovy Script Examples (lines 16096–16155)
+- PingAccess SDK guide, §ConfigurationType.GROOVY (line 476)
+- PingGateway SDK guide, §22 Script Extensibility (ScriptableFilter)
 - Current transforms: `deployments/platform/specs/am-auth-response-v2.yaml`
 - Current profile: `deployments/platform/profiles/platform-am.yaml`
-- PingGateway SDK guide, §22 Script Extensibility (ScriptableFilter)
 - PingAM authentication API research: `docs/research/pingam-authentication-api.md`
 - Platform transform pipeline: `docs/research/message-xform-platform-transforms.md`
