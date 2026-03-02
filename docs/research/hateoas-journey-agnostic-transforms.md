@@ -48,6 +48,23 @@ API surface with HATEOAS `_links` without knowing which journey is active.
 
 ### Target response (journey-agnostic with HAL)
 
+Per the HAL specification ([draft-kelly-json-hal-11][hal-spec], October 2023),
+a HAL document uses two reserved properties:
+
+- **`_links`** — hyperlinks from the resource to related URIs, keyed by
+  link relation type (per [RFC 8288][rfc8288]). Each link object has a
+  REQUIRED `href` and optional `templated`, `type`, `deprecation`, `name`,
+  `profile`, `title`, `hreflang`.
+- **`_embedded`** — nested HAL resource objects (not used here).
+
+HAL intentionally has **no forms or actions** (FAQ B.5: *"Omitting forms from
+HAL was an intentional design decision"*). Action semantics are encoded in the
+link relation name itself — e.g., a `submit` relation means POST the
+callback values to that `href`.
+
+[hal-spec]: https://datatracker.ietf.org/doc/html/draft-kelly-json-hal-11
+[rfc8288]: https://datatracker.ietf.org/doc/html/rfc8288
+
 ```json
 {
   "stage": "DataStore1",
@@ -69,30 +86,20 @@ API surface with HATEOAS `_links` without knowing which journey is active.
     "self": { "href": "/api/v1/auth/login" },
     "submit": {
       "href": "/api/v1/auth/login",
-      "method": "POST",
       "title": "Submit credentials"
     },
     "cancel": {
       "href": "/api/v1/auth/login?_action=cancel",
-      "method": "POST",
       "title": "Cancel authentication"
-    }
-  },
-  "_actions": {
-    "submit": {
-      "type": "submit",
-      "description": "Submit the callback values to continue the journey"
-    },
-    "register-passkey": {
-      "type": "webauthn-register",
-      "description": "Register a new passkey"
     }
   }
 }
 ```
 
-The `_links` and `_actions` tell the client **what it can do next** — without
-the client needing to hard-code journey flows.
+The `_links` tell the client **what it can do next** — without the client
+needing to hard-code journey flows. The link relation names (`submit`,
+`cancel`, `passkey`) encode the action semantics; the client's API
+documentation defines what HTTP method and payload each relation expects.
 
 ---
 
@@ -209,7 +216,7 @@ The three solutions below correspond to these three positions.
 ### How it works
 
 Add a **Scripted Decision Node** at strategic points in the journey tree that
-injects a `MetadataCallback` with HATEOAS-style `_links` and `_actions`.
+injects a `MetadataCallback` with HAL `_links`.
 The gateway layer then performs only generic structural mapping — no journey
 knowledge needed.
 
@@ -252,14 +259,7 @@ var metadata = {
     "self": { "href": "/api/v1/auth/login" },
     "submit": {
       "href": "/api/v1/auth/login",
-      "method": "POST",
       "title": "Submit credentials"
-    }
-  },
-  "_actions": {
-    "submit": {
-      "type": "submit",
-      "description": "Submit credentials to continue"
     }
   }
 };
@@ -267,12 +267,7 @@ var metadata = {
 if (hasPasskey) {
   metadata._links["passkey"] = {
     "href": "/api/v1/auth/passkey",
-    "method": "POST",
     "title": "Sign in with passkey"
-  };
-  metadata._actions["passkey"] = {
-    "type": "webauthn-auth",
-    "description": "Authenticate with a registered passkey"
   };
 }
 
@@ -304,12 +299,8 @@ action.goTo("true");
         "value": {
           "_links": {
             "self": { "href": "/api/v1/auth/login" },
-            "submit": { "href": "/api/v1/auth/login", "method": "POST" },
-            "passkey": { "href": "/api/v1/auth/passkey", "method": "POST" }
-          },
-          "_actions": {
-            "submit": { "type": "submit" },
-            "passkey": { "type": "webauthn-auth" }
+            "submit": { "href": "/api/v1/auth/login", "title": "Submit credentials" },
+            "passkey": { "href": "/api/v1/auth/passkey", "title": "Sign in with passkey" }
           }
         }
       }]
@@ -365,7 +356,7 @@ transform:
         "realm": .realm,
         "_links": {
           "profile": { "href": "/api/v1/user/profile" },
-          "logout": { "href": "/api/v1/auth/logout", "method": "POST" }
+          "logout": { "href": "/api/v1/auth/logout", "title": "End session" }
         }
       }
     else
@@ -378,9 +369,8 @@ knowledge. It's a static mapping of PingAM callback classes to generic UI
 input types. This mapping is stable across all journeys and would only change
 if PingAM adds new callback types (which is rare).
 
-The `_links` and `_actions` — the journey-specific "what can you do next"
-data — comes from AM itself via `MetadataCallback`. The gateway just extracts
-and promotes it.
+The `_links` — the journey-specific "what can you do next" data — come from
+AM itself via `MetadataCallback`. The gateway just extracts and promotes them.
 
 ### Assessment
 
@@ -458,12 +448,12 @@ step — clean API surface without enrichment.
 ### How it works
 
 1. **AM side**: Scripted Decision Nodes inject `MetadataCallback` with
-   `_links`, `_actions`, and any journey-specific enrichment (e.g.,
-   pre-extracted WebAuthn ceremony data so the gateway doesn't need regex).
+   `_links` and any journey-specific enrichment (e.g., pre-extracted WebAuthn
+   ceremony data so the gateway doesn't need regex).
 
 2. **Gateway side**: A single generic transform spec that:
    - Maps callback types to UI types (static, structural)
-   - Extracts `MetadataCallback` and promotes `_links`/`_actions` to top level
+   - Extracts `MetadataCallback` and promotes `_links` to top level
    - Moves `authId` to `X-Auth-Session` header
    - Strips internal fields
 
@@ -519,7 +509,7 @@ gateway would never see the raw JavaScript:
 var ceremonyData = {
   "_links": {
     "self": { "href": "/api/v1/auth/passkey" },
-    "submit": { "href": "/api/v1/auth/passkey", "method": "POST" }
+    "submit": { "href": "/api/v1/auth/passkey", "title": "Submit passkey attestation" }
   },
   "webauthn": {
     "type": "webauthn-register",
@@ -847,7 +837,7 @@ TextOutputCallbacks — clients must handle them.
 
 **For full HATEOAS**: Solution 3 (hybrid) is the right long-term
 architecture. AM-side Scripted Decision Nodes inject `MetadataCallback` with
-`_links` and `_actions`; the gateway does generic structural mapping +
+`_links`; the gateway does generic structural mapping +
 MetadataCallback extraction. This requires:
 
 1. Per-journey Scripted Decision Node scripts in AM
@@ -892,6 +882,8 @@ equivalent.
 
 ## 12. References
 
+- HAL specification: [draft-kelly-json-hal-11](https://datatracker.ietf.org/doc/html/draft-kelly-json-hal-11) (October 2023)
+- Web Linking: [RFC 8288](https://datatracker.ietf.org/doc/html/rfc8288)
 - PingAM 8 vendor docs, §Scripted Decision node API (lines 290011–290495)
 - PingAM 8 vendor docs, §callbacksBuilder (lines 291795–291900)
 - PingAM 8 vendor docs, `metadataCallback(Object outputValue)` (line 291814)
