@@ -63,6 +63,8 @@ function fn() {
         loginJourneyParams: '',
         passkeyJourneyParams: 'authIndexType=service&authIndexValue=WebAuthnJourney',
         usernamelessJourneyParams: 'authIndexType=service&authIndexValue=UsernamelessJourney',
+        deviceBindingJourneyParams: 'authIndexType=service&authIndexValue=DeviceBindingJourney',
+        deviceSigningJourneyParams: 'authIndexType=service&authIndexValue=DeviceSigningJourney',
 
         // -- Clean URL endpoints (request-side URL rewriting by message-xform) ----
         // PA's /api application + message-xform URL rewrite specs:
@@ -83,6 +85,8 @@ function fn() {
         passkeyTestUser: 'user.4',
         // Dedicated usernameless passkey test user (separate from identifier-first)
         usernamelessTestUser: 'user.5',
+        // Dedicated device binding test user (separate from passkey/login tests)
+        deviceBindingTestUser: 'user.6',
 
         // AM hostname for Host header (required for AM API calls through PA)
         amHostHeader: 'am.platform.local:18080',

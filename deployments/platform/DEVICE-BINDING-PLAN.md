@@ -1,6 +1,6 @@
 # Device Binding Implementation Plan
 
-> **Status**: 🟡 In Progress — Phase 2 Complete
+> **Status**: 🟡 In Progress — Phase 3 Written (pending live K8s validation)
 > **Created**: 2026-02-17
 > **Last Updated**: 2026-03-02
 
@@ -73,11 +73,11 @@ End-to-end Karate tests for device binding and signing verification.
 
 | # | Step | Status |
 |---|------|--------|
-| 3.1 | Create `device-binding.feature` with `@setup` provisioning | ⬜ |
-| 3.2 | Scenario: Bind device with NONE auth type | ⬜ |
-| 3.3 | Scenario: Verify signature from bound device | ⬜ |
-| 3.4 | Scenario: Verify fails after device cleanup | ⬜ |
-| 3.5 | Run full suite and verify pass | ⬜ |
+| 3.1 | Create `device-binding.feature` with `@setup` provisioning | ✅ |
+| 3.2 | Scenario: Bind device with NONE auth type | ✅ (written, self-test passed) |
+| 3.3 | Scenario: Verify signature from bound device | ✅ (written) |
+| 3.4 | Scenario: Verify fails after device cleanup | ✅ (written) |
+| 3.5 | Run full suite and verify pass | ⏳ Needs live K8s |
 
 ---
 
