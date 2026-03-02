@@ -382,12 +382,112 @@ Instead of (or alongside) message-xform's declarative YAML+JSLT approach,
 each gateway product has its own native extension mechanism for body
 transformation. This section compares both.
 
-### C1: PingAccess — Java `AsyncRuleInterceptor` Plugin
+### C1a: PingAccess — Native Groovy Script Rule (OOTB)
 
-PingAccess has **no Groovy or scripting layer**. Its extension model is
-compiled Java plugins deployed as JARs. The message-xform
-`MessageTransformRule` is itself a PingAccess `AsyncRuleInterceptor` — so
-the generic callback mapping could be implemented either:
+PingAccess has a **built-in Groovy Script Rule** type — no custom plugin
+required. Created via the Admin UI (Access → Rules → Add Rule → Type:
+"Groovy Script"), the script has full access to the `Exchange` object during
+both request and response phases.
+
+**Key objects available in Groovy scripts** (from PingAccess 9.0 docs,
+§Groovy in PingAccess):
+
+| Object | Access pattern | Capabilities |
+|--------|---------------|-------------|
+| Exchange | `exc` | Request + response lifecycle |
+| Request | `exc?.request` | URI, method, headers, body |
+| Response | `exc?.response` | Status, headers, body (null during request phase) |
+| Headers | `exc?.response?.header` | `add()`, `getFirstValue()`, `removeFields()`, `setContentType()` |
+| Body | `exc?.response?.body` | `getContent()` (byte[]), `getLength()` |
+| Logger | `exc?.log` | `info()`, `debug()`, `warn()`, `error()` |
+| Properties | `exc?.setProperty(k,v)` | Per-request key-value storage |
+
+**⚠️ Matcher requirement**: PA Groovy scripts must end with a matcher
+instance — `pass()` to allow, `fail()` to deny. The script can modify
+the response body and headers *before* calling the matcher.
+
+#### Example: PA Groovy Script Rule for Generic Callback Transform
+
+```groovy
+// PingAccess Rule: AuthCallbackTransform (Type: Groovy Script)
+// Created via Admin UI — no JAR deployment needed
+
+import groovy.json.JsonSlurper
+import groovy.json.JsonOutput
+
+if (exc?.response) {
+    // Response phase — transform the AM callback response
+    def contentType = exc?.response?.header?.getFirstValue("Content-Type")
+    if (contentType?.contains("application/json")) {
+        def slurper = new JsonSlurper()
+        def body = slurper.parseText(new String(exc?.response?.body?.getContent()))
+
+        if (body.callbacks) {
+            def transformed = [
+                stage: body.stage,
+                callbacks: body.callbacks.collect { cb ->
+                    [
+                        type: mapType(cb.type),
+                        prompt: cb.output?.getAt(0)?.value?.trim() ?: cb.type,
+                        inputKey: cb.input?.getAt(0)?.name
+                    ]
+                }.findAll { it.type != 'metadata' }
+            ]
+
+            // Extract MetadataCallback HATEOAS data if present
+            def metadataCb = body.callbacks.find { it.type == 'MetadataCallback' }
+            if (metadataCb?.output?.getAt(0)?.value) {
+                transformed.putAll(metadataCb.output[0].value)
+            }
+
+            // Move authId to response header
+            exc?.response?.header?.add("X-Auth-Session", body.authId)
+
+            // Replace response body
+            def json = JsonOutput.toJson(transformed)
+            exc?.response?.body = json.getBytes("UTF-8")
+            exc?.response?.header?.setContentLength(json.length())
+        }
+    }
+}
+
+pass()
+
+String mapType(String amType) {
+    switch (amType) {
+        case 'NameCallback': return 'text'
+        case 'PasswordCallback': return 'password'
+        case 'TextInputCallback': return 'text'
+        case 'ChoiceCallback': return 'choice'
+        case 'ConfirmationCallback': return 'confirm'
+        case 'HiddenValueCallback': return 'hidden'
+        case 'TextOutputCallback': return 'display'
+        case 'MetadataCallback': return 'metadata'
+        default: return amType.toLowerCase()
+    }
+}
+```
+
+**Advantages over a custom Java plugin:**
+- No JAR compilation, no `deploy/` directory, no PA restart
+- Editable directly in the PA Admin UI (live Groovy editor)
+- Syntax-validated on save
+- Same `Exchange` access as Java plugins
+
+**Limitations:**
+- Must end with a matcher (`pass()`/`fail()`) — it's an access control rule,
+  not a pure transformation filter
+- Body modification API is lower-level (`byte[]`) compared to PingGateway's
+  `.entity.json` convenience
+- No built-in JSON-to-body setter — must serialize manually via `JsonOutput`
+- Script lives in PA config (database), not as a deployable file artifact
+
+### C1b: PingAccess — Custom Java `AsyncRuleInterceptor` Plugin
+
+For more complex scenarios, PingAccess also supports compiled Java plugins
+deployed as JARs. The message-xform `MessageTransformRule` is itself a
+PingAccess `AsyncRuleInterceptor` — so the generic callback mapping could
+be implemented either:
 
 - **Via message-xform** (declarative YAML+JSLT spec — already shown in A/B)
 - **Via a custom Java plugin** (compiled, deployed alongside or instead of
@@ -432,12 +532,13 @@ public class CallbackTransformRule extends AsyncRuleInterceptorBase {
 **reinvents message-xform**. The message-xform plugin already provides
 exactly this capability via declarative YAML specs — the generic spec
 from Approach A/B runs on PingAccess via the existing `MessageTransformRule`
-without any new Java code.
+without any new Java code. And for simpler cases, the **native Groovy
+Script Rule** (C1a) avoids the JAR deployment entirely.
 
 The real value of a custom PA plugin would be if you needed **imperative
-logic** that JSLT cannot express (e.g., HTTP callouts to external services,
-stateful session tracking, or complex crypto operations). For structural
-callback mapping, JSLT is sufficient.
+logic** that JSLT cannot express *and* that requires compiled-Java
+capabilities beyond Groovy (e.g., custom crypto, complex threading,
+third-party library dependencies).
 
 ### C2: PingGateway — `ScriptableFilter` (Groovy)
 
@@ -520,19 +621,21 @@ String mapType(String amType) {
 }
 ```
 
-### Side-by-Side: PingAccess vs PingGateway Native
+### Side-by-Side: All Three Native Options
 
-| Aspect | PingAccess (Java plugin) | PingGateway (Groovy script) |
-|--------|-------------------------|----------------------------|
-| Language | Java 21 (compiled) | Groovy (interpreted, JSR-223) |
-| Deployment | JAR in PA `deploy/` dir, restart required | `.groovy` file on disk, hot-reloadable |
-| Body access | `exchange.getResponse().getBody()` | `response.entity.string` / `.json` |
-| Header access | `exchange.getResponse().setHeader()` | `response.headers.put()` |
-| HTTP callouts | Custom `HttpClient` | Built-in `http` binding (client handler) |
-| State | Per-request only (stateless rule) | `globals` ConcurrentHashMap across invocations |
-| Testability | JUnit + mock Exchange | Limited (no standard test harness) |
-| Portability | ❌ PA only | ❌ PG only |
-| message-xform | ✅ Already the plugin | ✅ Can deploy standalone proxy alongside PG |
+| Aspect | PA Groovy Script Rule | PA Java Plugin | PG Groovy ScriptableFilter |
+|--------|-----------------------|----------------|---------------------------|
+| Language | Groovy (interpreted) | Java 21 (compiled) | Groovy (interpreted, JSR-223) |
+| Deployment | PA Admin UI (no restart) | JAR in `deploy/` dir (restart) | `.groovy` file on disk (hot-reload) |
+| Body read | `exc?.response?.body?.getContent()` | `exchange.getResponse().getBody()` | `response.entity.string` / `.json` |
+| Body write | Manual `byte[]` + `JsonOutput` | `exchange.getResponse().setBody()` | `response.entity.json = ...` |
+| Header access | `exc?.response?.header?.add()` | `exchange.getResponse().setHeader()` | `response.headers.put()` |
+| HTTP callouts | ❌ Not available | `HttpClient` (injected) | Built-in `http` binding |
+| State | `exc.setProperty(k,v)` per-request | Per-request (stateless rule) | `globals` ConcurrentHashMap |
+| Testability | ❌ No test harness | ✅ JUnit + mock Exchange | ❌ Limited |
+| Must return | Matcher (`pass()`/`fail()`) | `Outcome` enum | Promise (handler chain) |
+| Portability | ❌ PA only | ❌ PA only | ❌ PG only |
+| Custom plugin | ❌ Not needed | ✅ Required | ❌ Not needed |
 
 ### Assessment
 
@@ -541,15 +644,18 @@ String mapType(String amType) {
 | Journey-agnosticism | ✅ High | Same generic mapping as Approach B, with MetadataCallback extraction |
 | Maintenance burden | ⚠️ Medium | Gateway-specific code must be maintained per product |
 | AM configuration | Same as A/B | MetadataCallback enrichment still needs AM-side scripting |
-| PA complexity | ⚠️ Medium | Custom Java plugin — but message-xform already does this |
-| PG complexity | ⚠️ Medium | Groovy is powerful but harder to test than YAML+JSLT |
+| PA Groovy Script | ✅ Easy | OOTB — no plugin, no restart, Admin UI editor |
+| PA Java plugin | ⚠️ Medium | Custom JAR — but message-xform already does this |
+| PG Groovy | ⚠️ Medium | Powerful but harder to test than YAML+JSLT |
 | HATEOAS richness | Same as A | Depends on what AM provides via MetadataCallback |
 
-**Bottom line**: Both gateways *can* do the generic mapping natively, but
-message-xform already provides a **gateway-agnostic** implementation that
-runs on both (PA plugin or standalone proxy alongside PG). Writing
-gateway-specific code only makes sense if you need capabilities beyond
-what JSLT can express (HTTP callouts, stateful logic, crypto).
+**Bottom line**: Both gateways can do the generic mapping natively — and
+PingAccess can do it *without any custom plugin* via the built-in Groovy
+Script Rule. However, message-xform still provides a **gateway-agnostic**
+implementation that runs on both (PA plugin or standalone proxy alongside
+PG). The PA Groovy Script Rule is the most interesting alternative for
+quick prototyping or environments where deploying a custom JAR is not
+desirable.
 
 ---
 
