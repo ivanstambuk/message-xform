@@ -376,14 +376,76 @@ a first step — clean API surface without enrichment.
 
 ---
 
-## Approach C: PingGateway ScriptableFilter (Groovy)
+## Approach C: Gateway-Native Scripting (PingAccess + PingGateway)
 
-### How It Works
+Instead of (or alongside) message-xform's declarative YAML+JSLT approach,
+each gateway product has its own native extension mechanism for body
+transformation. This section compares both.
 
-Instead of message-xform, use PingGateway's `ScriptableFilter` with a Groovy
-script that intercepts AM responses and applies the same callback mapping.
+### C1: PingAccess — Java `AsyncRuleInterceptor` Plugin
 
-### PingGateway Config
+PingAccess has **no Groovy or scripting layer**. Its extension model is
+compiled Java plugins deployed as JARs. The message-xform
+`MessageTransformRule` is itself a PingAccess `AsyncRuleInterceptor` — so
+the generic callback mapping could be implemented either:
+
+- **Via message-xform** (declarative YAML+JSLT spec — already shown in A/B)
+- **Via a custom Java plugin** (compiled, deployed alongside or instead of
+  message-xform)
+
+A **custom Java plugin** would look like:
+
+```java
+// Conceptual — PingAccess AsyncRuleInterceptorBase subclass
+public class CallbackTransformRule extends AsyncRuleInterceptorBase {
+    @Override
+    public Outcome handleResponse(Exchange exchange) {
+        JsonNode body = parseJson(exchange.getResponse().getBody());
+        if (body.has("callbacks")) {
+            ObjectNode transformed = JsonNodeFactory.instance.objectNode();
+            transformed.put("stage", body.path("stage").asText());
+
+            ArrayNode callbacks = transformed.putArray("callbacks");
+            for (JsonNode cb : body.get("callbacks")) {
+                if (!"MetadataCallback".equals(cb.path("type").asText())) {
+                    ObjectNode mapped = callbacks.addObject();
+                    mapped.put("type", mapType(cb.path("type").asText()));
+                    mapped.put("prompt", cb.at("/output/0/value").asText());
+                    mapped.put("inputKey", cb.at("/input/0/name").asText());
+                }
+            }
+
+            // Extract MetadataCallback → promote _links/_actions
+            extractMetadata(body, transformed);
+
+            // authId → X-Auth-Session header
+            exchange.getResponse().setHeader(
+                "X-Auth-Session", body.path("authId").asText());
+            exchange.getResponse().setBody(transformed.toString());
+        }
+        return Outcome.CONTINUE;
+    }
+}
+```
+
+**Key insight**: Building a custom Java plugin for this is possible but
+**reinvents message-xform**. The message-xform plugin already provides
+exactly this capability via declarative YAML specs — the generic spec
+from Approach A/B runs on PingAccess via the existing `MessageTransformRule`
+without any new Java code.
+
+The real value of a custom PA plugin would be if you needed **imperative
+logic** that JSLT cannot express (e.g., HTTP callouts to external services,
+stateful session tracking, or complex crypto operations). For structural
+callback mapping, JSLT is sufficient.
+
+### C2: PingGateway — `ScriptableFilter` (Groovy)
+
+PingGateway supports Groovy (or any JSR-223 language) scripts as filters
+via `ScriptableFilter`. This provides a **runtime-scriptable** alternative
+to compiled Java.
+
+#### PingGateway Config
 
 ```json
 {
@@ -398,7 +460,7 @@ script that intercepts AM responses and applies the same callback mapping.
 }
 ```
 
-### Groovy Script
+#### Groovy Script
 
 ```groovy
 // AuthCallbackTransform.groovy
@@ -458,20 +520,36 @@ String mapType(String amType) {
 }
 ```
 
+### Side-by-Side: PingAccess vs PingGateway Native
+
+| Aspect | PingAccess (Java plugin) | PingGateway (Groovy script) |
+|--------|-------------------------|----------------------------|
+| Language | Java 21 (compiled) | Groovy (interpreted, JSR-223) |
+| Deployment | JAR in PA `deploy/` dir, restart required | `.groovy` file on disk, hot-reloadable |
+| Body access | `exchange.getResponse().getBody()` | `response.entity.string` / `.json` |
+| Header access | `exchange.getResponse().setHeader()` | `response.headers.put()` |
+| HTTP callouts | Custom `HttpClient` | Built-in `http` binding (client handler) |
+| State | Per-request only (stateless rule) | `globals` ConcurrentHashMap across invocations |
+| Testability | JUnit + mock Exchange | Limited (no standard test harness) |
+| Portability | ❌ PA only | ❌ PG only |
+| message-xform | ✅ Already the plugin | ✅ Can deploy standalone proxy alongside PG |
+
 ### Assessment
 
 | Aspect | Rating | Notes |
 |--------|--------|-------|
 | Journey-agnosticism | ✅ High | Same generic mapping as Approach B, with MetadataCallback extraction |
-| Maintenance burden | ⚠️ Medium | Groovy script must be maintained separately from message-xform |
+| Maintenance burden | ⚠️ Medium | Gateway-specific code must be maintained per product |
 | AM configuration | Same as A/B | MetadataCallback enrichment still needs AM-side scripting |
-| Gateway complexity | ⚠️ Medium | Groovy is powerful but harder to test than YAML+JSLT |
-| PingGateway dependency | ❌ Locked | Only works with PingGateway, not PingAccess or standalone |
+| PA complexity | ⚠️ Medium | Custom Java plugin — but message-xform already does this |
+| PG complexity | ⚠️ Medium | Groovy is powerful but harder to test than YAML+JSLT |
 | HATEOAS richness | Same as A | Depends on what AM provides via MetadataCallback |
 
-**Note on PingAccess**: PingAccess does **not** have a ScriptableFilter or
-Groovy scripting capability. The PingAccess adapter uses the compiled Java
-`MessageTransformRule` (our plugin). So this approach is PingGateway-only.
+**Bottom line**: Both gateways *can* do the generic mapping natively, but
+message-xform already provides a **gateway-agnostic** implementation that
+runs on both (PA plugin or standalone proxy alongside PG). Writing
+gateway-specific code only makes sense if you need capabilities beyond
+what JSLT can express (HTTP callouts, stateful logic, crypto).
 
 ---
 
@@ -550,16 +628,16 @@ journey-specific transform; all other journeys use the generic one.
 
 ## Comparison Matrix
 
-| Criterion | A: AM Enrichment | B: Generic Gateway | C: PG Groovy | D: Hybrid |
-|-----------|-----------------|-------------------|-------------|-----------|
+| Criterion | A: AM Enrichment | B: Generic Gateway | C: Native Scripting (PA/PG) | D: Hybrid |
+|-----------|-----------------|-------------------|----------------------------|-----------|
 | Journey-agnostic gateway | ✅ | ✅ | ✅ | ✅ |
 | HATEOAS `_links` | ✅ Rich | ❌ None | ✅ If AM provides | ✅ Rich |
 | AM configuration needed | 🔧 Scripts per journey | ❌ None | 🔧 Same as A | 🔧 Scripts per journey |
-| PingAccess compatible | ✅ | ✅ | ❌ PG only | ✅ |
-| PingGateway compatible | ✅ | ✅ | ✅ | ✅ |
-| Standalone compatible | ✅ | ✅ | ❌ | ✅ |
+| PingAccess compatible | ✅ (message-xform) | ✅ | ✅ (Java plugin) | ✅ |
+| PingGateway compatible | ✅ (message-xform) | ✅ | ✅ (Groovy script) | ✅ |
+| Standalone compatible | ✅ | ✅ | ❌ (gateway-specific) | ✅ |
 | WebAuthn handling | ⚠️ Complex | ❌ Raw JS | ⚠️ Complex | ⚠️ Best-effort |
-| Gateway maintenance | ✅ Low | ✅ Minimal | ⚠️ Medium | ✅ Low |
+| Gateway maintenance | ✅ Low | ✅ Minimal | ⚠️ Medium (per product) | ✅ Low |
 | AM maintenance | ⚠️ Per journey | ✅ None | ⚠️ Per journey | ⚠️ Per journey |
 | Testing complexity | ⚠️ E2E required | ✅ Unit testable | ⚠️ E2E required | ⚠️ E2E required |
 
@@ -668,17 +746,16 @@ extraction. This requires:
 3. A WebAuthn-specific transform that may still need JS regex extraction
    (unless AM pre-extracts ceremony data into MetadataCallback)
 
-**For the PingGateway Groovy question**: Yes, PingGateway Groovy scripts can
-do the same structural mapping as message-xform. The `ScriptableFilter` has
-full access to request/response bodies and headers. However:
+**For the native scripting question**: Both PingAccess and PingGateway can
+natively implement the same generic callback mapping:
 
-- Groovy scripts are harder to test (no JSLT unit test framework)
-- Groovy is PingGateway-only — not portable to PingAccess or standalone
-- message-xform provides a declarative, gateway-agnostic approach
+- **PingAccess**: Custom Java `AsyncRuleInterceptor` plugin (compiled JAR)
+- **PingGateway**: Groovy `ScriptableFilter` (interpreted, hot-reloadable)
 
-The message-xform JSLT transform is **equivalent in capability** to a
-PingGateway Groovy script for this use case, and is portable across all
-gateway products.
+However, both are **gateway-specific** implementations that must be
+maintained separately. message-xform provides a **single declarative
+approach** (YAML+JSLT) that runs on both gateways (PA plugin or standalone
+proxy alongside PG) — and is easier to test than either native option.
 
 ---
 
