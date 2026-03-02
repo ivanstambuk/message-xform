@@ -162,6 +162,25 @@ Browser                  PingAccess               PingFederate         Backend
 > token endpoint directly via `HttpClient` (available to async rules), then
 > writes the result to `SessionStateSupport`.
 
+> ⚠️ **Pitfall: step-up token ≠ web session token.**
+>
+> PingAccess's `Identity.getAttributes()` reflects the claims from the
+> **original login token** — the one that established the web session
+> (`PA_SUBJECT` cookie).  When the step-up flow re-authenticates via
+> PingFederate, the resulting token is a **new, separate token** obtained
+> by the CallbackRule's code exchange.  This new token is NOT used to
+> replace the web session.
+>
+> **Consequence:** Even if PingFederate returns transaction-scoped claims
+> (`txn_amount`, `txn_payee`, `acr`) in the step-up token, these claims
+> do **not** appear in `Identity.getAttributes()` and do **not** flow
+> into the built-in JWT identity mapping.  The CallbackRule must extract
+> them from the step-up token and write them to `SessionStateSupport`
+> (Approach A) or a JWE cookie (Approach B).
+>
+> This is the fundamental reason why the built-in JWT identity mapping
+> cannot include signing context — it only sees the login session's claims.
+
 #### Can Groovy Script Rules Access SessionStateSupport?
 
 **Yes.**  Groovy script rules access the same `Exchange` object as Java plugins
