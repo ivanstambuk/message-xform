@@ -139,7 +139,10 @@ function fn() {
         // Required claims: sub, iss, exp, iat, nbf, platform, android-version, challenge
         // The 'iss' is the Android app package name; we use a synthetic one for E2E.
         // AM may validate presence of 'platform' and 'android-version' claims.
-        var issuer = 'io.messagexform.e2e';
+        // MUST match one of the applicationIds in DeviceBindingNode config.
+        // The DeviceBindingNode is configured with applicationIds: ["com.example.test"]
+        // and AM validates that iss == one of these values.
+        var issuer = 'com.example.test';
         var androidVersion = 34;  // Android 14 (API 34) — realistic value
         var payload = '{"sub":"' + escapeJsonString(userId)
             + '","iss":"' + escapeJsonString(issuer)
