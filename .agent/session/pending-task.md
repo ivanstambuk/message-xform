@@ -1,42 +1,29 @@
 # Pending Task
 
-**Focus**: Device Binding — Phase 3.5: Debug AM JWS Validation  
-**Status**: BLOCKED — AM returns 401 on DeviceBindingCallback submission
-**Blocker**: JWS format mismatch between helper and AM's DeviceBindingNode
+**Focus**: Device Binding — Phase 3.5: Debug AM JWS Validation
+**Status**: BLOCKED — AM returns 401 on DeviceBindingCallback JWS submission
+**Next Step**: Determine the exact JWS format expected by AM's DeviceBindingNode
 
-## What Works
-- ✅ K8s cluster up, all 4 pods running (PD, AM, PA admin, PA engine)
-- ✅ DeviceBindingService enabled (encryption=NONE)
-- ✅ `boundDevices` LDAP schema applied to PD
-- ✅ `DeviceBindingJourney` responds with `DeviceBindingCallback`
-- ✅ JWS construction: RS512 signing, header, payload, signature all correct
-- ✅ Self-test passes (JWS gen + RS512 verification)
-- ✅ GraalJS interop fix in bind()/sign() — type-based lookup works
+## Context Notes
+- K8s cluster stopped, pods scaled to 0 (restart: `sudo systemctl start k3s`,
+  then scale up with `kubectl scale statefulset/deployment --replicas=1`)
+- DeviceBindingService enabled at realm level (persists in PD config store)
+- `boundDevices` LDAP schema applied to PD (persists)
+- User DN format: `uid=user.6,ou=People,dc=example,dc=com`
+- AM uses `id=user.6,ou=user,dc=example,dc=com` as internal userId
+- Self-test passes — crypto helper JWS gen + RS512 verification works
+- GraalJS interop fix applied (type-based callback lookup)
 
-## The Blocker
-AM's `DeviceBindingNode` returns `failure` outcome after receiving the JWS.
-The 401 is the journey's failure path, not an HTTP error. Tried:
-1. `publicKey` in JWS header (base64 X.509 DER) — 401
-2. `publicKey` in JWS payload — 401
-3. `jwk` in JWS header (standard JWK with n/e) — 401
-4. No public key at all — 401
-5. Even a dummy/invalid JWS — same 401
+## Blocker: AM JWS Format Unknown
+Tried: publicKey in header, publicKey in payload, jwk in header, no key, dummy JWS.
+All result in DeviceBindingNode → failure → 401.
 
-AM produces no debug output. The DeviceBindingNode silently falls to failure.
-
-## Next Steps
-1. Enable AM debug logging at MESSAGE level (needs Tomcat restart or AM console)
-2. OR: Find the Ping SDK Android/iOS source for DeviceBindingCallback.sign()
-   to determine the exact JWS format (header fields, payload claims)
-3. OR: Use a real Ping SDK (JS or Android) to do one binding, then inspect
-   the JWS format used by wireshark or request capture
-4. After fixing the format: rerun `./run-e2e.sh --env k8s device-binding.feature`
-
-## Infrastructure State
-- K8s pods are running but will stop if k3s is stopped
-- DeviceBindingService: enabled (will persist in PD config store)
-- boundDevices schema: applied (will persist in PD)
-- Port-forward not active (was killed)
+Approaches to unblock:
+1. Extract the bundled `boundDevices` LDIF from AM WAR (pitfall #4) — may contain
+   clues about expected attribute format
+2. Enable AM MESSAGE-level debug (needs Tomcat sys prop or AM console)
+3. Find Ping SDK Android source for DeviceBindingCallback.sign() on GitHub
+4. Use a real Ping SDK to do one binding, capture JWS via network trace
 
 ## SDD Gaps
 - None — this work is infrastructure/deployment, not a core engine feature

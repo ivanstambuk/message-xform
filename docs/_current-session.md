@@ -6,7 +6,7 @@ Device Binding — Phase 2 (E2E Crypto Helper) + Phase 3 (Feature Tests).
 ## Status
 ✅ **Phase 2 Complete** — `device-binding.js` helper created and committed.
 ✅ **Phase 3 Written** — `device-binding.feature` created with 3 scenarios.
-⏳ **Phase 3.5 Pending** — Live K8s validation (cluster was not running).
+🚧 **Phase 3.5 Blocked** — AM's DeviceBindingNode rejects JWS (401).
 
 ## Summary of Work Done
 
@@ -16,21 +16,25 @@ Device Binding — Phase 2 (E2E Crypto Helper) + Phase 3 (Feature Tests).
 - Created `list-bound-devices.feature` and `delete-bound-device.feature` helpers.
 - Self-test verifies JWS structure + RS512 signature correctness.
 
-### Phase 3: E2E Feature Tests ✅ (written)
-- Created `device-binding.feature` with 3 scenarios:
-  1. Full binding registration + signing verification (9-step flow)
-  2. Signing verification fails after device cleanup (negative test)
-  3. Self-test — crypto helper validation (✅ passed offline)
-- Updated `karate-config.js`:
-  - Added `deviceBindingJourneyParams` and `deviceSigningJourneyParams`
-  - Added `deviceBindingTestUser: 'user.6'`
+### Phase 3: E2E Feature Tests ✅ (written, blocked on live validation)
+- Created `device-binding.feature` with 3 scenarios.
+- Updated `karate-config.js` with journey params and `deviceBindingTestUser`.
+- Started K8s cluster, enabled DeviceBindingService, applied boundDevices schema.
+- Fixed GraalJS Java List interop bug (type-based callback lookup).
+- Self-test scenario passes; live AM validation returns 401.
 
-## Key Learnings
-- JWS payload: `{sub, challenge, exp, iat, nbf}` — matches ForgeRock SDK v4.2+
-- JWS header: `{"alg":"RS512","kid":"<UUID>"}` — kid = deviceId
-- AM callback input names are positional (IDToken1jws, etc.) — suffix match
-- K8s cluster needs to be started for live E2E validation
+### Debugging Work
+- Tried 5 public key placement strategies: header `publicKey`, payload `publicKey`,
+  header `jwk` (standard JWK), no key, dummy JWS — all return 401.
+- AM DeviceBindingNode fails silently — no debug output.
+- Documented 3 new pitfalls in PITFALLS.md (GraalJS interop, service prerequisite, silent failure).
+
+## Blocker
+AM's `DeviceBindingNode` returns `failure` outcome for all JWS submissions.
+Need to determine the exact JWS format via SDK source or AM debug logging.
 
 ## Handover
-Start K8s cluster → run `./run-e2e.sh --env k8s device-binding.feature` → if green,
-mark Phase 3 complete and proceed to Phase 4 (Transform Specs & Clean URLs).
+- K8s cluster stopped, pods scaled to 0.
+- DeviceBindingService enabled (persists in PD config store).
+- boundDevices schema applied (persists in PD).
+- Next: determine JWS format, fix helper, rerun tests.

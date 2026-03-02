@@ -157,3 +157,57 @@ Host: pingam        ← WRONG
 **Severity: LOW**
 
 PingDirectory sample users are `user.1` through `user.10`, not zero-indexed.
+
+## 14. GraalJS Java List Identity Comparison Fails
+
+**Severity: HIGH**
+
+Karate's GraalJS runtime wraps Java `List` elements differently on each access.
+Using `===` to compare a previously retrieved element against `list[i]` always
+returns `false`, because the GraalJS proxy wrappers are different objects.
+
+```javascript
+// BROKEN: idx is always -1
+var cb = findCallback(callbacks, 'DeviceBindingCallback');
+for (var i = 0; i < callbacks.length; i++) {
+    if (callbacks[i] === cb) { idx = i; break; }  // never matches
+}
+
+// CORRECT: use type-based match
+for (var i = 0; i < callbacks.length; i++) {
+    if (callbacks[i].type === 'DeviceBindingCallback') { ... }
+}
+```
+
+**Rule**: Never use identity (`===`) comparison on Java collection elements
+in Karate GraalJS helpers. Use property-based matching instead.
+
+## 15. DeviceBindingService Must Be Enabled Before Journeys
+
+**Severity: HIGH**
+
+The `DeviceBindingService` must be enabled at realm level BEFORE any journey
+using `DeviceBindingNode` or `DeviceSigningVerifierNode` will work. Without it,
+the nodes silently fail. Enable via REST:
+```bash
+curl -X PUT ".../am/json/realms/root/realm-config/services/deviceBindingService" \
+  -d '{"deviceBindingAttrName":"boundDevices","deviceBindingSettingsEncryptionScheme":"NONE"}'
+```
+
+Note: the service is NOT automatically enabled when journeys are imported.
+The `setup-device-binding.sh` script handles this, but it must be re-run
+after any PD volume recreation.
+
+## 16. DeviceBindingNode Fails Silently — No Debug Output
+
+**Severity: MEDIUM**
+
+When `DeviceBindingNode` cannot validate a JWS response, it falls to the
+`failure` outcome without any server-side error logging. The HTTP response is
+simply `401 Unauthorized` with `"Login failure"` — no detail about what
+validation step failed (signature, claims, key format, etc.).
+
+AM's `Authentication` debug file at `/home/forgerock/openam/var/debug/Authentication`
+is empty by default. Debug logging must be explicitly enabled to diagnose
+DeviceBindingNode failures.
+
