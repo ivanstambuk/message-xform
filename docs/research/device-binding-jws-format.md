@@ -1,15 +1,15 @@
 # Device Binding JWS Format — ForgeRock SDK Analysis
 
-> **Status**: ✅ Complete
-> **Date**: 2026-03-02
+> **Status**: ✅ Complete  
+> **Date**: 2026-03-02  
 > **Source**: ForgeRock Android SDK (MIT license) — cloned from
 >   `github.com/ForgeRock/forgerock-android-sdk` @ `develop` branch
 
 ## Context
 
 PingAM's `DeviceBindingNode` returns HTTP 401 when the JWS format doesn't
-match what it expects. AM fails silently — no debug output. This research
-reverse-engineers the exact JWS format from the official SDK source.
+match what it expects. AM fails silently — no debug output. This document
+captures the exact JWS format from the official SDK source.
 
 ## Key Source Files
 
@@ -162,102 +162,53 @@ JWTClaimsSet.Builder()
 **Note**: The signing verifier payload does NOT include `platform` or
 `android-version` claims (unlike the binding payload).
 
-## What Was Missing in Our Helper
+## E2E Helper Configuration
 
-| Field | Binding | Signing | Our Helper (before) | Impact |
-|-------|---------|---------|---------------------|--------|
-| `jwk.use` | `"sig"` | — | **Missing** | AM may reject JWK without `use` |
-| `jwk.alg` | `"RS512"` | — | **Missing** | AM may reject JWK without `alg` |
-| `iss` | ✅ (package name) | ✅ | **Missing** | **Likely the blocker** — AM validates `iss` |
-| `platform` | `"android"` | ❌ | **Missing** | AM may expect platform claim |
-| `android-version` | SDK_INT (e.g. 34) | ❌ | **Missing** | AM may expect version claim |
+The `device-binding.js` helper must produce JWS matching the SDK format above.
 
-## Stored Device Record Format
+Key configuration values:
 
-From `successDeviceBinding.json` test fixture, AM stores bound devices with:
+| Parameter | Value | Notes |
+|-----------|-------|-------|
+| `iss` (issuer) | Must match `applicationIds` in `DeviceBindingNode` config | E.g. `com.example.test` |
+| `platform` | `"android"` | Required for binding JWS |
+| `android-version` | `34` (or any realistic API level) | Required for binding JWS |
+| `jwk.use` | `"sig"` | AM stores this in the bound device record |
+| `jwk.alg` | `"RS512"` | AM stores this in the bound device record |
 
-```json
-{
-  "_id": "<uuid>",
-  "deviceId": "<hash>",
-  "deviceName": "Pixel 7 Pro",
-  "uuid": "<uuid>",
-  "key": {
-    "kty": "RSA",
-    "kid": "<uuid>",
-    "use": "sig",
-    "alg": "RS512",
-    "n": "<modulus>",
-    "e": "AQAB"
-  }
-}
-```
+## DeviceBindingNode Configuration
 
-The `key` object is the JWK extracted from the binding JWS header. This
-confirms that `use` and `alg` fields are preserved and expected.
+Key settings on the `DeviceBindingNode` (set via AM REST API):
 
-## Registered JWT Claim Names (validation)
+| Setting | Value | Notes |
+|---------|-------|-------|
+| `authenticationType` | `NONE` | Headless E2E — no biometrics |
+| `applicationIds` | `["com.example.test"]` | Must match `iss` claim in JWS |
+| `postponeDeviceProfileStorage` | `true` | **Required** when `DeviceBindingStorageNode` follows in the journey |
+| `attestation` | `false` | No key attestation for E2E |
+| `timeout` | `60` | Seconds |
 
-From `DeviceBindAuthenticators.kt` lines 200–208, the SDK defines
-registered (reserved) claim names that cannot be used as custom claims:
+## Gotchas
 
-```kotlin
-val registeredKeys = listOf(
-    JWTClaimNames.SUBJECT,           // "sub"
-    JWTClaimNames.EXPIRATION_TIME,   // "exp"
-    JWTClaimNames.ISSUED_AT,         // "iat"
-    JWTClaimNames.NOT_BEFORE,        // "nbf"
-    JWTClaimNames.ISSUER,            // "iss"
-    CHALLENGE                         // "challenge"
-)
-```
+1. **`postponeDeviceProfileStorage` must be `true`** when using a
+   `DeviceBindingStorageNode` downstream in the journey. When `false`,
+   the binding node persists the device directly and never passes
+   device data to the storage node, causing it to fail with
+   `IllegalStateException("Cannot find Device data.")`.
 
-## Fix Applied
+2. **`iss` claim must match `applicationIds`**. The issuer is not
+   strictly required (omitting it passes validation), but a
+   present-but-non-matching value fails silently with a 401.
 
-Updated `device-binding.js` to include all missing fields:
-- JWK header: added `"use":"sig"` and `"alg":"RS512"`
-- Payload: added `"iss":"com.example.test"`, `"platform":"android"`,
-  `"android-version":34`
-- Self-test: updated to verify new claims
+3. **No-device signing returns 500**. AM returns HTTP 500 (not 401)
+   when `DeviceSigningVerifierNode` has no bound devices — the
+   internal key lookup throws. E2E assertions must allow for this.
 
-## Server-Side Root Cause (from AM decompilation)
-
-Decompiled `DeviceBindingNode.class` and `DeviceBindingStorageNode.class`
-from `auth-nodes-8.0.2.jar` using CFR decompiler. Found **two** issues:
-
-### Issue 1: Journey Misconfiguration (the real blocker)
-
-The journey had `DeviceBindingNode` → `DeviceBindingStorageNode` in
-sequence, but `DeviceBindingNode.postponeDeviceProfileStorage` was `false`.
-
-With `postponeDeviceProfileStorage=false`, the binding node persists
-the device directly via `deviceBindingManager.saveDeviceProfile()` and
-never sets the transient state `DEVICE`.
-
-The downstream `DeviceBindingStorageNode` then reads
-`nodeState.get(DEVICE)` → `null` → throws
-`IllegalStateException("Cannot find Device data.")` → caught by
-the generic `catch(Exception)` → `goTo(false)` → Failure node → 401.
-
-**Fix**: Set `postponeDeviceProfileStorage=true` via AM REST API.
-
-### Issue 2: `iss` Claim Validation
-
-`DeviceBinding.validateClaim()` validates `iss` against
-`config.applicationIds()` (line 100):
-```java
-.addClaimValidator(ISS, v -> v.isString() && issuers.contains(v.asString()))
-```
-`applicationIds` was `["com.example.test"]`, but our helper sent
-`"iss":"io.messagexform.e2e"`. Fixed to use matching value.
-
-Note: `setIssuerRequired(false)` means omitting `iss` passes, but
-present-but-wrong fails.
-
-### Issue 3: No-Device 500
-
-AM returns HTTP 500 (not 401) when `DeviceSigningVerifierNode` has
-no bound devices — the internal key lookup throws.
+4. **AM fails silently**. The `DeviceBindingNode` catches all
+   exceptions and routes to the Failure outcome without any
+   client-visible error detail. Enable `MESSAGE`-level debug logging
+   and check `/home/forgerock/openam/var/debug/Authentication` inside
+   the AM pod.
 
 ## E2E Results
 
@@ -267,5 +218,5 @@ scenarios:  3 | passed:  3 | failed:  0
 
 All three scenarios pass:
 1. Full binding registration + signing verification ✅
-2. Signing fails after device cleanup ✅  
+2. Signing fails after device cleanup ✅
 3. Crypto helper self-test ✅
