@@ -249,12 +249,16 @@ custom identity mapping plugin needed.
 
 ### 2.3 PingGateway Implementation
 
-PingGateway's session model is **significantly more flexible** than PingAccess
-for this use case.
+PingGateway's architecture is **significantly more flexible** than PingAccess
+for this use case.  Unlike PA's rule-based model, PingGateway uses a **filter
+chain** where each filter is a first-class component that can read/write
+sessions, make outbound HTTP calls, and produce responses.  This means the
+entire step-up flow can be implemented in Groovy — no Java plugins required.
 
-#### Session API
+#### Session Model
 
-PingGateway sessions implement `Map<String, Object>`:
+PingGateway sessions are a simple `Map<String, Object>` interface, accessed
+via `SessionContext` in the context chain:
 
 ```java
 SessionContext sessionCtx = context.asContext(SessionContext.class);
@@ -271,66 +275,366 @@ session.put("signing.context", signingCtx);
 Map<String, Object> ctx = (Map<String, Object>) session.get("signing.context");
 ```
 
-> Source: `docs/reference/pinggateway-sdk-guide.md` §3, lines 726–870
-
-#### Session Storage
+PingGateway supports two session storage mechanisms:
 
 | Feature | Stateful | Stateless (JWT) |
 |---------|----------|-----------------|
-| Storage | Server-side | Client-side cookie |
+| Storage | Server-side (PG memory) | Client-side (JWT in `Set-Cookie`) |
 | Cookie name | `IG_SESSIONID` | `openig-jwt-session` |
 | Size limit | Unlimited | 4 KB per cookie (auto-split) |
 | Data types | All | JSON-compatible only |
 | Load balancing | Sticky sessions | Any server (shared keys) |
 
+> **Both session types use `Set-Cookie`** — the browser receives and sends
+> session state automatically via cookie headers.  The "JWT" in "stateless
+> JWT session" refers to the encoding of the cookie value, not a bearer token.
+> The cookie is `HttpOnly` and `Secure` — not readable by JavaScript.
+
 For signing context, **stateless JWT sessions** are preferred — the signing
 context is small, JSON-compatible, and the JWT cookie provides tamper-proof
 integrity without server-side state.
 
-#### Groovy ScriptableFilter (PG)
+#### Step-Up Flow (PG)
 
-PingGateway Groovy scripts have **full access** to the session — this is a
-first-class API, not a workaround:
+```
+Browser                  PingGateway              PingFederate         Backend
+   │                         │                         │                  │
+   │  POST /api/payments     │                         │                  │
+   │  (existing PG session   │                         │                  │
+   │   cookie)               │                         │                  │
+   │ ──────────────────────► │                         │                  │
+   │                         │                         │                  │
+   │                    [StepUpFilter]                 │                  │
+   │                    reads session:                  │                  │
+   │                    no signing context?             │                  │
+   │                         │                         │                  │
+   │  ◄─── 401 Challenge ─── │                         │                  │
+   │  Location: /pf/authn    │                         │                  │
+   │  ?ACR=txn-signing       │                         │                  │
+   │  &state=<nonce>         │                         │                  │
+   │                         │                         │                  │
+   │  Browser follows        │                         │                  │
+   │  redirect to PF ────────────────────────────────► │                  │
+   │                         │                    [Re-authenticate]      │
+   │                         │                    (strong auth +         │
+   │                         │                     transaction context)  │
+   │  ◄──── auth code + state ───────────────────────  │                  │
+   │                         │                         │                  │
+   │  GET /signing-callback  │                         │                  │
+   │  ?code=<code>           │                         │                  │
+   │  &state=<nonce>         │                         │                  │
+   │ ──────────────────────► │                         │                  │
+   │                         │                         │                  │
+   │                    [CallbackFilter]               │                  │
+   │                    uses `http` client to call      │                  │
+   │                    PF token endpoint:              │                  │
+   │                         │ ── POST /token ───────► │                  │
+   │                         │ ◄── tokens ──────────── │                  │
+   │                    extracts signing claims         │                  │
+   │                    writes to Session:              │                  │
+   │                      session.put(                  │                  │
+   │                        "signing.context",          │                  │
+   │                        { amount, payee,            │                  │
+   │                          acr, timestamp })         │                  │
+   │                         │                         │                  │
+   │  ◄─── 302 + Set-Cookie: ──────────────────────── │                  │
+   │       (PG session cookie updated with             │                  │
+   │        signing context baked into JWT)             │                  │
+   │       Location: /api/payments                     │                  │
+   │                         │                         │                  │
+   │  POST /api/payments     │                         │                  │
+   │  (same PG session       │                         │                  │
+   │   cookie, now contains  │                         │                  │
+   │   signing context)      │                         │                  │
+   │ ──────────────────────► │                         │                  │
+   │                         │                         │                  │
+   │                    [StepUpFilter]                 │                  │
+   │                    session has signing             │                  │
+   │                    context ✓                       │                  │
+   │                    validates TTL, amount ✓         │                  │
+   │                         │                         │                  │
+   │                    [JwtBuilderFilter]             │                  │
+   │                    builds signed JWT from          │                  │
+   │                    template:                       │                  │
+   │                    { sub, roles, scopes,           │                  │
+   │                      txn: session[signing.ctx] }   │                  │
+   │                    sets X-Identity-JWT             │                  │
+   │                         │ ──────────────────────────────────────────►│
+   │                         │                         │             [Process]
+   │  ◄────────────── 200 OK ──────────────────────────────────────────── │
+```
+
+#### Groovy ScriptableFilter — How It Works
+
+PingGateway's `ScriptableFilter` executes a Groovy script as a filter in
+the request/response chain.  Understanding the execution model is important:
+
+**Bindings available to every script:**
+
+| Binding | Type | Purpose |
+|---------|------|---------|
+| `context` | `Context` | The context chain (session, OAuth2, client, etc.) |
+| `request` | `Request` | The current HTTP request |
+| `next` | `Handler` | The next filter/handler in the chain — call to forward the request |
+| `http` | `Client` | An HTTP client for making **outbound calls** (token exchange, etc.) |
+| `logger` | `Logger` | Per-filter logger instance |
+| `globals` | `ConcurrentHashMap` | Cross-invocation persistent state (see below) |
+
+**Control flow — what happens when the script returns:**
+
+- **`return next.handle(context, request)`** — forwards the request to the
+  next filter in the chain (and eventually to the backend).  The response
+  flows back through the chain in reverse order.  The browser receives the
+  backend's response.
+
+- **`return new Response(Status.UNAUTHORIZED)`** — short-circuits the chain.
+  The `next` handler is **never called** — the request does NOT reach the
+  backend.  PingGateway sends this response directly to the browser.  This
+  is how the 401 challenge works: the browser receives it and follows the
+  `Location` redirect to PingFederate.
+
+- **`return new Response(Status.FOUND)`** — same short-circuit, but with a
+  302 redirect.  The CallbackFilter uses this to redirect the browser back
+  to the original API endpoint after writing the signing context to the
+  session.
+
+**`globals` — persistent cross-invocation state:**
+
+The `globals` binding is a `ConcurrentHashMap` that persists across all
+invocations of the same script instance.  It lives for the lifetime of the
+PingGateway route — it is NOT request-scoped.  Use cases:
+
+- Caching validation keys fetched from PingFederate's JWKS endpoint
+- Tracking replay detection nonces (`jti` values)
+- Counters or rate-limiting state
 
 ```groovy
-// StepUpFilter.groovy (PingGateway ScriptableFilter)
+// Example: cache PF signing keys (fetched once, reused across requests)
+if (!globals.containsKey("pf_jwks")) {
+    def jwksResponse = http.send(new Request()
+        .setMethod("GET")
+        .setUri("https://pf.example.com/pf/JWKS")).get()
+    globals["pf_jwks"] = jwksResponse.entity.json
+}
+def jwks = globals["pf_jwks"]
+```
+
+> **Important:** `globals` is shared across concurrent requests to the same
+> filter instance.  Use `ConcurrentHashMap` operations (`.putIfAbsent()`,
+> `.computeIfAbsent()`) for thread safety.
+
+#### Custom Filters Required (PG)
+
+| Filter            | Type              | Purpose |
+|-------------------|-------------------|---------|
+| **StepUpFilter**  | Groovy ScriptableFilter | Checks session for signing context. Returns 401 with redirect if absent or expired |
+| **CallbackFilter**| Groovy ScriptableFilter | Handles the OIDC callback, uses `http` client to exchange code → tokens, writes signing context to session, redirects browser back |
+| **JwtBuilderFilter** | OOTB (config only) | Produces a signed JWT for the backend containing identity + signing context claims — **no code required** |
+
+#### StepUpFilter (Groovy)
+
+```groovy
+// StepUpFilter.groovy — validate signing context in session
 def session = context.asContext(SessionContext.class).session
 
 def signingCtx = session["signing.context"]
 if (signingCtx == null) {
-    // No signing context — return 401 challenge
-    return new Response(Status.UNAUTHORIZED)
-        .tap { headers.put("Location", "/pf/authn?ACR=txn-signing") }
+    // No signing context — short-circuit: send 401 to the browser.
+    // next.handle() is NOT called — the request never reaches the backend.
+    // The browser receives this response and follows the Location redirect.
+    def challengeUri = "https://pf.example.com/as/authorization.oauth2" +
+        "?response_type=code" +
+        "&client_id=signing-app" +
+        "&redirect_uri=https://gateway.example.com/signing-callback" +
+        "&scope=openid+txn-signing" +
+        "&acr_values=txn-signing" +
+        "&state=" + UUID.randomUUID().toString()
+
+    // Save original request URI so CallbackFilter can redirect back
+    session["signing.original_uri"] = request.uri.toASCIIString()
+
+    return new Response(Status.FOUND)
+        .tap { headers.put("Location", challengeUri) }
 }
 
-// Validate TTL
-if (System.currentTimeMillis() - (signingCtx.timestamp as long) > 300_000) {
+// Validate TTL (5 minutes)
+def timestamp = signingCtx.timestamp as long
+if (System.currentTimeMillis() - timestamp > 300_000) {
     session.remove("signing.context")
-    return new Response(Status.UNAUTHORIZED)
-        .tap { headers.put("Location", "/pf/authn?ACR=txn-signing") }
+    // Same redirect as above — expired, need re-authentication
+    return new Response(Status.FOUND)
+        .tap { headers.put("Location", challengeUri) }
 }
 
-// Forward to backend with signing context header
-request.headers.put("X-Signing-Context",
-    new groovy.json.JsonOutput().toJson(signingCtx))
+// Signing context valid — forward to the next filter in the chain.
+// JwtBuilderFilter (downstream) will pick up the signing context from
+// the session and include it in the signed JWT for the backend.
 return next.handle(context, request)
 ```
 
-PingGateway Groovy scripts also have:
-- **`http` client** — bound into scope automatically by
-  `AbstractScriptableHeapObject`, backed by `ClientHandler`.
-  Available for outbound calls (token exchange).
-- **`next` handler** — for forwarding requests.
-- **`globals`** — `ConcurrentHashMap` for cross-invocation state.
+#### CallbackFilter (Groovy)
 
-This means the **entire flow** (StepUpFilter + CallbackFilter) can be
-implemented in Groovy on PingGateway — no Java plugin required.
+```groovy
+// CallbackFilter.groovy — handle OIDC callback, write session state
+def session = context.asContext(SessionContext.class).session
 
-#### PingGateway: No Identity Mapping Limitation
+// Extract authorization code from the callback query parameters
+def code = request.uri.query?.split("&")
+    ?.collectEntries { it.split("=", 2).with { [(it[0]): it[1]] } }
+    ?.get("code")
 
-PingGateway does not have a separate "identity mapping" SPI like PingAccess.
-Headers are set directly by filters.  Any filter can read session state and
-set headers — there is no abstraction boundary to work around.
+if (!code) {
+    return new Response(Status.BAD_REQUEST)
+        .tap { entity.string = '{"error": "missing authorization code"}' }
+}
+
+// Exchange authorization code for tokens using the bound `http` client.
+// This is an OUTBOUND call from PingGateway to PingFederate's token endpoint.
+def tokenRequest = new Request()
+    .setMethod("POST")
+    .setUri("https://pf.example.com/as/token.oauth2")
+tokenRequest.headers.put("Content-Type", "application/x-www-form-urlencoded")
+tokenRequest.entity.string = "grant_type=authorization_code" +
+    "&code=${code}" +
+    "&redirect_uri=https://gateway.example.com/signing-callback" +
+    "&client_id=signing-app" +
+    "&client_secret=${globals['client_secret'] ?: 'configured-secret'}"
+
+def tokenResponse = http.send(tokenRequest).get()
+def tokens = tokenResponse.entity.json
+
+// Extract signing claims from the ID token or access token
+// (depends on PF configuration — claims could be in either)
+def idTokenClaims = parseJwtClaims(tokens.id_token)
+
+// Write signing context to the session.
+// On the NEXT request, this data will be available in the session cookie.
+session["signing.context"] = [
+    amount   : idTokenClaims.txn_amount,
+    payee    : idTokenClaims.txn_payee,
+    acr      : idTokenClaims.acr,
+    sub      : idTokenClaims.sub,
+    timestamp: System.currentTimeMillis()
+]
+
+// Redirect browser back to the original API endpoint.
+// The browser will re-send the original request, now with the session
+// cookie containing the signing context.
+def originalUri = session.remove("signing.original_uri") ?: "/api/payments"
+return new Response(Status.FOUND)
+    .tap { headers.put("Location", originalUri as String) }
+```
+
+> **Control flow:** The `return new Response(Status.FOUND)` sends a 302
+> redirect response to the browser.  `next.handle()` is never called —
+> there is nothing to forward to the backend at this point.  The browser
+> follows the redirect back to `/api/payments`, which re-enters the filter
+> chain from the top.  This time, the StepUpFilter finds the signing context
+> in the session and lets the request through to `JwtBuilderFilter` and
+> then to the backend.
+
+#### JWT Production for Backend — JwtBuilderFilter
+
+The signing context in the session needs to reach the backend as a **signed
+JWT**.  PingGateway's built-in `JwtBuilderFilter` does this through pure
+route configuration — no Groovy or Java code:
+
+```json
+{
+  "comment": "Build signed JWT with identity + signing context",
+  "type": "JwtBuilderFilter",
+  "config": {
+    "template": {
+      "sub": "${contexts.oauth2.accessToken.info.sub}",
+      "roles": "${contexts.oauth2.accessToken.info.roles}",
+      "scopes": "${contexts.oauth2.accessToken.scopes}",
+      "txn": "${session['signing.context']}",
+      "iat": "${now.epochSeconds}",
+      "jti": "${contexts.transactionId.transactionId.value}"
+    },
+    "secretsProvider": "JwtSigningKeyProvider"
+  }
+}
+```
+
+The template expression `${session['signing.context']}` reads the signing
+context directly from the session — the same data written by the
+CallbackFilter.  The `JwtBuilderFilter` produces a signed JWT and injects
+it into the context chain as `JwtBuilderContext`.  A downstream
+`HeaderFilter` sets the JWT as the `X-Identity-JWT` request header sent
+to the backend.
+
+> **Key advantage over PingAccess:** In PA, the built-in JWT identity
+> mapping cannot read `SessionStateSupport` — you'd need a custom Java
+> plugin.  In PG, `JwtBuilderFilter` reads **any** expression source
+> (session, OAuth2, request, attributes) natively.  Both Approach A and
+> Approach B produce a signed JWT for the backend without custom code.
+
+#### Complete Route Configuration
+
+The full filter chain for a protected API route:
+
+```json
+{
+  "handler": {
+    "type": "Chain",
+    "config": {
+      "filters": [
+        {
+          "type": "ScriptableFilter",
+          "config": {
+            "type": "application/x-groovy",
+            "file": "StepUpFilter.groovy"
+          }
+        },
+        {
+          "type": "JwtBuilderFilter",
+          "config": {
+            "template": {
+              "sub": "${contexts.oauth2.accessToken.info.sub}",
+              "txn": "${session['signing.context']}"
+            },
+            "secretsProvider": "JwtSigningKeyProvider"
+          }
+        },
+        {
+          "type": "HeaderFilter",
+          "config": {
+            "messageType": "REQUEST",
+            "add": {
+              "X-Identity-JWT": ["${contexts.jwtBuilder.value}"]
+            }
+          }
+        }
+      ],
+      "handler": "ReverseProxyHandler"
+    }
+  }
+}
+```
+
+The callback endpoint is a separate route:
+
+```json
+{
+  "condition": "${matches(request.uri.path, '^/signing-callback')}",
+  "handler": {
+    "type": "Chain",
+    "config": {
+      "filters": [
+        {
+          "type": "ScriptableFilter",
+          "config": {
+            "type": "application/x-groovy",
+            "file": "CallbackFilter.groovy"
+          }
+        }
+      ],
+      "handler": "ClientHandler"
+    }
+  }
+}
+```
 
 ---
 
