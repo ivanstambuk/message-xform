@@ -216,12 +216,56 @@ val registeredKeys = listOf(
 
 Updated `device-binding.js` to include all missing fields:
 - JWK header: added `"use":"sig"` and `"alg":"RS512"`
-- Payload: added `"iss":"io.messagexform.e2e"`, `"platform":"android"`,
+- Payload: added `"iss":"com.example.test"`, `"platform":"android"`,
   `"android-version":34`
 - Self-test: updated to verify new claims
 
-## Next Steps
+## Server-Side Root Cause (from AM decompilation)
 
-1. Start K8s cluster and run E2E tests with the fixed JWS format
-2. If still failing: enable AM MESSAGE-level debug to see server-side
-   validation errors
+Decompiled `DeviceBindingNode.class` and `DeviceBindingStorageNode.class`
+from `auth-nodes-8.0.2.jar` using CFR decompiler. Found **two** issues:
+
+### Issue 1: Journey Misconfiguration (the real blocker)
+
+The journey had `DeviceBindingNode` → `DeviceBindingStorageNode` in
+sequence, but `DeviceBindingNode.postponeDeviceProfileStorage` was `false`.
+
+With `postponeDeviceProfileStorage=false`, the binding node persists
+the device directly via `deviceBindingManager.saveDeviceProfile()` and
+never sets the transient state `DEVICE`.
+
+The downstream `DeviceBindingStorageNode` then reads
+`nodeState.get(DEVICE)` → `null` → throws
+`IllegalStateException("Cannot find Device data.")` → caught by
+the generic `catch(Exception)` → `goTo(false)` → Failure node → 401.
+
+**Fix**: Set `postponeDeviceProfileStorage=true` via AM REST API.
+
+### Issue 2: `iss` Claim Validation
+
+`DeviceBinding.validateClaim()` validates `iss` against
+`config.applicationIds()` (line 100):
+```java
+.addClaimValidator(ISS, v -> v.isString() && issuers.contains(v.asString()))
+```
+`applicationIds` was `["com.example.test"]`, but our helper sent
+`"iss":"io.messagexform.e2e"`. Fixed to use matching value.
+
+Note: `setIssuerRequired(false)` means omitting `iss` passes, but
+present-but-wrong fails.
+
+### Issue 3: No-Device 500
+
+AM returns HTTP 500 (not 401) when `DeviceSigningVerifierNode` has
+no bound devices — the internal key lookup throws.
+
+## E2E Results
+
+```
+scenarios:  3 | passed:  3 | failed:  0
+```
+
+All three scenarios pass:
+1. Full binding registration + signing verification ✅
+2. Signing fails after device cleanup ✅  
+3. Crypto helper self-test ✅
