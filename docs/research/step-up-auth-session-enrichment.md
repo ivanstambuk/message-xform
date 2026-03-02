@@ -1,11 +1,11 @@
 # Step-Up Authentication & Session Enrichment for Transaction Signing
 
-> Investigation date: 2026-03-02
-> Sources: PingAccess 9.0 SDK guide (`docs/reference/pingaccess-sdk-guide.md`),
-> PingGateway 2025.11 SDK guide (`docs/reference/pinggateway-sdk-guide.md`),
-> Groovy scripting research (`docs/research/pingaccess-groovy-payload-rewrite.md`),
-> PingAccess plugin API research (`docs/research/pingaccess-plugin-api.md`),
-> RFC 9470 (OAuth 2.0 Step-Up Authentication Challenge Protocol),
+> Investigation date: 2026-03-02  
+> Sources: PingAccess 9.0 SDK guide (`docs/reference/pingaccess-sdk-guide.md`),  
+> PingGateway 2025.11 SDK guide (`docs/reference/pinggateway-sdk-guide.md`),  
+> Groovy scripting research (`docs/research/pingaccess-groovy-payload-rewrite.md`),  
+> PingAccess plugin API research (`docs/research/pingaccess-plugin-api.md`),  
+> RFC 9470 (OAuth 2.0 Step-Up Authentication Challenge Protocol),  
 > RFC 9396 (OAuth 2.0 Rich Authorization Requests)
 
 ---
