@@ -305,8 +305,8 @@ Browser                  PingGateway              PingFederate         Backend
    │ ──────────────────────► │                         │                  │
    │                         │                         │                  │
    │                    [StepUpFilter]                 │                  │
-   │                    reads session:                  │                  │
-   │                    no signing context?             │                  │
+   │                    reads session:                 │                  │
+   │                    no signing context?            │                  │
    │                         │                         │                  │
    │  ◄─── 401 Challenge ─── │                         │                  │
    │  Location: /pf/authn    │                         │                  │
@@ -315,9 +315,9 @@ Browser                  PingGateway              PingFederate         Backend
    │                         │                         │                  │
    │  Browser follows        │                         │                  │
    │  redirect to PF ────────────────────────────────► │                  │
-   │                         │                    [Re-authenticate]      │
-   │                         │                    (strong auth +         │
-   │                         │                     transaction context)  │
+   │                         │                     [Re-authenticate]      │
+   │                         │                     (strong auth +         │
+   │                         │                      transaction context)  │
    │  ◄──── auth code + state ───────────────────────  │                  │
    │                         │                         │                  │
    │  GET /signing-callback  │                         │                  │
@@ -326,20 +326,20 @@ Browser                  PingGateway              PingFederate         Backend
    │ ──────────────────────► │                         │                  │
    │                         │                         │                  │
    │                    [CallbackFilter]               │                  │
-   │                    uses `http` client to call      │                  │
-   │                    PF token endpoint:              │                  │
+   │                    uses `http` client to call     │                  │
+   │                    PF token endpoint:             │                  │
    │                         │ ── POST /token ───────► │                  │
    │                         │ ◄── tokens ──────────── │                  │
-   │                    extracts signing claims         │                  │
-   │                    writes to Session:              │                  │
-   │                      session.put(                  │                  │
-   │                        "signing.context",          │                  │
-   │                        { amount, payee,            │                  │
-   │                          acr, timestamp })         │                  │
+   │                    extracts signing claims        │                  │
+   │                    writes to Session:             │                  │
+   │                      session.put(                 │                  │
+   │                        "signing.context",         │                  │
+   │                        { amount, payee,           │                  │
+   │                          acr, timestamp })        │                  │
    │                         │                         │                  │
-   │  ◄─── 302 + Set-Cookie: ──────────────────────── │                  │
+   │  ◄─── 302 + Set-Cookie: ───────────────────────── │                  │
    │       (PG session cookie updated with             │                  │
-   │        signing context baked into JWT)             │                  │
+   │        signing context baked into JWT)            │                  │
    │       Location: /api/payments                     │                  │
    │                         │                         │                  │
    │  POST /api/payments     │                         │                  │
@@ -349,16 +349,16 @@ Browser                  PingGateway              PingFederate         Backend
    │ ──────────────────────► │                         │                  │
    │                         │                         │                  │
    │                    [StepUpFilter]                 │                  │
-   │                    session has signing             │                  │
-   │                    context ✓                       │                  │
-   │                    validates TTL, amount ✓         │                  │
+   │                    session has signing            │                  │
+   │                    context ✓                      │                  │
+   │                    validates TTL, amount ✓        │                  │
    │                         │                         │                  │
    │                    [JwtBuilderFilter]             │                  │
-   │                    builds signed JWT from          │                  │
-   │                    template:                       │                  │
-   │                    { sub, roles, scopes,           │                  │
-   │                      txn: session[signing.ctx] }   │                  │
-   │                    sets X-Identity-JWT             │                  │
+   │                    builds signed JWT from         │                  │
+   │                    template:                      │                  │
+   │                    { sub, roles, scopes,          │                  │
+   │                      txn: session[signing.ctx] }  │                  │
+   │                    sets X-Identity-JWT            │                  │
    │                         │ ──────────────────────────────────────────►│
    │                         │                         │             [Process]
    │  ◄────────────── 200 OK ──────────────────────────────────────────── │
@@ -638,17 +638,32 @@ The callback endpoint is a separate route:
 
 ---
 
-## 3. Approach B — Custom Signed JWT Cookie
+## 3. Approach B — Custom Encrypted JWT Cookie (JWE)
 
 ### 3.1 Concept
 
 Completely bypass the gateway's session mechanism for the signing context.
-After step-up re-authentication via PingFederate, a short-lived **signed JWT**
-is issued and set as a **separate cookie** (not the web session cookie).
+After step-up re-authentication via PingFederate, a short-lived **encrypted
+JWT** (JWE — JSON Web Encryption) is issued and set as a **separate cookie**
+(not the web session cookie).
 
-The gateway passes this cookie through to the backend (or a gateway rule
-validates it).  The signing context lives **outside** the session entirely —
-it's a standalone, self-contained proof.
+The cookie value is a **JWE compact serialization** — the claims are encrypted
+using the gateway's own key.  The contents are **not readable** by the browser,
+by JavaScript, or by any party that does not hold the decryption key.  Only
+the gateway can decrypt and validate the token.
+
+The gateway decrypts the cookie, validates the claims (expiry, subject, `jti`),
+and forwards the signing context to the backend (as a re-signed JWT or within
+the identity-mapped JWT).  The signing context lives **outside** the session
+entirely — it's a standalone, self-contained, encrypted proof.
+
+> **Why JWE, not JWS (signed-only)?**  A signed JWT (JWS) is base64url-encoded
+> — anyone can decode and read the claims.  While `HttpOnly` + `Secure` cookie
+> flags prevent JavaScript access, the cookie value is still visible in browser
+> dev tools, proxy logs, and network captures.  JWE encrypts the payload,
+> ensuring **confidentiality** in addition to integrity.  The gateway uses its
+> own symmetric key (AES) or asymmetric key (RSA/EC) to encrypt, so only the
+> gateway can read the claims.
 
 ### 3.2 Flow
 
@@ -659,8 +674,8 @@ Browser                  Gateway (PA or PG)        PingFederate         Backend
    │  (session cookie only)  │                         │                  │
    │ ──────────────────────► │                         │                  │
    │                         │                         │                  │
-   │                    [StepUpRule/Filter]             │                  │
-   │                    No signing JWT cookie?          │                  │
+   │                    [StepUpRule/Filter]            │                  │
+   │                    No signing JWT cookie?         │                  │
    │                         │                         │                  │
    │  ◄─── 401 Challenge ─── │                         │                  │
    │  Location: /pf/authn    │                         │                  │
@@ -668,46 +683,49 @@ Browser                  Gateway (PA or PG)        PingFederate         Backend
    │  &response_type=code    │                         │                  │
    │  &scope=openid txn      │                         │                  │
    │                         │                         │                  │
-   │  ──── OIDC redirect ──────────────────────────► │                  │
-   │                         │                    [Re-authenticate]      │
-   │  ◄──── code + state ─────────────────────────── │                  │
+   │  ──── OIDC redirect ────────────────────────────► │                  │
+   │                         │                     [Re-authenticate]      │
+   │  ◄──── code + state ───────────────────────────── │                  │
    │                         │                         │                  │
    │  GET /signing-callback  │                         │                  │
    │  ?code=<code>           │                         │                  │
    │ ──────────────────────► │                         │                  │
    │                         │                         │                  │
-   │                    [CallbackRule/Filter]           │                  │
-   │                    exchange code → tokens          │                  │
-   │                    extract signing claims          │                  │
-   │                    build signing JWT:              │                  │
-   │                      { amount, payee, acr,         │                  │
-   │                        iat, exp (5 min),           │                  │
-   │                        sub, jti }                  │                  │
-   │                    sign with gateway key           │                  │
+   │                    [CallbackRule/Filter]          │                  │
+   │                    exchange code → tokens         │                  │
+   │                    extract signing claims         │                  │
+   │                    build JWE (encrypted JWT):     │                  │
+   │                      encrypt with gateway key:    │                  │
+   │                      { amount, payee, acr,        │                  │
+   │                        iat, exp (5 min),          │                  │
+   │                        sub, jti }                 │                  │
+   │                    (opaque to browser)            │                  │
    │                         │                         │                  │
-   │  ◄─── 302 + Set-Cookie: ──────────────────────── │                  │
-   │       PA_SIGNING_JWT=<jwt>; HttpOnly; Secure;     │                  │
+   │  ◄─── 302 + Set-Cookie: ───────────────────────── │                  │
+   │       PA_SIGNING_JWE=<jwe>; HttpOnly; Secure;     │                  │
    │       SameSite=Strict; Path=/api; Max-Age=300     │                  │
    │       Location: /api/payments                     │                  │
    │                         │                         │                  │
    │  POST /api/payments     │                         │                  │
    │  Cookie: PA_SUBJECT=..  │                         │                  │
-   │  Cookie: PA_SIGNING_JWT=.. │                      │                  │
+   │  Cookie: PA_SIGNING_JWE=.. │                      │                  │
    │ ──────────────────────► │                         │                  │
    │                         │                         │                  │
-   │                    [StepUpRule/Filter]             │                  │
-   │                    validates signing JWT:          │                  │
-   │                    - signature valid               │                  │
-   │                    - not expired                   │                  │
-   │                    - claims match request          │                  │
-   │                         │ ─────────────────────────────────────────►│
-   │  ◄────────────── 200 OK ──────────────────────────────────────── │
+   │                    [StepUpRule/Filter]            │                  │
+   │                    decrypts JWE with              │                  │
+   │                    gateway key, then validates:   │                  │
+   │                    - decryption successful        │                  │
+   │                    - not expired                  │                  │
+   │                    - claims match request         │                  │
+   │                         │ ──────────────────────────────────────────►│
+   │                         │                         │             [Process]
+   │  ◄────────────── 200 OK ──────────────────────────────────────────── │
 ```
 
 ### 3.3 Cookie Properties
 
 ```http
-Set-Cookie: PA_SIGNING_JWT=eyJhbGciOi...;
+Set-Cookie: PA_SIGNING_JWE=eyJhbGciOiJSU0EtT0FFUCIsImVuYyI6IkEyNTZHQ00ifQ...;
   HttpOnly;          # not readable by JavaScript
   Secure;            # HTTPS only
   SameSite=Strict;   # CSRF protection
@@ -715,13 +733,21 @@ Set-Cookie: PA_SIGNING_JWT=eyJhbGciOi...;
   Max-Age=300        # 5-minute TTL
 ```
 
-The JWT itself contains:
+The cookie value is a **JWE compact serialization** (5 dot-separated parts):
+`header.encryptedKey.iv.ciphertext.tag` — the claims are **not readable**
+without the decryption key.
+
+The JWE header and encrypted payload:
 
 ```json
+// JWE Header (readable — describes the encryption algorithm)
 {
-  "alg": "RS256",
-  "typ": "JWT"
+  "alg": "RSA-OAEP",        // key encryption algorithm
+  "enc": "A256GCM",         // content encryption algorithm
+  "kid": "gateway-signing-key-2026"
 }
+
+// Encrypted Payload (only readable after decryption by the gateway)
 {
   "sub": "user123",
   "acr": "txn-signing",
@@ -736,36 +762,60 @@ The JWT itself contains:
 }
 ```
 
+**Algorithm options:**
+
+| Key Management (`alg`) | Content Encryption (`enc`) | Key Type | Notes |
+|------------------------|---------------------------|----------|-------|
+| `RSA-OAEP` | `A256GCM` | RSA (asymmetric) | Standard for gateway-managed RSA keys |
+| `dir` | `A256GCM` | AES-256 (symmetric) | Simpler — direct encryption with shared key |
+| `A256KW` | `A256GCM` | AES-256 (symmetric) | Key wrapping — allows key rotation |
+
+For gateway-only encryption (no external party needs to decrypt),
+**`dir` + `A256GCM`** (direct symmetric encryption) is the simplest
+choice — a single AES-256 key, no key wrapping overhead.
+
 ### 3.4 PingAccess Implementation
 
-The custom rule validates the JWT cookie:
+The custom rule decrypts and validates the JWE cookie:
 
 ```java
 // In handleRequest():
-String jwtCookie = exchange.getRequest().getHeaders()
-    .getCookies().get("PA_SIGNING_JWT");
+String jweCookie = exchange.getRequest().getHeaders()
+    .getCookies().get("PA_SIGNING_JWE");
 
-if (jwtCookie == null) {
+if (jweCookie == null) {
     // Challenge: return 401 with redirect
     return challenge(exchange);
 }
 
-// Validate JWT (signature, expiry, claims)
-SigningContext ctx = jwtValidator.validate(jwtCookie);
-if (ctx == null || ctx.isExpired()) {
+// Decrypt JWE and validate claims (expiry, subject, jti)
+try {
+    SigningContext ctx = jweDecryptor.decryptAndValidate(jweCookie);
+    if (ctx.isExpired()) {
+        return challenge(exchange);
+    }
+} catch (JweDecryptionException e) {
+    // Tampered or wrong key — treat as missing
     return challenge(exchange);
 }
-
-// Inject as header for backend
-exchange.getRequest().getHeaders().add(
-    "X-Signing-Context", ctx.toJson());
 ```
 
-Setting the cookie in the callback:
+Setting the JWE cookie in the callback:
 
 ```java
-// In the callback rule:
-SetCookie signingCookie = new SetCookie("PA_SIGNING_JWT", signedJwt);
+// In the callback rule — build JWE and set as cookie:
+ObjectNode claims = objectMapper.createObjectNode();
+claims.put("sub", identity.getSubject());
+claims.put("acr", "txn-signing");
+claims.put("iat", System.currentTimeMillis() / 1000);
+claims.put("exp", System.currentTimeMillis() / 1000 + 300);
+claims.put("jti", UUID.randomUUID().toString());
+claims.set("txn", signingClaimsNode);  // { amount, payee, currency }
+
+// Encrypt as JWE (e.g., using Nimbus JOSE+JWT or Jose4j)
+String jwe = jweEncryptor.encrypt(claims);  // dir+A256GCM or RSA-OAEP+A256GCM
+
+SetCookie signingCookie = new SetCookie("PA_SIGNING_JWE", jwe);
 signingCookie.setHttpOnly(true);
 signingCookie.setSecure(true);
 signingCookie.setPath("/api");
@@ -782,28 +832,44 @@ return CompletableFuture.completedFuture(Outcome.RETURN);
 ### 3.5 PingGateway Implementation
 
 ```groovy
-// CallbackFilter.groovy — set signing JWT cookie
+// CallbackFilter.groovy — build JWE and set as cookie
+import org.forgerock.json.jose.builders.JwtBuilderFactory
+import org.forgerock.json.jose.jwe.JweAlgorithm
+import org.forgerock.json.jose.jwe.EncryptionMethod
+
 def tokenResponse = http.send(tokenRequest).get()
 def claims = extractSigningClaims(tokenResponse)
-def jwt = buildSignedJwt(claims) // Jose4j or Nimbus
 
-def cookie = new Cookie()
-cookie.name = "PG_SIGNING_JWT"
-cookie.value = jwt
-cookie.httpOnly = true
-cookie.secure = true
-cookie.path = "/api"
-cookie.maxAge = 300
+// Build encrypted JWT (JWE) using ForgeRock commons-jose (on PG classpath)
+def jwe = new JwtBuilderFactory()
+    .jwe(encryptionKey)                          // gateway's AES-256 or RSA key
+    .headers()
+        .alg(JweAlgorithm.DIRECT)                // direct key encryption
+        .enc(EncryptionMethod.A256GCM)           // AES-256-GCM content encryption
+        .done()
+    .claims(new JwtClaimsSet([
+        sub: claims.sub,
+        acr: "txn-signing",
+        txn: [amount: claims.amount, payee: claims.payee],
+        iat: System.currentTimeMillis().intdiv(1000),
+        exp: System.currentTimeMillis().intdiv(1000) + 300,
+        jti: UUID.randomUUID().toString()
+    ]))
+    .build()   // returns compact JWE: header.key.iv.ciphertext.tag
+
+def cookieValue = "PA_SIGNING_JWE=${jwe}; " +
+    "HttpOnly; Secure; SameSite=Strict; Path=/api; Max-Age=300"
 
 def redirect = new Response(Status.FOUND)
 redirect.headers.put("Location", originalUri)
-redirect.headers.add("Set-Cookie", cookie.toHeaderValue())
+redirect.headers.add("Set-Cookie", cookieValue)
 return redirect
 ```
 
-PingGateway's `JwtSessionManager` could also be used to sign the JWT with
-the gateway's own keys (symmetric or asymmetric), but a custom JWT gives more
-control over claims and TTL scoping.
+PingGateway bundles ForgeRock's `commons-jose` library (and Jose4j/Nimbus),
+so JWE encryption is available directly in Groovy ScriptableFilters without
+additional dependencies.  The encryption key can be loaded from PG's
+`SecretsProvider` or from a keystore configured in `config.json`.
 
 ---
 
@@ -813,16 +879,17 @@ control over claims and TTL scoping.
 |-----------|--------------------------|-------------------------------|
 | **Session coupling** | Enriches existing session | Independent — separate cookie |
 | **Cookie count** | +1 (session state cookie) | +1 (signing JWT cookie) |
-| **Tamper-proof** | PA-signed session state cookie | Self-signed JWT with RS256 |
+| **Tamper-proof** | PA-signed session state cookie | JWE — encrypted + integrity-protected |
+| **Confidentiality** | PA-encrypted session state cookie | JWE — claims not readable without key |
 | **TTL management** | Manual (timestamp in attributes) | JWT `exp` claim (standard) |
 | **Scope control** | Global (all apps on same PA) | Cookie `Path` scoping |
 | **One-shot semantics** | Manual `removeAttribute()` | Cookie `Max-Age` + `jti` replay check |
-| **Backend integration** | Rule injects header from session state | Rule injects header from JWT claims |
+| **Backend integration** | JwtBuilderFilter (PG) or custom IM plugin (PA) | Gateway decrypts JWE, re-signs for backend |
 | **Groovy-only (no Java)** | Partial (StepUpRule yes, CallbackRule needs HttpClient) | Same (callback needs HttpClient) |
 | **PingGateway Groovy-only** | ✅ Full (http client available in scripts) | ✅ Full |
-| **Stateless** | No (PA-managed session state) | Yes (JWT is self-contained) |
-| **Portability** | PA/PG-specific session API | JWT can be validated by any backend |
-| **Complexity** | Lower (uses built-in session infra) | Higher (JWT signing, key management) |
+| **Stateless** | No (PA-managed session state) | Yes (JWE is self-contained) |
+| **Portability** | PA/PG-specific session API | JWE can be validated by any party with key |
+| **Complexity** | Lower (uses built-in session infra) | Higher (JWE encryption, key management) |
 
 ### Recommendation
 
@@ -831,7 +898,7 @@ control over claims and TTL scoping.
   `SessionStateSupport` is already in use for other purposes.
 
 - **Approach B** is architecturally cleaner: separation of concerns between
-  "are you logged in" (session cookie) and "did you authorize this" (signing JWT).
+  "are you logged in" (session cookie) and "did you authorize this" (JWE cookie).
   Better for environments with multiple backends, microservices, or when the
   backend needs to validate the signing proof independently.
 
@@ -920,7 +987,7 @@ requires claims inside the JWT that PingAccess produces via identity mapping.
 |--------|-------------|:----------------:|:----------------:|
 | **1. Rule sets plain header** | StepUpRule adds `X-Signing-Context` header alongside the JWT identity mapping header | ⚠️ Partial — signing context is a separate header, not inside the JWT | N/A |
 | **2. Custom IdentityMappingPlugin** | New Java plugin that reads `SessionStateSupport` and produces a JWT with signing claims included | ✅ Yes | N/A |
-| **3. Custom JWT cookie (Approach B)** | Gateway issues a separate signed JWT cookie; the backend reads it directly | N/A | ✅ Yes — the JWT IS the signing proof |
+| **3. Custom JWE cookie (Approach B)** | Gateway issues a separate encrypted JWT cookie; decrypts and re-signs for the backend | N/A | ✅ Yes — the JWE IS the signing proof |
 | **4. PF token customization** | PingFederate includes signing claims in the access/ID token during step-up | ✅ Yes — built-in JWT mapping then includes them | ✅ Yes |
 
 **Analysis:**
@@ -975,10 +1042,9 @@ public class SessionStateJwtIdentityMapping
   management, and configuration UI.  Medium-to-high effort.
 
 - **Option 3 (Approach B)** avoids the identity mapping problem entirely.
-  The signing JWT is a separate cookie — the backend reads it from the
-  `Cookie` header or the gateway extracts it and forwards it as a header.
-  The backend validates it independently.  The existing identity mapping
-  (JWT or HeaderMapping) continues to work unchanged for the login session.
+  The signing context is in a separate JWE cookie — the gateway decrypts it
+  and can re-sign the claims into the backend-facing JWT.  The existing identity
+  mapping (JWT or HeaderMapping) continues to work unchanged for the login session.
 
 - **Option 4** pushes the complexity to PingFederate.  If PF can return
   transaction-scoped claims in the ID token during step-up (custom OIDC
@@ -988,13 +1054,13 @@ public class SessionStateJwtIdentityMapping
 
 #### Recommendation for JWT-Based Backends
 
-**Approach B (Custom JWT Cookie) is the preferred solution** when the backend
+**Approach B (Custom JWE Cookie) is the preferred solution** when the backend
 requires signing context in a JWT.  It avoids:
 
 - No custom identity mapping plugin
 - No PF token customization
 - No coupling between the session state and the identity mapping pipeline
-- Clean separation: login JWT (identity mapping) vs. signing JWT (custom cookie)
+- Clean separation: login JWT (identity mapping) vs. signing JWE (custom cookie)
 
 If the backend insists on a **single JWT** containing both identity and
 signing claims, Option 2 (custom `IdentityMappingPlugin`) is the only viable
@@ -1197,9 +1263,10 @@ Both approaches produce cookies that MUST be:
 
 - **Approach A**: PA/PG manages the session cookie signing keys.  No
   additional key management.
-- **Approach B**: The gateway needs a signing key for the custom JWT.
-  Options: use the PingFederate-issued token directly (no gateway signing),
-  or use a gateway-managed keypair (requires key rotation).
+- **Approach B**: The gateway needs an **encryption key** for the JWE cookie.
+  Options: AES-256 symmetric key (`dir` + `A256GCM` — simplest), or RSA/EC
+  asymmetric key (`RSA-OAEP` + `A256GCM` — allows key separation).
+  Key must be managed and rotated by the gateway.
 
 ---
 
@@ -1214,7 +1281,7 @@ Both approaches produce cookies that MUST be:
 | Groovy alternative (StepUpRule) | ✅ Possible | ✅ Possible |
 | Groovy alternative (CallbackRule) | ❌ No HttpClient | ❌ No HttpClient |
 | Identity mapping change | Custom `IdentityMappingPlugin` if JWT-based backend | None (rule sets headers) |
-| Key management | None (session state) or signing key (custom IM plugin) | Gateway signing key |
+| Key management | None (session state) or signing key (custom IM plugin) | Gateway encryption key (AES-256 or RSA) |
 | Total new plugins | 2 rules (+ 1 IM plugin if JWT backend) | 2 rules + JWT signing |
 
 ### PingGateway
@@ -1226,7 +1293,7 @@ Both approaches produce cookies that MUST be:
 | JWT for backend | `JwtBuilderFilter` (OOTB, config-only) | Custom JWT in CallbackFilter |
 | Groovy-only | ✅ Both filters | ✅ Both filters |
 | Session config | `JwtSessionManager` in `config.json` | None (custom cookie) |
-| Key management | PG `SecretsProvider` (JwtBuilderFilter) | Gateway signing key or PG keys |
+| Key management | PG `SecretsProvider` (JwtBuilderFilter) | Gateway encryption key or PG keys |
 | Total new components | 2 filters + 1 route config (no code) | 2 filters + JWT signing |
 
 ---
