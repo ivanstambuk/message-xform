@@ -698,25 +698,174 @@ path under Approach A.
 
 ### PingGateway
 
-PingGateway has no separate identity mapping SPI.  All header injection is
-done by filters.  Session attributes are directly accessible from any filter
-in the chain via `context.asContext(SessionContext.class).getSession()`.
+PingGateway does not have a separate "identity mapping" SPI like PingAccess.
+Instead, it provides **`JwtBuilderFilter`** — a built-in, OOTB filter
+specifically designed to produce signed (or encrypted) JWTs for backend
+consumption.  This is the direct equivalent of PA's JWT identity mapping,
+but significantly more powerful.
 
-A filter can produce a JWT with any combination of identity attributes and
-session state — there is no abstraction boundary between "identity" and
-"session state" that would prevent merging them into a single JWT.
+> **Organizational requirement: backends expect a signed JWT, not plain
+> headers.**  Plain headers are a fallback only — the preferred backend
+> integration pattern is a signed JWT containing identity + context claims.
+> PingGateway's `JwtBuilderFilter` satisfies this requirement natively.
 
-For JWT-based backends, a Groovy ScriptableFilter can:
+#### JwtBuilderFilter — How It Works
 
-1. Read identity from `OAuth2Context` or `SsoTokenContext`
-2. Read signing context from `Session`
-3. Merge both into a single JWT
-4. Sign with PG-managed keys (Jose4j/Nimbus on classpath)
-5. Set as a request header
+`JwtBuilderFilter` (`o.f.openig.filter.JwtBuilderFilter`) is a standard
+PingGateway filter in the request/response chain.  It:
 
-No custom Java plugin is needed.  PingGateway's flat model (everything is a
-filter, everything accesses Context) avoids the identity mapping limitation
-entirely.
+1. **Evaluates a claim template** — a JSON map where each value is a
+   PingGateway expression (`${...}`) resolved against the full context
+   chain (session, OAuth2, attributes, request, etc.).
+2. **Creates a JWT** via a `JwtFactory` SPI — the factory handles
+   algorithm selection (RS256, ES256, etc.), key resolution via
+   `SecretsProvider`, and key ID (`kid`) injection.
+3. **Injects the JWT into the context chain** as a `JwtBuilderContext` —
+   a custom context type that downstream filters can access via
+   `context.asContext(JwtBuilderContext.class).getJwt()`.
+4. **A downstream `HeaderFilter`** reads the built JWT from the context
+   and sets it as a request header (e.g., `X-Identity-JWT`).
+
+```java
+// Simplified internal flow (from PG SDK source):
+public Promise<Response, NeverThrowsException> filter(
+        Context context, Request request, Handler next) {
+    Bindings bindings = Bindings.bindings(context, request);
+    return Expressions.evaluateAsync(template, bindings)
+        .thenAsync(evaluated -> {
+            return jwtFactory.create((Map) evaluated)
+                .thenAsync(jwt -> next.handle(
+                    new JwtBuilderContext(context, jwt), request));
+        });
+}
+```
+
+#### Route Configuration Example
+
+A route that produces a signed JWT containing identity claims AND session
+state (signing context) for the backend:
+
+```json
+{
+  "handler": {
+    "type": "Chain",
+    "config": {
+      "filters": [
+        {
+          "comment": "Build signed JWT with identity + signing context",
+          "type": "JwtBuilderFilter",
+          "config": {
+            "template": {
+              "sub": "${contexts.oauth2.accessToken.info.sub}",
+              "roles": "${contexts.oauth2.accessToken.info.roles}",
+              "scopes": "${contexts.oauth2.accessToken.scopes}",
+              "clientId": "${contexts.oauth2.accessToken.info.client_id}",
+              "txn": "${session['signing.context']}",
+              "iat": "${now.epochSeconds}",
+              "jti": "${contexts.transactionId.transactionId.value}"
+            },
+            "secretsProvider": "JwtSigningKeyProvider"
+          }
+        },
+        {
+          "comment": "Inject the built JWT as a request header",
+          "type": "HeaderFilter",
+          "config": {
+            "messageType": "REQUEST",
+            "add": {
+              "X-Identity-JWT": ["${contexts.jwtBuilder.value}"]
+            }
+          }
+        }
+      ],
+      "handler": "ReverseProxyHandler"
+    }
+  }
+}
+```
+
+**Key points:**
+
+- The `template` map is the claim set.  Each value is a PG expression with
+  **full access to all context types**: `${session.*}` (session attributes),
+  `${contexts.oauth2.*}` (OAuth2 token info), `${request.*}` (request
+  properties), `${contexts.client.*}` (client connection info).
+- `${session['signing.context']}` directly reads session state — no custom
+  plugin, no Groovy, no Java code.  Pure configuration.
+- The `secretsProvider` reference points to a configured `SecretsProvider`
+  object (JWKS file, keystore, or PingFederate-managed keys) that handles
+  signing.
+- The resulting JWT is accessed downstream via the expression
+  `${contexts.jwtBuilder.value}` — which returns the compact serialized
+  JWT string (`eyJhbGciOi...`).
+
+#### What JwtBuilderFilter Can Access (Expression Sources)
+
+| Expression | Source | Example |
+|-----------|--------|--------|
+| `${session['key']}` | Session attributes (stateful or JWT cookie) | `${session['signing.context']}` |
+| `${contexts.oauth2.accessToken.info.sub}` | OAuth2 token claims | Subject from validated access token |
+| `${contexts.oauth2.accessToken.scopes}` | OAuth2 scopes | `["openid", "profile"]` |
+| `${contexts.client.remoteAddress}` | Client connection | `192.168.1.100` |
+| `${request.uri.path}` | Request URI | `/api/payments/confirm` |
+| `${contexts.transactionId.transactionId.value}` | Distributed trace ID | Correlation UUID |
+| `${contexts.ssoToken.value}` | PingAM SSO token | AM session ID |
+| `${attributes['key']}` | AttributesContext (per-request) | Custom filter output |
+
+This means `JwtBuilderFilter` can produce a JWT containing **any combination**
+of identity attributes and session state — all through configuration, no code.
+
+#### Alternative: Groovy ScriptableFilter for JWT
+
+For scenarios requiring more complex logic (conditional claims, computed
+values, multi-source merging), a Groovy ScriptableFilter can produce JWTs
+programmatically:
+
+```groovy
+import org.forgerock.json.jose.builders.JwtBuilderFactory
+import org.forgerock.json.jose.jws.JwsAlgorithm
+
+def session = context.asContext(SessionContext.class).session
+def oauth2 = context.asContext(OAuth2Context.class).accessToken
+
+def claims = [
+    sub   : oauth2.info.sub,
+    roles : oauth2.info.roles,
+    scopes: oauth2.scopes,
+]
+
+// Conditionally add signing context if present
+def signingCtx = session["signing.context"]
+if (signingCtx) {
+    claims.txn = signingCtx
+    claims.acr = "txn-signing"
+}
+
+// Build and sign JWT (Jose4j / ForgeRock commons-jose on classpath)
+def jwt = new JwtBuilderFactory()
+    .jws(signingKey)
+    .headers().alg(JwsAlgorithm.RS256).done()
+    .claims(new JwtClaimsSet(claims))
+    .build()
+
+request.headers.put("X-Identity-JWT", jwt)
+return next.handle(context, request)
+```
+
+This approach gives maximum flexibility but is typically unnecessary — the
+declarative `JwtBuilderFilter` template handles most scenarios without code.
+
+#### PingGateway: No Identity Mapping Limitation
+
+Unlike PingAccess, PingGateway has **no abstraction boundary** between
+"identity" and "session state" when producing JWTs.  The `JwtBuilderFilter`
+template can reference any context in the chain — session, OAuth2,
+request attributes — all in the same claim set.
+
+**This means Approach A (Session State Enrichment) works cleanly on
+PingGateway even for JWT-based backends**, without custom plugins.  The
+signing context written to the session by the CallbackFilter appears
+automatically in the next JWT produced by `JwtBuilderFilter`.
 
 ---
 
@@ -760,9 +909,9 @@ Both approaches produce cookies that MUST be:
 | CallbackRule | Java plugin (token exchange, write session state) | Java plugin (token exchange, sign JWT, set cookie) |
 | Groovy alternative (StepUpRule) | ✅ Possible | ✅ Possible |
 | Groovy alternative (CallbackRule) | ❌ No HttpClient | ❌ No HttpClient |
-| Identity mapping change | None (rule sets headers) | None (rule sets headers) |
-| Key management | None | Gateway signing key |
-| Total new plugins | 2 rules | 2 rules + JWT signing |
+| Identity mapping change | Custom `IdentityMappingPlugin` if JWT-based backend | None (rule sets headers) |
+| Key management | None (session state) or signing key (custom IM plugin) | Gateway signing key |
+| Total new plugins | 2 rules (+ 1 IM plugin if JWT backend) | 2 rules + JWT signing |
 
 ### PingGateway
 
@@ -770,14 +919,48 @@ Both approaches produce cookies that MUST be:
 |-----------|-----------|-----------|
 | StepUpFilter | Groovy ScriptableFilter or Java filter | Groovy ScriptableFilter or Java filter |
 | CallbackFilter | Groovy ScriptableFilter (has `http` client) | Groovy ScriptableFilter |
+| JWT for backend | `JwtBuilderFilter` (OOTB, config-only) | Custom JWT in CallbackFilter |
 | Groovy-only | ✅ Both filters | ✅ Both filters |
 | Session config | `JwtSessionManager` in `config.json` | None (custom cookie) |
-| Key management | PG session keys | Gateway signing key or PG keys |
-| Total new components | 2 filters (can be Groovy) | 2 filters + JWT signing |
+| Key management | PG `SecretsProvider` (JwtBuilderFilter) | Gateway signing key or PG keys |
+| Total new components | 2 filters + 1 route config (no code) | 2 filters + JWT signing |
 
 ---
 
-## 9. Open Questions
+## 9. JWT Production Comparison: PingAccess vs PingGateway
+
+Both gateways can produce signed JWTs for backends, but the mechanisms and
+limitations differ significantly:
+
+| Aspect | PA JWT Identity Mapping | PG `JwtBuilderFilter` |
+|--------|------------------------|----------------------|
+| **Type** | Identity mapping SPI plugin | Standard filter (OOTB) |
+| **Configuration** | Admin UI dropdown (select attributes) | JSON route config with expression templates |
+| **Claim source** | `Identity.getAttributes()` only | **Any expression**: session, OAuth2, attributes, request |
+| **Session state access** | ❌ Cannot read `SessionStateSupport` | ✅ `${session['signing.context']}` |
+| **Custom claims** | Only what's in the PF token | Arbitrary — any expression that resolves |
+| **Conditional claims** | ❌ Not supported | ✅ Via Groovy ScriptableFilter fallback |
+| **Key management** | PA-internal (not configurable) | `SecretsProvider` (JWKS, keystore, PF-managed) |
+| **Signing algorithms** | PA-determined | Configurable (RS256, ES256, etc.) |
+| **Code required** | None (built-in) / Java plugin (custom) | None (config-only) / Groovy (complex cases) |
+| **Session state in JWT** | ❌ Requires custom `IdentityMappingPlugin` | ✅ Native — `${session['key']}` in template |
+
+> **Key takeaway:** PingGateway's `JwtBuilderFilter` is strictly more powerful
+> than PingAccess's JWT identity mapping.  For JWT-based backends that need
+> signing context claims, PingGateway requires **zero custom code** (just route
+> configuration), while PingAccess requires a **custom Java plugin**.
+
+### Impact on Approach Selection
+
+| Scenario | PingAccess | PingGateway |
+|----------|-----------|-------------|
+| Backend accepts plain headers | Approach A works (rule sets headers) — fallback only | Approach A works (filter sets headers) — fallback only |
+| Backend requires signed JWT | Approach A needs custom `IdentityMappingPlugin`; **prefer Approach B** | Approach A works natively via `JwtBuilderFilter`; **both approaches viable** |
+| Backend requires single JWT (identity + signing) | Only custom `IdentityMappingPlugin` | `JwtBuilderFilter` template merges both sources |
+
+---
+
+## 10. Open Questions
 
 1. **PA session state cookie scope**: Is the session state cookie
    automatically shared across all PA applications on the same virtual host,
@@ -800,9 +983,14 @@ Both approaches produce cookies that MUST be:
    `SingleSignOnFilter` be configured for step-up flows (custom ACR, scopes),
    or does the entire OIDC flow need to be custom-scripted?
 
+6. **PG `JwtBuilderFilter` claim types**: Does the expression template
+   support nested objects (e.g., `txn.amount`, `txn.payee`) or only
+   flat string values?  The session object is `Map<String, Object>` so
+   nested maps should serialize, but this needs verification.
+
 ---
 
-## 10. References
+## 11. References
 
 | Source | Path |
 |--------|------|
@@ -816,6 +1004,8 @@ Both approaches produce cookies that MUST be:
 | PG SDK Guide — SessionContext & Session | `docs/reference/pinggateway-sdk-guide.md` §3, lines 726–870 |
 | PG SDK Guide — Session Types | `docs/reference/pinggateway-sdk-guide.md` §3, lines 827–855 |
 | PG SDK Guide — PA vs PG Session Model | `docs/reference/pinggateway-sdk-guide.md` §3, lines 884–892 |
+| PG SDK Guide — JwtBuilderFilter | `docs/reference/pinggateway-sdk-guide.md` §14, lines 3342–3378 |
+| PG SDK Guide — Filter Catalog (JwtBuilderFilter) | `docs/reference/pinggateway-sdk-guide.md` §15, line 4962 |
 | PG SDK Guide — ScriptableFilter | `docs/reference/pinggateway-sdk-guide.md` §14, lines 4348–4402 |
 | PG SDK Guide — Session Access in Expressions | `docs/reference/pinggateway-sdk-guide.md` §3, lines 873–879 |
 
