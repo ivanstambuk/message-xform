@@ -1,30 +1,30 @@
-# Current Session — PingDirectory CTS Research Complete
+# Current Session — Device Binding Phase 2 E2E Crypto Helper
 
 ## Focus
-Research analysis: PingDirectory as CTS/Config/Policy store for PingAM.
+Device Binding — Phase 2: E2E Crypto Helper for Karate E2E tests.
 
 ## Status
-✅ **Complete** — Research document written and committed.
+✅ **Complete** — `device-binding.js` helper created and committed.
 
 ## Summary of Work Done
 
-### PingDirectory CTS Compatibility Analysis ✅
-- Cross-referenced external AI feedback against our verified deployment.
-- Searched official Ping Identity docs and web sources.
-- Confirmed official stance: PingDS is the only *supported* CTS backend.
-- Debunked "different codebases" claim — shared OpenDS lineage.
-- Documented the two tweaks (schema relaxation + etag mirror VA).
-- Captured risk assessment: low risk for dev/test, medium for prod.
-- Created `docs/research/pingdirectory-cts-compatibility.md`.
-- Updated `llms.txt` and `knowledge-map.md`.
+### Phase 2: E2E Crypto Helper ✅
+- Created `device-binding.js` with pure JDK crypto (RSA 2048 + RS512 JWS signing).
+- Implements `generateKeyPair()` → `{ publicKey, privateKey, kid }` (UUID-based KID).
+- Implements `buildJws(challenge, userId, privateKey, kid)` → compact JWS string.
+- Implements `parseBindingCallback(callbacks)` → extracts challenge, userId, username, authenticationType.
+- Implements `parseSigningCallback(callbacks)` → extracts challenge, userId from DeviceSigningVerifierCallback.
+- High-level API: `bind(callbacks)` (one-shot bind), `sign(callbacks, privateKey, kid)` (one-shot sign).
+- Built-in `selfTest()` verifying JWS structure + RS512 signature correctness.
+- Created `list-bound-devices.feature` and `delete-bound-device.feature` helper features.
+- Updated `DEVICE-BINDING-PLAN.md` with Phase 2 completion status.
 
 ## Key Learnings
-- PingDirectory and PingDS share OpenDS heritage — not separate codebases.
-- Official Ping FAQ explicitly says PingDS-only for CTS (Article #000035133).
-- Our deployment works because LDAP protocol compatibility is high enough.
-- The two tweaks (structural OC relaxation + etag VA) are documented PD features.
+- JWS payload for ForgeRock device binding: `{sub, challenge, exp, iat, nbf}` — matches SDK v4.2+.
+- JWS header: `{"alg":"RS512","kid":"<UUID>"}` — kid doubles as deviceId in callback input.
+- AM callback input field names are positional (`IDToken1jws`, `IDToken2jws`, etc.) — parser
+  finds them by suffix match rather than hardcoded names.
 
 ## Handover
-Session was a single research task. No carry-over work.
-Previous pending task (Device Binding Phase 2 — E2E Crypto Helper) remains
-the next implementation item. See `.agent/session/pending-task.md`.
+Phase 3 (E2E Feature Tests) is next: create `device-binding.feature` with scenarios for
+binding, signing verification, and cleanup-then-failure. See `.agent/session/pending-task.md`.

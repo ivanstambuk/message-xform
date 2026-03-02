@@ -1,8 +1,8 @@
 # Device Binding Implementation Plan
 
-> **Status**: 🟡 In Progress — Phase 1 Complete
+> **Status**: 🟡 In Progress — Phase 2 Complete
 > **Created**: 2026-02-17
-> **Last Updated**: 2026-02-17 22:10
+> **Last Updated**: 2026-03-02
 
 ## Overview
 
@@ -51,12 +51,12 @@ Build a headless JWS signer using pure JDK crypto (same pattern as `webauthn.js`
 
 | # | Step | Status |
 |---|------|--------|
-| 2.1 | Create `device-binding.js` helper with RSA key generation | ⬜ |
-| 2.2 | Implement JWS builder (RS512 signing) | ⬜ |
-| 2.3 | Implement `DeviceBindingCallback` parser | ⬜ |
-| 2.4 | Implement `DeviceSigningVerifierCallback` parser | ⬜ |
-| 2.5 | Implement device cleanup via REST API (`DELETE /devices/2fa/binding/{id}`) | ⬜ |
-| 2.6 | Unit-test the helper in isolation | ⬜ |
+| 2.1 | Create `device-binding.js` helper with RSA key generation | ✅ |
+| 2.2 | Implement JWS builder (RS512 signing) | ✅ |
+| 2.3 | Implement `DeviceBindingCallback` parser | ✅ |
+| 2.4 | Implement `DeviceSigningVerifierCallback` parser | ✅ |
+| 2.5 | Implement device cleanup via REST API (`DELETE /devices/2fa/binding/{id}`) | ✅ |
+| 2.6 | Self-test (built-in `selfTest()` — verifies JWS gen + RS512 sig) | ✅ |
 
 **Key functions:**
 - `generateKeyPair()` → `{ publicKey, privateKey, kid }`

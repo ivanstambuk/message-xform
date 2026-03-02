@@ -1,21 +1,26 @@
 # Pending Task
 
-**Focus**: Device Binding — Phase 2: E2E Crypto Helper
-**Status**: Phase 1 complete, Phase 2 not started
-**Next Step**: Create `device-binding.js` helper with RSA key generation and JWS signing
+**Focus**: Device Binding — Phase 3: E2E Feature Tests
+**Status**: Phase 2 complete, Phase 3 not started
+**Next Step**: Create `device-binding.feature` with binding + signing + cleanup scenarios
 
 ## Context Notes
-- `DeviceBindingCallback` verified on K8s — returns challenge, userId, authenticationType=NONE
-- Helper pattern should follow existing `webauthn.js` approach
-- Key functions needed:
-  - `generateKeyPair()` → `{ publicKey, privateKey, kid }`
-  - `buildBindingJws(challenge, userId, privateKey)` → JWS string (RS512)
-  - `parseBindingCallback(callbacks)` → `{ challenge, userId, authenticationType }`
-  - `parseSigningCallback(callbacks)` → `{ challenge, userId }`
-  - `cleanupBoundDevices(amUrl, username, sessionToken)` → void
-- AM expects response: `IDToken1jws` (signed JWT), `IDToken1deviceName`, `IDToken1deviceId`
-- K8s cluster is running, port-forward needed: `kubectl port-forward -n message-xform svc/pingam 28080:8080`
-- boundDevices LDIF already applied to PD, DeviceBindingService already enabled
+- `device-binding.js` helper created with full crypto support (Phase 2 ✅)
+- Helper provides: `bind()`, `sign()`, `parseBindingCallback()`, `parseSigningCallback()`, `selfTest()`
+- RS512 JWS with `{sub, challenge, exp, iat, nbf}` payload — matches ForgeRock SDK format
+- Supporting Karate features: `list-bound-devices.feature`, `delete-bound-device.feature`
+- K8s cluster is running, DeviceBindingCallback verified
+- Journey params needed in karate-config.js:
+  - `deviceBindingJourneyParams: 'authIndexType=service&authIndexValue=DeviceBindingJourney'`
+  - `deviceSigningJourneyParams: 'authIndexType=service&authIndexValue=DeviceSigningJourney'`
+- Use dedicated test user (e.g., `user.6`) to avoid conflicts with passkey tests
+
+## Phase 3 Steps
+- 3.1: Create `device-binding.feature` with `@setup` provisioning
+- 3.2: Scenario — Bind device with NONE auth type
+- 3.3: Scenario — Verify signature from bound device
+- 3.4: Scenario — Verify fails after device cleanup
+- 3.5: Run full suite and verify pass
 
 ## SDD Gaps
 - None — this work is infrastructure/deployment, not a core engine feature
